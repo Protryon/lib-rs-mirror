@@ -1,0 +1,86 @@
+use std::collections::BTreeMap;
+use std::collections::HashMap;
+use chrono::Duration;
+use chrono::prelude::*;
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CrateDownloadsFile {
+    pub version_downloads: Vec<CrateVersionDailyDownload>,
+    pub meta: CrateDownloadsExtra,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CrateDownloadsExtra {
+    #[serde(default)]
+    pub extra_downloads: Vec<CrateExtraDailyDownload>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CrateVersionDailyDownload {
+    id: usize,
+    pub version: usize,
+    pub downloads: usize,
+    pub date: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CrateExtraDailyDownload {
+    pub downloads: usize,
+    pub date: String,
+}
+
+
+#[derive(Debug)]
+pub struct DownloadWeek {
+    pub date: Date<Utc>,
+    pub total: usize,
+    pub downloads: Vec<(Option<usize>, usize)>,
+}
+
+impl CrateDownloadsFile {
+    pub fn weekly_downloads(&self) -> Vec<DownloadWeek> {
+        let ver_dl = &self.version_downloads;
+        let other_dl = &self.meta.extra_downloads;
+
+        let latest_date = parse_date(match (ver_dl.iter().map(|d| &d.date).max(), other_dl.iter().map(|d| &d.date).max()) {
+            (Some(a), Some(b)) => a.max(b),
+            (a, b) => if let Some(any) = a.or(b) {any} else {return vec![]},
+        });
+
+        let mut by_week = BTreeMap::<i64, HashMap<Option<usize>, usize>>::new();
+        for ver_day in ver_dl {
+            let date = parse_date(&ver_day.date);
+            let weeksago = -(latest_date - date).num_weeks(); // negate to sort by oldest first
+            *by_week.entry(weeksago).or_insert(HashMap::new())
+                .entry(Some(ver_day.version)).or_insert(0)
+                 += ver_day.downloads;
+        }
+
+        for day in other_dl {
+            let date = parse_date(&day.date);
+            let weeksago = -(latest_date - date).num_weeks(); // negate to sort by oldest first
+            *by_week.entry(weeksago).or_insert(HashMap::new())
+                .entry(None)
+                .or_insert(0)
+                += day.downloads;
+        }
+
+        // Btreemap guarantees sorted order
+        by_week.into_iter().map(|(weeksago, downloads)| {
+            let date = latest_date - Duration::weeks(-weeksago);
+            DownloadWeek {
+                date,
+                total: downloads.values().sum(),
+                downloads: downloads.into_iter().collect(),
+            }
+        }).collect()
+    }
+}
+
+
+fn parse_date(date: &str) -> Date<Utc> {
+    let y = date[0..4].parse().expect("dl date parse");
+    let m = date[5..7].parse().expect("dl date parse");
+    let d = date[8..10].parse().expect("dl date parse");
+    Utc.ymd(y,m,d)
+}

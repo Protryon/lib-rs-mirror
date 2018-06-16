@@ -1,0 +1,20 @@
+[package]
+name = "github_info"
+version = "0.2.0"
+authors = ["Kornel <kornel@geekhood.net>"]
+
+[lib]
+name = "github_info"
+path = "src/lib_github.rs"
+
+[dependencies]
+repo_url = { git = "https://gitlab.com/crates.rs/repo_url.git" }
+serde = "1.0.53"
+serde_derive = "1.0.53"
+serde_json = "1.0.17"
+failure = "0.1.1"
+file = "1.1.2"
+urlencoding = "1.0.0"
+
+[dependencies.github-rs]
+version = "0.6.1"

@@ -1,0 +1,667 @@
+# This is where the categories available on crates.io are defined. To propose
+# a change to the categories, send a pull request with your change made to this
+# file.
+#
+# For help with TOML, see: https://github.com/toml-lang/toml
+#
+# Format:
+#
+# ```toml
+# [slug]
+# name = "Display name"
+# description = "Give an idea of the crates that belong in this category."
+#
+#  [slug.categories.subcategory-slug]
+#  name = "Subcategory display name, not including parent category display name"
+#  description = "Give an idea of the crates that belong in this subcategory."
+# ```
+#
+# Notes:
+# - Slugs are the primary identifier. If you make a change to a category's slug,
+#   crates that have been published with that slug will need to be updated to
+#   use the new slug in order to stay in that category. If you only change
+#   names and descriptions, those attributes CAN be updated without affecting
+#   crates in that category.
+# - Slugs are used in the path of URLs, so they should not contain spaces, `/`,
+#   `@`, `:`, or `.`. They should be all lowercase.
+#
+
+[algorithms]
+name = "Algorithms"
+title = "algorithm in Rust"
+description = """
+Rust implementations of core algorithms such as hashing, sorting, \
+searching, and more.\
+"""
+short-description = """
+Core algorithms such as hashing, sorting and searching.
+"""
+
+[api-bindings]
+name = "API bindings"
+title = "Rust API bindings"
+description = """
+Idiomatic wrappers of specific APIs for convenient access from \
+Rust. Includes HTTP API wrappers as well. Non-idiomatic or unsafe \
+bindings can be found in External FFI bindings.\
+"""
+short-description = """
+Idiomatic wrappers of C library APIs for convenient access from Rust."""
+
+[asynchronous]
+name = "Asynchronous"
+title = "async Rust library"
+description = """
+Crates to help you deal with events independently of the main program \
+flow, using techniques like futures, promises, waiting, or eventing.\
+"""
+short-description = """
+Async program flow using techniques like futures, promises, waiting, or eventing."""
+
+[authentication]
+name = "Authentication"
+title = "Rust authentication library"
+description = """
+Crates to help with the process of confirming identities.\
+"""
+short-description = """
+Help with the process of confirming identities."""
+
+[caching]
+name = "Caching"
+title = "Rust caching library"
+description = """
+Crates to store the results of previous computations in order to reuse \
+the results.\
+"""
+short-description = """
+Store the results of previous computations."""
+
+[command-line-interface]
+name = "Command-line interface"
+title = "command-line interface for Rust"
+description = """
+Crates to help create command line interfaces, such as argument \
+parsers, line-editing, or output coloring and formatting.\
+"""
+short-description = """
+Argument parsers, line-editing, or output coloring and formatting."""
+
+[command-line-utilities]
+name = "Command line utilities"
+title = "Rust command line utility"
+description = """
+Applications to run at the command line.\
+"""
+short-description = """
+Applications to run at the command line."""
+
+[compression]
+name = "Compression"
+title = "Rust compression library"
+description = """
+Algorithms for making data smaller.\
+"""
+short-description = """
+Algorithms for making data smaller."""
+
+[config]
+name = "Configuration"
+title = "Rust configuration library"
+description = """
+Crates to facilitate configuration management for applications.\
+"""
+short-description = """
+Configuration management for applications."""
+
+[concurrency]
+name = "Concurrency"
+title = "Rust library for concurrency"
+description = """
+Crates for implementing concurrent and parallel computation.\
+"""
+short-description = """
+Implementing concurrent and parallel computation."""
+
+[cryptography]
+name = "Cryptography"
+title = "Rust cryptography library"
+description = """
+Algorithms intended for securing data.\
+"""
+short-description = """
+Algorithms intended for securing data."""
+
+[database]
+name = "Database interfaces"
+title = "database interface for Rust"
+description = """
+Crates to interface with database management systems.\
+"""
+short-description = """
+Interface with database management systems."""
+
+[database-implementations]
+name = "Database implementations"
+title = "Rust database implementation"
+description = """
+Databases allow clients to store and query large amounts of data in an \
+efficient manner. This category is for database management systems \
+implemented in Rust.\
+"""
+short-description = """
+Database management systems implemented in Rust."""
+
+[data-structures]
+name = "Data structures"
+title = "data structures in Rust"
+description = """
+Rust implementations of particular ways of organizing data suited for \
+specific purposes.\
+"""
+short-description = """
+Rust implementations of data structures for specific purposes."""
+
+[date-and-time]
+name = "Date and time"
+title = "Rust date and time library"
+description = """
+Crates to manage the inherent complexity of dealing with the fourth \
+dimension.\
+"""
+short-description = """
+Dealing with the fourth dimension."""
+
+[development-tools]
+name = "Development tools"
+title = "Rust development tool"
+description = """
+Crates that provide developer-facing features such as testing, debugging, \
+linting, performance profiling, autocompletion, formatting, and more.\
+"""
+short-description = """
+Testing, debugging, linting, performance profiling, autocompletion, formatting, and more."""
+
+[development-tools.categories.build-utils]
+name = "Build Utils"
+title = "Rust build utility"
+description = """
+Utilities for build scripts and other build time steps.\
+"""
+short-description = """
+Utilities for build scripts and other build time steps."""
+
+[development-tools.categories.cargo-plugins]
+name = "Cargo plugins"
+title = "Cargo plug-in"
+description = """
+Subcommands that extend the capabilities of Cargo.\
+"""
+short-description = """
+Subcommands that extend the capabilities of Cargo."""
+
+[development-tools.categories.debugging]
+name = "Debugging"
+title = "library for debugging in Rust"
+description = """
+Crates to help you figure out what is going on with your code such as \
+logging, tracing, or assertions.\
+"""
+short-description = """
+Figure out what is going on with your code via logging, tracing, or assertions."""
+
+[development-tools.categories.ffi]
+name = "FFI"
+title = "C interface for Rust"
+description = """
+Crates to help you better interface with other languages. This \
+includes binding generators and helpful language constructs.\
+"""
+short-description = """
+Interface with other languages. Includes binding generators and helpful language constructs."""
+
+[development-tools.categories.procedural-macro-helpers]
+name = "Procedural macro helpers"
+title = "Rust procedural macro helper"
+description = """
+Crates to help you write procedural macros in Rust.
+"""
+short-description = """
+Extend Rust language with procedural macros.
+"""
+
+[development-tools.categories.profiling]
+name = "Profiling"
+title = "profiling in Rust"
+description = """
+Crates to help you figure out the performance of your code.\
+"""
+short-description = """
+Figure out the performance of your code."""
+
+[development-tools.categories.testing]
+name = "Testing"
+title = "Rust testing library"
+description = """
+Crates to help you verify the correctness of your code.\
+"""
+short-description = """
+Verify the correctness of your code."""
+
+[email]
+name = "Email"
+title = "Rust email library"
+description = """
+Crates to help with Sending, receiving, formatting, and parsing email.\
+"""
+short-description = """
+Sending, receiving, formatting, and parsing email."""
+
+[embedded]
+name = "Embedded development"
+title = "embedded development in Rust"
+description = """
+Crates that are primarily useful on embedded devices or \
+without an operating system.
+"""
+short-description = """
+For embedded devices or devices without an operating system.
+"""
+
+[emulators]
+name = "Emulators"
+title = "emulator in Rust"
+description = """
+Emulators allow one computer to behave like another, often to allow \
+running software that is not natively available on the host \
+computer. Video game systems are commonly emulated.\
+"""
+short-description = """
+Run software or games not available natively on the host computer."""
+
+[encoding]
+name = "Encoding"
+title = "Rust data encoding library"
+description = """
+Encoding and/or decoding data from one data format to another.\
+"""
+short-description = """
+Encoding and/or decoding data from one data format to another."""
+
+[external-ffi-bindings]
+name = "External FFI bindings"
+title = "Rust bindings for external library"
+description = """
+Direct Rust FFI bindings to libraries written in other languages; \
+often denoted by a -sys suffix. Safe and idiomatic wrappers are in \
+the API bindings category.
+"""
+short-description = """
+Direct Rust FFI bindings to libraries written in other languages
+"""
+
+[filesystem]
+name = "Filesystem"
+title = "Rust filesystem library"
+description = """
+Crates for dealing with files and filesystems.\
+"""
+short-description = """
+Crates for dealing with files and filesystems."""
+
+[game-engines]
+name = "Game engines"
+title = "Rust game engine"
+description = """
+Crates for creating games.\
+"""
+short-description = """
+Crates for creating games."""
+
+[games]
+name = "Games"
+title = "game in Rust"
+description = """
+Applications for fun and entertainment. If Rust the video game were \
+implemented in Rust the programming language, it would belong in this \
+category. Libraries to help create video games are in the \
+Game engines category.\
+"""
+short-description = """
+Fun and entertainment. Games implemented in the Rust programming language."""
+
+[gui]
+name = "GUI"
+title = "Rust GUI library"
+description = """
+Crates to help you create a graphical user interface.\
+"""
+short-description = """
+Create a graphical user interface."""
+
+[hardware-support]
+name = "Hardware support"
+title = "Rust hardware support library"
+description = """
+Crates to interface with specific CPU or other hardware features.\
+"""
+short-description = """
+Interface with specific CPU or other hardware features."""
+
+[internationalization]
+name = "Internationalization (i18n)"
+title = "Rust i18n library"
+description = """
+Crates to help develop software capable of adapting to various \
+languages and regions.\
+"""
+short-description = """
+Develop software capable of adapting to various languages and regions."""
+
+[localization]
+name = "Localization (L10n)"
+title = "Rust localization library"
+description = """
+Crates to help adapting internationalized software to specific \
+languages and regions.\
+"""
+short-description = """
+Internationalizing software to specific languages and regions."""
+
+[memory-management]
+name = "Memory management"
+title = "Rust memory management library"
+description = """
+Crates to help with allocation, memory mapping, garbage collection, \
+reference counting, or interfaces to foreign memory managers.\
+"""
+short-description = """
+Allocation, memory mapping, garbage collection, reference counting, or interfaces to foreign memory managers."""
+
+[multimedia]
+name = "Multimedia"
+title = "multimedia in Rust"
+description = """
+Crates that provide audio, video, and image processing or rendering \
+engines.\
+"""
+short-description = """
+Audio, video, and image processing or rendering engines."""
+
+[multimedia.categories.audio]
+name = "Audio"
+title = "Rust audio library"
+description = """
+Crates that record, output, or process audio.
+"""
+short-description = """
+Record, output, or process audio.
+"""
+
+[multimedia.categories.video]
+name = "Video"
+title = "Rust video library"
+description = """
+Crates that record, output, or process video.
+"""
+short-description = """
+Record, output, or process video.
+"""
+
+[multimedia.categories.images]
+name = "Images"
+title = "Rust image library"
+description = """
+Crates that process or build images.
+"""
+short-description = """
+Process or build images.
+"""
+
+[multimedia.categories.encoding]
+name = "Encoding"
+title = "Rust media encoding library"
+description = """
+Crates that encode or decode binary data in multimedia formats.
+"""
+short-description = """
+Encode or decode binary data in multimedia formats.
+"""
+
+[network-programming]
+name = "Network programming"
+title = "Rust network programming library"
+description = """
+Crates dealing with higher-level network protocols such as FTP, HTTP, \
+or SSH, or lower-level network protocols such as TCP or UDP.\
+"""
+short-description = """
+Network protocols such as FTP, HTTP, or SSH, or lower-level TCP or UDP."""
+
+[no-std]
+name = "No standard library"
+title = "bare metal library for Rust"
+description = """
+Crates that are able to function without the Rust standard library.
+"""
+short-description = """
+Libraries that function without the Rust standard library.
+"""
+
+[os]
+name = "Operating systems"
+title = "Rust system-specific library"
+description = """
+Bindings to operating system-specific APIs.\
+"""
+short-description = """
+Bindings to operating system-specific APIs."""
+
+[os.categories.macos-apis]
+name = "mac OS APIs"
+title = "Rust API for macOS"
+description = """
+Bindings to macOS-specific APIs.\
+"""
+short-description = """
+Bindings to macOS-specific APIs."""
+
+[os.categories.unix-apis]
+name = "Unix APIs"
+title = "Rust API for Unix"
+description = """
+Bindings to Unix-specific APIs.\
+"""
+short-description = """
+Bindings to Unix-specific APIs."""
+
+[os.categories.windows-apis]
+name = "Windows APIs"
+title = "Rust API Windows"
+description = """
+Bindings to Windows-specific APIs.\
+"""
+short-description = """
+Bindings to Windows-specific APIs."""
+
+[parser-implementations]
+name = "Parser implementations"
+title = "Rust parser"
+description = """
+Parsers implemented for particular formats or languages.\
+"""
+short-description = """
+Parsers for particular formats or languages."""
+
+[parsing]
+name = "Parsing"
+title = "Rust parsing library"
+description = """
+Crates to help create parsers of binary and text \
+formats. Format-specific parsers belong in other, more specific \
+categories.\
+"""
+short-description = """
+Create parsers of binary and text formats."""
+
+[rendering]
+name = "Rendering"
+title = "graphics rendering in Rust"
+description = """
+Real-time or offline rendering of 2D or 3D graphics, \
+usually with the help of a graphics card.\
+"""
+short-description = """
+Real-time or offline rendering of 2D or 3D graphics, usually on a GPU."""
+
+[rendering.categories.engine]
+name = "Rendering engine"
+title = "Rust rendering engine"
+description = """
+High-level solutions for rendering on the screen.\
+"""
+short-description = """
+High-level solutions for rendering on the screen."""
+
+[rendering.categories.graphics-api]
+name = "Graphics APIs"
+title = "Rust graphics library"
+description = """
+Crates that provide direct access to the hardware's or the operating \
+system's rendering capabilities.\
+"""
+short-description = """
+Direct access to the hardware's or the operating system's rendering capabilities."""
+
+[rendering.categories.data-formats]
+name = "Data formats"
+title = "data format for Rust"
+description = """
+Loading and parsing of data formats related to 2D or 3D rendering, like \
+3D models or animation sheets.\
+"""
+short-description = """
+Loading and parsing of data for 2D/3D rendering, like 3D models or animations."""
+
+[rust-patterns]
+name = "Rust patterns"
+title = "Rust language library"
+description = """
+Shared solutions for particular situations specific to programming in \
+Rust.\
+"""
+short-description = """
+Shared solutions for particular situations specific to programming in Rust."""
+
+[science]
+name = "Science"
+title = "Rust scientific library"
+description = """
+Crates related to solving problems involving math, physics, chemistry, \
+biology, machine learning, geoscience, and other scientific fields.\
+"""
+short-description = """
+Solving problems involving math, physics, and other scientific fields."""
+
+[simulation]
+name = "Simulation"
+title = "Rust simulation library"
+description = """
+Crates used to model or construct models for some activity, e.g. to \
+simulate a networking protocol.\
+"""
+short-description = """
+Model or construct models for some activity, e.g. to simulate a networking protocol."""
+
+[template-engine]
+name = "Template engine"
+title = "Rust template engine"
+description = """
+Crates designed to combine templates with data to produce result \
+documents, usually with an emphasis on processing text.\
+"""
+short-description = """
+Combine templates with data to produce documents, usually with an emphasis on processing text."""
+
+[text-editors]
+name = "Text editors"
+title = "Rust text editor"
+description = """
+Applications for editing text.\
+"""
+short-description = """
+Applications for editing text."""
+
+[text-processing]
+name = "Text processing"
+title = "Rust text processing library"
+description = """
+Crates to deal with the complexities of human language when expressed \
+in textual form.\
+"""
+short-description = """
+Deal with the complexities of human language when expressed in textual form."""
+
+[value-formatting]
+name = "Value formatting"
+title = "Rust value formatting library"
+description = """
+Crates to allow an application to format values for display to a user, \
+potentially adapting the display to various languages and regions.\
+"""
+short-description = """
+Format values for display to a user, potentially adapting the display to various languages and regions."""
+
+[visualization]
+name = "Visualization"
+title = "Rust visualization library"
+description = """
+Ways to view data, such as plotting or graphing.\
+"""
+short-description = """
+Ways to view data, such as plotting or graphing."""
+
+[wasm]
+name = "WebAssembly"
+title = "WebAssembly in Rust"
+description = """
+Crates for use when targeting WebAssembly, or for manipulating WebAssembly.\
+"""
+short-description = """
+Targeting or manipulating WebAssembly."""
+
+[web-programming]
+name = "Web programming"
+title = "Rust web dev library"
+description = """
+Crates to create applications for the web.\
+"""
+short-description = """
+Create applications for the Web."""
+
+[web-programming.categories.http-client]
+name = "HTTP client"
+title = "Rust HTTP client"
+description = """
+Crates to make HTTP network requests.\
+"""
+short-description = """
+Make HTTP network requests."""
+
+[web-programming.categories.http-server]
+name = "HTTP server"
+title = "Rust HTTP server"
+description = """
+Crates to serve data over HTTP.\
+"""
+short-description = """
+Serve data over HTTP."""
+
+[web-programming.categories.websocket]
+name = "WebSocket"
+title = "WebSocket library in Rust"
+description = """
+Crates to communicate over the WebSocket protocol.\
+"""
+short-description = """
+Communicate over the WebSocket protocol."""

@@ -1,0 +1,120 @@
+extern crate toml;
+extern crate serde;
+#[macro_use] extern crate serde_derive;
+#[macro_use] extern crate lazy_static;
+#[macro_use] extern crate quick_error;
+
+use toml::value::{Value, Table};
+use std::collections::BTreeMap;
+
+const CATEGORIES_TOML: &[u8] = include_bytes!("categories.toml");
+
+#[derive(Debug, Clone)]
+pub struct Categories {
+    pub root: CategoryMap,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Category {
+    pub name: String,
+    pub description: String,
+    #[serde(rename="short-description")]
+    pub short_description: String,
+    pub title: String,
+    pub slug: String,
+    pub sub: CategoryMap,
+}
+
+pub type CategoryMap = BTreeMap<String, Category>;
+pub type CResult<T> = Result<T, CatError>;
+
+quick_error! {
+    #[derive(Debug, Clone)]
+    pub enum CatError {
+        MissingField {}
+        Parse(err: toml::de::Error) {
+            display("Categories parse error: {}", err)
+            from()
+        }
+    }
+}
+
+
+lazy_static!{
+    pub static ref CATEGORIES: Categories = {
+        Categories::new().expect("built-in categories")
+    };
+}
+
+impl Categories {
+    fn new() -> CResult<Self> {
+        Ok(Self {
+            root: Self::categories_from_table("", toml::from_slice(CATEGORIES_TOML)?)?
+        })
+    }
+
+    pub fn from_slug<S: AsRef<str>>(&self, slug: S) -> impl Iterator<Item = &Category> {
+        let mut out = Vec::new();
+        let mut cats = &self.root;
+        for name in slug.as_ref().split("::") {
+            match cats.get(name) {
+                Some(cat) => {
+                    cats = &cat.sub;
+                    out.push(cat);
+                },
+                None => break,
+            }
+        }
+        out.into_iter()
+    }
+
+    fn categories_from_table(full_slug_start: &str, toml: Table) -> CResult<CategoryMap> {
+        toml.into_iter().map(|(slug, details)| {
+            let mut details: Table = details.try_into()?;
+            let name = details.remove("name").ok_or(CatError::MissingField)?.try_into()?;
+            let description = details.remove("description").ok_or(CatError::MissingField)?.try_into()?;
+            let short_description = details.remove("short-description").ok_or(CatError::MissingField)?.try_into()?;
+            let title = details.remove("title").ok_or(CatError::MissingField)?.try_into()?;
+
+            let mut full_slug = String::with_capacity(full_slug_start.len()+2+slug.len());
+            if full_slug_start != "" {
+                full_slug.push_str(full_slug_start);
+                full_slug.push_str("::");
+            }
+            full_slug.push_str(&slug);
+
+            let sub = if let Some(Value::Table(table)) = details.remove("categories") {
+                Self::categories_from_table(&full_slug, table)?
+            } else {
+                CategoryMap::new()
+            };
+            Ok((slug, Category {
+                name,
+                title,
+                short_description,
+                description,
+                slug: full_slug,
+                sub,
+            }))
+        }).collect()
+    }
+}
+
+impl Category {
+    pub fn singular_name(&self) -> &str {
+        if self.name.ends_with("s") && self.name != "Asynchronous" {
+            &self.name[..self.name.len()-1]
+        } else {
+            &self.name
+        }
+    }
+}
+
+#[test]
+fn cat() {
+    Categories::new().expect("categories")
+        .root
+        .get("parsing").expect("parsing");
+
+    CATEGORIES.root.get("development-tools").expect("development-tools").sub.get("build-utils").expect("build-utils");
+}

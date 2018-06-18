@@ -1,0 +1,35 @@
+[package]
+name = "kitchen_sink"
+version = "0.2.0"
+authors = ["Kornel <kornel@geekhood.net>"]
+publish = false
+
+[lib]
+name = "kitchen_sink"
+path = "src/lib_kitchen_sink.rs"
+
+[dependencies]
+crates-index = "0.12.0"
+crates_io_client = { git = "https://gitlab.com/crates.rs/crates_io_client.git" }
+docs_rs_client = { git = "https://gitlab.com/crates.rs/docs_rs_client.git" }
+github_info = { git = "https://gitlab.com/crates.rs/github_info.git" }
+crate_files = { git = "https://gitlab.com/crates.rs/crate_files.git" }
+user_db = { git = "https://gitlab.com/crates.rs/user_db.git" }
+crate_db = { git = "https://gitlab.com/crates.rs/crate_db.git" }
+categories = { git = "https://gitlab.com/crates.rs/categories.git" }
+rich_crate = { git = "https://gitlab.com/crates.rs/rich_crate.git" }
+lazyonce = "0.2.0"
+repo_url = { git = "https://gitlab.com/crates.rs/repo_url.git" }
+cargo_toml = "0.3.0"
+serde = "1.0.43"
+serde_derive = "1.0.43"
+serde_json = "1.0.16"
+file = "1.1.1"
+toml = "0.4.6"
+lazy_static = "1.0.0"
+regex = "1.0.0"
+url = "1.7.0"
+failure = "0.1.1"
+lazycell = "0.6.0"
+rayon = "1.0.1"
+

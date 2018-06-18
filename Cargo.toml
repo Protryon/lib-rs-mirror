@@ -1,0 +1,17 @@
+[package]
+name = "crate_db"
+version = "0.2.0"
+authors = ["Kornel <kornel@geekhood.net>"]
+description = "Internal index of crates used by crates.rs"
+
+[lib]
+name ="crate_db"
+path = "src/lib_crate_db.rs"
+
+[dependencies]
+rusqlite = "0.13.0"
+rich_crate = { git = "https://gitlab.com/crates.rs/rich_crate.git" }
+failure = "0.1.1"
+rayon = "1.0.1"
+lazy_static = "1.0.0"
+chrono = "0.4.2"

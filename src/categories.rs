@@ -6,6 +6,7 @@ extern crate serde;
 
 use toml::value::{Value, Table};
 use std::collections::BTreeMap;
+use std::borrow::Cow;
 
 const CATEGORIES_TOML: &[u8] = include_bytes!("categories.toml");
 
@@ -97,6 +98,44 @@ impl Categories {
                 sub,
             }))
         }).collect()
+    }
+
+    pub fn fixed_category_slugs(cats: &[String]) -> impl Iterator<Item = Cow<str>> {
+        let mut cats = cats.iter().enumerate().filter_map(|(idx, s)| {
+            if s.len() < 2 {
+                return None;
+            }
+            let mut chars = s.chars().peekable();
+            while let Some(cur) = chars.next() {
+                // look for a:b instead of a::b
+                if cur == ':' {
+                    if chars.peek().map_or(false, |&c| c == ':') {
+                        chars.next(); // OK, skip second ':'
+                        continue;
+                    }
+                }
+                if cur == '-' || cur.is_ascii_lowercase() || cur.is_ascii_digit() {
+                    continue;
+                }
+
+                // bad syntax! Fix!
+                let slug = s.to_lowercase().split(':').filter(|s| s.len() > 0).collect::<Vec<_>>().join("::");
+                if s.len() == 0 {
+                    return None;
+                }
+                let depth = slug.split("::").count();
+                return Some((depth, idx, slug.into()));
+            }
+            let depth = s.split("::").count();
+            Some((depth, idx, Cow::Borrowed(s.as_ref())))
+        }).collect::<Vec<_>>();
+
+        // depth, then original order
+        cats.sort_by(|a, b| {
+            b.0.cmp(&a.0).then(a.1.cmp(&b.1))
+        });
+
+        cats.into_iter().map(|(_,_,c)| c)
     }
 }
 

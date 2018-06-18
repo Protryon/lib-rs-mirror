@@ -5,6 +5,7 @@ extern crate urlencoding;
 #[macro_use] extern crate serde_derive;
 extern crate serde_json;
 extern crate repo_url;
+extern crate simple_cache;
 #[macro_use] extern crate failure;
 
 pub type CResult<T> = std::result::Result<T, failure::Error>;
@@ -19,7 +20,7 @@ use failure::SyncFailure;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::time::Duration;
 use std::thread;
-
+use simple_cache::SimpleCache;
 use github_rs::headers::{rate_limit_remaining, rate_limit_reset};
 
 mod model;
@@ -33,14 +34,14 @@ enum GitApiError {
 
 pub struct GitHub {
     token: String,
-    pub cache_dir: PathBuf,
+    cache: SimpleCache,
 }
 
 impl GitHub {
     pub fn new(cache_dir: impl Into<PathBuf>, token: impl Into<String>) -> CResult<Self> {
         Ok(Self {
             token: token.into(),
-            cache_dir: cache_dir.into(),
+            cache: SimpleCache::new(cache_dir, "github.db")?,
         })
     }
 
@@ -80,18 +81,17 @@ impl GitHub {
                            .execute())
     }
 
-    fn get_cached<F, B>(&self, cache_file: &str, cb: F) -> CResult<B>
+    fn get_cached<F, B>(&self, key: &str, cb: F) -> CResult<B>
         where B: for<'de> serde::Deserialize<'de>,
         F: FnOnce(&client::Github) -> Result<(Headers, StatusCode, Option<serde_json::Value>), github_rs::errors::Error>
     {
-        let cache_path = self.cache_dir.join(cache_file);
-        if let Ok(cached) = file::get(&cache_path) {
+        if let Ok(cached) = self.cache.get(key) {
             Ok(serde_json::from_slice(&cached)?)
         } else {
             let client = &self.client()?;
-            eprintln!("Cache miss {}", cache_path.display());
+            eprintln!("Cache miss {}", key);
             let (headers, status, body) = cb(&*client).map_err(SyncFailure::new)?;
-            eprintln!("Recvd {} {:?} {:?}", cache_file, status, headers);
+            eprintln!("Recvd {} {:?} {:?}", key, status, headers);
             if let (Some(rl), Some(rs)) = (rate_limit_remaining(&headers), rate_limit_reset(&headers)) {
                 let end_timestamp = Duration::from_secs(rs.into());
                 let now = SystemTime::now().duration_since(UNIX_EPOCH)?;
@@ -104,15 +104,17 @@ impl GitHub {
                 }
             }
             let stats = body.ok_or(GitApiError::NoBody)?;
-            let allow = status.is_success() || status == StatusCode::NotFound || status == StatusCode::MovedPermanently;
-            let disallow = status.is_server_error() || status.is_informational()
-                || status == StatusCode::Accepted
-                || status == StatusCode::NotModified
-                || status == StatusCode::Processing
-                || status == StatusCode::Created
-                || status == StatusCode::Forbidden || status == StatusCode::Continue;
-            if allow && !disallow {
-                file::put(cache_path, stats.to_string())?;
+            let allow = match status {
+                StatusCode::Accepted |
+                StatusCode::Created => false,
+                StatusCode::NotFound |
+                StatusCode::Gone |
+                StatusCode::MovedPermanently => true,
+                _ => status.is_success(),
+            };
+
+            if allow {
+                self.cache.set(key, stats.to_string().as_bytes())?;
             }
             Ok(serde_json::from_value(stats)?)
         }

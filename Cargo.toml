@@ -1,6 +1,6 @@
 [package]
 name = "github_info"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Kornel <kornel@geekhood.net>"]
 
 [lib]
@@ -9,6 +9,7 @@ path = "src/lib_github.rs"
 
 [dependencies]
 repo_url = { git = "https://gitlab.com/crates.rs/repo_url.git" }
+simple_cache = { git = "https://gitlab.com/crates.rs/simple_cache.git" }
 serde = "1.0.53"
 serde_derive = "1.0.53"
 serde_json = "1.0.17"

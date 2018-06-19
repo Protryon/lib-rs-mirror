@@ -3,8 +3,8 @@ extern crate serde;
 extern crate serde_json;
 #[macro_use] extern crate serde_derive;
 use std::path::PathBuf;
-use simple_cache::Error;
 use simple_cache::SimpleCache;
+pub use simple_cache::Error;
 
 #[derive(Debug)]
 pub struct DocsRsClient {
@@ -19,10 +19,10 @@ pub struct BuildStatus {
 }
 
 impl DocsRsClient {
-    pub fn new<P: Into<PathBuf>>(cache_base_path: P) -> Self {
-        Self {
-            cache: SimpleCache::new(cache_base_path),
-        }
+    pub fn new(cache_base_path: impl Into<PathBuf>) -> Result<Self, Error> {
+        Ok(Self {
+            cache: SimpleCache::new(cache_base_path, "cache.db")?,
+        })
     }
 
     pub fn builds(&self, crate_name: &str, version: &str) -> Result<bool, Error> {
@@ -32,7 +32,7 @@ impl DocsRsClient {
     pub fn build_status(&self, crate_name: &str, version: &str) -> Result<Vec<BuildStatus>, Error> {
         let cache_file = format!("meta/{}-{}.docsrs.json", crate_name, version);
         let url = format!("https://docs.rs/crate/{}/{}/builds.json", crate_name, version);
-        self.cache.get_json(cache_file, url)
+        self.cache.get_json(&cache_file, url)
     }
 }
 

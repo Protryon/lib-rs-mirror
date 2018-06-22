@@ -1,0 +1,75 @@
+
+[workspace]
+members = [
+"cargo_author",
+"cargo_toml",
+"categories",
+"crate_db",
+"crate_files",
+"crates_io_client",
+"docs_rs_client",
+"front_end",
+"github_info",
+"kitchen_sink",
+"lazyonce",
+"reindex",
+"render_readme",
+"repo_url",
+"rich_crate",
+"simple_cache",
+"user_db",
+]
+
+[profile.dev]
+opt-level = 1
+
+[patch.'https://gitlab.com/crates.rs/cargo_author.git']
+cargo_author = { path = "cargo_author" }
+
+[patch.'https://gitlab.com/crates.rs/cargo_toml.git']
+cargo_toml = { path = "cargo_toml" }
+
+[patch.'https://gitlab.com/crates.rs/categories.git']
+categories = { path = "categories" }
+
+[patch.'https://gitlab.com/crates.rs/crate_db.git']
+crate_db = { path = "crate_db" }
+
+[patch.'https://gitlab.com/crates.rs/crate_files.git']
+crate_files = { path = "crate_files" }
+
+[patch.'https://gitlab.com/crates.rs/crates_io_client.git']
+crates_io_client = { path = "crates_io_client" }
+
+[patch.'https://gitlab.com/crates.rs/docs_rs_client.git']
+docs_rs_client = { path = "docs_rs_client" }
+
+[patch.'https://gitlab.com/crates.rs/front_end.git']
+front_end = { path = "front_end" }
+
+[patch.'https://gitlab.com/crates.rs/github_info.git']
+github_info = { path = "github_info" }
+
+[patch.'https://gitlab.com/crates.rs/kitchen_sink.git']
+kitchen_sink = { path = "kitchen_sink" }
+
+[patch.'https://gitlab.com/crates.rs/lazyonce.git']
+lazyonce = { path = "lazyonce" }
+
+[patch.'https://gitlab.com/crates.rs/reindex.git']
+reindex = { path = "reindex" }
+
+[patch.'https://gitlab.com/crates.rs/render_readme.git']
+render_readme = { path = "render_readme" }
+
+[patch.'https://gitlab.com/crates.rs/repo_url.git']
+repo_url = { path = "repo_url" }
+
+[patch.'https://gitlab.com/crates.rs/rich_crate.git']
+rich_crate = { path = "rich_crate" }
+
+[patch.'https://gitlab.com/crates.rs/simple_cache.git']
+simple_cache = { path = "simple_cache" }
+
+[patch.'https://gitlab.com/crates.rs/user_db.git']
+user_db = { path = "user_db" }

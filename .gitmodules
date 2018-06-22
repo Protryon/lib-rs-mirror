@@ -1,0 +1,57 @@
+[submodule "cargo_author"]
+	path = cargo_author
+	url = https://gitlab.com/crates.rs/cargo_author.git
+[submodule "cargo_toml"]
+	path = cargo_toml
+	url = https://gitlab.com/crates.rs/cargo_toml.git
+[submodule "categories"]
+	path = categories
+	url = https://gitlab.com/crates.rs/categories.git
+[submodule "crate_db"]
+	path = crate_db
+	url = https://gitlab.com/crates.rs/crate_db.git
+[submodule "crate_files"]
+	path = crate_files
+	url = https://gitlab.com/crates.rs/crate_files.git
+[submodule "style"]
+	path = style
+	url = https://gitlab.com/crates.rs/style.git
+[submodule "crates_io_client"]
+	path = crates_io_client
+	url = https://gitlab.com/crates.rs/crates_io_client.git
+[submodule "docs_rs_client"]
+	path = docs_rs_client
+	url = https://gitlab.com/crates.rs/docs_rs_client.git
+[submodule "github_info"]
+	path = github_info
+	url = https://gitlab.com/crates.rs/github_info.git
+[submodule "kitchen_sink"]
+	path = kitchen_sink
+	url = https://gitlab.com/crates.rs/kitchen_sink.git
+[submodule "lazyonce"]
+	path = lazyonce
+	url = https://gitlab.com/crates.rs/lazyonce.git
+[submodule "reindex"]
+	path = reindex
+	url = https://gitlab.com/crates.rs/reindex.git
+[submodule "render_readme"]
+	path = render_readme
+	url = https://gitlab.com/crates.rs/render_readme.git
+[submodule "repo_url"]
+	path = repo_url
+	url = https://gitlab.com/crates.rs/repo_url.git
+[submodule "rich_crate"]
+	path = rich_crate
+	url = https://gitlab.com/crates.rs/rich_crate.git
+[submodule "simple_cache"]
+	path = simple_cache
+	url = https://gitlab.com/crates.rs/simple_cache.git
+[submodule "user_db"]
+	path = user_db
+	url = https://gitlab.com/crates.rs/user_db.git
+[submodule "data/index"]
+	path = data/index
+	url = https://github.com/rust-lang/crates.io-index.git
+[submodule "front_end"]
+	path = front_end
+	url = https://gitlab.com/crates.rs/front_end.git

@@ -1,0 +1,115 @@
+@use std::ops::Div;
+@use std::ops::Add;
+@use templates::base;
+@use templates::labels;
+@use cat_page::CatPage;
+@use Urler;
+@use iter::*;
+
+@(p: &CatPage, url: &Urler)
+
+@:base(&p.page(), {
+    <header id="category">
+        <div class="inner-col">
+            <div class="breadcrumbs" typeof="BreadcrumbList">
+            <h1>
+              <span property="itemListElement" typeof="ListItem">
+                <a property="item" typeof="WebPage" href="/"><span property="name">Crates</span>.rs</a>
+                <meta property="position" content="1">
+              </span>
+            </h1>
+            &rsaquo;
+            <span property="itemListElement" typeof="ListItem">
+              <a href="/#home-categories" property="item" typeof="WebPage"><span property="name">Categories</span></a>
+              <meta property="position" content="2">
+            </span>
+            &rsaquo;
+            <span class="categories has-keywords">
+            @for (i, subcat) in p.parent_categories().iter().enumerate() {
+                <span property="itemListElement" typeof="ListItem">
+                  <a href="@url.category(subcat)" title="@subcat.short_description" property="item" typeof="WebPage"><span property="name">@subcat.name</span></a>
+                  <meta property="position" content="@i.add(3)">
+                </span>
+                &rsaquo;
+            }
+            </span>
+            <span class="keywords">
+              <span>
+                @for key in p.keywords.iter().take(3) {
+                  <a href="@url.keyword(key)" class=keyword><span>#</span>@key</a>
+                }
+              </span>
+              @for key in p.keywords.iter().skip(3).take(3) {
+                <a href="@url.keyword(key)" class=keyword><span>#</span>@key</a>
+              }
+            </span>
+
+            <h2>@p.cat.name</h2>
+            <p class=desc>@p.description()</p>
+            </div>
+
+            <nav><ul>
+              <li class=active>@if p.crates.len() != p.count {
+                    @p.crates.len() of @p.count crates
+                } else {
+                    @p.count crates
+                }
+              </li>
+              @for subcat in p.cat.sub.values() {
+                  <li><a href="@url.category(subcat)" title="@subcat.short_description">@subcat.name</a></li>
+              }
+            </ul></nav>
+        </div>
+    </header>
+
+    <main>
+        <div id="category-crates" class="cat-@p.cat.slug">
+          <div class="inner-col">
+            <ul>
+                @for (c, downloads) in &p.crates {
+                <li>
+                    <a href="@url.krate(c)">
+                        <div class=h>
+                            <h4>@c.name()</h4>
+                            @if let Some(desc) = c.description() {
+                              <p class=desc>@p.render_markdown_str(desc)</p>
+                            }
+                        </div>
+                        <div class=meta>
+                            <span class="version @p.version_class(c)"><span>v</span>@c.version()</span>
+                            <span class=downloads title="@downloads recent downloads">@if let Some((num,unit)) = Some(p.downloads(*downloads)) {@num<b>@unit</b>}</span>
+                            @:labels(c)
+                            @for k in c.keywords() {
+                                <span class=k><span>#</span>@k</span>
+                            }
+                        </div>
+                    </a>
+                </li>
+                }
+            </ul>
+          </div>
+        </div>
+        @if p.crates.len() != p.count {
+            <div class=pager>
+                <div class="inner-col">
+                    <a href="@url.category_page(&p.cat, p.crates.len().add(1).div(10).add(1))">Next page</a>
+                </div>
+            </div>
+        }
+
+    </main>
+    <footer>
+        <div class=seealso>
+        <div class="inner-col">
+          See also:
+            @for (last, cat) in p.related_categories().iter().identify_last() {
+            @for (last, subcat) in cat.iter().identify_last() {
+              <a href="@url.category(subcat)" title="@subcat.short_description">@subcat.name</a>
+              @if !last {&rsaquo;}
+            }
+            @if !last {|}
+          }
+        </div>
+        </div>
+      </footer>
+})

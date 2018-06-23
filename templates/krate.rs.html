@@ -1,0 +1,237 @@
+@use templates::base;
+@use templates::labels;
+@use templates::downloads;
+@use templates::footer;
+@use templates::deps_list;
+@use iter::*;
+@use Urler;
+@use CratePage;
+
+@(url: &Urler, c: &CratePage)
+
+@:base(&c.page(url), {
+  <div typeof="SoftwareApplication">
+  <header id="package">
+    <div class="inner-col">
+    <div class="breadcrumbs" typeof="BreadcrumbList">
+    <h1>
+      <span property="itemListElement" typeof="ListItem">
+        <a property="item" typeof="WebPage" href="/"><span property="name">Crates</span>.rs</a>
+        <meta property="position" content="1">
+      </span>
+    </h1>
+     &rsaquo;
+    @if c.ver.has_categories() {
+      <span class="categories @if c.ver.keywords().next().is_some() {has-keywords}">
+      @for (last, (major, cat)) in c.category_slugs_unique().iter().enumerate().identify_last() {
+        @for (last, (i, subcat)) in cat.iter().enumerate().identify_last() {
+          @if major < 2 {
+            <span property="itemListElement" typeof="ListItem">
+              <a href="@url.category(subcat)" title="@subcat.short_description" property="item" typeof="WebPage"><span property="name">@subcat.name</span></a>
+              <meta property="position" content="@i.saturating_add(2)">
+            </span>
+          } else {
+            <a href="@url.category(subcat)" title="@subcat.short_description">@subcat.name</a>
+          }
+          @if !last {&rsaquo;}
+        }
+        @if !last {|}
+      }
+      </span>
+    }
+    </div>
+    @if c.ver.keywords().next().is_some() {
+      <span class="keywords">
+        <span>
+          @for key in c.ver.keywords().take(3) {
+            <a property="applicationCategory" href="@url.keyword(key)" class=keyword><span>#</span>@key</a>
+          }
+        </span>
+        @for key in c.ver.keywords().skip(3) {
+          <a property="applicationCategory" href="@url.keyword(key)" class=keyword><span>#</span>@key</a>
+        }
+      </span>
+    }
+    </h1>
+    <h2>
+      @:labels(&c.ver)
+
+      <span property="name">
+      @if c.ver.is_yanked() {
+        <del>@c.ver.name()</del>
+      } else {
+        @for (last, part) in c.name_underscore_parts().identify_last() {@part@if !last {<span class=un>_<wbr></span>}}
+      }
+      </span>
+
+    </h2>
+    @if let Some(desc) = c.ver.description() {
+      <p class=desc>@c.render_markdown_str(desc)</p>
+    }
+    <p class=byline>
+      @if c.ver.is_yanked() {
+        was
+      }
+      by
+      @if let Some((authors, owners, co_owned, contrib, period_after_authors)) = Some(c.all_contributors()) {
+        @for (last, a) in authors.iter().identify_last() {
+          @if let Some(url) = url.author(a) {
+            <a href="@url" property="author" typeof="Person"><span property="name">@a.name()</span></a>@if !last {,} else {@if period_after_authors {.}}
+          } else {
+            @a.name()@if !last {,} else {@if period_after_authors {.}}
+          }
+        }
+        @if contrib > 1 {
+          <span class=contributors>and
+          @if let Some(repo) = c.ver.repository() {
+            <a href="@repo.contributors_http_url()">
+              @if contrib == 100 {
+                over
+              }
+              @contrib contributors</a>@if !owners.is_empty() {.}
+          } else {
+            @contrib contributors@if !owners.is_empty() {.}
+          }
+          </span>
+        }
+        @if !owners.is_empty() {
+          <span class=coowners>
+          <span>@if co_owned {Co-owned} else {Owned}</span>
+          by @for (last, a) in owners.iter().identify_last() {
+            @if let Some(url) = url.author(a) {
+              <a href="@url" property="author" typeof="Person"><span property="name">@a.name()</span></a>@if !last {,} else {.}
+            } else {
+              @a.name()@if !last {,} else {.}
+            }
+          }
+          </span>
+        }
+      }
+    </p>
+    <nav><ul>
+      <li class=active>About</li>
+      @if let Some(doc) = c.api_reference_url() {
+        <li><a href="@doc">API reference</a></li>
+      }
+      @if let Some(doc) = c.ver.documentation() {
+        <li><a href="@doc">Documentation</a></li>
+      }
+      @if let Some(home) = c.ver.homepage() {
+        <li><a property="url" href="@home">Homepage</a></li>
+      }
+      @if let Some(repo) = c.ver.repository() {
+        <li><a href="@repo.canonical_http_url()">@repo.site_link_label()</a></li>
+      }
+    </ul></nav>
+    </div>
+  </header>
+  <main>
+    <div class="inner-col">
+      <section id="readme-deps">
+        <div>
+          <section class="about-crate">
+            <section id="versions">
+              <h3>@c.version_stats_summary()</h3>
+              <table>
+                @for (i,gr) in c.top_versions().enumerate() {
+                  <tr><th content="@gr.ver.num" property="@if i == 0 {softwareVersion}">
+                    @if c.is_version_new(&gr.ver, i) {
+                      <span class=new vocab="" property="">new</span>
+                    }
+                    @gr.ver.num
+                  </th><td property="@if i == 0 {datePublished}" class="date">
+                    @if gr.ver.yanked {
+                      <del>@CratePage::format(&gr.ver.created_at)</del>
+                    } else {
+                      @CratePage::format(&gr.ver.created_at)
+                    }
+                  </td></tr>
+                }
+              </table>
+            </section>
+
+            <section id="downloads">
+              @if let Some((top, cat)) = c.top_category() {
+                <p class="top-n">#<b>@top</b> in <a href="@url.category(cat)" title="@cat.description">@cat.name</a></p>
+              } else {
+                @if let Some((top, keyword)) = c.top_keyword() {
+                  <p class="top-n">#<b>@top</b> in <a href="@url.keyword(&keyword)">#@keyword</a></p>
+                }
+              }
+              @:downloads(&c.download_graph())
+              <p><b>@c.all.downloads_recent()</b> downloads per month</p>
+            </section>
+          </section>
+
+          @if let Ok(readme) = c.ver.readme() {
+            @if let Some(readme) = readme {
+              <section id=readme class="readme" vocab="">
+                @c.render_readme(readme)
+              </section>
+            }
+          } else {
+            <section id=readme>
+              <p class=error>Error while getting readme</p>
+            </section>
+          }
+
+          @if c.is_readme_short() {
+            @if let Some(intro) = c.render_lib_intro() {
+              <hr>
+              <section id=lib_intro class="readme" vocab="">
+                <h3>
+                  @if let Some(doc) = c.api_reference_url() {
+                    <a href="@doc"><code>lib.rs</code></a>:
+                  } else {
+                    <code>lib.rs</code>:
+                  }
+                </h3>
+                @intro
+              </section>
+            }
+          }
+        </div>
+        <section id="deps">
+          <section id="license">
+            <b property="license">@if let Some(lic) = c.ver.license() {
+              @lic
+            }
+            @if let Some(filename) = c.ver.license_file() {
+              <span title="@filename">Custom</span>
+            }</b>
+            license
+          </section>
+
+          @if let Some((normal, dev, build)) = c.dependencies() {
+            @if c.has_runtime_deps() {
+              <h4><a href="@url.deps(&c.ver)">Dependencies</a></h4>
+            }
+            <div>
+            <ul class="@if normal.len() > 4 {long}">
+              @if !c.has_runtime_deps() {
+                <li>No runtime deps</li>
+              } else {
+                @:deps_list(url, &normal, "")
+              }
+              @if let Some(links) = c.ver.links() {
+                <li><span class="label label-build">links</span> <code>@links</code></li>
+              }
+            </ul>
+            <ul class="dev @if dev.len() > 4 {long}">
+              @if c.ver.has_buildrs() {
+                <li><span class="label label-build">build</span> <code>build.rs</code></li>
+              }
+              @:deps_list(url, &build, "build")
+              @:deps_list(url, &dev, "dev")
+            </ul>
+            </div>
+          } else {
+            <p class="error">Dependencies unknown</p>
+          }
+        </section>
+      </section>
+    </div>
+  </main>
+  </div>
+  @:footer()
+})

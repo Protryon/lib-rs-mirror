@@ -1,0 +1,33 @@
+@use templates::target_cfg;
+@use rich_crate::RichDep;
+@use kitchen_sink::Target;
+@use Urler;
+@(url: &Urler, set: &[RichDep], label: &str)
+
+@for d in set.iter() {
+    <li property="requirements" class="@if d.dep.optional() {optional}">
+      @if label != "" {
+        <span class="label label-@label">
+          @label
+        </span>
+      }
+      @if d.dep.optional() {
+        @for (f, enabled) in &d.only_for_features {
+          <span class="feature" title="optional feature">@if *enabled {@f} else {@f?}</span>
+        }
+        @if d.only_for_features.is_empty() {
+          <span class="feature" title="optional feature">
+            optional
+          </span>
+        }
+      }
+      @for t in &d.only_for_targets {
+        @if let Target::Cfg(t) = t {
+          @:target_cfg(t)
+        } else {
+          <span class="cfg k">@t</span>
+        }
+      }
+      <a href="@url.dependency(d)">@d.name</a>&nbsp;<span class="version">@d.dep.req()</span>@for f in d.dep.req_features() {<span class="with-feature"><wbr>+<span>@f</span></span>}
+    </li>
+}

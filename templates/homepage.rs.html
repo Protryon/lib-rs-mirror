@@ -1,0 +1,31 @@
+@use templates::base;
+@use templates::home_categories;
+@use home_page::HomePage;
+@use Urler;
+
+@(home: &HomePage, url: &Urler)
+
+@:base(&home.page(), {
+    <header id="home">
+        <div class="inner-col">
+        <h1>Crates.rs</h1>
+        <p>A fast, lightweight, site to browse most popular <a href="https://rust-lang.org">Rust</a> libraries and applications. Unofficial, experimental, opinionated alternative to crates.io</p>
+        </div>
+    </header>
+
+
+    <main>
+        <section id="home-categories">
+            <div class="inner-col">
+                <ul class=cat>
+                @:home_categories(&home.all_categories(), url, true)
+                </ul>
+            </div>
+        </section>
+
+    </main>
+
+    <footer>
+        <div class="inner-col">
+        <p>By <a href=https://kornel.ski>kornelski</a>. (<a href="https://gitlab.com/crates.rs">Source code</a>)</p></div></footer>
+})

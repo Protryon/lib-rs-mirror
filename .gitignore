@@ -1,0 +1,6 @@
+target/
+*.css
+public/crates/
+public/fira/
+public/sitemap.xml
+public/**/*.html

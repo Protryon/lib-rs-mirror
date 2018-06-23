@@ -1,0 +1,31 @@
+@use home_page::HomeCategory;
+@use Urler;
+
+@(cats: &[HomeCategory], url: &Urler, toplevel: bool)
+
+    @for cat in cats {
+        <li>
+        <div>
+            <a href="@url.category(&cat.cat)">@if toplevel {
+                <h3>@cat.cat.name</h3>
+            } else {
+                <h4>@cat.cat.name</h4>
+            }
+            <span class=desc>@cat.cat.short_description</span>
+            </a>
+        </div>
+            <ul class=crates>
+            @for t in &cat.top {
+                <li>
+                    <a href="@url.krate(t)" title="@t.description().unwrap_or("")">@t.name()</a></li>
+            }
+            @if cat.pop.saturating_sub(cat.top.len()) > 2 {
+                <li>and <a class="more" href="@url.category(&cat.cat)">@cat.pop.saturating_sub(cat.top.len()) more…</a></li>
+            }
+            </ul>
+        </li>
+        @if !cat.sub.is_empty() {
+            @:home_categories(&cat.sub, url, false)
+        }
+    }
+

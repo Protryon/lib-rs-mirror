@@ -5,8 +5,7 @@ extern crate serde_json;
 #[macro_use] extern crate quick_error;
 use rusqlite::Connection;
 use std::sync::Mutex;
-use std::path::PathBuf;
-use std::fs::read;
+use std::path::Path;
 mod error;
 pub use error::Error;
 
@@ -14,17 +13,14 @@ pub use error::Error;
 pub struct SimpleCache {
     conn: Mutex<Connection>,
     pub cache_only: bool,
-    cache_base_path: PathBuf,
 }
 
 impl SimpleCache {
-    pub fn new(cache_base_path: impl Into<PathBuf>, db_name: &str) -> Result<Self, Error> {
-        let cache_base_path = cache_base_path.into();
-        let conn = Connection::open(cache_base_path.join(db_name))?;
+    pub fn new(db_path: &Path) -> Result<Self, Error> {
+        let conn = Connection::open(db_path)?;
         conn.execute("PRAGMA synchronous = 0", &[])?;
         Ok(Self {
             conn: Mutex::new(conn),
-            cache_base_path,
             cache_only: false,
         })
     }
@@ -40,22 +36,10 @@ impl SimpleCache {
     }
 
     pub fn get(&self, cache_name: &str) -> Result<Vec<u8>, Error> {
-        {
-            let conn = self.conn.lock().unwrap();
-            let mut q = conn.prepare_cached("SELECT value FROM cache WHERE key = ?1")?;
-            if let Ok(res) = q.query_row(&[&cache_name], |r| r.get(0)) {
-                return Ok(res);
-            }
-        }
-
-        let cache_file = self.cache_base_path.join(cache_name);
-        if let Ok(data) = read(&cache_file) {
-            let conn = self.conn.lock().unwrap();
-            let mut q = conn.prepare_cached("INSERT OR REPLACE INTO cache(key, value) VALUES(?1, ?2)")?;
-            q.execute(&[&cache_name, &data])?;
-            eprintln!("Migrated {}", cache_file.display());
-            ::std::fs::remove_file(cache_file).ok();
-            Ok(data)
+        let conn = self.conn.lock().unwrap();
+        let mut q = conn.prepare_cached("SELECT value FROM cache WHERE key = ?1")?;
+        if let Ok(res) = q.query_row(&[&cache_name], |r| r.get(0)) {
+            Ok(res)
         } else {
             Err(Error::NotCached)
         }

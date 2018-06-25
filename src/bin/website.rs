@@ -12,6 +12,7 @@ use rayon::prelude::*;
 use std::path::Path;
 use std::path::PathBuf;
 use kitchen_sink::KitchenSink;
+use render_readme::ImageOptimAPIFilter;
 use categories::CategoryMap;
 use std::fs;
 use std::fs::File;
@@ -21,16 +22,17 @@ use std::collections::HashSet;
 ///
 /// See home_page.rs for interesting bits
 ///
-fn main() {
+fn main() -> Result<(), failure::Error> {
     let mut out = File::create("public/index.html").unwrap();
     let crates = KitchenSink::new_default().unwrap();
     let done_pages = Mutex::new(HashSet::new());
+    let image_filter = Arc::new(render_readme::ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_path())?);
 
     println!("Generating homepage…");
     let res = front_end::render_homepage(&mut out, &crates)
         .and_then(|_| {
             println!("Generating category pages…");
-            render_categories(&categories::CATEGORIES.root, Path::new("public"), &crates, &done_pages)
+            render_categories(&categories::CATEGORIES.root, Path::new("public"), &crates, &done_pages, image_filter.clone())
         });
 
     if let Err(e) = res {
@@ -42,16 +44,15 @@ fn main() {
     }
 
     println!("http://localhost:3000/");
+    Ok(())
 }
 
-fn render_categories(cats: &CategoryMap, base: &Path, crates: &KitchenSink, done_pages: &Mutex<HashSet<String>>) -> Result<(), failure::Error> {
-    let image_filter = Arc::new(render_readme::ImageOptimAPIFilter {api_id: "czjpqfbdkz"});
-
+fn render_categories(cats: &CategoryMap, base: &Path, crates: &KitchenSink, done_pages: &Mutex<HashSet<String>>, image_filter: Arc<ImageOptimAPIFilter>) -> Result<(), failure::Error> {
     cats.par_iter().map(|(slug, cat)| {
         if !cat.sub.is_empty() {
             let new_base = base.join(slug);
             let _ = fs::create_dir(&new_base);
-            render_categories(&cat.sub, &new_base, crates, done_pages)?;
+            render_categories(&cat.sub, &new_base, crates, done_pages, image_filter.clone())?;
         }
         let render_crate = |c: Crate| {
             {

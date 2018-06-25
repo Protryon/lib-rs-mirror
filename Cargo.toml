@@ -1,6 +1,6 @@
 [package]
 name = "front_end"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Kornel <kornel@geekhood.net>"]
 autobins = true
 
@@ -9,12 +9,12 @@ name = "front_end"
 path = "src/front_end.rs"
 
 [build-dependencies]
-ructe = "0.3.16"
+ructe = {git = "https://github.com/kaj/ructe.git", rev="ab3c18c83bb8fffa14334180e3316fbcdd738ad5" }
 
 [dependencies]
-kitchen_sink = { git = "https://gitlab.com/crates.rs/kitchen_sink.git" }
+kitchen_sink = { git = "https://gitlab.com/crates.rs/kitchen_sink.git", version = "0.2.2" }
 rich_crate = { git = "https://gitlab.com/crates.rs/rich_crate.git" }
-render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git" }
+render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git", version = "0.3.0" }
 categories = { git = "https://gitlab.com/crates.rs/categories.git" }
 rayon = "1.0.1"
 failure = "0.1.1"

@@ -2,7 +2,7 @@ extern crate simple_cache;
 extern crate serde;
 extern crate serde_json;
 #[macro_use] extern crate serde_derive;
-use std::path::PathBuf;
+use std::path::Path;
 use simple_cache::SimpleCache;
 pub use simple_cache::Error;
 
@@ -19,9 +19,9 @@ pub struct BuildStatus {
 }
 
 impl DocsRsClient {
-    pub fn new(cache_base_path: impl Into<PathBuf>) -> Result<Self, Error> {
+    pub fn new(cache_path: impl AsRef<Path>) -> Result<Self, Error> {
         Ok(Self {
-            cache: SimpleCache::new(cache_base_path, "cache.db")?,
+            cache: SimpleCache::new(cache_path.as_ref())?,
         })
     }
 
@@ -38,7 +38,7 @@ impl DocsRsClient {
 
 #[test]
 fn test_docsrsclient() {
-    let client = DocsRsClient::new("../data");
+    let client = DocsRsClient::new("../data/cache.db").expect("new");
 
     assert!(client.builds("libc", "0.2.40").expect("libc"));
     client.build_status("libc", "0.2.40").expect("libc");

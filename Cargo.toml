@@ -1,6 +1,6 @@
 [package]
 name = "crates_io_client"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Kornel <kornel@geekhood.net>"]
 description = "Unofficial, minimal client that gets data from crates.io internal JS API"
 
@@ -11,5 +11,5 @@ path = "src/lib_crates_io_client.rs"
 [dependencies]
 serde = "1.0.45"
 serde_derive = "1.0.45"
-simple_cache = { git = "https://gitlab.com/crates.rs/simple_cache.git" }
+simple_cache = { git = "https://gitlab.com/crates.rs/simple_cache.git", version = "0.3.0" }
 chrono = "0.4.3"

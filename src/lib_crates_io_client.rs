@@ -31,13 +31,14 @@ pub struct CratesIoCrate {
 impl CratesIoClient {
     pub fn new(cache_base_path: &Path) -> Result<Self, Error> {
         Ok(Self {
-            cache: SimpleCache::new(cache_base_path, "cache.db")?,
-            crates: SimpleCache::new(cache_base_path, "crates.db")?,
+            cache: SimpleCache::new(&cache_base_path.join("cache.db"))?,
+            crates: SimpleCache::new(&cache_base_path.join("crates.db"))?,
         })
     }
 
     pub fn cache_only(&mut self, no_net: bool) -> &mut Self {
         self.cache.cache_only = no_net;
+        self.crates.cache_only = no_net;
         self
     }
 
@@ -81,12 +82,12 @@ impl CratesIoClient {
 
 #[test]
 fn cratesioclient() {
-    let client = CratesIoClient::new("../data");
+    let client = CratesIoClient::new(Path::new("../data")).expect("new");
 
     client.crate_meta("capi", "0.0.1").expect("cargo-deb");
     let owners = client.crate_owners("cargo-deb", "1.10.0").expect("crate_owners");
     assert_eq!(2, owners.len(), "that will fail when metadata updates");
-    match CratesIoClient::new("../data").cache_only(true).crate_data("fail404","999") {
+    match CratesIoClient::new(Path::new("../data")).expect("new").cache_only(true).crate_data("fail404","999") {
         Err(Error::NotCached) => {},
         e => panic!("{:?}", e),
     }

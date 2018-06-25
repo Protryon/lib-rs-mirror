@@ -1,5 +1,6 @@
-use reqwest;
+use std::path::Path;
 use std::borrow::Cow;
+use simple_cache::{SimpleCache, Error};
 
 /// Callbacks for every image URL in the document
 pub trait ImageFilter: Send + Sync + 'static {
@@ -29,10 +30,20 @@ struct ImageOptimImageMeta {
 }
 
 /// Filter through https://imageoptim.com/api
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug)]
 pub struct ImageOptimAPIFilter {
     /// Get one from https://imageoptim.com/api/register
-    pub api_id: &'static str,
+    api_id: &'static str,
+    cache: SimpleCache,
+}
+
+impl ImageOptimAPIFilter {
+    pub fn new(api_id: &'static str, cache_path: &Path) -> Result<Self, Error> {
+        Ok(Self {
+            api_id,
+            cache: SimpleCache::new(cache_path)?,
+        })
+    }
 }
 
 impl ImageFilter for ImageOptimAPIFilter {
@@ -41,9 +52,8 @@ impl ImageFilter for ImageOptimAPIFilter {
     }
 
     fn image_size(&self, url: &str) -> Option<(u32, u32)> {
-        reqwest::get(&format!("https://img.gs/{}/meta,timeout=90/{}", self.api_id, url))
-            .and_then(|r| r.error_for_status())
-            .and_then(|mut r| r.json::<ImageOptimImageMeta>())
+        let api_url = format!("https://img.gs/{}/meta,timeout=90/{}", self.api_id, url);
+        self.cache.get_json(&url, api_url)
             .map_err(|e| {
                 eprintln!("warning: image req to meta of {} failed: {}", url, e);
             })

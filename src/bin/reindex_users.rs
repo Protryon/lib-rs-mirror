@@ -9,6 +9,7 @@ use repo_url::RepoHost;
 use std::sync::Arc;
 use std::sync::mpsc;
 use std::thread;
+use std::collections::HashSet;
 
 fn main() {
     let crates = Arc::new(match kitchen_sink::KitchenSink::new_default() {
@@ -20,6 +21,7 @@ fn main() {
     });
     let crates2 = crates.clone();
     let (tx, rx) = mpsc::channel();
+    let mut seen = HashSet::new();
 
     thread::spawn(move || {
         let tx1 = tx.clone();
@@ -62,6 +64,12 @@ fn main() {
     while let Some((email, name)) = rx.recv().unwrap() {
         let email: String = email;
         let name: Option<String> = name;
+
+        if seen.contains(&email) {
+            continue;
+        }
+        seen.insert(email.clone());
+
         crates2.index_email(&email, name.as_ref().map(|s| s.as_str())).unwrap();
     }
 }

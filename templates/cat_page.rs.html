@@ -1,5 +1,3 @@
-@use std::ops::Div;
-@use std::ops::Add;
 @use templates::base;
 @use templates::labels;
 @use cat_page::CatPage;
@@ -28,7 +26,7 @@
             @for (i, subcat) in p.parent_categories().iter().enumerate() {
                 <span property="itemListElement" typeof="ListItem">
                   <a href="@url.category(subcat)" title="@subcat.short_description" property="item" typeof="WebPage"><span property="name">@subcat.name</span></a>
-                  <meta property="position" content="@i.add(3)">
+                  <meta property="position" content="@(i+3)">
                 </span>
                 &rsaquo;
             }
@@ -92,7 +90,7 @@
         @if p.crates.len() != p.count {
             <div class=pager>
                 <div class="inner-col">
-                    <a href="@url.category_page(&p.cat, p.crates.len().add(1).div(10).add(1))">Next page</a>
+                    <a href="@url.category_page(&p.cat, (p.crates.len() + 1) / 10 + 1)">Next page</a>
                 </div>
             </div>
         }

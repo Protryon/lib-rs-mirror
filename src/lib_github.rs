@@ -9,7 +9,7 @@ extern crate simple_cache;
 #[macro_use] extern crate failure;
 
 pub type CResult<T> = std::result::Result<T, failure::Error>;
-use std::path::PathBuf;
+use std::path::Path;
 
 use urlencoding::encode;
 use repo_url::SimpleRepo;
@@ -38,10 +38,10 @@ pub struct GitHub {
 }
 
 impl GitHub {
-    pub fn new(cache_dir: impl Into<PathBuf>, token: impl Into<String>) -> CResult<Self> {
+    pub fn new(cache_path: impl AsRef<Path>, token: impl Into<String>) -> CResult<Self> {
         Ok(Self {
             token: token.into(),
-            cache: SimpleCache::new(cache_dir, "github.db")?,
+            cache: SimpleCache::new(cache_path.as_ref())?,
         })
     }
 
@@ -123,7 +123,9 @@ impl GitHub {
 
 #[test]
 fn github_contrib() {
-    let gh = GitHub::new("/www/crates.rs/data/github", std::env::var("GITHUB_TOKEN").unwrap()).unwrap();
+    let gh = GitHub::new(
+        "../data/github.db",
+        std::env::var("GITHUB_TOKEN").expect("GITHUB_TOKEN env var")).unwrap();
     let repo = SimpleRepo{
         owner:"visionmedia".into(),
         repo:"superagent".into(),
@@ -134,7 +136,9 @@ fn github_contrib() {
 
 #[test]
 fn test_user_by_email() {
-    let gh = GitHub::new("/www/crates.rs/data/github", std::env::var("GITHUB_TOKEN").unwrap()).unwrap();
+    let gh = GitHub::new(
+        "../data/github.db",
+        std::env::var("GITHUB_TOKEN").expect("GITHUB_TOKEN env var")).unwrap();
     let user = gh.user_by_email("github@pornel.net").unwrap().unwrap();
     assert_eq!("kornelski", user.login);
 }

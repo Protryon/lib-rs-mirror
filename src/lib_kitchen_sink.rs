@@ -75,6 +75,7 @@ pub struct KitchenSink {
     category_crate_counts: LazyOnce<Option<HashMap<String, u32>>>,
     crate_path_index: LazyOnce<HashMap<String, PathBuf>>,
     unarchiver: Unarchiver,
+    main_cache_path: PathBuf,
 }
 
 impl KitchenSink {
@@ -92,16 +93,18 @@ impl KitchenSink {
     }
 
     pub fn new(data_path: &Path, github_token: &str) -> CResult<Self> {
+        let main_cache_path = Self::assert_exists(data_path.join("cache.db"))?;
         Ok(Self {
             index: crates_index::Index::new(Self::assert_exists(data_path.join("index"))?),
-            crates_io: crates_io_client::CratesIoClient::new(data_path)?,
-            docs_rs: docs_rs_client::DocsRsClient::new(data_path)?,
+            docs_rs: docs_rs_client::DocsRsClient::new(&main_cache_path)?,
             crate_db: crate_db::CrateDb::new(Self::assert_exists(data_path.join("category_keywords.db"))?)?,
             user_db: user_db::UserDb::new(Self::assert_exists(data_path.join("users.db"))?)?,
-            gh: github_info::GitHub::new(data_path, github_token)?,
+            gh: github_info::GitHub::new(&Self::assert_exists(data_path.join("github.db"))?, github_token)?,
+            crates_io: crates_io_client::CratesIoClient::new(data_path)?,
             unarchiver: Unarchiver::new(data_path),
             crate_path_index: LazyOnce::new(),
             category_crate_counts: LazyOnce::new(),
+            main_cache_path,
         })
     }
 
@@ -131,6 +134,10 @@ impl KitchenSink {
                 Err(KitchenSinkErr::CratesDataDirEnvVarMissing)
             },
         }
+    }
+
+    pub fn main_cache_path(&self) -> &Path {
+        &self.main_cache_path
     }
 
     /// Don't make requests to crates.io

@@ -23,8 +23,8 @@ use std::collections::HashSet;
 /// See home_page.rs for interesting bits
 ///
 fn main() -> Result<(), failure::Error> {
-    let mut out = File::create("public/index.html").unwrap();
-    let crates = KitchenSink::new_default().unwrap();
+    let mut out = File::create("public/index.html").expect("write to public/index.html");
+    let crates = KitchenSink::new_default().expect("init caches, data, etc.");
     let done_pages = Mutex::new(HashSet::new());
     let image_filter = Arc::new(render_readme::ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_path())?);
 

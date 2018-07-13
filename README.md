@@ -4,16 +4,6 @@
 
 Crates [published](https://doc.rust-lang.org/cargo/reference/publishing.html) to crates.**io** will automatically show up on crates.**rs**. Crates.rs is not a registry on its own, and it's not affiliated with crates.io or the Rust project.
 
-## Contributing
-
-The site is open source. It aims to be friendly and will enforce [Code of Conduct](CODE_OF_CONDUCT.md) to Rust's high standards. Rust begginers are welcome. Contributions beyond just code, such as UX and design, are appreciated.
-
-If you'd like to help improve it:
-
- * [See the list of open issues](https://gitlab.com/groups/crates.rs/-/issues) or [file an issue/bug report/question](https://gitlab.com/crates.rs/crates.rs/issues/new).
-
- * If you'd like to discuss the site or brainstorm solutions with a wider audience, [Rust user forum](http://users.rust-lang.org/) is a good place. You can [DM kornel](https://users.rust-lang.org/u/kornel), too.
-
 ## Building
 
  0. [Install Rust](https://www.rust-lang.org/install.html) and [Node.js](https://nodejs.org/download/) (Node is used for [Sass styles](https://gitlab.com/crates.rs/style))
@@ -25,8 +15,33 @@ If you'd like to help improve it:
     cd crates.rs
     ```
 
- 2. [Get the initial data files](https://crates.rs/data) for the site (about 2GB).
-    * Extract files in `.xz` format using [7zip](https://www.7-zip.org/download.html), [The Unarchiver (Mac)](https://theunarchiver.com/) or `unxz data/*.xz`.
+ 2. Run `make`. It will download, compile and run everything. In case it doesn't work, try the step-by-step instructions below.
+
+## Contributing
+
+The site is open source. It aims to be friendly and will enforce [Code of Conduct](CODE_OF_CONDUCT.md) to Rust's high standards. Rust begginers are welcome. Contributions beyond just code, such as UX and design, are appreciated.
+
+If you'd like to help improve it:
+
+ * [See the list of open issues](https://gitlab.com/groups/crates.rs/-/issues) or [file an issue/bug report/question](https://gitlab.com/crates.rs/crates.rs/issues/new).
+
+ * If you'd like to discuss the site or brainstorm solutions with a wider audience, [Rust user forum](http://users.rust-lang.org/) is a good place. You can [DM kornel](https://users.rust-lang.org/u/kornel), too.
+
+### Where to find the code?
+
+ * If you want to change look'n'feel (CSS): [see the `style` subproject](https://gitlab.com/crates.rs/style).
+ * If you want to change HTML of the templates: [see the `front_end` subproject](https://gitlab.com/crates.rs/front_end).
+ * If you want to show new kind of data on the pages:
+     1. Fetch/compute that data in [one of the subprojects](https://gitlab.com/crates.rs) most relevant for that type of data (e.g. there's a subproject for [interacting with GitHub API](https://gitlab.com/crates.rs/github_info) if you want to get information from there).
+     2. Expose that data source [in the `kitchen_sink` subproject](https://gitlab.com/crates.rs/front_end) which connects all data sources together.
+     3. Put that data in the page helper objects (e.g. `CratePage`) [in the `front_end` subproject](https://gitlab.com/crates.rs/front_end).
+     4. Use the data in HTML templates.
+
+## Building step-by-step
+
+ 1. [Get the initial data files](https://crates.rs/data) for the site (about 2GB).
+
+ 2. Extract the data files in `.xz` format using [7zip](https://www.7-zip.org/download.html), [The Unarchiver (Mac)](https://theunarchiver.com/) or `unxz data/*.xz`.
     * Put them all (`cache.db`, `crates.db`, `github.db`, `users.db`, `category_keywords.db`) in the `data/` subdirectory of crates.rs checkout.
 
  3. Generate front-end [styles](https://gitlab.com/crates.rs/style):

@@ -6,7 +6,7 @@ Crates [published](https://doc.rust-lang.org/cargo/reference/publishing.html) to
 
 ## Building
 
- 0. [Install Rust](https://www.rust-lang.org/install.html) and [Node.js](https://nodejs.org/download/) (Node is used for [Sass styles](https://gitlab.com/crates.rs/style))
+ 0. [Install Rust](https://www.rust-lang.org/install.html), [Node.js](https://nodejs.org/download/) (Node is used for [Sass styles](https://gitlab.com/crates.rs/style)), and [Docutils](http://docutils.sourceforge.net/) (for `.rst` readmes).
 
  1. Clone this repository **recursively**, so that all subprojects are included:
 

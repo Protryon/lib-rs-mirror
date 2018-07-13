@@ -8,8 +8,8 @@ See [installation instructions for the crates.rs project](https://gitlab.com/cra
 
 ## Changing CSS
 
-Styles are in a [separate project](https://gitlab.com/crates.rs/style).
+Styles are in a [separate project](https://gitlab.com/crates.rs/style) and need to be built before you compile this project.
 
 ## Adding templates
 
-All `templates/*.rs.html` files are automatically included as templates in `front_end.rs`.
+All `templates/*.rs.html` files are automatically included as templates in `front_end.rs`. [Documentation for the template syntax](https://docs.rs/ructe/0.4.0/ructe/Template_syntax/index.html).

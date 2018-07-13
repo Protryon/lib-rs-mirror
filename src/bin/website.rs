@@ -18,6 +18,8 @@ use std::fs;
 use std::fs::File;
 use std::sync::{Arc, Mutex};
 use std::collections::HashSet;
+use failure::Fail;
+use failure::ResultExt;
 
 ///
 /// See home_page.rs for interesting bits
@@ -30,9 +32,12 @@ fn main() -> Result<(), failure::Error> {
 
     println!("Generating homepage…");
     let res = front_end::render_homepage(&mut out, &crates)
+        .context("Failed rendering homepage")
         .and_then(|_| {
             println!("Generating category pages…");
+            let _ = fs::create_dir_all("public/crates");
             render_categories(&categories::CATEGORIES.root, Path::new("public"), &crates, &done_pages, image_filter.clone())
+            .context("Failed rendering categories")
         });
 
     if let Err(e) = res {
@@ -66,21 +71,29 @@ fn render_categories(cats: &CategoryMap, base: &Path, crates: &KitchenSink, done
             let ver = crates.rich_crate_version(&c)?;
             let path = PathBuf::from(format!("public/crates/{}.html", c.name()));
             println!("{}", path.display());
-            let mut outfile = File::create(&path)?;
+            let mut outfile = File::create(&path)
+                .with_context(|_| format!("Can't create {}", path.display()))?;
             front_end::render_crate_page(&mut outfile, &allver, &ver, crates, image_filter.clone());
             Ok(())
         };
 
-        crates.top_crates_in_category(&cat.slug, 55)?
-        .into_par_iter().map(|(c,_)| render_crate(c))
-        .collect::<Result<(), failure::Error>>()?;
+        crates.top_crates_in_category(&cat.slug, 55)
+            .context("top crates")?
+        .into_par_iter()
+        .map(|(c,_)| {
+            let msg = format!("Failed rendering crate {}", c.name());
+            render_crate(c).context(msg)
+        })
+        .collect::<Result<(), _>>()?;
 
-        crates.recently_updated_crates_in_category(&cat.slug)?
+        crates.recently_updated_crates_in_category(&cat.slug)
+            .context("recently updated crates")?
         .into_par_iter().map(render_crate)
         .collect::<Result<(), failure::Error>>()?;
 
         let path = base.join(format!("{}.html", slug));
-        let mut out = File::create(&path)?;
+        let mut out = File::create(&path)
+            .with_context(|_| format!("Can't create {}", path.display()))?;
         front_end::render_category(&mut out, cat, crates, image_filter.clone())?;
         println!("{}", path.display());
         Ok(())

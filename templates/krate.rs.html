@@ -58,7 +58,7 @@
 
       <span property="name">
       @if c.ver.is_yanked() {
-        <del>@c.ver.name()</del>
+        <del>@c.ver.short_name()</del>
       } else {
         @for (last, part) in c.name_underscore_parts().identify_last() {@part@if !last {<span class=un>_<wbr></span>}}
       }

@@ -22,12 +22,12 @@ impl Urler {
 
     /// Summary of all dependencies
     pub fn deps(&self, krate: &RichCrateVersion) -> String {
-        format!("https://deps.rs/crate/{}/{}", encode(krate.name()), encode(krate.version()))
+        format!("https://deps.rs/crate/{}/{}", encode(krate.short_name()), encode(krate.version()))
     }
 
     /// Link to crate individual page
     pub fn krate(&self, krate: &RichCrateVersion) -> String {
-        format!("/crates/{}", encode(krate.name()))
+        format!("/crates/{}", encode(krate.short_name()))
     }
 
     pub fn keyword(&self, name: &str) -> String {

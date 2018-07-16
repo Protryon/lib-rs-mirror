@@ -68,7 +68,7 @@
                 <li>
                     <a href="@url.krate(c)">
                         <div class=h>
-                            <h4>@c.name()</h4>
+                            <h4>@c.short_name()</h4>
                             @if let Some(desc) = c.description() {
                               <p class=desc>@p.render_markdown_str(desc)</p>
                             }

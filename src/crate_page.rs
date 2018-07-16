@@ -63,9 +63,9 @@ impl<'a> CratePage<'a> {
             keywords: if keywords != "" {Some(keywords)} else {None},
             created: Some(self.date_created()),
             description: self.ver.description().map(|d| format!("{} | Rust package at Crates.rs", d)),
-            item_name: Some(self.ver.name().to_string()),
+            item_name: Some(self.ver.short_name().to_string()),
             item_description: self.ver.description().map(|d| d.to_string()),
-            alternate: Some(format!("https://crates.io/crates/{}", self.ver.name())),
+            alternate: self.ver.crates_io_url(),
             canonical: Some(url.krate(&self.ver)),
             noindex: self.ver.is_yanked(),
             alt_critical_css: None,
@@ -96,7 +96,7 @@ impl<'a> CratePage<'a> {
             "Rust crate"
         };
         let mut name_capital = String::new();
-        let mut ch = self.ver.name().chars();
+        let mut ch = self.ver.short_name().chars();
         if let Some(f) = ch.next() {
             name_capital.extend(f.to_uppercase());
             name_capital.extend(ch);
@@ -110,7 +110,7 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn name_underscore_parts(&self) -> impl Iterator<Item = &str> {
-        self.ver.name().split('_')
+        self.ver.short_name().split('_')
     }
 
     pub fn render_markdown_str(&self, s: &str) -> templates::Html<String> {
@@ -128,8 +128,9 @@ impl<'a> CratePage<'a> {
                 }
             }
             if !out.is_empty() {
-                let docs_url = format!("https://docs.rs/{}/{}/{}", self.ver.name(), self.ver.version(), self.ver.name());
-                return Some(templates::Html(self.markup.page(&Markup::Markdown(out), Some((&docs_url, &docs_url)), self.nofollow())));
+                let docs_url = self.ver.docs_rs_url();
+                let base = docs_url.as_ref().map(|u| (u.as_str(),u.as_str()));
+                return Some(templates::Html(self.markup.page(&Markup::Markdown(out), base, self.nofollow())));
             }
         }
         return None;
@@ -325,8 +326,8 @@ impl<'a> CratePage<'a> {
 
     /// docs.rs link, if available
     pub fn api_reference_url(&self) -> Option<String> {
-        if self.kitchen_sink.has_docs_rs(self.ver.name(), self.ver.version()) {
-            Some(format!("https://docs.rs/{}", self.ver.name()))
+        if self.kitchen_sink.has_docs_rs(self.ver.short_name(), self.ver.version()) {
+            Some(format!("https://docs.rs/{}", self.ver.short_name()))
         } else {
             None
         }

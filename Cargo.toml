@@ -13,7 +13,7 @@ ructe = "0.4.0"
 
 [dependencies]
 kitchen_sink = { git = "https://gitlab.com/crates.rs/kitchen_sink.git", version = "0.2.2" }
-rich_crate = { git = "https://gitlab.com/crates.rs/rich_crate.git" }
+rich_crate = { git = "https://gitlab.com/crates.rs/rich_crate.git", version = "0.2.0" }
 render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git", version = "0.3.0" }
 categories = { git = "https://gitlab.com/crates.rs/categories.git" }
 rayon = "1.0.1"

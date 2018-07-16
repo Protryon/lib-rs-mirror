@@ -4,6 +4,7 @@ use categories::Category;
 use categories::CategoryMap;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use rich_crate::Origin;
 use rich_crate::RichCrateVersion;
 use categories::CATEGORIES;
 use kitchen_sink::KitchenSink;
@@ -43,7 +44,7 @@ impl<'a> HomePage<'a> {
     }
 
     /// Add most recently updated crates to the list of top crates in each category
-    fn add_updated_to_all_categories(&self, cats: &mut [HomeCategory], seen: &mut HashSet<String>) {
+    fn add_updated_to_all_categories(&self, cats: &mut [HomeCategory], seen: &mut HashSet<Origin>) {
         // it's not the same order as before, but that's fine, it adds more variety
         for cat in cats {
             // depth first
@@ -52,7 +53,7 @@ impl<'a> HomePage<'a> {
             let new: Vec<_> = self.crates.recently_updated_crates_in_category(&cat.cat.slug).unwrap()
                 .into_iter()
                 .filter(|c| {
-                    seen.get(c.name()).is_none()
+                    seen.get(&Origin::from_crates_io_name(c.name())).is_none()
                 })
                 .take(3)
                 .filter_map(|c| {
@@ -60,7 +61,7 @@ impl<'a> HomePage<'a> {
                 })
                 .collect();
             for c in &new {
-                seen.insert(c.name().to_owned());
+                seen.insert(c.origin().to_owned());
             }
             cat.top.extend(new);
         }
@@ -68,7 +69,7 @@ impl<'a> HomePage<'a> {
 
     /// A crate can be in multiple categories, so `seen` ensures every crate is shown only once
     /// across all categories.
-    fn make_all_categories(&self, root: &'static CategoryMap, seen: &mut HashSet<String>) -> Vec<HomeCategory> {
+    fn make_all_categories(&self, root: &'static CategoryMap, seen: &mut HashSet<Origin>) -> Vec<HomeCategory> {
         let mut c: Vec<_> = root.iter().map(|(_, cat)| {
             // depth first - important!
             let sub = self.make_all_categories(&cat.sub, seen);
@@ -91,7 +92,7 @@ impl<'a> HomePage<'a> {
             cat.top.extend(self.crates.top_crates_in_category(&cat.cat.slug, 35).unwrap()
                 .into_iter()
                 .filter(|(c,_)| {
-                    seen.get(c.name()).is_none()
+                    seen.get(&Origin::from_crates_io_name(c.name())).is_none()
                 })
                 .take(7)
                 .map(|(c, d)| {
@@ -102,7 +103,7 @@ impl<'a> HomePage<'a> {
                     self.crates.rich_crate_version(&c).ok()
                 }));
             for c in &cat.top {
-                seen.insert(c.name().to_owned());
+                seen.insert(c.origin().to_owned());
             }
             cat.dl = dl.max(cat.dl);
         }

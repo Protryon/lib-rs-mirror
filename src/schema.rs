@@ -9,7 +9,7 @@ impl CrateDb {
             BEGIN;
             CREATE TABLE IF NOT EXISTS crates (
                 id              INTEGER PRIMARY KEY,
-                name            TEXT NOT NULL UNIQUE,
+                origin          TEXT NOT NULL UNIQUE,
                 recent_downloads INTEGER NOT NULL
             );
             CREATE TABLE IF NOT EXISTS keywords (

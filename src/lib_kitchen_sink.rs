@@ -18,6 +18,7 @@ extern crate url;
 extern crate user_db;
 
 pub use crates_index::Crate;
+use crates_io_client::CrateOwner;
 pub use crates_io_client::CrateDependency;
 pub use crates_io_client::CrateDepKind;
 pub use crates_io_client::CrateMetaVersion;
@@ -44,6 +45,7 @@ use std::collections::hash_map::Entry::*;
 use std::collections::HashMap;
 use std::path::{PathBuf, Path};
 use std::env;
+use rich_crate::Origin;
 
 pub type CError = failure::Error;
 pub type CResult<T> = Result<T, CError>;
@@ -73,7 +75,7 @@ pub struct KitchenSink {
     user_db: user_db::UserDb,
     gh: github_info::GitHub,
     category_crate_counts: LazyOnce<Option<HashMap<String, u32>>>,
-    crate_path_index: LazyOnce<HashMap<String, PathBuf>>,
+    crate_path_index: LazyOnce<HashMap<Origin, PathBuf>>,
     unarchiver: Unarchiver,
     main_cache_path: PathBuf,
 }
@@ -154,16 +156,16 @@ impl KitchenSink {
         self.index.crates()
     }
 
-    pub fn crate_by_name(&self, name: &str) -> Result<Crate, KitchenSinkErr> {
+    pub fn crate_by_name(&self, name: &Origin) -> Result<Crate, KitchenSinkErr> {
         self.crate_path_index.get(|| {
             self.index.crate_index_paths()
                 .filter_map(|p| {
                     let f = p.file_name().and_then(|f| f.to_str()).map(|s| s.to_lowercase());
-                    f.map(|f| (f, p))
+                    f.map(|f| (Origin::from_crates_io_name(&f), p))
                 })
                 .collect()
         })
-        .get(&name.to_lowercase())
+        .get(name)
         .map(Crate::new)
         .ok_or(KitchenSinkErr::CrateNotFound)
     }
@@ -221,16 +223,17 @@ impl KitchenSink {
         }
 
         let mut derived = Derived::default();
+        let origin = Origin::from_crates_io_name(name);
 
         // Guess keywords if none were specified
         // TODO: also ignore useless keywords that are unique db-wide
         if meta.manifest.package.keywords.is_empty() {
-            derived.keywords = Some(self.crate_db.keywords(name).context("keywordsdb")?);
+            derived.keywords = Some(self.crate_db.keywords(&origin).context("keywordsdb")?);
         };
 
         // Guess categories if none were specified
         if meta.manifest.package.categories.is_empty() {
-            derived.categories = Some(self.crate_db.categories(name).context("catdb")?);
+            derived.categories = Some(self.crate_db.categories(&origin).context("catdb")?);
         }
 
         // Guess repo URL if none was specified
@@ -287,12 +290,12 @@ impl KitchenSink {
 
     /// Returns (nth, slug)
     pub fn top_category(&self, krate: &RichCrate) -> Option<(u32, String)> {
-        self.crate_db.top_category(krate.name())
+        self.crate_db.top_category(&krate.origin())
     }
 
     /// Returns (nth, keyword)
     pub fn top_keyword(&self, krate: &RichCrate) -> Option<(u32, String)> {
-        self.crate_db.top_keyword(krate.name())
+        self.crate_db.top_keyword(&krate.origin())
     }
 
     /// Maintenance: add user to local db index
@@ -397,7 +400,7 @@ impl KitchenSink {
                 (key, ca)
             }).collect();
 
-        if let Ok(owners) = self.crates_io.crate_owners(krate.name(), krate.version()) {
+        if let Ok(owners) = self.crate_owners(krate) {
             for owner in owners {
                 if let Some(login) = owner.github_login() {
                     match authors.entry(AuthorId::GitHub(login.to_lowercase())) {
@@ -524,6 +527,10 @@ impl KitchenSink {
 
         let owners_partial = authors.iter().any(|a| a.owner);
         (authors, owners, owners_partial, if hit_max_contributor_count {100} else {contributors})
+    }
+
+    fn crate_owners(&self, krate: &RichCrateVersion) -> CResult<Vec<CrateOwner>> {
+        Ok(self.crates_io.crate_owners(krate.short_name(), krate.version())?)
     }
 
     pub fn top_crates_in_category(&self, slug: &str, limit: u32) -> CResult<Vec<(Crate, u32)>> {

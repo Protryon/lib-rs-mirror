@@ -1,6 +1,7 @@
 use crates_index::Version;
 use Author;
 use Readme;
+use Origin;
 use semver;
 use repo_url::Repo;
 use cargo_toml::TomlManifest;
@@ -16,6 +17,7 @@ pub use parse_cfg::ErrorKind as CfgErr;
 
 #[derive(Debug, Clone)]
 pub struct RichCrateVersion {
+    origin: Origin,
     index: Version,
     manifest: TomlManifest,
     derived: Derived,
@@ -32,6 +34,7 @@ pub struct RichCrateVersion {
 impl RichCrateVersion {
     pub fn new(index: Version, manifest: TomlManifest, derived: Derived, readme: Result<Option<Readme>, ()>, lib_file: Option<String>, has_buildrs: bool) -> Self {
         Self {
+            origin: Origin::from_crates_io_name(index.name()),
             repo: manifest.package.repository.as_ref().and_then(|r| Repo::new(r).ok()),
             authors: manifest.package.authors.iter().map(|a| Author::new(a)).collect(),
             index, manifest, readme, has_buildrs,
@@ -84,7 +87,21 @@ impl RichCrateVersion {
         self.manifest.package.keywords.iter().map(|s| s.as_ref())
     }
 
-    pub fn name(&self) -> &str {
+    /// Globally unique URL-like string identifying source & the crate within that source
+    pub fn origin(&self) -> &Origin {
+        &self.origin
+    }
+
+    pub fn crates_io_url(&self) -> Option<String> {
+        Some(format!("https://crates.io/crates/{}", self.short_name()))
+    }
+
+    pub fn docs_rs_url(&self) -> Option<String> {
+        Some(format!("https://docs.rs/{}/{}/{}", self.short_name(), self.version(), self.short_name()))
+    }
+
+    /// Readable name
+    pub fn short_name(&self) -> &str {
         self.index.name()
     }
 
@@ -147,7 +164,7 @@ impl RichCrateVersion {
         !self.has_bin() &&
         self.has_buildrs() &&
         (self.links().is_some() || (
-            self.name().ends_with("-sys") ||
+            self.short_name().ends_with("-sys") ||
             self.category_slugs().any(|c| c == "external-ffi-bindings")
             // _dll suffix is a false positive
         ))

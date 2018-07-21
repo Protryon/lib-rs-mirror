@@ -1,4 +1,5 @@
 
+use Origin;
 use crates_io_client::CratesIoCrate;
 use crates_io_client::CrateMetaVersion;
 pub use crates_io_client::DownloadWeek;
@@ -9,18 +10,24 @@ pub use crates_io_client::DownloadWeek;
 /// Currently just a wrapper around crates.io API data.
 #[derive(Debug)]
 pub struct RichCrate {
+    origin: Origin,
     crates_io: CratesIoCrate,
 }
 
 impl RichCrate {
     pub fn new(crates_io: CratesIoCrate) -> Self {
         Self {
+            origin: Origin::from_crates_io_name(&crates_io.meta.krate.name),
             crates_io,
         }
     }
 
     pub fn name(&self) -> &str {
         &self.crates_io.meta.krate.name
+    }
+
+    pub fn origin(&self) -> &Origin {
+        &self.origin
     }
 
     pub fn weekly_downloads(&self) -> Vec<DownloadWeek> {

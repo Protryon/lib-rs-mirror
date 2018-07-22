@@ -14,6 +14,7 @@ pub use rich_crate::*;
 mod rich_crate_version;
 pub use rich_crate_version::*;
 
+pub use repo_url::Repo;
 pub use render_readme::Markup;
 pub use render_readme::Readme;
 

@@ -325,9 +325,10 @@ impl KitchenSink {
     /// Maintenance: add crate to local db index
     pub fn index_crate(&self, c: &Crate) -> CResult<()> {
         let k = self.rich_crate(c)?;
-        self.crate_db.index_versions(&k)?;
         let v = self.rich_crate_version(c)?;
-        self.crate_db.index_latest(&v)
+        self.crate_db.index_latest(&v)?;
+        self.crate_db.index_versions(&k)?;
+        Ok(())
     }
 
     pub fn user_by_email(&self, email: &str) -> CResult<Option<User>> {

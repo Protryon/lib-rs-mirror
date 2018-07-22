@@ -3,11 +3,11 @@ extern crate libflate;
 extern crate render_readme;
 extern crate repo_url;
 extern crate tar;
-extern crate toml;
+
 #[macro_use] extern crate quick_error;
 
-use cargo_toml::TomlManifest;
 use cargo_toml::TomlPackage;
+use cargo_toml::TomlManifest;
 use render_readme::Markup;
 use render_readme::Readme;
 use repo_url::Repo;
@@ -17,43 +17,15 @@ use std::path::PathBuf;
 
 mod error;
 mod tarball;
-mod git;
 
 pub use error::*;
 pub type Result<T> = std::result::Result<T, UnarchiverError>;
 
-pub struct Unarchiver {
-    base_path: PathBuf,
+/// Read tarball and get Cargo.toml, etc. out of it.
+pub fn read_archive(archive_tgz: impl Read, name: &str, ver: &str) -> Result<CrateFile> {
+    let prefix = format!("{}-{}", name, ver);
+    Ok(tarball::read_archive(archive_tgz, Path::new(&prefix))?)
 }
-
-impl Unarchiver {
-    /// Temporary files will be stored in `cache_base_dir`
-    pub fn new(cache_base_dir: impl Into<PathBuf>) -> Self {
-        Self {
-            base_path: cache_base_dir.into(),
-        }
-    }
-
-    /// Read tarball and get Cargo.toml, etc. out of it.
-    pub fn read_archive(&self, archive_tgz: impl Read, name: &str, ver: &str) -> Result<CrateFile> {
-        let prefix = format!("{}-{}", name, ver);
-        let mut meta = tarball::read_archive(archive_tgz, Path::new(&prefix))?;
-
-        let has_readme = meta.readme.as_ref().ok().and_then(|opt| opt.as_ref()).is_some();
-        if !has_readme {
-            let maybe_repo = meta.manifest.package.repository.as_ref().and_then(|r| Repo::new(r).ok());
-            if let Some(ref repo) = maybe_repo {
-                meta.readme = git::checkout(repo, &self.base_path, name)
-                .and_then(|checkout| {
-                    git::find_readme(&checkout, &meta.manifest.package)
-                });
-            }
-        }
-
-        Ok(meta)
-    }
-}
-
 
 #[derive(Debug, Clone)]
 pub struct CrateFile {
@@ -77,7 +49,6 @@ impl CrateFile {
     }
 }
 
-
 fn readme_from_repo(markup: Markup, repo_url: &Option<String>) -> Readme {
     let repo = repo_url.as_ref().and_then(|url| Repo::new(url).ok());
     let base_url = repo.as_ref().map(|r| r.readme_base_url());
@@ -92,9 +63,7 @@ fn is_readme_filename(path: &Path, package: Option<&TomlPackage>) -> bool {
         if let Some(&TomlPackage{readme: Some(ref r),..}) = package {
             r == s
         } else {
-            // that's not great; there are readme-windows, readme.ja.md and more
-            let readme_filenames = &["readme.md", "readme.markdown", "readme.mdown", "readme", "readme.rst", "readme.adoc", "readme.txt", "readme.rest"];
-            readme_filenames.iter().any(|f| f.eq_ignore_ascii_case(s.as_ref()))
+            render_readme::is_readme_filename(path)
         }
     })
 }

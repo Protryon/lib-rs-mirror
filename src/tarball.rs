@@ -4,7 +4,6 @@ use render_readme::Markup;
 use std::io::Read;
 use std::path::Path;
 use tar::Archive;
-use toml;
 use readme_from_repo;
 use is_readme_filename;
 use Result;
@@ -60,13 +59,7 @@ pub fn read_archive(archive: impl Read, prefix: &Path) -> Result<CrateFile> {
                 lib_file = Some(data);
             },
             ReadAs::Toml => {
-                manifest = Some(match toml::from_str(&data) {
-                    Ok(manifest) => manifest,
-                    // some crates lack [package] header :(
-                    Err(e) => if let Ok(m) = toml::from_str(&format!("[package]\n{}",data.replace("[project]",""))) {m} else {
-                        Err(e)?
-                    },
-                });
+                manifest = Some(TomlManifest::from_slice(data.as_bytes())?);
             },
             ReadAs::ReadmeMarkdown => {
                 markup = Some(Markup::Markdown(data));

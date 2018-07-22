@@ -23,11 +23,10 @@ members = [
 [profile.dev]
 opt-level = 1
 
-[patch.'https://gitlab.com/crates.rs/cargo_author.git']
-cargo_author = { path = "cargo_author" }
-
-[patch.'https://gitlab.com/crates.rs/cargo_toml.git']
+[patch.crates-io]
 cargo_toml = { path = "cargo_toml" }
+cargo_author = { path = "cargo_author" }
+lazyonce = { path = "lazyonce" }
 
 [patch.'https://gitlab.com/crates.rs/categories.git']
 categories = { path = "categories" }
@@ -52,9 +51,6 @@ github_info = { path = "github_info" }
 
 [patch.'https://gitlab.com/crates.rs/kitchen_sink.git']
 kitchen_sink = { path = "kitchen_sink" }
-
-[patch.'https://gitlab.com/crates.rs/lazyonce.git']
-lazyonce = { path = "lazyonce" }
 
 [patch.'https://gitlab.com/crates.rs/reindex.git']
 reindex = { path = "reindex" }

@@ -39,6 +39,8 @@ impl CrateDb {
         let tx = conn.transaction()?;
         {
             let mut insert_crate = tx.prepare_cached("INSERT OR IGNORE INTO crates (origin, recent_downloads) VALUES (?1, ?2)")?;
+            let mut insert_repo = tx.prepare_cached("INSERT OR IGNORE INTO crate_repos (crate_id, repo) VALUES (?1, ?2)")?;
+            let mut delete_repo = tx.prepare_cached("DELETE FROM crate_repos WHERE crate_id = ?1")?;
             let mut insert_category = tx.prepare_cached("INSERT OR IGNORE INTO categories (crate_id, slug, weight) VALUES (?1, ?2, ?3)")?;
             let mut get_crate_id = tx.prepare_cached("SELECT id FROM crates WHERE origin = ?1")?;
 
@@ -46,6 +48,12 @@ impl CrateDb {
 
             insert_crate.execute(&[&origin, &0]).context("insert crate")?;
             let crate_id: u32 = get_crate_id.query_row(&[&origin], |row| row.get(0)).context("crate_id")?;
+
+            if let Some(repo) = c.repository() {
+                insert_repo.execute(&[&crate_id, &repo.canonical_git_url().as_ref()]).context("insert repo")?;
+            } else {
+                delete_repo.execute(&[&crate_id]).context("del repo")?;
+            }
 
             let mut insert_keyword = KeywordInsert::new(&tx, crate_id)?;
             print!("{} = {}: ", origin, crate_id);
@@ -103,7 +111,6 @@ impl CrateDb {
         println!("");
         Ok(())
     }
-
 
     /// Update download counts of the crate
     pub fn index_versions(&self, all: &RichCrate) -> Result<()> {

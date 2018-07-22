@@ -23,6 +23,18 @@ impl CrateDb {
                 weight          REAL NOT NULL,
                 explicit        INTEGER NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS crate_repos (
+                crate_id        INTEGER NOT NULL UNIQUE,
+                repo            TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS repo_crates (
+                repo            TEXT NOT NULL,
+                path            TEXT NOT NULL,
+                crate_name      TEXT NOT NULL
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS repo_crates_idx on repo_crates(repo, path, crate_name);
+
             CREATE TABLE IF NOT EXISTS crate_versions (
                 crate_id        INTEGER NOT NULL,
                 version         TEXT NOT NULL,

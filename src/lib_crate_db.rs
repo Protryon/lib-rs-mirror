@@ -12,6 +12,7 @@ use rusqlite::*;
 use chrono::prelude::*;
 use std::path::Path;
 use std::sync::Mutex;
+use failure::ResultExt;
 type Result<T> = std::result::Result<T, failure::Error>;
 
 mod schema;
@@ -41,12 +42,13 @@ impl CrateDb {
             let mut insert_category = tx.prepare_cached("INSERT OR IGNORE INTO categories (crate_id, slug, weight) VALUES (?1, ?2, ?3)")?;
             let mut get_crate_id = tx.prepare_cached("SELECT id FROM crates WHERE origin = ?1")?;
 
-            let origin = c.origin();
-            insert_crate.execute(&[&origin.to_str(), &0])?;
-            let crate_id: u32 = get_crate_id.query_row(&[&origin.to_str()], |row| row.get(0))?;
+            let origin = c.origin().to_str();
+
+            insert_crate.execute(&[&origin, &0]).context("insert crate")?;
+            let crate_id: u32 = get_crate_id.query_row(&[&origin], |row| row.get(0)).context("crate_id")?;
 
             let mut insert_keyword = KeywordInsert::new(&tx, crate_id)?;
-            print!("{} = {}: ", origin.to_str(), crate_id);
+            print!("{} = {}: ", origin, crate_id);
 
             let cat_w = if c.raw_category_slugs().next().is_none() {0.05} else {1.0};
             for (i, slug) in c.category_slugs().enumerate() {
@@ -55,7 +57,7 @@ impl CrateDb {
                 if slug.contains("::") {
                     w *= 1.3; // more specific
                 }
-                insert_category.execute(&[&crate_id, &&*slug, &w])?;
+                insert_category.execute(&[&crate_id, &&*slug, &w]).context("insert cat")?;
                 insert_keyword.add(&*slug, w, false)?;
             }
             for (i, k) in c.raw_keywords().map(|k| k.to_lowercase().trim().to_string()).enumerate() {
@@ -97,7 +99,7 @@ impl CrateDb {
                 }
             }
         }
-        tx.commit()?;
+        tx.commit().context("commit crate upd")?;
         println!("");
         Ok(())
     }
@@ -109,20 +111,20 @@ impl CrateDb {
         let tx = conn.transaction()?;
         {
             let mut update_recent = tx.prepare_cached("UPDATE crates SET recent_downloads = ?1 WHERE id = ?2")?;
-            let mut get_crate_id = tx.prepare_cached("SELECT id FROM crates WHERE name = ?1")?;
+            let mut get_crate_id = tx.prepare_cached("SELECT id FROM crates WHERE origin = ?1")?;
             let mut insert_version = tx.prepare_cached("INSERT OR IGNORE INTO crate_versions (crate_id, version, created) VALUES (?1, ?2, ?3)")?;
 
-            let origin = all.origin();
-            let crate_id: u32 = get_crate_id.query_row(&[&origin.to_str()], |row| row.get(0))?;
+            let origin = all.origin().to_str();
+            let crate_id: u32 = get_crate_id.query_row(&[&origin], |row| row.get(0)).context("get crate id")?;
             let recent = all.downloads_recent() as u32;
-            update_recent.execute(&[&recent, &crate_id])?;
+            update_recent.execute(&[&recent, &crate_id]).context("update recent")?;
 
             for ver in all.versions() {
-                let timestamp = DateTime::parse_from_rfc3339(&ver.created_at)?;
-                insert_version.execute(&[&crate_id, &ver.num, &timestamp.timestamp()])?;
+                let timestamp = DateTime::parse_from_rfc3339(&ver.created_at).context("version timestamp")?;
+                insert_version.execute(&[&crate_id, &ver.num, &timestamp.timestamp()]).context("insert ver")?;
             }
         }
-        tx.commit()?;
+        tx.commit().context("versions commit")?;
         Ok(())
     }
 
@@ -153,8 +155,8 @@ impl CrateDb {
         join categories cc on cc.crate_id = ck.crate_id
         group by slug
         order by 1 desc
-        limit 1"#)?;
-        let all = query.query_map(&[&origin.to_str()], |row| row.get(1))?;
+        limit 1"#).context("categories")?;
+        let all = query.query_map(&[&origin.to_str()], |row| row.get(1)).context("categories q")?;
         Ok(all.collect::<std::result::Result<_,_>>()?)
     }
 
@@ -221,7 +223,7 @@ impl CrateDb {
             order by 1 desc
             limit 6
         "#)?;
-        let res = query.query_map(&[&slug], |row| row.get(1))?;
+        let res = query.query_map(&[&slug], |row| row.get(1)).context("related_categories")?;
         Ok(res.collect::<std::result::Result<_,_>>()?)
     }
 
@@ -272,7 +274,7 @@ impl CrateDb {
                 order by 1 desc
                 limit 10
         "#)?;
-        let q = query.query_map(&[&slug], |row| row.get(1))?;
+        let q = query.query_map(&[&slug], |row| row.get(1)).context("top keywords")?;
         let q = q.filter_map(|r| r.ok());
         Ok(q.collect())
     }
@@ -326,7 +328,7 @@ impl CrateDb {
         "#)?;
         let q = q.query_map(&[], |row| -> (String, u32) {
             (row.get(0), row.get(1))
-        })?.filter_map(|r| r.ok());
+        }).context("counts")?.filter_map(|r| r.ok());
         Ok(q.collect())
     }
 
@@ -371,11 +373,11 @@ impl<'a> KeywordInsert<'a> {
             return Ok(());
         }
         self.insert_name.execute(&[&word, if visible {&1} else {&0}])?;
-        let (keyword_id, old_vis): (u32, u32) = self.select_id.query_row(&[&word],|r| (r.get(0), r.get(1)))?;
+        let (keyword_id, old_vis): (u32, u32) = self.select_id.query_row(&[&word],|r| (r.get(0), r.get(1))).context("get keyword")?;
         if visible && old_vis == 0 {
-            self.make_visible.execute(&[&keyword_id])?;
+            self.make_visible.execute(&[&keyword_id]).context("keyword vis")?;
         }
-        self.insert_value.execute(&[&keyword_id, &self.crate_id, &weight, if visible {&1} else {&0}])?;
+        self.insert_value.execute(&[&keyword_id, &self.crate_id, &weight, if visible {&1} else {&0}]).context("keyword")?;
         Ok(())
     }
 }

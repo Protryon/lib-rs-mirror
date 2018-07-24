@@ -5,6 +5,7 @@ extern crate crate_db;
 extern crate crate_files;
 extern crate crates_index;
 extern crate crates_io_client;
+extern crate crate_git_checkout;
 extern crate docs_rs_client;
 extern crate file;
 extern crate github_info;
@@ -28,7 +29,6 @@ pub use github_info::UserType;
 pub use rich_crate::{Cfg, Target};
 
 use cargo_toml::TomlLibOrBin;
-use crate_files::Unarchiver;
 use failure::ResultExt;
 use github_info::GitCommitAuthor;
 use lazyonce::LazyOnce;
@@ -76,7 +76,7 @@ pub struct KitchenSink {
     gh: github_info::GitHub,
     category_crate_counts: LazyOnce<Option<HashMap<String, u32>>>,
     crate_path_index: LazyOnce<HashMap<Origin, PathBuf>>,
-    unarchiver: Unarchiver,
+    git_checkout_path: PathBuf,
     main_cache_path: PathBuf,
 }
 
@@ -103,7 +103,7 @@ impl KitchenSink {
             user_db: user_db::UserDb::new(Self::assert_exists(data_path.join("users.db"))?)?,
             gh: github_info::GitHub::new(&Self::assert_exists(data_path.join("github.db"))?, github_token)?,
             crates_io: crates_io_client::CratesIoClient::new(data_path)?,
-            unarchiver: Unarchiver::new(data_path),
+            git_checkout_path: data_path.join("git"),
             crate_path_index: LazyOnce::new(),
             category_crate_counts: LazyOnce::new(),
             main_cache_path,
@@ -189,6 +189,22 @@ impl KitchenSink {
         let name = latest.name();
         let ver = latest.version();
         let mut meta = self.crate_file(name, ver).context("crate file")?;
+
+        let has_readme = meta.readme.as_ref().ok().and_then(|opt| opt.as_ref()).is_some();
+        if !has_readme {
+            let maybe_repo = meta.manifest.package.repository.as_ref().and_then(|r| Repo::new(r).ok());
+            if let Some(ref repo) = maybe_repo {
+                let res = crate_git_checkout::checkout(repo, &self.git_checkout_path.join(name))
+                .map_err(From::from)
+                .and_then(|repo| {
+                    crate_git_checkout::find_readme(&repo, &meta.manifest.package)
+                });
+                match res {
+                    Ok(readme) => meta.readme = Ok(readme),
+                    Err(err) => eprintln!("Checkout of {} failed: {}", name, err)
+                }
+            }
+        }
 
         // Quick'n'dirty autobins substitute
         if meta.manifest.bin.is_empty() {
@@ -571,7 +587,7 @@ impl KitchenSink {
     /// Read tarball
     fn crate_file(&self, name: &str, ver: &str) -> CResult<crate_files::CrateFile> {
         let data = self.crates_io.crate_data(name, ver).context("crate_file")?;
-        Ok(self.unarchiver.read_archive(&data[..], name, ver)?)
+        Ok(crate_files::read_archive(&data[..], name, ver)?)
     }
 
     pub fn repo_commits(&self, repo: &SimpleRepo) -> CResult<Vec<github_info::CommitMeta>> {

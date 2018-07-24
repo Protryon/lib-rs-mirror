@@ -18,6 +18,7 @@ members = [
 "rich_crate",
 "simple_cache",
 "user_db",
+"crate_git_checkout",
 ]
 
 [profile.dev]
@@ -36,6 +37,9 @@ crate_db = { path = "crate_db" }
 
 [patch.'https://gitlab.com/crates.rs/crate_files.git']
 crate_files = { path = "crate_files" }
+
+[patch.'https://gitlab.com/crates.rs/crate_git_checkout.git']
+crate_git_checkout = { path = "crate_git_checkout" }
 
 [patch.'https://gitlab.com/crates.rs/crates_io_client.git']
 crates_io_client = { path = "crates_io_client" }

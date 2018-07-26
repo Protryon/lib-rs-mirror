@@ -19,7 +19,7 @@ use std::hash::Hash;
 use urler::Urler;
 use Page;
 
-/// Data sources used in `krate.rs.html`
+/// Data sources used in `crate_page.rs.html`
 pub struct CratePage<'a> {
     pub all: &'a RichCrate,
     pub ver: &'a RichCrateVersion,

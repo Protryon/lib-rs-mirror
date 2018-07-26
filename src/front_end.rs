@@ -75,14 +75,14 @@ pub fn render_homepage(out: &mut Write, crates: &KitchenSink) -> Result<(), fail
     Ok(())
 }
 
-/// See `krate.rs.html`
+/// See `crate_page.rs.html`
 pub fn render_crate_page(out: &mut Write, all: &RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, filter: ArcImageFilter) -> String {
     let markup = &Renderer::new_filter(Highlighter::new(), filter);
     let urler = Urler::new();
     let c = CratePage {
         all, ver, kitchen_sink, markup,
     };
-    templates::krate(out, &urler, &c).unwrap();
+    templates::crate_page(out, &urler, &c).unwrap();
     c.page_title()
 }
 

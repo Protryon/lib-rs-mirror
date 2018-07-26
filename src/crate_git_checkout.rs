@@ -4,6 +4,7 @@ extern crate repo_url;
 extern crate failure;
 extern crate git2;
 
+use std::process::Command;
 use cargo_toml::TomlPackage;
 use render_readme::Readme;
 use render_readme::Markup;
@@ -57,14 +58,29 @@ fn iter_blobs_recurse<F>(repo: &Repository, tree: &Tree, path: &mut String, cb: 
 
 fn get_repo(repo: &Repo, repo_path: &Path) -> Result<Repository, git2::Error> {
     let url = repo.canonical_git_url();
-    Ok(match Repository::open(repo_path) {
-        Ok(repo) => repo,
-        Err(_) => {
-            let mut ch = RepoBuilder::new();
-            ch.bare(true);
-            ch.clone(&url, repo_path)?
+    match Repository::open(repo_path) {
+        Ok(repo) => Ok(repo),
+        err => {
+            let ok = Command::new("git")
+                .arg("clone")
+                .arg("--depth=1")
+                .arg("--config").arg("core.askPass=true")
+                .arg("--")
+                .arg(&*url)
+                .arg(&repo_path)
+                .output()
+                .map(|output| output.status.success())
+                .unwrap_or(false);
+            if !ok {
+                let mut ch = RepoBuilder::new();
+                ch.bare(true);
+                // no support for depth=1!
+                ch.clone(&url, repo_path)
+            } else {
+                Repository::open(repo_path)
+            }
         },
-    })
+    }
 }
 
 pub fn find_manifests(repo: &Repo, repo_path: &Path) -> Result<Vec<(String, TomlManifest)>, failure::Error> {

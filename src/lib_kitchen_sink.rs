@@ -194,10 +194,10 @@ impl KitchenSink {
         if !has_readme {
             let maybe_repo = meta.manifest.package.repository.as_ref().and_then(|r| Repo::new(r).ok());
             if let Some(ref repo) = maybe_repo {
-                let res = crate_git_checkout::checkout(repo, &self.git_checkout_path.join(name))
+                let res = crate_git_checkout::checkout(repo, &self.git_checkout_path, name)
                 .map_err(From::from)
-                .and_then(|repo| {
-                    crate_git_checkout::find_readme(&repo, &meta.manifest.package)
+                .and_then(|checkout| {
+                    crate_git_checkout::find_readme(&checkout, &meta.manifest.package)
                 });
                 match res {
                     Ok(readme) => meta.readme = Ok(readme),
@@ -344,6 +344,16 @@ impl KitchenSink {
         let v = self.rich_crate_version(c)?;
         self.crate_db.index_latest(&v)?;
         self.crate_db.index_versions(&k)?;
+        if let Some(repo) = v.repository() {
+            let manif = crate_git_checkout::find_manifests(repo, &self.git_checkout_path, v.short_name())
+                .with_context(|_| format!("find manifests in {}", repo.canonical_http_url()))?
+                .into_iter()
+                .map(|(subpath, manifest)| {
+                    (subpath, manifest.package.name)
+                })
+                .collect::<Vec<_>>();
+            self.crate_db.index_repo_crates(repo, manif.into_iter()).context("index rev repo")?;
+        }
         Ok(())
     }
 

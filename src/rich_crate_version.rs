@@ -165,6 +165,7 @@ impl RichCrateVersion {
         self.has_buildrs() &&
         (self.links().is_some() || (
             self.short_name().ends_with("-sys") ||
+            self.short_name().ends_with("_sys") ||
             self.category_slugs().any(|c| c == "external-ffi-bindings")
             // _dll suffix is a false positive
         ))

@@ -15,14 +15,8 @@ use std::path::Path;
 use git2::{Tree, Repository, build::RepoBuilder, Reference, ObjectType, Blob};
 
 pub fn checkout(repo: &Repo, checkout_path: &Path) -> Result<Repository, git2::Error> {
-    let repo = get_repo(&repo.canonical_git_url(), &checkout_path)?;
+    let repo = get_repo(repo, &checkout_path)?;
     Ok(repo)
-}
-
-pub fn clone_or_update(url: &str, into: &Path) -> Result<Repository, git2::Error> {
-    let mut ch = RepoBuilder::new();
-    ch.bare(true);
-    Ok(ch.clone(url, into)?)
 }
 
 pub fn iter_blobs<F>(repo: &Repository, treeish: &Reference, mut cb: F) -> Result<(), failure::Error>
@@ -61,15 +55,20 @@ fn iter_blobs_recurse<F>(repo: &Repository, tree: &Tree, path: &mut String, cb: 
     Ok(())
 }
 
-fn get_repo(url: &str, repo_path: &Path) -> Result<Repository, git2::Error> {
-    match Repository::open(repo_path) {
-        Ok(repo) => Ok(repo),
-        Err(_) => clone_or_update(url, repo_path),
-    }
+fn get_repo(repo: &Repo, repo_path: &Path) -> Result<Repository, git2::Error> {
+    let url = repo.canonical_git_url();
+    Ok(match Repository::open(repo_path) {
+        Ok(repo) => repo,
+        Err(_) => {
+            let mut ch = RepoBuilder::new();
+            ch.bare(true);
+            ch.clone(&url, repo_path)?
+        },
+    })
 }
 
-pub fn find_manifests(url: &str, repo_path: &Path) -> Result<Vec<(String, TomlManifest)>, failure::Error> {
-    let repo = get_repo(url, repo_path)?;
+pub fn find_manifests(repo: &Repo, repo_path: &Path) -> Result<Vec<(String, TomlManifest)>, failure::Error> {
+    let repo = get_repo(repo, repo_path)?;
     let head = repo.head()?;
     let mut tomls = Vec::new();
     iter_blobs(&repo, &head, |inner_path, name, blob| {

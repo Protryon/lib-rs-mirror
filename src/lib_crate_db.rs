@@ -6,6 +6,7 @@ extern crate rich_crate;
 use std::collections::HashMap;
 use rich_crate::RichCrate;
 use rich_crate::Origin;
+use rich_crate::Repo;
 use rich_crate::Markup;
 use rich_crate::RichCrateVersion;
 use rusqlite::*;
@@ -39,7 +40,7 @@ impl CrateDb {
         let tx = conn.transaction()?;
         {
             let mut insert_crate = tx.prepare_cached("INSERT OR IGNORE INTO crates (origin, recent_downloads) VALUES (?1, ?2)")?;
-            let mut insert_repo = tx.prepare_cached("INSERT OR IGNORE INTO crate_repos (crate_id, repo) VALUES (?1, ?2)")?;
+            let mut insert_repo = tx.prepare_cached("INSERT OR REPLACE INTO crate_repos (crate_id, repo) VALUES (?1, ?2)")?;
             let mut delete_repo = tx.prepare_cached("DELETE FROM crate_repos WHERE crate_id = ?1")?;
             let mut insert_category = tx.prepare_cached("INSERT OR IGNORE INTO categories (crate_id, slug, weight) VALUES (?1, ?2, ?3)")?;
             let mut get_crate_id = tx.prepare_cached("SELECT id FROM crates WHERE origin = ?1")?;
@@ -109,6 +110,35 @@ impl CrateDb {
         }
         tx.commit().context("commit crate upd")?;
         println!("");
+        Ok(())
+    }
+
+    /// Update crate <> repo association
+    ///
+    /// Along with `index_latest` it establishes 2-way association.
+    /// It solves two problems:
+    ///
+    /// 1. A published crate can define what repository it is from, but *any* crate
+    ///    can point to *any* repo, so that alone is not enough to prove it actually
+    ///    is the crate's real repository.
+    ///    Checking what crates are in the repository confirms or disproves the association.
+    /// 2. A repository can contain more than one crate (monorepo). Search of the repo
+    ///    finds location of the crate within the repo, adding extra precision to the
+    ///    crate's repo URL (needed for e.g. GitHub README relative links), and adds
+    ///    interesting relationship information for crates.
+    pub fn index_repo_crates(&self, repo: &Repo, paths_and_names: impl Iterator<Item = (impl AsRef<str>, impl AsRef<str>)>) -> Result<()> {
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        {
+            let repo = repo.canonical_git_url();
+            let mut insert_repo = tx.prepare_cached("INSERT OR IGNORE INTO repo_crates (repo, path, crate_name) VALUES (?1, ?2, ?3)")?;
+            for (path, name) in paths_and_names {
+                let name = name.as_ref();
+                let path = path.as_ref();
+                insert_repo.execute(&[&repo.as_ref(), &path, &name]).context("repo rev insert")?;
+            }
+        }
+        tx.commit().context("commit rev repo")?;
         Ok(())
     }
 

@@ -3,6 +3,7 @@ extern crate cargo_toml;
 extern crate repo_url;
 extern crate failure;
 extern crate git2;
+extern crate urlencoding;
 
 use std::process::Command;
 use cargo_toml::TomlPackage;
@@ -15,8 +16,8 @@ use std::path::Path;
 
 use git2::{Tree, Repository, build::RepoBuilder, Reference, ObjectType, Blob};
 
-pub fn checkout(repo: &Repo, checkout_path: &Path) -> Result<Repository, git2::Error> {
-    let repo = get_repo(repo, &checkout_path)?;
+pub fn checkout(repo: &Repo, base_path: &Path, name: &str) -> Result<Repository, git2::Error> {
+    let repo = get_repo(repo, base_path, name)?;
     Ok(repo)
 }
 
@@ -56,11 +57,20 @@ fn iter_blobs_recurse<F>(repo: &Repository, tree: &Tree, path: &mut String, cb: 
     Ok(())
 }
 
-fn get_repo(repo: &Repo, repo_path: &Path) -> Result<Repository, git2::Error> {
-    let url = repo.canonical_git_url();
-    match Repository::open(repo_path) {
+fn get_repo(repo: &Repo, base_path: &Path, name: &str) -> Result<Repository, git2::Error> {
+    let url = &*repo.canonical_git_url();
+
+    let repo_path = base_path.join(urlencoding::encode(url));
+    if !repo_path.exists() {
+        let old_path = base_path.join(name);
+        if old_path.exists() {
+            let _= std::fs::rename(old_path, &repo_path);
+        }
+    }
+
+    match Repository::open(&repo_path) {
         Ok(repo) => Ok(repo),
-        err => {
+        _ => {
             let ok = Command::new("git")
                 .arg("clone")
                 .arg("--depth=1")
@@ -75,7 +85,7 @@ fn get_repo(repo: &Repo, repo_path: &Path) -> Result<Repository, git2::Error> {
                 let mut ch = RepoBuilder::new();
                 ch.bare(true);
                 // no support for depth=1!
-                ch.clone(&url, repo_path)
+                ch.clone(&url, &repo_path)
             } else {
                 Repository::open(repo_path)
             }
@@ -83,8 +93,8 @@ fn get_repo(repo: &Repo, repo_path: &Path) -> Result<Repository, git2::Error> {
     }
 }
 
-pub fn find_manifests(repo: &Repo, repo_path: &Path) -> Result<Vec<(String, TomlManifest)>, failure::Error> {
-    let repo = get_repo(repo, repo_path)?;
+pub fn find_manifests(repo: &Repo, base_path: &Path, name: &str) -> Result<Vec<(String, TomlManifest)>, failure::Error> {
+    let repo = get_repo(repo, base_path, name)?;
     let head = repo.head()?;
     let mut tomls = Vec::new();
     iter_blobs(&repo, &head, |inner_path, name, blob| {
@@ -139,17 +149,3 @@ fn is_readme_filename(path: &Path, package: Option<&TomlPackage>) -> bool {
 }
 
 
-#[test]
-fn test_find_tomls() {
-    let tomls = find_manifests("(n/a)", Path::new(".")).unwrap();
-    assert_eq!(1, tomls.len());
-}
-
-#[test]
-fn test_find_readme() {
-    let toml = ::std::fs::read("Cargo.toml").unwrap();
-    let manifest = TomlManifest::from_slice(&toml).unwrap();
-    let repo = get_repo("(n/a)", Path::new(".")).unwrap();
-    let readme = find_readme(&repo, &manifest.package).unwrap();
-    assert!(readme.is_some());
-}

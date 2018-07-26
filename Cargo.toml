@@ -1,7 +1,7 @@
 [package]
 description = "Analyze git repository containing Cargo crates"
 name = "crate_git_checkout"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Kornel <kornel@geekhood.net>"]
 
 [lib]
@@ -14,3 +14,4 @@ cargo_toml = "0.3.1"
 render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git" }
 repo_url = { git = "https://gitlab.com/crates.rs/repo_url.git" }
 failure = "0.1.1"
+urlencoding = "1.0.0"

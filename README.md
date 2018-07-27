@@ -42,7 +42,7 @@ If you'd like to help improve it:
  1. [Get the initial data files](https://crates.rs/data) for the site (about 2GB).
 
  2. Extract the data files in `.xz` format using [7zip](https://www.7-zip.org/download.html), [The Unarchiver (Mac)](https://theunarchiver.com/) or `unxz data/*.xz`.
-    * Put them all (`cache.db`, `crates.db`, `github.db`, `users.db`, `category_keywords.db`) in the `data/` subdirectory of crates.rs checkout.
+    * Put them all (`cache.db`, `crates.db`, `github.db`, `users.db`, `crate_meta.db`) in the `data/` subdirectory of crates.rs checkout.
 
  3. Generate front-end [styles](https://gitlab.com/crates.rs/style):
 

@@ -1,4 +1,6 @@
 target/
 data/*.db
 data/*.xz
+data/Makefile
+data/index.html
 data/git

@@ -4,7 +4,7 @@ website: caches data/index/1 styles
 	cd front_end && cargo run --release --bin website
 	cd style && npm start
 
-caches: data/cache.db data/crates.db data/github.db data/category_keywords.db data/users.db
+caches: data/cache.db data/crates.db data/github.db data/crate_meta.db data/users.db
 
 styles: style/public/index.css
 
@@ -25,7 +25,7 @@ data/index/1:
 	-rm -f $@
 	unxz -vk $<
 
-data/cache.db.xz data/github.db.xz data/category_keywords.db.xz data/users.db.xz data/crates.db:
+data/cache.db.xz data/github.db.xz data/crate_meta.db.xz data/users.db.xz data/crates.db:
 	@echo Downloading $@
 	curl --fail --output $@ https://crates.rs/$@
 

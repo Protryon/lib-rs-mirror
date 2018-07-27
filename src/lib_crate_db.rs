@@ -37,7 +37,7 @@ impl CrateDb {
     /// Add data of the latest version of a crate to the index
     pub fn index_latest(&self, c: &RichCrateVersion) -> Result<()> {
         let mut conn = self.conn.lock().unwrap();
-        let tx = conn.transaction()?;
+        let tx = conn.transaction().context("index_latest tx")?;
         {
             let mut insert_crate = tx.prepare_cached("INSERT OR IGNORE INTO crates (origin, recent_downloads) VALUES (?1, ?2)")?;
             let mut insert_repo = tx.prepare_cached("INSERT OR REPLACE INTO crate_repos (crate_id, repo) VALUES (?1, ?2)")?;
@@ -128,7 +128,7 @@ impl CrateDb {
     ///    interesting relationship information for crates.
     pub fn index_repo_crates(&self, repo: &Repo, paths_and_names: impl Iterator<Item = (impl AsRef<str>, impl AsRef<str>)>) -> Result<()> {
         let mut conn = self.conn.lock().unwrap();
-        let tx = conn.transaction()?;
+        let tx = conn.transaction().context("index_repo_crates tx")?;
         {
             let repo = repo.canonical_git_url();
             let mut insert_repo = tx.prepare_cached("INSERT OR IGNORE INTO repo_crates (repo, path, crate_name) VALUES (?1, ?2, ?3)")?;
@@ -145,7 +145,7 @@ impl CrateDb {
     /// Update download counts of the crate
     pub fn index_versions(&self, all: &RichCrate) -> Result<()> {
         let mut conn = self.conn.lock().unwrap();
-        let tx = conn.transaction()?;
+        let tx = conn.transaction().context("index_versions tx")?;
         {
             let mut update_recent = tx.prepare_cached("UPDATE crates SET recent_downloads = ?1 WHERE id = ?2")?;
             let mut get_crate_id = tx.prepare_cached("SELECT id FROM crates WHERE origin = ?1")?;

@@ -50,6 +50,13 @@ impl GitHub {
     }
 
     pub fn user_by_email(&self, email: &str) -> CResult<Option<User>> {
+        let std_suffix = "@users.noreply.github.com";
+        if email.ends_with(std_suffix) {
+            let login = email[0..email.len()-std_suffix.len()].split('+').last().unwrap();
+            if let Ok(user) = self.user_by_login(login) {
+                return Ok(Some(user));
+            }
+        }
         let enc_email = encode(email);
         let cache_file = format!("user-{}.json", enc_email);
         let res: SearchResults<User> = self.get_cached(&cache_file, |client| client.get()

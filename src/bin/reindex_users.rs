@@ -20,7 +20,7 @@ fn main() {
         },
     });
     let crates2 = crates.clone();
-    let (tx, rx) = mpsc::channel();
+    let (tx, rx) = mpsc::sync_channel(64);
     let mut seen = HashSet::new();
 
     thread::spawn(move || {
@@ -28,9 +28,9 @@ fn main() {
         rayon::scope(move |s1| {
             for k in crates.all_crates() {
                 let crates = Arc::clone(&crates);
-                println!("{:?}", k.name());
                 let tx = tx1.clone();
                 s1.spawn(move |_| {
+                    println!("{:?}", k.name());
                     let r1 = crates.rich_crate_version(&k);
                     let res = r1.and_then(|c| {
                         if let Some(Repo{host:RepoHost::GitHub(repo),..}) = c.repository() {

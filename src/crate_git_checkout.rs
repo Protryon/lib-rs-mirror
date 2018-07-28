@@ -96,8 +96,12 @@ fn get_repo(repo: &Repo, base_path: &Path, name: &str) -> Result<Repository, git
 pub fn find_manifests(repo: &Repo, base_path: &Path, name: &str) -> Result<Vec<(String, TomlManifest)>, failure::Error> {
     let repo = get_repo(repo, base_path, name)?;
     let head = repo.head()?;
+    find_manifests_in_repo(&repo, &head)
+}
+
+fn find_manifests_in_repo(repo: &Repository, treeish: &Reference) -> Result<Vec<(String, TomlManifest)>, failure::Error> {
     let mut tomls = Vec::new();
-    iter_blobs(&repo, &head, |inner_path, name, blob| {
+    iter_blobs(repo, treeish, |inner_path, name, blob| {
         if name == "Cargo.toml" {
             match TomlManifest::from_slice(blob.content()) {
                 Ok(toml) => tomls.push((inner_path.to_owned(), toml)),
@@ -109,19 +113,31 @@ pub fn find_manifests(repo: &Repo, base_path: &Path, name: &str) -> Result<Vec<(
     Ok(tomls)
 }
 
+fn path_in_repo(repo: &Repository, treeish: &Reference, crate_name: &str) -> Result<Option<String>, failure::Error> {
+    Ok(find_manifests_in_repo(repo, treeish)?
+        .into_iter()
+        .find(|(_, manifest)| manifest.package.name == crate_name)
+        .map(|(path, _)| path))
+}
+
 pub fn find_readme(repo: &Repository, package: &TomlPackage) -> Result<Option<Readme>, failure::Error> {
     let head = repo.head()?;
     let mut readme = None;
+
+    let prefix = path_in_repo(&repo, &head, &package.name)?;
+    let prefix = prefix.as_ref().map(|s| s.as_str()).unwrap_or("");
+
     iter_blobs(&repo, &head, |base, name, blob| {
-        let pathname = Path::new(base).join(name);
-        if is_readme_filename(&pathname, Some(package)) {
+        let rel_path = if base.starts_with(prefix) {&base[prefix.len()..]} else {base};
+        let rel_path_name = Path::new(rel_path).join(name);
+        if is_readme_filename(&rel_path_name, Some(package)) {
             let text = String::from_utf8_lossy(blob.content()).to_string();
-            let markup = if pathname.extension().map_or(false, |e| e == "rst") {
+            let markup = if rel_path_name.extension().map_or(false, |e| e == "rst") {
                 Markup::Rst(text)
             } else {
                 Markup::Markdown(text)
             };
-            readme = Some(readme_from_repo(markup, &package.repository));
+            readme = Some(readme_from_repo(markup, &package.repository, base));
         }
         Ok(())
     })?;
@@ -129,10 +145,10 @@ pub fn find_readme(repo: &Repository, package: &TomlPackage) -> Result<Option<Re
 }
 
 
-fn readme_from_repo(markup: Markup, repo_url: &Option<String>) -> Readme {
+fn readme_from_repo(markup: Markup, repo_url: &Option<String>, base_dir_in_repo: &str) -> Readme {
     let repo = repo_url.as_ref().and_then(|url| Repo::new(url).ok());
-    let base_url = repo.as_ref().map(|r| r.readme_base_url());
-    let base_image_url = repo.map(|r| r.readme_base_image_url());
+    let base_url = repo.as_ref().map(|r| r.readme_base_url(base_dir_in_repo));
+    let base_image_url = repo.map(|r| r.readme_base_image_url(base_dir_in_repo));
 
     Readme::new(markup, base_url, base_image_url)
 }

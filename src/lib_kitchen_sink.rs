@@ -99,7 +99,7 @@ impl KitchenSink {
         Ok(Self {
             index: crates_index::Index::new(Self::assert_exists(data_path.join("index"))?),
             docs_rs: docs_rs_client::DocsRsClient::new(&main_cache_path)?,
-            crate_db: crate_db::CrateDb::new(Self::assert_exists(data_path.join("category_keywords.db"))?)?,
+            crate_db: crate_db::CrateDb::new(Self::assert_exists(data_path.join("crate_meta.db"))?)?,
             user_db: user_db::UserDb::new(Self::assert_exists(data_path.join("users.db"))?)?,
             gh: github_info::GitHub::new(&Self::assert_exists(data_path.join("github.db"))?, github_token)?,
             crates_io: crates_io_client::CratesIoClient::new(data_path)?,

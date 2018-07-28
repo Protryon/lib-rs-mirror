@@ -15,6 +15,7 @@ extern crate render_readme;
 extern crate rich_crate;
 extern crate semver;
 extern crate urlencoding;
+extern crate locale;
 
 mod cat_page;
 mod crate_page;

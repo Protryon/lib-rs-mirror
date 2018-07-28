@@ -4,16 +4,16 @@
 
 <span class="labels">
   @if ver.is_yanked() {
-    <span class="yanked">yanked</span>
+    <span title="this version has been deleted" class="yanked">yanked</span>
   }
   @if ver.is_sys() {
-    <span class="sys">sys</span>
+    <span title="system library" class="sys">sys</span>
   }
   @if ver.is_app() {
-    <span class="bin">app</span>
+    <span title="contains executables" class="bin">app</span>
   } else {
     @if ver.has_bin() {
-      <span class="bin">bin</span>
+      <span title="contains executables" class="bin">bin</span>
     }
   }
 </span>

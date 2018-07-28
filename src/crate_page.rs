@@ -18,6 +18,8 @@ use std::collections::HashSet;
 use std::hash::Hash;
 use urler::Urler;
 use Page;
+use locale::Numeric;
+use std::fmt::Display;
 
 /// Data sources used in `crate_page.rs.html`
 pub struct CratePage<'a> {
@@ -164,6 +166,10 @@ impl<'a> CratePage<'a> {
         let (authors, owners, co_owned, contributors) = self.kitchen_sink.all_contributors(&self.ver);
         let period_after_authors = !owners.is_empty() && contributors == 0;
         (authors, owners, co_owned, contributors, period_after_authors)
+    }
+
+    pub fn format_number(&self, num: impl Display) -> String {
+        Numeric::english().format_int(num)
     }
 
     pub fn format(date: &DateTime<FixedOffset>) -> String {

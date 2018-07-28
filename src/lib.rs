@@ -49,10 +49,10 @@ impl CrateFile {
     }
 }
 
-fn readme_from_repo(markup: Markup, repo_url: &Option<String>) -> Readme {
+fn readme_from_repo(markup: Markup, repo_url: &Option<String>, base_path: &str) -> Readme {
     let repo = repo_url.as_ref().and_then(|url| Repo::new(url).ok());
-    let base_url = repo.as_ref().map(|r| r.readme_base_url());
-    let base_image_url = repo.map(|r| r.readme_base_image_url());
+    let base_url = repo.as_ref().map(|r| r.readme_base_url(base_path));
+    let base_image_url = repo.map(|r| r.readme_base_image_url(base_path));
 
     Readme::new(markup, base_url, base_image_url)
 }

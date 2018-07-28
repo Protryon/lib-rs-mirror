@@ -11,8 +11,8 @@ use {UnarchiverError, CrateFile};
 
 enum ReadAs {
     Toml,
-    ReadmeMarkdown,
-    ReadmeRst,
+    ReadmeMarkdown(String),
+    ReadmeRst(String),
     Lib,
 }
 
@@ -35,10 +35,11 @@ pub fn read_archive(archive: impl Read, prefix: &Path) -> Result<CrateFile> {
                     p if p == Path::new("Cargo.toml") || p == Path::new("cargo.toml") => ReadAs::Toml,
                     p if p == Path::new("src/lib.rs") => ReadAs::Lib,
                     p => if is_readme_filename(p, manifest.as_ref().map(|m| &m.package)) {
+                        let path_prefix = p.parent().unwrap().display().to_string();
                         if p.extension().map_or(false, |e| e == "rst") {
-                            ReadAs::ReadmeRst
+                            ReadAs::ReadmeRst(path_prefix)
                         } else {
-                            ReadAs::ReadmeMarkdown
+                            ReadAs::ReadmeMarkdown(path_prefix)
                         }
                     } else {
                         continue;
@@ -61,11 +62,11 @@ pub fn read_archive(archive: impl Read, prefix: &Path) -> Result<CrateFile> {
             ReadAs::Toml => {
                 manifest = Some(TomlManifest::from_slice(data.as_bytes())?);
             },
-            ReadAs::ReadmeMarkdown => {
-                markup = Some(Markup::Markdown(data));
+            ReadAs::ReadmeMarkdown(path_prefix) => {
+                markup = Some((path_prefix, Markup::Markdown(data)));
             },
-            ReadAs::ReadmeRst => {
-                markup = Some(Markup::Rst(data));
+            ReadAs::ReadmeRst(path_prefix) => {
+                markup = Some((path_prefix, Markup::Rst(data)));
             },
         }
     }
@@ -75,7 +76,7 @@ pub fn read_archive(archive: impl Read, prefix: &Path) -> Result<CrateFile> {
     ))?;
 
     Ok(CrateFile {
-        readme: Ok(markup.map(|m| readme_from_repo(m, &manifest.package.repository))),
+        readme: Ok(markup.map(|(path, m)| readme_from_repo(m, &manifest.package.repository, &path))),
         manifest,
         files,
         lib_file,

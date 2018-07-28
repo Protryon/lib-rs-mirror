@@ -1,6 +1,6 @@
 [package]
 name = "repo_url"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Kornel <kornel@geekhood.net>"]
 description = "Basic properties and formatting of URLs of GitHub and GitLab repositories"
 license = "CC0-1.0"

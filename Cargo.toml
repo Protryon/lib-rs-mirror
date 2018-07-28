@@ -28,7 +28,8 @@ opt-level = 1
 cargo_toml = { path = "cargo_toml" }
 cargo_author = { path = "cargo_author" }
 lazyonce = { path = "lazyonce" }
-onig_sys = { git = "https://github.com/kornelski/rust-onig.git", default-features = false }
+onig_sys = { git = "https://github.com/rust-onig/rust-onig.git", default-features = false }
+rusqlite = { git = "https://github.com/jgallagher/rusqlite.git" }
 
 [patch.'https://gitlab.com/crates.rs/categories.git']
 categories = { path = "categories" }

@@ -25,6 +25,7 @@ pub struct RichCrateVersion {
     readme: Result<Option<Readme>, ()>,
     lib_file: Option<String>,
     repo: Option<Repo>,
+    path_in_repo: Option<String>,
     has_buildrs: bool,
 }
 
@@ -32,13 +33,14 @@ pub struct RichCrateVersion {
 ///
 /// Crates.rs uses this only for the latest version of a crate.
 impl RichCrateVersion {
-    pub fn new(index: Version, manifest: TomlManifest, derived: Derived, readme: Result<Option<Readme>, ()>, lib_file: Option<String>, has_buildrs: bool) -> Self {
+    pub fn new(index: Version, manifest: TomlManifest, derived: Derived, readme: Result<Option<Readme>, ()>, lib_file: Option<String>, path_in_repo: Option<String>, has_buildrs: bool) -> Self {
         Self {
             origin: Origin::from_crates_io_name(index.name()),
             repo: manifest.package.repository.as_ref().and_then(|r| Repo::new(r).ok()),
             authors: manifest.package.authors.iter().map(|a| Author::new(a)).collect(),
             index, manifest, readme, has_buildrs,
             derived,
+            path_in_repo,
             lib_file,
         }
     }
@@ -117,6 +119,13 @@ impl RichCrateVersion {
 
     pub fn repository(&self) -> Option<&Repo> {
         self.repo.as_ref()
+    }
+
+    pub fn repository_link(&self) -> Option<(Cow<str>, &str)> {
+        self.repository().map(|repo| {
+            let relpath = self.path_in_repo.as_ref().map(|s| s.as_str()).unwrap_or("");
+            (repo.canonical_http_url(relpath), repo.site_link_label())
+        })
     }
 
     pub fn readme(&self) -> Result<Option<&Readme>, ()> {

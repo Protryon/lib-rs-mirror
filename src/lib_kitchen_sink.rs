@@ -270,19 +270,34 @@ impl KitchenSink {
         let maybe_repo = meta.manifest.package.repository.as_ref().and_then(|r| Repo::new(r).ok());
 
         // We show github link prominently, so if homepage = github, that's nothing new
-        if Self::is_same_url(meta.manifest.package.homepage.as_ref(), meta.manifest.package.repository.as_ref()) ||
-            maybe_repo.as_ref().map_or(false, |repo| Self::is_same_url(Some(&*repo.canonical_http_url()), meta.manifest.package.homepage.as_ref())) {
+        let homepage_is_repo = Self::is_same_url(meta.manifest.package.homepage.as_ref(), meta.manifest.package.repository.as_ref());
+        let homepage_is_canonical_repo = maybe_repo.as_ref()
+            .and_then(|repo| {
+                meta.manifest.package.homepage.as_ref()
+                .and_then(|home| Repo::new(&home).ok())
+                .map(|other| {
+                    repo.canonical_git_url() == other.canonical_git_url()
+                })
+            })
+            .unwrap_or(false);
+
+        if homepage_is_repo || homepage_is_canonical_repo {
             meta.manifest.package.homepage = None;
         }
 
         if Self::is_same_url(meta.manifest.package.documentation.as_ref(), meta.manifest.package.homepage.as_ref()) ||
            Self::is_same_url(meta.manifest.package.documentation.as_ref(), meta.manifest.package.repository.as_ref()) ||
-           maybe_repo.as_ref().map_or(false, |repo| Self::is_same_url(Some(&*repo.canonical_http_url()), meta.manifest.package.documentation.as_ref())) {
+           maybe_repo.as_ref().map_or(false, |repo| Self::is_same_url(Some(&*repo.canonical_http_url("")), meta.manifest.package.documentation.as_ref())) {
             meta.manifest.package.documentation = None;
         }
 
+
+        let path_in_repo = maybe_repo.as_ref().and_then(|repo| {
+            self.crate_db.path_in_repo(repo, name).ok()
+        });
+
         let has_buildrs = meta.has("build.rs");
-        Ok(RichCrateVersion::new(latest.clone(), meta.manifest, derived, meta.readme.map_err(|_|()), meta.lib_file, has_buildrs))
+        Ok(RichCrateVersion::new(latest.clone(), meta.manifest, derived, meta.readme.map_err(|_|()), meta.lib_file, path_in_repo, has_buildrs))
     }
 
     pub fn has_docs_rs(&self, name: &str, ver: &str) -> bool {
@@ -346,7 +361,7 @@ impl KitchenSink {
         self.crate_db.index_versions(&k)?;
         if let Some(repo) = v.repository() {
             let manif = crate_git_checkout::find_manifests(repo, &self.git_checkout_path, v.short_name())
-                .with_context(|_| format!("find manifests in {}", repo.canonical_http_url()))?
+                .with_context(|_| format!("find manifests in {}", repo.canonical_git_url()))?
                 .into_iter()
                 .map(|(subpath, manifest)| {
                     (subpath, manifest.package.name)

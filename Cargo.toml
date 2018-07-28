@@ -1,6 +1,6 @@
 [package]
 name = "kitchen_sink"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["Kornel <kornel@geekhood.net>"]
 publish = false
 
@@ -20,7 +20,7 @@ crate_db = { git = "https://gitlab.com/crates.rs/crate_db.git" }
 categories = { git = "https://gitlab.com/crates.rs/categories.git" }
 rich_crate = { git = "https://gitlab.com/crates.rs/rich_crate.git" }
 lazyonce = "0.2.0"
-repo_url = { git = "https://gitlab.com/crates.rs/repo_url.git" }
+repo_url = { git = "https://gitlab.com/crates.rs/repo_url.git", version = "0.3.0" }
 cargo_toml = "0.3.0"
 serde = "1.0.43"
 serde_derive = "1.0.43"

@@ -149,7 +149,7 @@ impl Repo {
     /// URL for browsing the repository via web browser
     pub fn canonical_http_url(&self, base_dir_in_repo: &str) -> Cow<str> {
         assert!(!base_dir_in_repo.starts_with('/'));
-        let slash = if base_dir_in_repo != "" {"/"} else {""};
+        let slash = if base_dir_in_repo != "" {"/tree/master/"} else {""};
         match self.host {
             RepoHost::GitHub(SimpleRepo {ref owner, ref repo}) => {
                 format!("https://github.com/{}/{}{}{}", owner, repo, slash, base_dir_in_repo).into()
@@ -180,8 +180,8 @@ fn repo_parse() {
     let repo = Repo::new("HTTPS://GITHUB.COM/FOO/BAR").unwrap();
     assert_eq!("https://github.com/foo/bar.git", repo.canonical_git_url());
     assert_eq!("https://github.com/foo/bar", repo.canonical_http_url(""));
-    assert_eq!("https://github.com/foo/bar/subdir", repo.canonical_http_url("subdir"));
-    assert_eq!("https://github.com/foo/bar/sub/dir", repo.canonical_http_url("sub/dir"));
+    assert_eq!("https://github.com/foo/bar/tree/master/subdir", repo.canonical_http_url("subdir"));
+    assert_eq!("https://github.com/foo/bar/tree/master/sub/dir", repo.canonical_http_url("sub/dir"));
 
     let repo = Repo::new("HTTPS://GITlaB.COM/FOO/BAR").unwrap();
     assert_eq!("https://gitlab.com/foo/bar.git", repo.canonical_git_url());
@@ -189,6 +189,7 @@ fn repo_parse() {
     assert_eq!("https://gitlab.com/foo/bar/blob/master/foo/", repo.readme_base_url("foo"));
     assert_eq!("https://gitlab.com/foo/bar/blob/master/foo/bar/", repo.readme_base_url("foo/bar"));
     assert_eq!("https://gitlab.com/foo/bar/raw/master/baz/", repo.readme_base_image_url("baz/"));
+    assert_eq!("https://gitlab.com/foo/bar/tree/master/sub/dir", repo.canonical_http_url("sub/dir"));
 
     let repo = Repo::new("http://priv@example.com/#111").unwrap();
     assert_eq!("http://priv@example.com/#111", repo.canonical_git_url());

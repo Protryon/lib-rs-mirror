@@ -119,8 +119,8 @@
       @if let Some(home) = c.ver.homepage() {
         <li><a property="url" href="@home">Homepage</a></li>
       }
-      @if let Some(repo) = c.ver.repository() {
-        <li><a href="@repo.canonical_http_url()">@repo.site_link_label()</a></li>
+      @if let Some((url, label)) = c.ver.repository_link() {
+        <li><a href="@url">@label</a></li>
       }
     </ul></nav>
     </div>

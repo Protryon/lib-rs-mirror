@@ -142,6 +142,13 @@ impl CrateDb {
         Ok(())
     }
 
+    pub fn path_in_repo(&self, repo: &Repo, crate_name: &str) -> Result<String> {
+        let repo = repo.canonical_git_url();
+        let conn = self.conn.lock().unwrap();
+        let mut get_path = conn.prepare_cached("SELECT path FROM repo_crates WHERE repo = ?1 AND crate_name = ?2")?;
+        Ok(get_path.query_row(&[&repo, &crate_name], |row| row.get(0)).context("path_in_repo")?)
+    }
+
     /// Update download counts of the crate
     pub fn index_versions(&self, all: &RichCrate) -> Result<()> {
         let mut conn = self.conn.lock().unwrap();

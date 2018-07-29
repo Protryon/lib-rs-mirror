@@ -102,3 +102,28 @@ pub struct CommitMeta {
     pub commit: GitCommit,
     // parents: [{sha}]
 }
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct GitHubRepo {
+    pub name: String,
+    pub description: Option<String>,
+    pub fork: bool,
+    pub created_at: String,
+    pub updated_at: Option<String>,
+    pub pushed_at: Option<String>,
+    pub homepage: Option<String>,
+    pub stargazers_count: u32, // Stars
+    pub forks_count: u32, // Real number of forks
+    pub subscribers_count: u32, // Real number of watches
+    pub has_issues: bool,
+    pub open_issues_count: Option<u32>,
+    // language: JavaScript,
+    pub has_downloads: bool,
+    // has_wiki: true,
+    pub has_pages: bool,
+    pub archived: bool,
+    // default_branch: master,
+
+    /// My custom addition!
+    pub github_page_url: Option<String>,
+}

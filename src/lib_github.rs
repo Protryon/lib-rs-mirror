@@ -81,6 +81,27 @@ impl GitHub {
                            .execute())
     }
 
+    pub fn repo(&self, repo: &SimpleRepo) -> CResult<GitHubRepo> {
+        let cache_file = format!("{}/{}/repo", repo.owner, repo.repo);
+        let mut ghdata: GitHubRepo = self.get_cached(&cache_file, |client| client.get()
+                           .repos().owner(&repo.owner).repo(&repo.repo)
+                           .execute())?;
+
+        // Keep GH-specific logic in here
+        if ghdata.has_pages {
+            // Name is case-sensitive
+            ghdata.github_page_url = Some(format!("https://{}.github.io/{}/", repo.owner, ghdata.name));
+        }
+        // Some homepages are empty strings
+        if ghdata.homepage.as_ref().map_or(false, |h| !h.starts_with("http")) {
+            ghdata.homepage = None;
+        }
+        if !ghdata.has_issues {
+            ghdata.open_issues_count = None;
+        }
+        Ok(ghdata)
+    }
+
     pub fn contributors(&self, repo: &SimpleRepo) -> CResult<Vec<UserContrib>> {
         let cache_file = format!("{}-{}-contrib.json", repo.owner, repo.repo);
         self.get_cached(&cache_file, |client| client.get()

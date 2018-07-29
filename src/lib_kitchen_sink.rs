@@ -31,6 +31,7 @@ pub use rich_crate::RichCrate;
 pub use rich_crate::RichCrateVersion;
 
 use cargo_toml::TomlLibOrBin;
+use cargo_toml::TomlPackage;
 use failure::ResultExt;
 use github_info::GitCommitAuthor;
 use lazyonce::LazyOnce;
@@ -269,11 +270,42 @@ impl KitchenSink {
         // Dedupe links
         let maybe_repo = meta.manifest.package.repository.as_ref().and_then(|r| Repo::new(r).ok());
 
+        Self::remove_redundant_links(&mut meta.manifest.package, maybe_repo.as_ref());
+
+        if meta.manifest.package.homepage.is_none() {
+            if let Some(ref repo) = maybe_repo {
+                match repo.host() {
+                    RepoHost::GitHub(ref repo) => {
+                        if let Ok(ghrepo) = self.gh.repo(repo) {
+                            if let Some(url) = ghrepo.github_page_url {
+                                meta.manifest.package.homepage = Some(url);
+                            } else if let Some(url) = ghrepo.homepage {
+                                meta.manifest.package.homepage = Some(url);
+                            }
+                            Self::remove_redundant_links(&mut meta.manifest.package, maybe_repo.as_ref());
+                        }
+                        println!("§ {} lacked homepage, but had github {:?}", name, meta.manifest.package.homepage);
+                    },
+                    _ => {}, // TODO
+                }
+            }
+        }
+
+        let path_in_repo = maybe_repo.as_ref().and_then(|repo| {
+            self.crate_db.path_in_repo(repo, name).ok()
+        });
+
+        let has_buildrs = meta.has("build.rs");
+        Ok(RichCrateVersion::new(latest.clone(), meta.manifest, derived, meta.readme.map_err(|_|()), meta.lib_file, path_in_repo, has_buildrs))
+    }
+
+    fn remove_redundant_links(package: &mut TomlPackage, maybe_repo: Option<&Repo>) {
+
         // We show github link prominently, so if homepage = github, that's nothing new
-        let homepage_is_repo = Self::is_same_url(meta.manifest.package.homepage.as_ref(), meta.manifest.package.repository.as_ref());
-        let homepage_is_canonical_repo = maybe_repo.as_ref()
+        let homepage_is_repo = Self::is_same_url(package.homepage.as_ref(), package.repository.as_ref());
+        let homepage_is_canonical_repo = maybe_repo
             .and_then(|repo| {
-                meta.manifest.package.homepage.as_ref()
+                package.homepage.as_ref()
                 .and_then(|home| Repo::new(&home).ok())
                 .map(|other| {
                     repo.canonical_git_url() == other.canonical_git_url()
@@ -282,22 +314,18 @@ impl KitchenSink {
             .unwrap_or(false);
 
         if homepage_is_repo || homepage_is_canonical_repo {
-            meta.manifest.package.homepage = None;
+            package.homepage = None;
         }
 
-        if Self::is_same_url(meta.manifest.package.documentation.as_ref(), meta.manifest.package.homepage.as_ref()) ||
-           Self::is_same_url(meta.manifest.package.documentation.as_ref(), meta.manifest.package.repository.as_ref()) ||
-           maybe_repo.as_ref().map_or(false, |repo| Self::is_same_url(Some(&*repo.canonical_http_url("")), meta.manifest.package.documentation.as_ref())) {
-            meta.manifest.package.documentation = None;
+        if Self::is_same_url(package.documentation.as_ref(), package.homepage.as_ref()) ||
+           Self::is_same_url(package.documentation.as_ref(), package.repository.as_ref()) ||
+           maybe_repo.map_or(false, |repo| Self::is_same_url(Some(&*repo.canonical_http_url("")), package.documentation.as_ref())) {
+            package.documentation = None;
         }
 
-
-        let path_in_repo = maybe_repo.as_ref().and_then(|repo| {
-            self.crate_db.path_in_repo(repo, name).ok()
-        });
-
-        let has_buildrs = meta.has("build.rs");
-        Ok(RichCrateVersion::new(latest.clone(), meta.manifest, derived, meta.readme.map_err(|_|()), meta.lib_file, path_in_repo, has_buildrs))
+        if package.homepage.as_ref().map_or(false, |d| d.starts_with("https://docs.rs/") || d.starts_with("https://crates.rs/") || d.starts_with("https://crates.io/")) {
+            package.homepage = None;
+        }
     }
 
     pub fn has_docs_rs(&self, name: &str, ver: &str) -> bool {

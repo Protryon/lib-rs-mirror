@@ -27,7 +27,7 @@ pub struct CrateDb {
 impl CrateDb {
     /// Path to sqlite db file to create/update
     pub fn new(path: impl AsRef<Path>) -> Result<Self> {
-        let db = Self::db(path.as_ref())?;
+        let db = Self::db(path.as_ref()).context("schema creation failed")?;
         db.execute("PRAGMA synchronous = 0", &[])?;
         Ok(Self {
             conn: Mutex::new(db),
@@ -157,6 +157,7 @@ impl CrateDb {
             let mut update_recent = tx.prepare_cached("UPDATE crates SET recent_downloads = ?1 WHERE id = ?2")?;
             let mut get_crate_id = tx.prepare_cached("SELECT id FROM crates WHERE origin = ?1")?;
             let mut insert_version = tx.prepare_cached("INSERT OR IGNORE INTO crate_versions (crate_id, version, created) VALUES (?1, ?2, ?3)")?;
+            let mut insert_dl = tx.prepare_cached("INSERT OR REPLACE INTO crate_downloads (crate_id, period, version, downloads) VALUES (?1, ?2, ?3, ?4)").context("cr dl")?;
 
             let origin = all.origin().to_str();
             let crate_id: u32 = get_crate_id.query_row(&[&origin], |row| row.get(0)).context("get crate id")?;
@@ -166,6 +167,13 @@ impl CrateDb {
             for ver in all.versions() {
                 let timestamp = DateTime::parse_from_rfc3339(&ver.created_at).context("version timestamp")?;
                 insert_version.execute(&[&crate_id, &ver.num, &timestamp.timestamp()]).context("insert ver")?;
+            }
+
+            for dl in all.daily_downloads() {
+                let period = dl.date.and_hms(0,0,0).timestamp();
+                let ver = dl.version.map(|v| v.num.as_str()); // `NULL` means all versions together
+                let downloads = dl.downloads as u32;
+                insert_dl.execute(&[&crate_id, &period, &ver, &downloads]).context("insert dl")?;
             }
         }
         tx.commit().context("versions commit")?;

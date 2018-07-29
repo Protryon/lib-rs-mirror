@@ -1,6 +1,6 @@
 [package]
 name = "crates_io_client"
-version = "0.3.1"
+version = "0.3.2"
 authors = ["Kornel <kornel@geekhood.net>"]
 description = "Unofficial, minimal client that gets data from crates.io internal JS API"
 

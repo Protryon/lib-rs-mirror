@@ -1,3 +1,4 @@
+use parse_date;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use chrono::Duration;
@@ -30,7 +31,7 @@ pub struct CrateExtraDailyDownload {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DownloadWeek {
     pub date: Date<Utc>,
     pub total: usize,
@@ -44,7 +45,8 @@ impl CrateDownloadsFile {
 
         let latest_date = parse_date(match (ver_dl.iter().map(|d| &d.date).max(), other_dl.iter().map(|d| &d.date).max()) {
             (Some(a), Some(b)) => a.max(b),
-            (a, b) => if let Some(any) = a.or(b) {any} else {return vec![]},
+            (Some(any), None) | (None, Some(any)) => any,
+            _ => return vec![],
         });
 
         let mut by_week = BTreeMap::<i64, HashMap<Option<usize>, usize>>::new();
@@ -77,10 +79,3 @@ impl CrateDownloadsFile {
     }
 }
 
-
-fn parse_date(date: &str) -> Date<Utc> {
-    let y = date[0..4].parse().expect("dl date parse");
-    let m = date[5..7].parse().expect("dl date parse");
-    let d = date[8..10].parse().expect("dl date parse");
-    Utc.ymd(y,m,d)
-}

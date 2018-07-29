@@ -2,6 +2,10 @@ extern crate serde;
 extern crate simple_cache;
 extern crate chrono;
 #[macro_use] extern crate serde_derive;
+use chrono::TimeZone;
+use chrono::Utc;
+use chrono::Date;
+use std::collections::HashMap;
 use std::path::Path;
 
 mod crate_meta;
@@ -61,7 +65,7 @@ impl CratesIoClient {
     }
 
     pub fn crate_downloads(&self, crate_name: &str, as_of_version: &str) -> Result<CrateDownloadsFile, Error> {
-        self.get_json(&format!("down/{}.d{}.json", crate_name, as_of_version), format!("{}/downloads", crate_name))
+        self.get_json(&format!("{}-{}/downloads", crate_name, as_of_version), format!("{}/downloads", crate_name))
     }
 
     pub fn crate_owners(&self, crate_name: &str, as_of_version: &str) -> Result<Vec<CrateOwner>, Error> {
@@ -79,6 +83,43 @@ impl CratesIoClient {
         self.cache.get_json(cache_name, url)
     }
 }
+
+pub struct DailyVersionDownload<'a> {
+    pub version: Option<&'a CrateMetaVersion>,
+    pub downloads: usize,
+    pub date: Date<Utc>,
+}
+
+impl CratesIoCrate {
+    pub fn daily_downloads(&self) -> Vec<DailyVersionDownload> {
+        let versions: HashMap<_,_> = self.meta.versions.iter().map(|v| (v.id, v)).collect();
+        self.downloads.version_downloads.iter().map(|d| {
+            DailyVersionDownload {
+                version: versions.get(&d.version).map(|v| *v),
+                downloads: d.downloads,
+                date: parse_date(&d.date),
+            }
+        })
+        .chain(
+            self.downloads.meta.extra_downloads.iter().map(|d| {
+                DailyVersionDownload {
+                    version: None,
+                    downloads: d.downloads,
+                    date: parse_date(&d.date),
+                }
+            })
+        )
+        .collect()
+    }
+}
+
+pub(crate) fn parse_date(date: &str) -> Date<Utc> {
+    let y = date[0..4].parse().expect("dl date parse");
+    let m = date[5..7].parse().expect("dl date parse");
+    let d = date[8..10].parse().expect("dl date parse");
+    Utc.ymd(y,m,d)
+}
+
 
 #[test]
 fn cratesioclient() {

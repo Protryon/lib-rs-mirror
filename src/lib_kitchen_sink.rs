@@ -17,6 +17,7 @@ extern crate serde;
 extern crate toml;
 extern crate url;
 extern crate user_db;
+extern crate reqwest;
 
 pub use crates_index::Crate;
 use crates_io_client::CrateOwner;
@@ -284,7 +285,6 @@ impl KitchenSink {
                             }
                             Self::remove_redundant_links(&mut meta.manifest.package, maybe_repo.as_ref());
                         }
-                        println!("§ {} lacked homepage, but had github {:?}", name, meta.manifest.package.homepage);
                     },
                     _ => {}, // TODO
                 }
@@ -326,6 +326,24 @@ impl KitchenSink {
         if package.homepage.as_ref().map_or(false, |d| d.starts_with("https://docs.rs/") || d.starts_with("https://crates.rs/") || d.starts_with("https://crates.io/")) {
             package.homepage = None;
         }
+
+        if package.homepage.as_ref().map_or(false, |url| !Self::check_url_is_valid(url)) {
+            eprintln!("Removed homepage link, because it's invalid: {}", package.homepage.as_ref().unwrap());
+            package.homepage = None;
+        }
+
+        if package.documentation.as_ref().map_or(false, |url| !Self::check_url_is_valid(url)) {
+            eprintln!("Removed documentation link, because it's invalid: {}", package.documentation.as_ref().unwrap());
+            package.documentation = None;
+        }
+    }
+
+    pub fn check_url_is_valid(url: &str) -> bool {
+        reqwest::get(url)
+        .map(|res| {
+            res.status().is_success()
+        })
+        .unwrap_or(false)
     }
 
     pub fn has_docs_rs(&self, name: &str, ver: &str) -> bool {

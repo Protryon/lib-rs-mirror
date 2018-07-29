@@ -27,6 +27,8 @@ pub use crates_io_client::CratesIoCrate;
 pub use github_info::User;
 pub use github_info::UserType;
 pub use rich_crate::{Cfg, Target};
+pub use rich_crate::RichCrate;
+pub use rich_crate::RichCrateVersion;
 
 use cargo_toml::TomlLibOrBin;
 use failure::ResultExt;
@@ -37,8 +39,6 @@ use repo_url::RepoHost;
 use repo_url::SimpleRepo;
 use rich_crate::Author;
 use rich_crate::Derived;
-use rich_crate::RichCrate;
-use rich_crate::RichCrateVersion;
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::hash_map::Entry::*;
@@ -354,21 +354,25 @@ impl KitchenSink {
     }
 
     /// Maintenance: add crate to local db index
-    pub fn index_crate(&self, c: &Crate) -> CResult<()> {
-        let k = self.rich_crate(c)?;
-        let v = self.rich_crate_version(c)?;
-        self.crate_db.index_latest(&v)?;
-        self.crate_db.index_versions(&k)?;
-        if let Some(repo) = v.repository() {
-            let manif = crate_git_checkout::find_manifests(repo, &self.git_checkout_path, v.short_name())
-                .with_context(|_| format!("find manifests in {}", repo.canonical_git_url()))?
-                .into_iter()
-                .map(|(subpath, manifest)| {
-                    (subpath, manifest.package.name)
-                })
-                .collect::<Vec<_>>();
-            self.crate_db.index_repo_crates(repo, manif.into_iter()).context("index rev repo")?;
-        }
+    pub fn index_crate(&self, k: &RichCrate) -> CResult<()> {
+        self.crate_db.index_versions(k)?;
+        Ok(())
+    }
+
+    pub fn index_crate_latest_version(&self, v: &RichCrateVersion) -> CResult<()> {
+        self.crate_db.index_latest(v)?;
+        Ok(())
+    }
+
+    pub fn index_repo(&self, repo: &Repo, crate_name: &str) -> CResult<()> {
+        let manif = crate_git_checkout::find_manifests(repo, &self.git_checkout_path, crate_name)
+            .with_context(|_| format!("find manifests in {}", repo.canonical_git_url()))?
+            .into_iter()
+            .map(|(subpath, manifest)| {
+                (subpath, manifest.package.name)
+            })
+            .collect::<Vec<_>>();
+        self.crate_db.index_repo_crates(repo, manif.into_iter()).context("index rev repo")?;
         Ok(())
     }
 

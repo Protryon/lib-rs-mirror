@@ -33,6 +33,7 @@ pub use rich_crate::RichCrate;
 pub use rich_crate::RichCrateVersion;
 
 use simple_cache::SimpleCache;
+use crate_files::CrateFile;
 use cargo_toml::TomlLibOrBin;
 use cargo_toml::TomlPackage;
 use failure::ResultExt;
@@ -199,18 +200,7 @@ impl KitchenSink {
 
         let has_readme = meta.readme.as_ref().ok().and_then(|opt| opt.as_ref()).is_some();
         if !has_readme {
-            let maybe_repo = meta.manifest.package.repository.as_ref().and_then(|r| Repo::new(r).ok());
-            if let Some(ref repo) = maybe_repo {
-                let res = crate_git_checkout::checkout(repo, &self.git_checkout_path, name)
-                .map_err(From::from)
-                .and_then(|checkout| {
-                    crate_git_checkout::find_readme(&checkout, &meta.manifest.package)
-                });
-                match res {
-                    Ok(readme) => meta.readme = Ok(readme),
-                    Err(err) => eprintln!("Checkout of {} failed: {}", name, err)
-                }
-            }
+            self.add_readme_from_repo(&mut meta, maybe_repo.as_ref());
         }
 
         // Quick'n'dirty autobins substitute
@@ -299,6 +289,20 @@ impl KitchenSink {
 
         let has_buildrs = meta.has("build.rs");
         Ok(RichCrateVersion::new(latest.clone(), meta.manifest, derived, meta.readme.map_err(|_|()), meta.lib_file, path_in_repo, has_buildrs))
+    }
+
+    fn add_readme_from_repo(&self, meta: &mut CrateFile, maybe_repo: Option<&Repo>) {
+        if let Some(repo) = maybe_repo {
+            let res = crate_git_checkout::checkout(repo, &self.git_checkout_path, &meta.manifest.package.name)
+            .map_err(From::from)
+            .and_then(|checkout| {
+                crate_git_checkout::find_readme(&checkout, &meta.manifest.package)
+            });
+            match res {
+                Ok(readme) => meta.readme = Ok(readme),
+                Err(err) => eprintln!("Checkout of {} failed: {}", meta.manifest.package.name, err)
+            }
+        }
     }
 
     fn remove_redundant_links(&self, package: &mut TomlPackage, maybe_repo: Option<&Repo>) {

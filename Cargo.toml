@@ -1,13 +1,13 @@
 [package]
 name = "rich_crate"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["Kornel <kornel@geekhood.net>"]
 description = "Crate struct enriched with additional crates.rs metadata"
 license = "Apache-2.0 OR MIT"
 
 [dependencies]
 crates-index = "0.12.0"
-crates_io_client = { git = "https://gitlab.com/crates.rs/crates_io_client.git" }
+crates_io_client = { git = "https://gitlab.com/crates.rs/crates_io_client.git", version = "0.3.2" }
 render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git" }
 categories = { git = "https://gitlab.com/crates.rs/categories.git" }
 cargo_author = "1.0.0"

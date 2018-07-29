@@ -18,6 +18,7 @@ extern crate toml;
 extern crate url;
 extern crate user_db;
 extern crate reqwest;
+extern crate simple_cache;
 
 pub use crates_index::Crate;
 use crates_io_client::CrateOwner;
@@ -31,6 +32,7 @@ pub use rich_crate::{Cfg, Target};
 pub use rich_crate::RichCrate;
 pub use rich_crate::RichCrateVersion;
 
+use simple_cache::SimpleCache;
 use cargo_toml::TomlLibOrBin;
 use cargo_toml::TomlPackage;
 use failure::ResultExt;
@@ -76,6 +78,7 @@ pub struct KitchenSink {
     crate_db: crate_db::CrateDb,
     user_db: user_db::UserDb,
     gh: github_info::GitHub,
+    cache: SimpleCache,
     category_crate_counts: LazyOnce<Option<HashMap<String, u32>>>,
     crate_path_index: LazyOnce<HashMap<Origin, PathBuf>>,
     git_checkout_path: PathBuf,
@@ -105,6 +108,7 @@ impl KitchenSink {
             user_db: user_db::UserDb::new(Self::assert_exists(data_path.join("users.db"))?)?,
             gh: github_info::GitHub::new(&Self::assert_exists(data_path.join("github.db"))?, github_token)?,
             crates_io: crates_io_client::CratesIoClient::new(data_path)?,
+            cache: SimpleCache::new(&main_cache_path)?,
             git_checkout_path: data_path.join("git"),
             crate_path_index: LazyOnce::new(),
             category_crate_counts: LazyOnce::new(),
@@ -191,6 +195,7 @@ impl KitchenSink {
         let name = latest.name();
         let ver = latest.version();
         let mut meta = self.crate_file(name, ver).context("crate file")?;
+        let maybe_repo = meta.manifest.package.repository.as_ref().and_then(|r| Repo::new(r).ok());
 
         let has_readme = meta.readme.as_ref().ok().and_then(|opt| opt.as_ref()).is_some();
         if !has_readme {
@@ -268,10 +273,7 @@ impl KitchenSink {
             }
         }
 
-        // Dedupe links
-        let maybe_repo = meta.manifest.package.repository.as_ref().and_then(|r| Repo::new(r).ok());
-
-        Self::remove_redundant_links(&mut meta.manifest.package, maybe_repo.as_ref());
+        self.remove_redundant_links(&mut meta.manifest.package, maybe_repo.as_ref());
 
         if meta.manifest.package.homepage.is_none() {
             if let Some(ref repo) = maybe_repo {
@@ -283,7 +285,7 @@ impl KitchenSink {
                             } else if let Some(url) = ghrepo.homepage {
                                 meta.manifest.package.homepage = Some(url);
                             }
-                            Self::remove_redundant_links(&mut meta.manifest.package, maybe_repo.as_ref());
+                            self.remove_redundant_links(&mut meta.manifest.package, maybe_repo.as_ref());
                         }
                     },
                     _ => {}, // TODO
@@ -299,7 +301,7 @@ impl KitchenSink {
         Ok(RichCrateVersion::new(latest.clone(), meta.manifest, derived, meta.readme.map_err(|_|()), meta.lib_file, path_in_repo, has_buildrs))
     }
 
-    fn remove_redundant_links(package: &mut TomlPackage, maybe_repo: Option<&Repo>) {
+    fn remove_redundant_links(&self, package: &mut TomlPackage, maybe_repo: Option<&Repo>) {
 
         // We show github link prominently, so if homepage = github, that's nothing new
         let homepage_is_repo = Self::is_same_url(package.homepage.as_ref(), package.repository.as_ref());
@@ -327,23 +329,31 @@ impl KitchenSink {
             package.homepage = None;
         }
 
-        if package.homepage.as_ref().map_or(false, |url| !Self::check_url_is_valid(url)) {
+        if package.homepage.as_ref().map_or(false, |url| !self.check_url_is_valid(url)) {
             eprintln!("Removed homepage link, because it's invalid: {}", package.homepage.as_ref().unwrap());
             package.homepage = None;
         }
 
-        if package.documentation.as_ref().map_or(false, |url| !Self::check_url_is_valid(url)) {
+        if package.documentation.as_ref().map_or(false, |url| !self.check_url_is_valid(url)) {
             eprintln!("Removed documentation link, because it's invalid: {}", package.documentation.as_ref().unwrap());
             package.documentation = None;
         }
     }
 
-    pub fn check_url_is_valid(url: &str) -> bool {
-        reqwest::get(url)
+    pub fn check_url_is_valid(&self, url: &str) -> bool {
+        let cache_key = format!("url?:{}", url);
+        if let Ok(res) = self.cache.get(&cache_key) {
+            return res[0] != 0;
+        }
+
+        let res = reqwest::get(url)
         .map(|res| {
             res.status().is_success()
         })
-        .unwrap_or(false)
+        .unwrap_or(false);
+
+        let _ = self.cache.set(&cache_key, &[if res {1} else {0}]);
+        return res;
     }
 
     pub fn has_docs_rs(&self, name: &str, ver: &str) -> bool {

@@ -196,6 +196,7 @@ impl KitchenSink {
         let name = latest.name();
         let ver = latest.version();
         let mut meta = self.crate_file(name, ver).context("crate file")?;
+
         let maybe_repo = meta.manifest.package.repository.as_ref().and_then(|r| Repo::new(r).ok());
 
         let has_readme = meta.readme.as_ref().ok().and_then(|opt| opt.as_ref()).is_some();
@@ -293,14 +294,24 @@ impl KitchenSink {
 
     fn add_readme_from_repo(&self, meta: &mut CrateFile, maybe_repo: Option<&Repo>) {
         if let Some(repo) = maybe_repo {
+            let cache_key = format!("no-git-readme:{}-{}", &meta.manifest.package.name, &meta.manifest.package.version);
+            if self.cache.get(&cache_key).is_ok() {
+                return;
+            }
+
             let res = crate_git_checkout::checkout(repo, &self.git_checkout_path, &meta.manifest.package.name)
             .map_err(From::from)
             .and_then(|checkout| {
                 crate_git_checkout::find_readme(&checkout, &meta.manifest.package)
             });
             match res {
-                Ok(readme) => meta.readme = Ok(readme),
-                Err(err) => eprintln!("Checkout of {} failed: {}", meta.manifest.package.name, err)
+                Ok(Some(readme)) => meta.readme = Ok(Some(readme)),
+                nope => {
+                    let _ = self.cache.set(&cache_key, &[1]);
+                    if let Err(err) = nope {
+                        eprintln!("Checkout of {} failed: {}", meta.manifest.package.name, err);
+                    }
+                },
             }
         }
     }
@@ -334,12 +345,10 @@ impl KitchenSink {
         }
 
         if package.homepage.as_ref().map_or(false, |url| !self.check_url_is_valid(url)) {
-            eprintln!("Removed homepage link, because it's invalid: {}", package.homepage.as_ref().unwrap());
             package.homepage = None;
         }
 
         if package.documentation.as_ref().map_or(false, |url| !self.check_url_is_valid(url)) {
-            eprintln!("Removed documentation link, because it's invalid: {}", package.documentation.as_ref().unwrap());
             package.documentation = None;
         }
     }

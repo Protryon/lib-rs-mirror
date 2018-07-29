@@ -53,14 +53,29 @@
                     @p.count crates
                 }
               </li>
-              @for subcat in p.cat.sub.values() {
-                  <li><a href="@url.category(subcat)" title="@subcat.short_description">@subcat.name</a></li>
-              }
             </ul></nav>
         </div>
     </header>
 
     <main>
+        @if !p.cat.sub.is_empty() {
+          <nav id="category-subcategories">
+            <div class="inner-col">
+              <ul>
+                @for subcat in p.cat.sub.values() {
+                    <li><a href="@url.category(subcat)">
+                      <div class=h>
+                        <h4>@subcat.name</h4>
+                        <p class=desc>@subcat.description</p>
+                      </div>
+                    </a></li>
+                }
+              </ul>
+            </div>
+          </nav>
+          <hr>
+        }
+
         <div id="category-crates" class="cat-@p.cat.slug">
           <div class="inner-col">
             <ul>

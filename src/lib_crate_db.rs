@@ -279,6 +279,26 @@ impl CrateDb {
         Ok(res.collect::<std::result::Result<_,_>>()?)
     }
 
+
+    pub fn related_crates(&self, origin: &Origin) -> Result<Vec<String>> {
+        let conn = self.conn.lock().unwrap();
+        let mut query = conn.prepare_cached(r#"
+            SELECT sum(k2.weight * k1.weight) as w, c2.origin
+            FROM crates c1
+            JOIN crate_keywords k1 on k1.crate_id = c1.id
+            JOIN crate_keywords k2 on k1.keyword_id = k2.keyword_id
+            JOIN crates c2 on k2.crate_id = c2.id
+            WHERE c1.origin = ?1
+            AND k2.crate_id != c1.id
+            GROUP by k2.crate_id
+            HAVING w > 500
+            ORDER by 1 desc
+            LIMIT 6
+        "#)?;
+        let res = query.query_map(&[&origin.to_str()], |row| row.get(1)).context("related_crates")?;
+        Ok(res.collect::<std::result::Result<_,_>>()?)
+    }
+
     /// Find keywords that may be most relevant to the crate
     pub fn keywords(&self, origin: &Origin) -> Result<Vec<String>> {
         let conn = self.conn.lock().unwrap();

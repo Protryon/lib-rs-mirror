@@ -142,6 +142,56 @@ impl CrateDb {
         Ok(())
     }
 
+    pub fn parent_crate(&self, repo: &Repo, child_name: &str) -> Option<String> {
+        let conn = self.conn.lock().unwrap();
+        let mut paths = conn.prepare_cached("SELECT path, crate_name FROM repo_crates WHERE repo = ?1 LIMIT 100").ok()?;
+        let mut paths: HashMap<String, String> = paths
+            .query_map(&[&repo.canonical_git_url()], |r| (r.get(0), r.get(1)))
+            .ok()?
+            .collect::<std::result::Result<_, _>>().ok()?;
+
+        if paths.len() < 2 {
+            return None;
+        }
+
+        let child_path = paths.iter().find(|(_, child)| *child == child_name)
+            .map(|(path, _)| path.to_owned())?;
+        paths.remove(&child_path);
+        let mut child_path = child_path.as_str();
+
+        loop {
+             child_path = child_path.rsplitn(1, '/').skip(1)
+                .next().unwrap_or("");
+            if let Some(child) = paths.get(child_path) {
+                return Some(child.to_owned());
+            }
+            if child_path.is_empty() { // in these paths "" is the root
+                break;
+            }
+        }
+
+        fn unprefix(s: &str) -> &str {
+            if s.starts_with("rust-") || s.starts_with("rust_") {
+                return &s[5..];
+            }
+            if s.ends_with("-rs") || s.ends_with("_rs") {
+                return &s[..s.len()-3];
+            }
+            if s.starts_with("rust") {
+                return &s[4..];
+            }
+            s
+        }
+
+        if let Some(child) = repo.repo_name().and_then(|n| paths.get(n).or_else(|| paths.get(unprefix(n)))) {
+            return Some(child.to_owned());
+        }
+        if let Some(child) = repo.owner_name().and_then(|n| paths.get(n).or_else(|| paths.get(unprefix(n)))) {
+            return Some(child.to_owned());
+        }
+        None
+    }
+
     pub fn path_in_repo(&self, repo: &Repo, crate_name: &str) -> Result<String> {
         let repo = repo.canonical_git_url();
         let conn = self.conn.lock().unwrap();

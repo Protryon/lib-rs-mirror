@@ -170,20 +170,20 @@ header {
         }
         line-height: 1.08;
         margin: 0.44em 0 0;
-        .labels {
-            display: block;
-            font-size: 0.4em;
-            line-height: 1;
-            margin: 0 0 0.45em 0;
-            font-weight: normal;
-            > span {
-                border: 2px solid;
-                border-radius: 5px;
-                padding: 0 0.4ex;
-                color: #777;
-                &.yanked {
-                    color: red;
-                }
+    }
+    .labels {
+        display: block;
+        font-size: 0.4em;
+        line-height: 1;
+        margin: 0 0 0.45em 0;
+        font-weight: normal;
+        > span {
+            border: 2px solid;
+            border-radius: 5px;
+            padding: 0 0.4ex;
+            color: #777;
+            &.yanked {
+                color: red;
             }
         }
     }
@@ -206,7 +206,6 @@ header {
             font-size: 0.95em;
         }
     }
-
     nav {
         margin: 2em 0 0;
         > ul {

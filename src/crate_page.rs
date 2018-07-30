@@ -111,8 +111,8 @@ impl<'a> CratePage<'a> {
         }
     }
 
-    pub fn name_underscore_parts(&self) -> impl Iterator<Item = &str> {
-        self.ver.short_name().split('_')
+    pub fn parent_crate(&self) -> Option<RichCrateVersion> {
+        self.kitchen_sink.parent_crate(self.ver)
     }
 
     pub fn render_markdown_str(&self, s: &str) -> templates::Html<String> {

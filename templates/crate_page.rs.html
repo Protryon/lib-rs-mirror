@@ -37,6 +37,13 @@
         }
         @if !last {|}
       }
+      @if let Some(parent) = c.parent_crate() {
+        › <span>
+          <a href="@url.krate(&parent)">
+            @parent.short_name()
+          </a>
+        </span>
+      }
       </span>
     }
     </div>
@@ -60,7 +67,7 @@
       @if c.ver.is_yanked() {
         <del>@c.ver.short_name()</del>
       } else {
-        @for (last, part) in c.name_underscore_parts().identify_last() {@part@if !last {<span class=un>_<wbr></span>}}
+        @for (last, part) in c.ver.short_name().split('_').identify_last() {@part@if !last {<span class=un>_<wbr></span>}}
       }
       </span>
 

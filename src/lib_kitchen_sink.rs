@@ -458,6 +458,15 @@ impl KitchenSink {
         return Ok(self.gh.user_by_login(github_login).ok()); // errs on 404
     }
 
+    /// If given crate is a sub-crate, return crate that owns it.
+    /// The relationship is based on directory layout of monorepos.
+    pub fn parent_crate(&self, child: &RichCrateVersion) -> Option<RichCrateVersion> {
+        let repo = child.repository()?;
+        let name = self.crate_db.parent_crate(repo, child.short_name())?;
+        let krate = self.crate_by_name(&Origin::from_crates_io_name(&name)).ok()?;
+        self.rich_crate_version(&krate).ok()
+    }
+
     /// Merge authors, owners, contributors
     pub fn all_contributors<'a>(&self, krate: &'a RichCrateVersion) -> (Vec<CrateAuthor<'a>>, Vec<CrateAuthor<'a>>, bool, usize) {
         let mut contributors = krate.repository().as_ref().and_then(|repo| {

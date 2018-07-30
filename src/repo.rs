@@ -173,6 +173,26 @@ impl Repo {
             RepoHost::Other => self.url.as_str().into(),
         }
     }
+
+    pub fn owner_name(&self) -> Option<&str> {
+        match self.host {
+            RepoHost::GitHub(SimpleRepo {ref owner, ..}) |
+            RepoHost::GitLab(SimpleRepo {ref owner, ..}) => {
+                return Some(owner)
+            },
+            _ => None,
+        }
+    }
+
+    pub fn repo_name(&self) -> Option<&str> {
+        match self.host {
+            RepoHost::GitHub(SimpleRepo {ref repo, ..}) |
+            RepoHost::GitLab(SimpleRepo {ref repo, ..}) => {
+                return Some(repo)
+            },
+            _ => None,
+        }
+    }
 }
 
 #[test]

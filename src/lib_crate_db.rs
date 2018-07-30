@@ -93,7 +93,7 @@ impl CrateDb {
             }
             for (i, k) in c.authors().iter().filter_map(|a|a.email.as_ref().or(a.name.as_ref()).map(|a| a.to_lowercase())).enumerate() {
                 print!("@{}, ", k);
-                let mut w: f64 = 100./(100.+i as f64);
+                let mut w: f64 = 50./(100.+i as f64);
                 insert_keyword.add(&k, w, false)?;
             }
             if c.has_buildrs() {

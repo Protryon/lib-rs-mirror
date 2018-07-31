@@ -21,11 +21,11 @@ pub fn checkout(repo: &Repo, base_path: &Path, name: &str) -> Result<Repository,
     Ok(repo)
 }
 
-pub fn iter_blobs<F>(repo: &Repository, treeish: &Reference, mut cb: F) -> Result<(), failure::Error>
+#[inline]
+pub fn iter_blobs<F>(repo: &Repository, tree: &Tree, mut cb: F) -> Result<(), failure::Error>
     where F: FnMut(&str, &str, Blob) -> Result<(), failure::Error>
 {
-    let tree = treeish.peel_to_tree()?;
-    iter_blobs_recurse(repo, &tree, &mut String::with_capacity(500), &mut cb)?;
+    iter_blobs_recurse(repo, tree, &mut String::with_capacity(500), &mut cb)?;
     Ok(())
 }
 
@@ -93,15 +93,15 @@ fn get_repo(repo: &Repo, base_path: &Path, name: &str) -> Result<Repository, git
     }
 }
 
-pub fn find_manifests(repo: &Repo, base_path: &Path, name: &str) -> Result<Vec<(String, TomlManifest)>, failure::Error> {
-    let repo = get_repo(repo, base_path, name)?;
+pub fn find_manifests(repo: &Repository) -> Result<Vec<(String, TomlManifest)>, failure::Error> {
     let head = repo.head()?;
-    find_manifests_in_repo(&repo, &head)
+    let tree = head.peel_to_tree()?;
+    find_manifests_in_tree(&repo, &tree)
 }
 
-fn find_manifests_in_repo(repo: &Repository, treeish: &Reference) -> Result<Vec<(String, TomlManifest)>, failure::Error> {
+fn find_manifests_in_tree(repo: &Repository, tree: &Tree) -> Result<Vec<(String, TomlManifest)>, failure::Error> {
     let mut tomls = Vec::new();
-    iter_blobs(repo, treeish, |inner_path, name, blob| {
+    iter_blobs(repo, tree, |inner_path, name, blob| {
         if name == "Cargo.toml" {
             match TomlManifest::from_slice(blob.content()) {
                 Ok(toml) => tomls.push((inner_path.to_owned(), toml)),
@@ -113,8 +113,8 @@ fn find_manifests_in_repo(repo: &Repository, treeish: &Reference) -> Result<Vec<
     Ok(tomls)
 }
 
-fn path_in_repo(repo: &Repository, treeish: &Reference, crate_name: &str) -> Result<Option<String>, failure::Error> {
-    Ok(find_manifests_in_repo(repo, treeish)?
+fn path_in_repo(repo: &Repository, tree: &Tree, crate_name: &str) -> Result<Option<String>, failure::Error> {
+    Ok(find_manifests_in_tree(repo, tree)?
         .into_iter()
         .find(|(_, manifest)| manifest.package.name == crate_name)
         .map(|(path, _)| path))
@@ -122,12 +122,13 @@ fn path_in_repo(repo: &Repository, treeish: &Reference, crate_name: &str) -> Res
 
 pub fn find_readme(repo: &Repository, package: &TomlPackage) -> Result<Option<Readme>, failure::Error> {
     let head = repo.head()?;
+    let tree = head.peel_to_tree()?;
     let mut readme = None;
 
-    let prefix = path_in_repo(&repo, &head, &package.name)?;
+    let prefix = path_in_repo(&repo, &tree, &package.name)?;
     let prefix = prefix.as_ref().map(|s| s.as_str()).unwrap_or("");
 
-    iter_blobs(&repo, &head, |base, name, blob| {
+    iter_blobs(&repo, &tree, |base, name, blob| {
         let rel_path = if base.starts_with(prefix) {&base[prefix.len()..]} else {base};
         let rel_path_name = Path::new(rel_path).join(name);
         if is_readme_filename(&rel_path_name, Some(package)) {

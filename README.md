@@ -69,3 +69,10 @@ If you'd like to help improve it:
     ```
 
     This will launch a local web server on [localhost:3000](http://localhost:3000) that serves HTML from `front_end/public/` and *live reload* styles from `style/src/*.scss`, so you can browse the site and edit the styles locally.
+
+### Troubleshooting
+
+* If you get "patch for … in … did not resolve to any crates." error when building, delete `Cargo.lock` files from the project.
+
+* If you get an error about missing table "cache", or missing column "origin", download the data files again.
+

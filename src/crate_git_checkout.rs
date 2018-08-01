@@ -10,6 +10,7 @@ use cargo_toml::TomlPackage;
 use render_readme::Readme;
 use render_readme::Markup;
 use cargo_toml::TomlManifest;
+use std::collections::{HashMap, HashSet};
 
 use repo_url::Repo;
 use std::path::Path;
@@ -103,28 +104,31 @@ fn get_repo(repo: &Repo, base_path: &Path, name: &str) -> Result<Repository, git
     }
 }
 
-pub fn find_manifests(repo: &Repository) -> Result<Vec<(String, TomlManifest)>, failure::Error> {
+pub fn find_manifests(repo: &Repository) -> Result<(Vec<(String, TomlManifest)>, HashSet<String>), failure::Error> {
     let head = repo.head()?;
     let tree = head.peel_to_tree()?;
     find_manifests_in_tree(&repo, &tree)
 }
 
-fn find_manifests_in_tree(repo: &Repository, tree: &Tree) -> Result<Vec<(String, TomlManifest)>, failure::Error> {
-    let mut tomls = Vec::new();
+fn find_manifests_in_tree(repo: &Repository, tree: &Tree) -> Result<(Vec<(String, TomlManifest)>, HashSet<String>), failure::Error> {
+    let mut tomls = Vec::with_capacity(8);
+    let mut warnings = HashSet::new();
     iter_blobs(repo, tree, |inner_path, name, blob| {
         if name == "Cargo.toml" {
             match TomlManifest::from_slice(blob.content()) {
                 Ok(toml) => tomls.push((inner_path.to_owned(), toml)),
-                Err(err) => eprintln!("warning: can't parse {}/{}/{}: {}", repo.path().display(), inner_path, name, err),
+                Err(err) => {
+                    warnings.insert(format!("warning: can't parse {}/{}/{}: {}", repo.path().display(), inner_path, name, err));
+                },
             }
         }
         Ok(())
     })?;
-    Ok(tomls)
+    Ok((tomls, warnings))
 }
 
 fn path_in_repo(repo: &Repository, tree: &Tree, crate_name: &str) -> Result<Option<String>, failure::Error> {
-    Ok(find_manifests_in_tree(repo, tree)?
+    Ok(find_manifests_in_tree(repo, tree)?.0
         .into_iter()
         .find(|(_, manifest)| manifest.package.name == crate_name)
         .map(|(path, _)| path))

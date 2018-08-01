@@ -15,6 +15,16 @@ use repo_url::Repo;
 use std::path::Path;
 
 use git2::{Tree, Repository, build::RepoBuilder, Reference, ObjectType, Blob};
+mod iter;
+use iter::HistoryIter;
+
+
+fn commit_history_iter<'a>(repo: &Repository, commit: &Reference<'a>) -> Result<HistoryIter<'a>, git2::Error> {
+    if repo.is_shallow() {
+        repo.find_remote("origin")?.fetch(&["master"], None, None)?;
+    }
+    Ok(HistoryIter::new(commit.peel_to_commit()?))
+}
 
 pub fn checkout(repo: &Repo, base_path: &Path, name: &str) -> Result<Repository, git2::Error> {
     let repo = get_repo(repo, base_path, name)?;

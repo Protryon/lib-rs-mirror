@@ -385,8 +385,19 @@ impl KitchenSink {
         }
     }
 
+    /// "See also"
     pub fn related_categories(&self, slug: &str) -> CResult<Vec<String>> {
         self.crate_db.related_categories(slug)
+    }
+
+    /// Recommendations
+    pub fn related_crates(&self, krate: &RichCrateVersion) -> CResult<Vec<RichCrateVersion>> {
+        self.crate_db.related_crates(krate.origin()).context("relate crates")?
+        .into_iter().map(|origin| {
+            let c = self.crate_by_name(&Origin::from_string(origin))?;
+            self.rich_crate_version(&c)
+        })
+        .collect()
     }
 
     /// Returns (nth, slug)

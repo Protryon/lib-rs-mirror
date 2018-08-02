@@ -70,6 +70,7 @@ fn iter_blobs_recurse<F>(repo: &Repository, tree: &Tree, path: &mut String, cb: 
 }
 
 fn get_repo(repo: &Repo, base_path: &Path, name: &str) -> Result<Repository, git2::Error> {
+    let shallow = false;
     let url = &*repo.canonical_git_url();
 
     let repo_path = base_path.join(urlencoding::encode(url));
@@ -87,24 +88,25 @@ fn get_repo(repo: &Repo, base_path: &Path, name: &str) -> Result<Repository, git
                 eprintln!("Rejecting non-HTTP git URL: {}", url);
                 return err;
             }
-            let ok = Command::new("git")
-                .arg("clone")
-                .arg("--depth=64")
-                .arg("--config").arg("core.askPass=true")
-                .arg("--")
-                .arg(&*url)
-                .arg(&repo_path)
-                .output()
-                .map(|output| output.status.success())
-                .unwrap_or(false);
-            if !ok {
-                let mut ch = RepoBuilder::new();
-                ch.bare(true);
-                // no support for depth=1!
-                ch.clone(&url, &repo_path)
-            } else {
-                Repository::open(repo_path)
+            if shallow {
+                let ok = Command::new("git")
+                    .arg("clone")
+                    .arg("--depth=64")
+                    .arg("--config").arg("core.askPass=true")
+                    .arg("--")
+                    .arg(&*url)
+                    .arg(&repo_path)
+                    .output()
+                    .map(|output| output.status.success())
+                    .unwrap_or(false);
+                if ok {
+                    return Repository::open(repo_path);
+                }
             }
+            let mut ch = RepoBuilder::new();
+            ch.bare(true);
+            // no support for depth=1!
+            ch.clone(&url, &repo_path)
         },
     }
 }

@@ -142,6 +142,7 @@ impl CrateDb {
         Ok(())
     }
 
+    /// Returns crate name (not origin)
     pub fn parent_crate(&self, repo: &Repo, child_name: &str) -> Option<String> {
         let conn = self.conn.lock().unwrap();
         let mut paths = conn.prepare_cached("SELECT path, crate_name FROM repo_crates WHERE repo = ?1 LIMIT 100").ok()?;
@@ -434,7 +435,7 @@ impl CrateDb {
         "#)?;
         let q = query.query_map(&[&slug, &limit], |row| {
             let s: String = row.get(0);
-            (Origin::from_string(&s), row.get(1))
+            (Origin::from_string(s), row.get(1))
         })?;
         let q = q.filter_map(|r| r.ok());
         Ok(q.collect())
@@ -457,7 +458,7 @@ impl CrateDb {
         "#)?;
         let q = query.query_map(&[&slug], |row| {
             let s: String = row.get(1);
-            Origin::from_string(&s)
+            Origin::from_string(s)
         })?;
         let q = q.filter_map(|r| r.ok());
         Ok(q.collect())

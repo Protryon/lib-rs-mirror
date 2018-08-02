@@ -127,10 +127,10 @@ impl CrateDb {
     ///    crate's repo URL (needed for e.g. GitHub README relative links), and adds
     ///    interesting relationship information for crates.
     pub fn index_repo_crates(&self, repo: &Repo, paths_and_names: impl Iterator<Item = (impl AsRef<str>, impl AsRef<str>)>) -> Result<()> {
+        let repo = repo.canonical_git_url();
         let mut conn = self.conn.lock().unwrap();
         let tx = conn.transaction().context("index_repo_crates tx")?;
         {
-            let repo = repo.canonical_git_url();
             let mut insert_repo = tx.prepare_cached("INSERT OR IGNORE INTO repo_crates (repo, path, crate_name) VALUES (?1, ?2, ?3)")?;
             for (path, name) in paths_and_names {
                 let name = name.as_ref();
@@ -190,6 +190,27 @@ impl CrateDb {
             return Some(child.to_owned());
         }
         None
+    }
+
+    pub fn index_repo_changes(&self, repo: &Repo, changes: &[RepoChange]) -> Result<()> {
+        let repo = repo.canonical_git_url();
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction().context("index_repo_changes tx")?;
+        {
+            let mut insert_change = tx.prepare_cached("INSERT OR IGNORE INTO repo_changes (repo, crate_name, replacement, weight) VALUES (?1, ?2, ?3, ?4)")?;
+            for change in changes {
+                match *change {
+                    RepoChange::Replaced {ref crate_name, ref replacement, weight} => {
+                        insert_change.execute(&[&repo, &crate_name.as_str(), &Some(replacement.as_str()), &weight])
+                    },
+                    RepoChange::Removed {ref crate_name, weight} => {
+                        insert_change.execute(&[&repo, &crate_name.as_str(), &(None as Option<&str>), &weight])
+                    },
+                }?;
+            }
+        }
+        tx.commit().context("index_repo_changes c")?;
+        Ok(())
     }
 
     pub fn path_in_repo(&self, repo: &Repo, crate_name: &str) -> Result<String> {
@@ -468,6 +489,11 @@ impl CrateDb {
         }
         None
     }
+}
+
+pub enum RepoChange {
+    Removed {crate_name: String, weight: f64},
+    Replaced {crate_name: String, replacement: String, weight: f64},
 }
 
 pub struct KeywordInsert<'a> {

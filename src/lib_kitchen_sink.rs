@@ -51,6 +51,7 @@ use std::collections::HashMap;
 use std::path::{PathBuf, Path};
 use std::env;
 use rich_crate::Origin;
+use crate_db::{CrateDb, RepoChange};
 
 pub type CError = failure::Error;
 pub type CResult<T> = Result<T, CError>;
@@ -76,7 +77,7 @@ pub struct KitchenSink {
     index: crates_index::Index,
     crates_io: crates_io_client::CratesIoClient,
     docs_rs: docs_rs_client::DocsRsClient,
-    crate_db: crate_db::CrateDb,
+    crate_db: CrateDb,
     user_db: user_db::UserDb,
     gh: github_info::GitHub,
     cache: SimpleCache,
@@ -105,7 +106,7 @@ impl KitchenSink {
         Ok(Self {
             index: crates_index::Index::new(Self::assert_exists(data_path.join("index"))?),
             docs_rs: docs_rs_client::DocsRsClient::new(&main_cache_path)?,
-            crate_db: crate_db::CrateDb::new(Self::assert_exists(data_path.join("crate_meta.db"))?)?,
+            crate_db: CrateDb::new(Self::assert_exists(data_path.join("crate_meta.db"))?)?,
             user_db: user_db::UserDb::new(Self::assert_exists(data_path.join("users.db"))?)?,
             gh: github_info::GitHub::new(&Self::assert_exists(data_path.join("github.db"))?, github_token)?,
             crates_io: crates_io_client::CratesIoClient::new(data_path)?,
@@ -434,14 +435,54 @@ impl KitchenSink {
     }
 
     pub fn index_repo(&self, repo: &Repo, crate_name: &str) -> CResult<()> {
-        let manif = crate_git_checkout::find_manifests(repo, &self.git_checkout_path, crate_name)
-            .with_context(|_| format!("find manifests in {}", repo.canonical_git_url()))?
-            .into_iter()
-            .map(|(subpath, manifest)| {
-                (subpath, manifest.package.name)
-            })
-            .collect::<Vec<_>>();
-        self.crate_db.index_repo_crates(repo, manif.into_iter()).context("index rev repo")?;
+        let url = repo.canonical_git_url();
+        let checkout = crate_git_checkout::checkout(repo, &self.git_checkout_path, crate_name)?;
+
+        let (manif, warnings) = crate_git_checkout::find_manifests(&checkout)
+            .with_context(|_| format!("find manifests in {}", url))?;
+        for warn in warnings {
+            eprintln!("{}", warn);
+        }
+        let manif = manif.into_iter().map(|(subpath, manifest)| (subpath, manifest.package.name));
+        self.crate_db.index_repo_crates(repo, manif).context("index rev repo")?;
+
+        let mut changes = Vec::new();
+
+        crate_git_checkout::find_dependency_changes(&checkout, |added, removed, age| {
+            if removed.is_empty() {
+                if added.len() > 1 {
+                    // Divide evenly between all recommendations
+                    // and decay with age, assuming older changes are less relevant now.
+                    let weight = (1.0 / added.len().pow(2) as f64) * 30.0 / (30.0 + age as f64);
+                    if weight > 0.002 {
+                        for dep1 in added.iter().take(8) {
+                            for dep2 in added.iter().take(5) {
+                                if dep1 == dep2 {continue;}
+                                // Not really a replacement, but a recommendation if A then B
+                                changes.push(RepoChange::Replaced{crate_name: dep1.to_string(), replacement: dep2.to_string(), weight})
+                            }
+                        }
+                    }
+                }
+            } else {
+                for crate_name in removed {
+                    if !added.is_empty() {
+                        // Assuming relevance falls a bit when big changes are made.
+                        // Removals don't decay with age (if we see great comebacks, maybe it should be split by semver-major).
+                        let weight = 8.0 / (7.0 + added.len() as f64);
+                        for replacement in &added {
+                            changes.push(RepoChange::Replaced{crate_name: crate_name.clone(), replacement: replacement.to_string(), weight})
+                        }
+                        changes.push(RepoChange::Removed{crate_name, weight});
+                    } else {
+                        // ??? maybe use sliiight recommendation score based on existing (i.e. newer) state of deps in the repo?
+                        changes.push(RepoChange::Removed{crate_name, weight: 0.95});
+                    }
+                }
+            }
+        })?;
+        self.crate_db.index_repo_changes(repo, &changes)?;
+
         Ok(())
     }
 

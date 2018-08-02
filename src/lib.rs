@@ -29,7 +29,8 @@ impl Origin {
         Origin::CratesIO(name.to_lowercase())
     }
 
-    pub fn from_string(s: &str) -> Self {
+    pub fn from_string(s: impl AsRef<str>) -> Self {
+        let s = s.as_ref();
         let mut n = s.split(':');
         assert_eq!("crates.io", n.next().unwrap());
         Self::from_crates_io_name(n.next().unwrap())
@@ -40,4 +41,11 @@ impl Origin {
             Origin::CratesIO(ref s) => format!("crates.io:{}", s),
         }
     }
+}
+
+#[test]
+fn roundtrip() {
+    let o1 = Origin::from_crates_io_name("hello");
+    let o2 = Origin::from_string(o1.to_str());
+    assert_eq!(o1, o2);
 }

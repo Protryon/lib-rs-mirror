@@ -64,8 +64,8 @@ pub enum KitchenSinkErr {
     CategoryNotFound,
     #[fail(display = "category query failed")]
     CategoryQueryFailed,
-    #[fail(display = "crate not found")]
-    CrateNotFound,
+    #[fail(display = "crate not found: {:?}", _0)]
+    CrateNotFound(Origin),
     #[fail(display = "Environment variable CRATES_DATA_DIR is not set.\nChoose a dir where it's OK to store lots of data, and export it like CRATES_DATA_DIR=/var/lib/crates.rs")]
     CratesDataDirEnvVarMissing,
     #[fail(display = "{} does not exist\nPlease get data files from https://crates.rs/data and put them in that directory, or set CRATES_DATA_DIR to their location.", _0)]
@@ -175,7 +175,7 @@ impl KitchenSink {
         })
         .get(name)
         .map(Crate::new)
-        .ok_or(KitchenSinkErr::CrateNotFound)
+        .ok_or_else(|| KitchenSinkErr::CrateNotFound(name.clone()))
     }
 
     /// Wrapper object for metadata common for all versions of a crate

@@ -19,6 +19,7 @@ extern crate url;
 extern crate user_db;
 extern crate reqwest;
 extern crate simple_cache;
+extern crate itertools;
 
 pub use crates_index::Crate;
 use crates_io_client::CrateOwner;
@@ -32,6 +33,7 @@ pub use rich_crate::{Cfg, Target};
 pub use rich_crate::RichCrate;
 pub use rich_crate::RichCrateVersion;
 
+use itertools::Itertools;
 use simple_cache::SimpleCache;
 use crate_files::CrateFile;
 use cargo_toml::TomlLibOrBin;
@@ -392,12 +394,20 @@ impl KitchenSink {
 
     /// Recommendations
     pub fn related_crates(&self, krate: &RichCrateVersion) -> CResult<Vec<RichCrateVersion>> {
-        self.crate_db.related_crates(krate.origin()).context("relate crates")?
-        .into_iter().map(|origin| {
-            let c = self.crate_by_name(&Origin::from_string(origin))?;
+        let replacements = self.crate_db.replacement_crates(krate.short_name()).context("related_crates1")?;
+        let related = self.crate_db.related_crates(krate.origin()).context("related_crates2")?;
+
+        Ok(replacements.into_iter()
+        .map(|name| Origin::from_crates_io_name(&name))
+        .chain(related)
+        .unique()
+        .take(10)
+        .map(|origin| {
+            let c = self.crate_by_name(&origin)?;
             self.rich_crate_version(&c)
         })
-        .collect()
+        .filter_map(|res| res.map_err(|e| eprintln!("related crate err: {}", e)).ok())
+        .collect())
     }
 
     /// Returns (nth, slug)

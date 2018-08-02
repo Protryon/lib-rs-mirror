@@ -388,6 +388,12 @@ impl<'a> CratePage<'a> {
     pub fn download_graph(&self) -> DownloadsGraph {
         DownloadsGraph::new(self.all.weekly_downloads(), self.ver.has_bin())
     }
+
+    pub fn related_crates(&self) -> Option<Vec<RichCrateVersion>> {
+        self.kitchen_sink.related_crates(&self.ver)
+        .map_err(|e| eprintln!("related crates fail: {}", e))
+        .ok()
+    }
 }
 
 

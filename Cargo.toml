@@ -1,7 +1,7 @@
 [package]
 description = "Analyze git repository containing Cargo crates"
 name = "crate_git_checkout"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["Kornel <kornel@geekhood.net>"]
 
 [lib]

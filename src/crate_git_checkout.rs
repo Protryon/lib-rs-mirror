@@ -11,6 +11,7 @@ use render_readme::Readme;
 use render_readme::Markup;
 use cargo_toml::TomlManifest;
 use std::collections::{HashMap, HashSet};
+use std::collections::hash_map::Entry::Vacant;
 
 use repo_url::Repo;
 use std::path::Path;
@@ -84,7 +85,7 @@ fn get_repo(repo: &Repo, base_path: &Path, name: &str) -> Result<Repository, git
         _ => {
             let ok = Command::new("git")
                 .arg("clone")
-                .arg("--depth=1")
+                .arg("--depth=64")
                 .arg("--config").arg("core.askPass=true")
                 .arg("--")
                 .arg(&*url)
@@ -132,6 +133,67 @@ fn path_in_repo(repo: &Repository, tree: &Tree, crate_name: &str) -> Result<Opti
         .into_iter()
         .find(|(_, manifest)| manifest.package.name == crate_name)
         .map(|(path, _)| path))
+}
+
+#[derive(Debug, Copy, Clone, Default)]
+struct State {
+    since: Option<usize>,
+    until: Option<usize>,
+}
+
+
+/// Callback gets added, removed, number of commits ago.
+pub fn find_dependency_changes(repo: &Repository, mut cb: impl FnMut(HashSet<String>, HashSet<String>, usize)) -> Result<(), failure::Error> {
+    let head = repo.head()?;
+
+    let mut newer_deps: HashMap<String, State> = HashMap::with_capacity(100);
+
+    // iterates from the latest!
+    // The generation number here is not quite accurate (due to diamond-shaped histories),
+    // but I need the fiction of it being linerar for this implementation.
+    // A recursive implementation could do it better, maybe.
+    let commits = commit_history_iter(&repo, &head)?.filter(|c| !c.is_merge).map(|c| c.commit);
+    for (age, commit) in commits.enumerate() {
+        // All deps in a repo, because we traverse history once per repo, not once per crate,
+        // and because moving of deps between internal crates doesn't count.
+        let mut older_deps = HashSet::with_capacity(100);
+        for (_, mut manifest) in find_manifests_in_tree(&repo, &commit.tree()?)?.0 {
+            older_deps.extend(manifest.dependencies.into_iter().map(|(k,_)| k));
+            older_deps.extend(manifest.dev_dependencies.into_iter().map(|(k,_)| k));
+            older_deps.extend(manifest.build_dependencies.into_iter().map(|(k,_)| k));
+        }
+
+        let mut added = HashSet::with_capacity(10);
+        let mut removed = HashSet::with_capacity(10);
+
+        for (dep, state) in &mut newer_deps {
+            // if it's Some(), it's going to be added in the future! so it's not there now
+            // (as a side effect if dependency is added, removed, then re-added, it tracks only the most recent add/remove)
+            if state.since.is_none() {
+                if !older_deps.contains(dep) {
+                    added.insert(dep.clone());
+                    state.since = Some(age);
+                }
+            }
+        }
+
+        for dep in older_deps {
+            match newer_deps.entry(dep) {
+                Vacant(e) => {
+                    if age > 0 {
+                        removed.insert(e.key().clone());
+                        e.insert(State {since: None, until: Some(age)});
+                    } else {
+                        e.insert(State::default());
+                    }
+                },
+                _ => {},
+            }
+        }
+
+        cb(added, removed, age);
+    }
+    Ok(())
 }
 
 pub fn find_readme(repo: &Repository, package: &TomlPackage) -> Result<Option<Readme>, failure::Error> {

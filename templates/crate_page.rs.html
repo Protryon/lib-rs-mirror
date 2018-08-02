@@ -1,8 +1,8 @@
 @use templates::base;
 @use templates::labels;
 @use templates::downloads;
-@use templates::footer;
 @use templates::deps_list;
+@use date_now;
 @use iter::*;
 @use Urler;
 @use CratePage;
@@ -240,5 +240,11 @@
     </div>
   </main>
   </div>
-  @:footer()
+
+  <footer>
+    <div class="inner-col">
+      <aside><p><a href="/"><strong>Crates.rs</strong></a> is an unofficial Rust project by <a href="https://kornel.ski">kornelski</a>. This page was generated on @date_now() based on data from crates.io, GitHub API and public git repositories.</p></aside>
+
+    </div>
+  </footer>
 })

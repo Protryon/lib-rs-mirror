@@ -82,7 +82,11 @@ fn get_repo(repo: &Repo, base_path: &Path, name: &str) -> Result<Repository, git
 
     match Repository::open(&repo_path) {
         Ok(repo) => Ok(repo),
-        _ => {
+        err => {
+            if !url.starts_with("http://") && !url.starts_with("https://") && !url.starts_with("git@github.com:") {
+                eprintln!("Rejecting non-HTTP git URL: {}", url);
+                return err;
+            }
             let ok = Command::new("git")
                 .arg("clone")
                 .arg("--depth=64")
@@ -153,7 +157,7 @@ pub fn find_dependency_changes(repo: &Repository, mut cb: impl FnMut(HashSet<Str
     // but I need the fiction of it being linerar for this implementation.
     // A recursive implementation could do it better, maybe.
     let commits = commit_history_iter(&repo, &head)?.filter(|c| !c.is_merge).map(|c| c.commit);
-    for (age, commit) in commits.enumerate() {
+    for (age, commit) in commits.enumerate().take(1000) {
         // All deps in a repo, because we traverse history once per repo, not once per crate,
         // and because moving of deps between internal crates doesn't count.
         let mut older_deps = HashSet::with_capacity(100);

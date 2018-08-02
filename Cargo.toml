@@ -13,5 +13,5 @@ git2 = "0.7.2"
 cargo_toml = "0.3.1"
 render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git" }
 repo_url = { git = "https://gitlab.com/crates.rs/repo_url.git" }
-failure = "0.1.1"
+failure = "0.1.2"
 urlencoding = "1.0.0"

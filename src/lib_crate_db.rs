@@ -351,8 +351,23 @@ impl CrateDb {
         Ok(res.collect::<std::result::Result<_,_>>()?)
     }
 
+    pub fn replacement_crates(&self, crate_name: &str) -> Result<Vec<String>> {
+        let conn = self.conn.lock().unwrap();
+        let mut query = conn.prepare_cached(r#"
+            SELECT sum(weight) as w, replacement
+            FROM repo_changes
+            WHERE crate_name = ?1
+            AND replacement IS NOT NULL
+            GROUP BY replacement
+            HAVING w > 20
+            ORDER by 1 desc
+            LIMIT 4
+        "#)?;
+        let res = query.query_map(&[&crate_name], |row| row.get(1)).context("replacement_crates")?;
+        Ok(res.collect::<std::result::Result<_,_>>()?)
+    }
 
-    pub fn related_crates(&self, origin: &Origin) -> Result<Vec<String>> {
+    pub fn related_crates(&self, origin: &Origin) -> Result<Vec<Origin>> {
         let conn = self.conn.lock().unwrap();
         let mut query = conn.prepare_cached(r#"
             SELECT sum(k2.weight * k1.weight) as w, c2.origin
@@ -362,12 +377,16 @@ impl CrateDb {
             JOIN crates c2 on k2.crate_id = c2.id
             WHERE c1.origin = ?1
             AND k2.crate_id != c1.id
+            AND c2.recent_downloads > 150
             GROUP by k2.crate_id
             HAVING w > 500
             ORDER by 1 desc
             LIMIT 6
         "#)?;
-        let res = query.query_map(&[&origin.to_str()], |row| row.get(1)).context("related_crates")?;
+        let res = query.query_map(&[&origin.to_str()], |row| {
+            let s: String = row.get(1);
+            Origin::from_string(s)
+        }).context("related_crates")?;
         Ok(res.collect::<std::result::Result<_,_>>()?)
     }
 

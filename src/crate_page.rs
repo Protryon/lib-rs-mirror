@@ -135,7 +135,7 @@ impl<'a> CratePage<'a> {
                 return Some(templates::Html(self.markup.page(&Markup::Markdown(out), base, self.nofollow())));
             }
         }
-        return None;
+        None
     }
 
     pub fn is_readme_short(&self) -> bool {

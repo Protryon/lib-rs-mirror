@@ -132,10 +132,10 @@ fn nice_round_number(n: usize) -> (u32, usize) {
     }
     let exp = (n as f64).log2().ceil() as u32;
     let max = (1<<exp) as usize;
-    let rounded = if max >= 1000000 {
-        max / 1000000 * 1000000
-    } else if max >= 100000 {
-        max / 100000 * 100000
+    let rounded = if max >= 1_000_000 {
+        max / 1_000_000 * 1_000_000
+    } else if max >= 100_000 {
+        max / 100_000 * 100_000
     } else if max >= 10000 {
         max / 10000 * 10000
     } else {

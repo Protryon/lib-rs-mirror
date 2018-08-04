@@ -7,6 +7,8 @@ extern crate parse_cfg;
 extern crate render_readme;
 extern crate repo_url;
 extern crate semver;
+extern crate serde;
+#[macro_use] extern crate serde_derive;
 
 pub use cargo_author::*;
 mod rich_crate;

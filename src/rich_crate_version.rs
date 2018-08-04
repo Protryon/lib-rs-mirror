@@ -295,7 +295,7 @@ impl RichDep {
 }
 
 /// Metadata guessed
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Derived {
     pub categories: Option<Vec<String>>,
     pub keywords: Option<Vec<String>>,

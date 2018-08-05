@@ -449,7 +449,7 @@ impl CrateDb {
             select k.origin, k.recent_downloads from categories c
                 join crates k on c.crate_id = k.id
                 where c.slug = ?1
-                order by recent_downloads * weight desc
+                order by recent_downloads desc
                 limit ?2
         "#)?;
         let q = query.query_map(&[&slug, &limit], |row| {

@@ -17,7 +17,7 @@ fn main() {
         },
     });
 
-    let ref seen_repos = Mutex::new(HashSet::new());
+    let seen_repos = &Mutex::new(HashSet::new());
 
     rayon::scope(move |s1| {
         for k in crates.all_crates() {

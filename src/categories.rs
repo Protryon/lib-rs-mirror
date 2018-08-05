@@ -119,8 +119,8 @@ impl Categories {
                 }
 
                 // bad syntax! Fix!
-                let slug = s.to_lowercase().split(':').filter(|s| s.len() > 0).collect::<Vec<_>>().join("::");
-                if s.len() == 0 {
+                let slug = s.to_lowercase().split(':').filter(|s| !s.is_empty()).collect::<Vec<_>>().join("::");
+                if s.is_empty() {
                     return None;
                 }
                 let depth = slug.split("::").count();
@@ -141,7 +141,7 @@ impl Categories {
 
 impl Category {
     pub fn singular_name(&self) -> &str {
-        if self.name.ends_with("s") && self.name != "Asynchronous" {
+        if self.name.ends_with('s') && self.name != "Asynchronous" {
             &self.name[..self.name.len()-1]
         } else {
             &self.name

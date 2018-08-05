@@ -102,7 +102,7 @@ impl CrateDb {
             if let Some(l) = c.links() {
                 insert_keyword.add(l, 0.54, false)?;
             }
-            for (feat, _) in c.features() {
+            for feat in c.features().keys() {
                 if feat != "default" {
                     insert_keyword.add(feat, 0.55, false)?;
                 }
@@ -161,8 +161,7 @@ impl CrateDb {
         let mut child_path = child_path.as_str();
 
         loop {
-             child_path = child_path.rsplitn(1, '/').skip(1)
-                .next().unwrap_or("");
+             child_path = child_path.rsplitn(1, '/').nth(1).unwrap_or("");
             if let Some(child) = paths.get(child_path) {
                 return Some(child.to_owned());
             }
@@ -537,7 +536,7 @@ impl<'a> KeywordInsert<'a> {
     }
 
     pub fn add(&mut self, word: &str, weight: f64, visible: bool) -> Result<()> {
-        if word.len() == 0 {
+        if word.is_empty() {
             return Ok(());
         }
         self.insert_name.execute(&[&word, if visible {&1} else {&0}])?;

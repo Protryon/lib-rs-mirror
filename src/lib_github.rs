@@ -6,9 +6,8 @@ extern crate urlencoding;
 extern crate serde_json;
 extern crate repo_url;
 extern crate simple_cache;
-#[macro_use] extern crate failure;
+#[macro_use] extern crate quick_error;
 
-pub type CResult<T> = std::result::Result<T, failure::Error>;
 use std::path::Path;
 
 use urlencoding::encode;
@@ -16,7 +15,6 @@ use repo_url::SimpleRepo;
 use github_rs::client;
 use github_rs::{Headers, StatusCode};
 use github_rs::client::Executor;
-use failure::SyncFailure;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::time::Duration;
 use std::thread;
@@ -26,10 +24,31 @@ use github_rs::headers::{rate_limit_remaining, rate_limit_reset};
 mod model;
 pub use model::*;
 
-#[derive(Debug, Fail)]
-enum GitApiError {
-    #[fail(display = "response w/o body")]
-    NoBody,
+pub type CResult<T> = Result<T, Error>;
+
+quick_error! {
+    #[derive(Debug)]
+    pub enum Error {
+        NoBody {
+            display("Reponse with no body")
+        }
+        TryAgainLater {
+            display("Accepted, but no data available yet")
+        }
+        Cache(err: Box<simple_cache::Error>) {
+            from(e: simple_cache::Error) -> (Box::new(e))
+            display("Can't start cache: {}", err)
+        }
+        GitHub(err: String) {
+            from(e: github_rs::errors::Error) -> (e.to_string()) // non-Sync
+        }
+        Json(err: Box<serde_json::Error>) {
+            from(e: serde_json::Error) -> (Box::new(e))
+        }
+        Time(err: std::time::SystemTimeError) {
+            from()
+        }
+    }
 }
 
 pub struct GitHub {
@@ -46,7 +65,7 @@ impl GitHub {
     }
 
     fn client(&self) -> CResult<client::Github> {
-        Ok(client::Github::new(&self.token).map_err(SyncFailure::new)?)
+        Ok(client::Github::new(&self.token)?)
     }
 
     pub fn user_by_email(&self, email: &str) -> CResult<Option<User>> {
@@ -118,7 +137,7 @@ impl GitHub {
         } else {
             let client = &self.client()?;
             eprintln!("Cache miss {}", key);
-            let (headers, status, body) = cb(&*client).map_err(SyncFailure::new)?;
+            let (headers, status, body) = cb(&*client)?;
             eprintln!("Recvd {} {:?} {:?}", key, status, headers);
             if let (Some(rl), Some(rs)) = (rate_limit_remaining(&headers), rate_limit_reset(&headers)) {
                 let end_timestamp = Duration::from_secs(rs.into());
@@ -131,7 +150,7 @@ impl GitHub {
                     }
                 }
             }
-            let stats = body.ok_or(GitApiError::NoBody)?;
+            let stats = body.ok_or(Error::NoBody)?;
             let allow = match status {
                 StatusCode::Accepted |
                 StatusCode::Created => false,

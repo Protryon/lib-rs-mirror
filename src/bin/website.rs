@@ -67,8 +67,8 @@ fn render_categories(cats: &CategoryMap, base: &Path, crates: &KitchenSink, done
                 }
                 s.insert(c.name().to_owned());
             }
-            let allver = crates.rich_crate(&c)?;
-            let ver = crates.rich_crate_version(&c)?;
+            let allver = crates.rich_crate(&c).context("get crate")?;
+            let ver = crates.rich_crate_version(&c).context("get rich crate")?;
             let path = PathBuf::from(format!("public/crates/{}.html", c.name()));
             println!("{}", path.display());
             let mut outfile = File::create(&path)

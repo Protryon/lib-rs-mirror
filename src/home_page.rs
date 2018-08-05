@@ -56,6 +56,8 @@ impl<'a> HomePage<'a> {
                     seen.get(&Origin::from_crates_io_name(c.name())).is_none()
                 })
                 .take(3)
+                .collect();
+            let new: Vec<_> = new.into_par_iter()
                 .filter_map(|c| {
                     self.crates.rich_crate_version(&c).ok()
                 })
@@ -89,7 +91,7 @@ impl<'a> HomePage<'a> {
         // mark seen from least popular (assuming they're more specific)
         for cat in c.iter_mut().rev() {
             let mut dl = 0;
-            cat.top.extend(self.crates.top_crates_in_category(&cat.cat.slug, 35).unwrap()
+            let top: Vec<_> = self.crates.top_crates_in_category(&cat.cat.slug, 35).unwrap()
                 .into_iter()
                 .filter(|(c,_)| {
                     seen.get(&Origin::from_crates_io_name(c.name())).is_none()
@@ -99,6 +101,8 @@ impl<'a> HomePage<'a> {
                     dl += d as usize;
                     c
                 })
+                .collect();
+            cat.top.par_extend(top.into_par_iter()
                 .filter_map(|c| {
                     self.crates.rich_crate_version(&c).ok()
                 }));

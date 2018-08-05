@@ -1,5 +1,6 @@
 extern crate rusqlite;
 extern crate chrono;
+extern crate categories;
 extern crate failure;
 #[macro_use] extern crate lazy_static;
 extern crate rich_crate;
@@ -58,9 +59,17 @@ impl CrateDb {
 
             let mut insert_keyword = KeywordInsert::new(&tx, crate_id)?;
             print!("{} = {}: ", origin, crate_id);
+            let mut keywords = Vec::new();
 
             let cat_w = if c.raw_category_slugs().next().is_none() {0.05} else {1.0};
             for (i, slug) in c.category_slugs().enumerate() {
+                if categories::CATEGORIES.from_slug(&slug).next().is_none() {
+                    // Index invalid categories as keywords, so that the categories table is clean
+                    // but the data is not lost.
+                    keywords.extend(slug.split("::").map(|s| s.to_string()));
+                    continue;
+                }
+
                 print!(">{}, ", slug);
                 let mut w: f64 = 95./(5.+i as f64*3.) * cat_w;
                 if slug.contains("::") {
@@ -69,7 +78,7 @@ impl CrateDb {
                 insert_category.execute(&[&crate_id, &&*slug, &w]).context("insert cat")?;
                 insert_keyword.add(&*slug, w, false)?;
             }
-            for (i, k) in c.raw_keywords().map(|k| k.to_lowercase().trim().to_string()).enumerate() {
+            for (i, k) in c.raw_keywords().map(|k| k.to_lowercase().trim().to_string()).chain(keywords).enumerate() {
                 print!("#{}, ", k);
                 let mut w: f64 = 100./(6.+i as f64*2.);
                 if STOPWORDS.get(&k).is_some() {

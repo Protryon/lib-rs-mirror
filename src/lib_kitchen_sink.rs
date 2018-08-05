@@ -581,7 +581,7 @@ impl KitchenSink {
                     }
                 }
                 let key = author.email.as_ref().map(|e| AuthorId::Email(e.to_lowercase()))
-                    .or_else(|| author.name.clone().map(|n| AuthorId::Name(n)))
+                    .or_else(|| author.name.clone().map(AuthorId::Name))
                     .unwrap_or(AuthorId::Meh(i));
                 (key, ca)
             }).collect();
@@ -760,7 +760,7 @@ impl KitchenSink {
     }
 
     pub fn repo_commits(&self, repo: &SimpleRepo) -> CResult<Vec<github_info::CommitMeta>> {
-        self.gh.commits(repo)
+        Ok(self.gh.commits(repo)?)
     }
 }
 

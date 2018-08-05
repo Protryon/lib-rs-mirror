@@ -203,11 +203,11 @@ impl RichCrateVersion {
         let mut dev: BTreeMap<String, RichDep> = self.manifest.dev_dependencies.iter().map(to_dep).collect();
         let mut build: BTreeMap<String, RichDep> = self.manifest.build_dependencies.iter().map(to_dep).collect();
         // Don't display deps twice if they're required anyway
-        for (dep, _) in &normal {
+        for dep in normal.keys() {
             dev.remove(dep);
             build.remove(dep);
         }
-        for (dep, _) in &build {
+        for dep in build.keys() {
             dev.remove(dep);
         }
         fn add_targets(dest: &mut BTreeMap<String, RichDep>, src: &TomlDepsSet, target: &str) -> Result<(), CfgErr> {
@@ -240,7 +240,7 @@ impl RichCrateVersion {
 
         for (for_feature, wants) in self.features().into_iter().filter(|(n,_)| *n != "default") {
             for depstr in wants {
-                let mut depstr = depstr.splitn(2, "/");
+                let mut depstr = depstr.splitn(2, '/');
                 let name = depstr.next().expect("name should be there");
                 let with_feature = depstr.next();
 

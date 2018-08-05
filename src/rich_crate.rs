@@ -39,7 +39,7 @@ impl RichCrate {
         self.crates_io.daily_downloads()
     }
 
-    pub fn versions<'a>(&'a self) -> impl Iterator<Item=&'a CrateMetaVersion> {
+    pub fn versions(&self) -> impl Iterator<Item=&CrateMetaVersion> {
         self.crates_io.meta.versions()
     }
 

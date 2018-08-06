@@ -153,7 +153,7 @@ impl GitHub {
             let stats = body.ok_or(Error::NoBody)?;
             let allow = match status {
                 StatusCode::Accepted |
-                StatusCode::Created => false,
+                StatusCode::Created => return Err(Error::TryAgainLater),
                 StatusCode::NotFound |
                 StatusCode::Gone |
                 StatusCode::MovedPermanently => true,

@@ -123,9 +123,17 @@ impl GitHub {
 
     pub fn contributors(&self, repo: &SimpleRepo) -> CResult<Vec<UserContrib>> {
         let cache_file = format!("{}-{}-contrib.json", repo.owner, repo.repo);
-        self.get_cached(&cache_file, |client| client.get()
-                           .custom_endpoint(&format!("repos/{}/{}/stats/contributors", repo.owner, repo.repo))
-                           .execute())
+        let path = format!("repos/{}/{}/stats/contributors", repo.owner, repo.repo);
+        let callback = |client: &client::Github| {
+            client.get().custom_endpoint(&path).execute()
+        };
+        match self.get_cached(&cache_file, callback) {
+            Err(Error::TryAgainLater) => {
+                thread::sleep(Duration::from_secs(1));
+                self.get_cached(&cache_file, callback)
+            },
+            res => res,
+        }
     }
 
     fn get_cached<F, B>(&self, key: &str, cb: F) -> CResult<B>

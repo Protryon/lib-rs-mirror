@@ -240,7 +240,8 @@ impl CrateDb {
             let mut insert_dl = tx.prepare_cached("INSERT OR REPLACE INTO crate_downloads (crate_id, period, version, downloads) VALUES (?1, ?2, ?3, ?4)").context("cr dl")?;
 
             let origin = all.origin().to_str();
-            let crate_id: u32 = get_crate_id.query_row(&[&origin], |row| row.get(0)).context("get crate id")?;
+            let crate_id: u32 = get_crate_id.query_row(&[&origin], |row| row.get(0))
+                .with_context(|_| format!("the crate {} hasn't been indexed yet", origin))?;
             let recent = all.downloads_recent() as u32;
             update_recent.execute(&[&recent, &crate_id]).context("update recent")?;
 

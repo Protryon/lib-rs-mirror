@@ -267,7 +267,7 @@ impl CrateDb {
     pub fn categories(&self, origin: &Origin) -> Result<Vec<String>> {
         let conn = self.conn.lock().unwrap();
         let mut query = conn.prepare_cached(r#"
-        select sum((cc.weight+20.0) * ck.weight * relk.relevance), cc.slug
+        select sum(cc.weight * ck.weight * relk.relevance)/(8+count(*)), cc.slug
         from (
         ----------------------------------
             select avg(ck.weight) * srck.weight / (8000+sum(ck.weight)) as relevance, ck.keyword_id

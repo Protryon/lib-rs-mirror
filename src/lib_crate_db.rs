@@ -43,6 +43,8 @@ impl CrateDb {
             let mut insert_crate = tx.prepare_cached("INSERT OR IGNORE INTO crates (origin, recent_downloads) VALUES (?1, ?2)")?;
             let mut insert_repo = tx.prepare_cached("INSERT OR REPLACE INTO crate_repos (crate_id, repo) VALUES (?1, ?2)")?;
             let mut delete_repo = tx.prepare_cached("DELETE FROM crate_repos WHERE crate_id = ?1")?;
+            let mut clear_categories = tx.prepare_cached("DELETE FROM categories WHERE crate_id = ?1")?;
+            let mut clear_keywords = tx.prepare_cached("DELETE FROM crate_keywords WHERE crate_id = ?1")?;
             let mut insert_category = tx.prepare_cached("INSERT OR IGNORE INTO categories (crate_id, slug, weight) VALUES (?1, ?2, ?3)")?;
             let mut get_crate_id = tx.prepare_cached("SELECT id FROM crates WHERE origin = ?1")?;
 
@@ -56,6 +58,9 @@ impl CrateDb {
             } else {
                 delete_repo.execute(&[&crate_id]).context("del repo")?;
             }
+
+            clear_categories.execute(&[&crate_id]).context("clear cat")?;
+            clear_keywords.execute(&[&crate_id]).context("clear cat")?;
 
             let mut insert_keyword = KeywordInsert::new(&tx, crate_id)?;
             print!("{} = {}: ", origin, crate_id);

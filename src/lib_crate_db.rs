@@ -462,15 +462,27 @@ impl CrateDb {
     }
 
     /// Most popular crates in the category
-    pub fn top_crates_in_category(&self, slug: &str, limit: u32) -> Result<Vec<(Origin, u32)>> {
+    pub fn top_crates_in_category(&self, slug: &str, limit: u32, simple_sort: bool) -> Result<Vec<(Origin, u32)>> {
         let conn = self.conn.lock().unwrap();
-        let mut query = conn.prepare_cached(r#"
-            select k.origin, k.recent_downloads from categories c
+
+        let mut query = conn.prepare_cached(if simple_sort {
+            // sort by popularity
+            "select k.origin, k.recent_downloads from categories c
                 join crates k on c.crate_id = k.id
                 where c.slug = ?1
                 order by recent_downloads desc
                 limit ?2
-        "#)?;
+        "} else {
+            // sort by relevance to the category, downrank for being removed from crates
+            "select k.origin, k.recent_downloads from categories c
+                join crates k on c.crate_id = k.id
+                left join (select sum(weight) as w, crate_name from repo_changes where replacement is null group by crate_name) as removals
+                on k.origin = 'crates.io:' || removals.crate_name
+                where c.slug = ?1
+                order by (recent_downloads * c.weight) / (300 + coalesce(removals.w, 1)) desc
+                limit ?2"
+        })?;
+
         let q = query.query_map(&[&slug, &limit], |row| {
             let s: String = row.get(0);
             (Origin::from_string(s), row.get(1))

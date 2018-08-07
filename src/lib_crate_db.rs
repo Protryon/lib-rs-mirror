@@ -66,7 +66,12 @@ impl CrateDb {
             print!("{} = {}: ", origin, crate_id);
             let mut keywords = Vec::new();
 
-            let cat_w = if c.raw_category_slugs().next().is_none() {0.05} else {1.0};
+            let explicit_categories = c.raw_category_slugs().count();
+            let cat_w = if explicit_categories > 0 {
+                10.0 / (9.0 + explicit_categories as f64)
+            } else {
+                (0.001 + c.raw_keywords().count() as f64 * 0.01).min(0.05)
+            };
             for (i, slug) in c.category_slugs().enumerate() {
                 if categories::CATEGORIES.from_slug(&slug).next().is_none() {
                     // Index invalid categories as keywords, so that the categories table is clean
@@ -111,14 +116,14 @@ impl CrateDb {
                 insert_keyword.add(&k, w, false)?;
             }
             if c.has_buildrs() {
-                insert_keyword.add(":has_buildrs", 0.3, false)?;
+                insert_keyword.add(":has_buildrs", 0.13, false)?;
             }
             if let Some(l) = c.links() {
                 insert_keyword.add(l, 0.54, false)?;
             }
             for feat in c.features().keys() {
                 if feat != "default" {
-                    insert_keyword.add(feat, 0.55, false)?;
+                    insert_keyword.add(&format!(":{}", feat), 0.55, false)?;
                 }
             }
         }

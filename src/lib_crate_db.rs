@@ -52,9 +52,12 @@ impl CrateDb {
 
             insert_crate.execute(&[&origin, &0]).context("insert crate")?;
             let crate_id: u32 = get_crate_id.query_row(&[&origin], |row| row.get(0)).context("crate_id")?;
+            let mut insert_keyword = KeywordInsert::new(&tx, crate_id)?;
 
             if let Some(repo) = c.repository() {
-                insert_repo.execute(&[&crate_id, &repo.canonical_git_url().as_ref()]).context("insert repo")?;
+                let url = repo.canonical_git_url();
+                insert_repo.execute(&[&crate_id, &url.as_ref()]).context("insert repo")?;
+                insert_keyword.add(&format!(":repo:{}", url), 1., false)?; // crates in monorepo probably belong together
             } else {
                 delete_repo.execute(&[&crate_id]).context("del repo")?;
             }
@@ -62,9 +65,7 @@ impl CrateDb {
             clear_categories.execute(&[&crate_id]).context("clear cat")?;
             clear_keywords.execute(&[&crate_id]).context("clear cat")?;
 
-            let mut insert_keyword = KeywordInsert::new(&tx, crate_id)?;
             print!("{} = {}: ", origin, crate_id);
-            let mut keywords = Vec::new();
 
             let explicit_categories = c.raw_category_slugs().count();
             let cat_w = if explicit_categories > 0 {
@@ -73,22 +74,20 @@ impl CrateDb {
                 (0.001 + c.raw_keywords().count() as f64 * 0.01).min(0.05)
             };
             for (i, slug) in c.category_slugs().enumerate() {
-                if categories::CATEGORIES.from_slug(&slug).next().is_none() {
-                    // Index invalid categories as keywords, so that the categories table is clean
-                    // but the data is not lost.
-                    keywords.extend(slug.split("::").map(|s| s.to_string()));
-                    continue;
-                }
-
                 print!(">{}, ", slug);
                 let mut w: f64 = 95./(5.+i as f64*3.) * cat_w;
                 if slug.contains("::") {
                     w *= 1.3; // more specific
                 }
-                insert_category.execute(&[&crate_id, &&*slug, &w]).context("insert cat")?;
-                insert_keyword.add(&*slug, w, false)?;
+                let is_real = categories::CATEGORIES.from_slug(&slug).next().is_some(); // FIXME: that checks top level only
+                if is_real {
+                    insert_category.execute(&[&crate_id, &&*slug, &w]).context("insert cat")?;
+                }
+                if explicit_categories > 0 {
+                    insert_keyword.add(&*slug, w, false)?;
+                }
             }
-            for (i, k) in c.raw_keywords().map(|k| k.to_lowercase().trim().to_string()).chain(keywords).enumerate() {
+            for (i, k) in c.raw_keywords().map(|k| k.to_lowercase().trim().to_string()).enumerate() {
                 print!("#{}, ", k);
                 let mut w: f64 = 100./(6.+i as f64*2.);
                 if STOPWORDS.get(&k).is_some() {

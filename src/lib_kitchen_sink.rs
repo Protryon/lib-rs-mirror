@@ -245,12 +245,32 @@ impl KitchenSink {
         // Guess keywords if none were specified
         // TODO: also ignore useless keywords that are unique db-wide
         if meta.manifest.package.keywords.is_empty() {
-            derived.keywords = Some(self.crate_db.keywords(&origin).context("keywordsdb")?);
-        };
+            let gh = maybe_repo.as_ref()
+                .and_then(|repo| if let RepoHost::GitHub(ref gh) = repo.host() {
+                    self.gh.topics(gh).ok()
+                } else {None});
+            if let Some(mut topics) = gh {
+                topics.retain(|t| match t.as_str() {
+                    "rust" | "rs" | "rustlang" | "rust-lang" | "crate" | "crates" | "library" => false,
+                    t if t.starts_with("rust-") => false,
+                    _ => true
+                });
+                if !topics.is_empty() {
+                    meta.manifest.package.keywords = topics;
+                }
+            }
+            if meta.manifest.package.keywords.is_empty() {
+                derived.keywords = Some(self.crate_db.keywords(&origin).context("keywordsdb")?);
+            }
+        }
 
         // Guess categories if none were specified
-        if meta.manifest.package.categories.is_empty() {
-            derived.categories = Some(self.crate_db.categories(&origin).context("catdb")?);
+        if meta.manifest.package.categories.is_empty() && fetch_type == CrateData::Full {
+            derived.categories = Some({
+                let keywords_iter = meta.manifest.package.keywords.iter().map(|s| s.as_str());
+                self.crate_db.crate_categories(&origin, keywords_iter).context("catdb")?
+                .into_iter().map(|(_, c)| c).collect()
+            });
         }
 
         // Guess repo URL if none was specified

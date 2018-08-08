@@ -21,6 +21,8 @@ pub struct Category {
     pub description: String,
     #[serde(rename="short-description")]
     pub short_description: String,
+    #[serde(rename="standalone-name")]
+    pub standalone_name: Option<String>,
     pub title: String,
     pub slug: String,
     pub sub: CategoryMap,
@@ -76,6 +78,7 @@ impl Categories {
             let description = details.remove("description").ok_or(CatError::MissingField)?.try_into()?;
             let short_description = details.remove("short-description").ok_or(CatError::MissingField)?.try_into()?;
             let title = details.remove("title").ok_or(CatError::MissingField)?.try_into()?;
+            let standalone_name = details.remove("standalone-name").and_then(|v| v.try_into().ok());
 
             let mut full_slug = String::with_capacity(full_slug_start.len()+2+slug.len());
             if full_slug_start != "" {
@@ -93,6 +96,7 @@ impl Categories {
                 name,
                 title,
                 short_description,
+                standalone_name,
                 description,
                 slug: full_slug,
                 sub,
@@ -140,12 +144,8 @@ impl Categories {
 }
 
 impl Category {
-    pub fn singular_name(&self) -> &str {
-        if self.name.ends_with('s') && self.name != "Asynchronous" {
-            &self.name[..self.name.len()-1]
-        } else {
-            &self.name
-        }
+    pub fn standalone_name(&self) -> &str {
+        self.standalone_name.as_ref().unwrap_or(&self.name).as_str()
     }
 }
 

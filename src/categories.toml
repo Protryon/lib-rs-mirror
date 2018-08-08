@@ -281,6 +281,7 @@ Run software or games not available natively on the host computer."""
 
 [encoding]
 name = "Encoding"
+standalone-name = "Encoding data"
 title = "Rust data encoding library"
 description = """
 Encoding and/or decoding data from one data format to another.\
@@ -420,6 +421,7 @@ Process or build images.
 
 [multimedia.categories.encoding]
 name = "Encoding"
+standalone-name = "Encoding media"
 title = "Rust media encoding library"
 description = """
 Crates that encode or decode binary data in multimedia formats.
@@ -458,7 +460,7 @@ short-description = """
 Bindings to operating system-specific APIs."""
 
 [os.categories.macos-apis]
-name = "mac OS APIs"
+name = "macOS APIs"
 title = "Rust API for macOS"
 description = """
 Bindings to macOS-specific APIs.\
@@ -535,6 +537,7 @@ Direct access to the hardware's or the operating system's rendering capabilities
 
 [rendering.categories.data-formats]
 name = "Data formats"
+standalone-name = "Gfx data formats"
 title = "data format for Rust"
 description = """
 Loading and parsing of data formats related to 2D or 3D rendering, like \

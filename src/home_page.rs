@@ -91,7 +91,7 @@ impl<'a> HomePage<'a> {
         // mark seen from least popular (assuming they're more specific)
         for cat in c.iter_mut().rev() {
             let mut dl = 0;
-            let top: Vec<_> = self.crates.top_crates_in_category(&cat.cat.slug, 35).unwrap()
+            let top: Vec<_> = self.crates.top_crates_in_category(&cat.cat.slug, 35, false).unwrap()
                 .into_iter()
                 .filter(|(c,_)| {
                     seen.get(&Origin::from_crates_io_name(c.name())).is_none()

@@ -7,9 +7,9 @@
         <li>
         <div>
             <a href="@url.category(&cat.cat)">@if toplevel {
-                <h3>@cat.cat.name</h3>
+                <h3>@cat.cat.standalone_name()</h3>
             } else {
-                <h4>@cat.cat.name</h4>
+                <h4>@cat.cat.standalone_name()</h4>
             }
             <span class=desc>@cat.cat.short_description</span>
             </a>

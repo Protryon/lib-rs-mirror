@@ -7,6 +7,7 @@ use failure::Error;
 use templates;
 use std::collections::HashSet;
 use Page;
+use rayon::prelude::*;
 
 /// Data for category page template
 pub struct CatPage<'a> {
@@ -24,7 +25,7 @@ impl<'a> CatPage<'a> {
             count: crates.category_crate_count(&cat.slug)? as usize,
             keywords: crates.top_keywords_in_category(&cat.slug)?,
             related: crates.related_categories(&cat.slug)?,
-            crates: crates.top_crates_in_category(&cat.slug, 50)?.into_iter()
+            crates: crates.top_crates_in_category(&cat.slug, 75, true)?.into_par_iter()
                 .filter_map(|(c, d)| {
                     let c = match crates.rich_crate_version(&c) {
                         Ok(c) => c,
@@ -98,7 +99,7 @@ impl<'a> CatPage<'a> {
     /// Metadata about the category
     pub fn page(&self) -> Page {
         Page {
-            title: self.cat.name.clone(),
+            title: format!("{} — Rust crates", self.cat.standalone_name()),
             description: Some(self.cat.description.clone()),
             item_name: Some(self.cat.name.clone()),
             item_description: Some(self.cat.short_description.clone()),

@@ -25,6 +25,10 @@ impl Urler {
         format!("https://deps.rs/crate/{}/{}", encode(krate.short_name()), encode(krate.version()))
     }
 
+    pub fn reverse_deps(&self, krate: &RichCrateVersion) -> String {
+        format!("https://crates.io/crates/{}/reverse_dependencies", encode(krate.short_name()))
+    }
+
     /// Link to crate individual page
     pub fn krate(&self, krate: &RichCrateVersion) -> String {
         format!("/crates/{}", encode(krate.short_name()))

@@ -30,17 +30,17 @@ fn main() -> Result<(), failure::Error> {
     let done_pages = Mutex::new(HashSet::new());
     let image_filter = Arc::new(render_readme::ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_path())?);
 
-    println!("Generating homepage…");
-    let res = front_end::render_homepage(&mut out, &crates)
+    println!("Generating homepage and category pages…");
+    let (res1, res2) = rayon::join(|| {
+        front_end::render_homepage(&mut out, &crates)
         .context("Failed rendering homepage")
-        .and_then(|_| {
-            println!("Generating category pages…");
-            let _ = fs::create_dir_all("public/crates");
-            render_categories(&categories::CATEGORIES.root, Path::new("public"), &crates, &done_pages, image_filter.clone())
-            .context("Failed rendering categories")
-        });
+    }, || {
+        let _ = fs::create_dir_all("public/crates");
+        render_categories(&categories::CATEGORIES.root, Path::new("public"), &crates, &done_pages, image_filter.clone())
+        .context("Failed rendering categories")
+    });
 
-    if let Err(e) = res {
+    if let Err(e) = res1.and_then(|_| res2) {
         eprintln!("Website generation failed: {}", e);
         for c in e.causes() {
             eprintln!("error: -- {}", c);
@@ -77,7 +77,7 @@ fn render_categories(cats: &CategoryMap, base: &Path, crates: &KitchenSink, done
             Ok(())
         };
 
-        crates.top_crates_in_category(&cat.slug, 55)
+        crates.top_crates_in_category(&cat.slug, 75, true)
             .context("top crates")?
         .into_par_iter()
         .map(|(c,_)| {

@@ -71,6 +71,7 @@ impl CrateDb {
             let cat_w = if explicit_categories > 0 {
                 10.0 / (9.0 + explicit_categories as f64)
             } else {
+                print!(">??? ");
                 (0.001 + c.raw_keywords().count() as f64 * 0.01).min(0.05)
             };
             for (i, slug) in c.category_slugs().enumerate() {
@@ -276,7 +277,7 @@ impl CrateDb {
     pub fn categories(&self, origin: &Origin) -> Result<Vec<String>> {
         let conn = self.conn.lock().unwrap();
         let mut query = conn.prepare_cached(r#"
-        select sum(cc.weight * ck.weight * relk.relevance)/(8+count(*)), cc.slug
+        select sum(cc.weight * ck.weight * relk.relevance)/(8+count(*)) as w, cc.slug
         from (
         ----------------------------------
             select avg(ck.weight) * srck.weight / (8000+sum(ck.weight)) as relevance, ck.keyword_id
@@ -296,6 +297,7 @@ impl CrateDb {
         join crate_keywords ck on ck.keyword_id = relk.keyword_id
         join categories cc on cc.crate_id = ck.crate_id
         group by slug
+        having w > 0.3
         order by 1 desc
         limit 1"#).context("categories")?;
         let all = query.query_map(&[&origin.to_str()], |row| row.get(1)).context("categories q")?;

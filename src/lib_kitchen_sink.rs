@@ -52,6 +52,8 @@ use rich_crate::Derived;
 use rich_crate::Readme;
 use itertools::Itertools;
 use std::borrow::Cow;
+use std::sync::RwLock;
+use std::sync::Arc;
 use std::cmp::Ordering;
 use std::collections::hash_map::Entry::*;
 use std::collections::HashMap;
@@ -89,6 +91,7 @@ pub struct KitchenSink {
     crate_derived_cache: SimpleCache,
     category_crate_counts: LazyOnce<Option<HashMap<String, u32>>>,
     crate_path_index: LazyOnce<HashMap<Origin, PathBuf>>,
+    top_crates_cached: RwLock<HashMap<String, Arc<Vec<(Origin, u32)>>>>,
     git_checkout_path: PathBuf,
     main_cache_path: PathBuf,
 }
@@ -130,6 +133,7 @@ impl KitchenSink {
             git_checkout_path: data_path.join("git"),
             crate_path_index: LazyOnce::new(),
             category_crate_counts: LazyOnce::new(),
+            top_crates_cached: RwLock::new(HashMap::new()),
             main_cache_path,
         })
     }
@@ -357,7 +361,7 @@ impl KitchenSink {
 
         let path_in_repo = maybe_repo.as_ref().and_then(|repo| {
             if fetch_type != CrateData::Minimal {
-            self.crate_db.path_in_repo(repo, name).ok()
+                self.crate_db.path_in_repo(repo, name).ok()
             } else {
                 None
             }
@@ -474,8 +478,16 @@ impl KitchenSink {
     }
 
     /// Returns (nth, slug)
-    pub fn top_category(&self, krate: &RichCrate) -> Option<(u32, String)> {
-        self.crate_db.top_category(&krate.origin()).ok()
+    pub fn top_category(&self, krate: &RichCrateVersion) -> Option<(u32, String)> {
+        let crate_origin = krate.origin();
+        // FIXME: collect all and pick the most relevant
+        for slug in krate.category_slugs() {
+            let cat = self.top_crates_in_category(&slug).ok()?;
+            if let Some(pos) = cat.iter().position(|(o, _)| o == crate_origin) {
+                return Some((pos as u32 +1, slug.to_string()));
+            }
+        }
+        return None;
     }
 
     /// Returns (nth, keyword)
@@ -781,13 +793,24 @@ impl KitchenSink {
         Ok(self.crates_io.crate_owners(krate.short_name(), krate.version())?)
     }
 
-    pub fn top_crates_in_category(&self, slug: &str, limit: u32) -> CResult<Vec<(Crate, u32)>> {
-        Ok(self.crate_db.top_crates_in_category(slug, limit, false)?
-            .iter()
-            .filter_map(|(n, d)| {
-                self.crate_by_name(n).ok().map(|c| (c, *d))
+    // Sorted from the top, returns `(origin, recent_downloads)`
+    pub fn top_crates_in_category(&self, slug: &str) -> CResult<Arc<Vec<(Origin, u32)>>> {
+        {
+            let cache = self.top_crates_cached.read().unwrap();
+            if let Some(category) = cache.get(slug) {
+                return Ok(category.clone());
+            }
+        }
+        let mut cache = self.top_crates_cached.write().unwrap();
+        use std::collections::hash_map::Entry::*;
+        Ok(match cache.entry(slug.to_owned()) {
+            Occupied(e) => Arc::clone(e.get()),
+            Vacant(e) => {
+                let res = Arc::new(self.crate_db.top_crates_in_category(slug, 100)?);
+                e.insert(Arc::clone(&res));
+                res
+            }
             })
-            .collect())
     }
 
     pub fn top_keywords_in_category(&self, slug: &str) -> CResult<Vec<String>> {

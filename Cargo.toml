@@ -1,6 +1,6 @@
 [package]
 name = "kitchen_sink"
-version = "0.2.5"
+version = "0.3.0"
 authors = ["Kornel <kornel@geekhood.net>"]
 publish = false
 

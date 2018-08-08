@@ -127,3 +127,8 @@ pub struct GitHubRepo {
     /// My custom addition!
     pub github_page_url: Option<String>,
 }
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Topics {
+    pub names: Vec<String>,
+}

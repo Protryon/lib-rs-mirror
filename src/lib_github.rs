@@ -1,4 +1,5 @@
 extern crate github_rs;
+extern crate hyper;
 extern crate file;
 extern crate serde;
 extern crate urlencoding;
@@ -20,6 +21,7 @@ use std::time::Duration;
 use std::thread;
 use simple_cache::SimpleCache;
 use github_rs::headers::{rate_limit_remaining, rate_limit_reset};
+use hyper::header::{Accept, qitem};
 
 mod model;
 pub use model::*;
@@ -98,6 +100,16 @@ impl GitHub {
                            .repos().owner(&repo.owner).repo(&repo.repo)
                            .commits()
                            .execute())
+    }
+
+    pub fn topics(&self, repo: &SimpleRepo) -> CResult<Vec<String>> {
+        let cache_file = format!("{}/{}/topcs", repo.owner, repo.repo);
+        let path = format!("repos/{}/{}/topics", repo.owner, repo.repo);
+        let t: Topics = self.get_cached(&cache_file, |client| client.get()
+                           .custom_endpoint(&path)
+                           .set_header(Accept(vec![qitem("application/vnd.github.mercy-preview+json".parse().unwrap())]))
+                           .execute())?;
+        Ok(t.names)
     }
 
     pub fn repo(&self, repo: &SimpleRepo) -> CResult<GitHubRepo> {

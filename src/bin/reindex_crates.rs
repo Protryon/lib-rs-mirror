@@ -2,7 +2,7 @@ extern crate crate_db;
 extern crate kitchen_sink;
 extern crate failure;
 extern crate rayon;
-use kitchen_sink::KitchenSink;
+use kitchen_sink::{KitchenSink, CrateData};
 use kitchen_sink::RichCrateVersion;
 use kitchen_sink::Crate;
 use std::sync::{Arc, Mutex};
@@ -45,10 +45,10 @@ fn main() {
 }
 
 fn index_crate(crates: &KitchenSink, c: &Crate) -> Result<RichCrateVersion, failure::Error> {
-    let k = crates.rich_crate(c)?;
-    let v = crates.rich_crate_version(c)?;
-    crates.index_crate(&k)?;
+    let v = crates.rich_crate_version(c, CrateData::FullUncached)?;
     crates.index_crate_latest_version(&v)?;
+    let k = crates.rich_crate(c)?;
+    crates.index_crate(&k)?;
     Ok(v)
 }
 

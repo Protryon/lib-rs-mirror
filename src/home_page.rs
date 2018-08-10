@@ -7,7 +7,7 @@ use std::collections::HashSet;
 use rich_crate::Origin;
 use rich_crate::RichCrateVersion;
 use categories::CATEGORIES;
-use kitchen_sink::KitchenSink;
+use kitchen_sink::{KitchenSink, CrateData};
 use failure;
 use Page;
 use rayon::prelude::*;
@@ -59,7 +59,7 @@ impl<'a> HomePage<'a> {
                 .collect();
             let new: Vec<_> = new.into_par_iter()
                 .filter_map(|c| {
-                    self.crates.rich_crate_version(&c).ok()
+                    self.crates.rich_crate_version(&c, CrateData::Full).ok()
                 })
                 .collect();
             for c in &new {
@@ -104,7 +104,7 @@ impl<'a> HomePage<'a> {
                 .collect();
             cat.top.par_extend(top.into_par_iter()
                 .filter_map(|c| {
-                    self.crates.rich_crate_version(&c).ok()
+                    self.crates.rich_crate_version(&c, CrateData::Full).ok()
                 }));
             for c in &cat.top {
                 seen.insert(c.origin().to_owned());

@@ -11,7 +11,7 @@ use kitchen_sink::Crate;
 use rayon::prelude::*;
 use std::path::Path;
 use std::path::PathBuf;
-use kitchen_sink::KitchenSink;
+use kitchen_sink::{KitchenSink, CrateData};
 use render_readme::ImageOptimAPIFilter;
 use categories::CategoryMap;
 use std::fs;
@@ -24,6 +24,7 @@ use failure::ResultExt;
 ///
 /// See home_page.rs for interesting bits
 ///
+#[allow(deprecated)] // failure bug
 fn main() -> Result<(), failure::Error> {
     let mut out = File::create("public/index.html").expect("write to public/index.html");
     let crates = KitchenSink::new_default().expect("init caches, data, etc.");
@@ -68,7 +69,7 @@ fn render_categories(cats: &CategoryMap, base: &Path, crates: &KitchenSink, done
                 s.insert(c.name().to_owned());
             }
             let allver = crates.rich_crate(&c).context("get crate")?;
-            let ver = crates.rich_crate_version(&c).context("get rich crate")?;
+            let ver = crates.rich_crate_version(&c, CrateData::Full).context("get rich crate")?;
             let path = PathBuf::from(format!("public/crates/{}.html", c.name()));
             println!("{}", path.display());
             let mut outfile = File::create(&path)

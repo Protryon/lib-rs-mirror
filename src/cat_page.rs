@@ -1,6 +1,6 @@
 use rich_crate::RichCrateVersion;
 use render_readme::Renderer;
-use kitchen_sink::KitchenSink;
+use kitchen_sink::{KitchenSink, CrateData};
 use categories::CATEGORIES;
 use categories::Category;
 use failure::Error;
@@ -27,7 +27,7 @@ impl<'a> CatPage<'a> {
             related: crates.related_categories(&cat.slug)?,
             crates: crates.top_crates_in_category(&cat.slug, 75, true)?.into_par_iter()
                 .filter_map(|(c, d)| {
-                    let c = match crates.rich_crate_version(&c) {
+                    let c = match crates.rich_crate_version(&c, CrateData::Full) {
                         Ok(c) => c,
                         Err(e) => return Some(Err(e)),
                     };

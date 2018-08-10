@@ -10,9 +10,10 @@ use std::sync::Arc;
 use std::sync::mpsc;
 use std::thread;
 use std::collections::HashSet;
+use kitchen_sink::{KitchenSink, CrateData, Origin};
 
 fn main() {
-    let crates = Arc::new(match kitchen_sink::KitchenSink::new_default() {
+    let crates = Arc::new(match KitchenSink::new_default() {
         Ok(a) => a,
         Err(e) => {
             eprintln!("Error: {}", e);
@@ -31,7 +32,7 @@ fn main() {
                 let tx = tx1.clone();
                 s1.spawn(move |_| {
                     println!("{:?}", k.name());
-                    let r1 = crates.rich_crate_version(&k);
+                    let r1 = crates.rich_crate_version(&Origin::from_crates_io_name(k.name()), CrateData::Minimal);
                     let res = r1.and_then(|c| {
                         if let Some(Repo{host:RepoHost::GitHub(repo),..}) = c.repository() {
                             if let Ok(commits) = crates.repo_commits(&repo) {

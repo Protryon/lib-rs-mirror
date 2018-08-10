@@ -6,8 +6,9 @@ authors = ["Kornel <kornel@geekhood.net>"]
 [dependencies]
 crate_db = { git = "https://gitlab.com/crates.rs/crate_db.git" }
 github_info = { git = "https://gitlab.com/crates.rs/github_info.git" }
-kitchen_sink = { git = "https://gitlab.com/crates.rs/kitchen_sink.git", version = "0.2.3" }
+kitchen_sink = { git = "https://gitlab.com/crates.rs/kitchen_sink.git", version = "0.4.0" }
 repo_url = { git = "https://gitlab.com/crates.rs/repo_url.git" }
 user_db = { git = "https://gitlab.com/crates.rs/user_db.git" }
 failure = "0.1.1"
 rayon = "1.0.1"
+rand = "0.5.5"

@@ -132,6 +132,15 @@ Algorithms intended for securing data.\
 short-description = """
 Algorithms intended for securing data."""
 
+[cryptography.categories.cryptocurrencies]
+# fake, like the money
+name = "Cryptocurrency"
+title = "Libraries and tools for digital currencies"
+description = """
+Libraries and tools for digital currencies and distributed ledgers.\
+"""
+short-description = "Coins and blockchains."
+
 [database]
 name = "Database interfaces"
 title = "database interface for Rust"
@@ -565,6 +574,26 @@ biology, machine learning, geoscience, and other scientific fields.\
 """
 short-description = """
 Solving problems involving math, physics, and other scientific fields."""
+
+[science.categories.math]
+# fake
+name = "Math"
+title = "Rust math library"
+description = """
+Crates related to solving mathematical problems.\
+"""
+short-description = """
+Solving problems involving math and logic."""
+
+[science.categories.ml]
+# fake
+name = "Machine learning"
+title = "ML/AI/statistics in Rust"
+description = """
+Artificial intelligence, neural networks, deep learning, and statistics.\
+"""
+short-description = """
+AI, ML, NN and statistics."""
 
 [simulation]
 name = "Simulation"

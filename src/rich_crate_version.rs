@@ -6,6 +6,7 @@ use semver;
 use repo_url::Repo;
 use cargo_toml::TomlManifest;
 use cargo_toml::TomlDependency;
+use cargo_toml::TomlPackage;
 pub use cargo_toml::TomlDepsSet;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -33,7 +34,8 @@ pub struct RichCrateVersion {
 ///
 /// Crates.rs uses this only for the latest version of a crate.
 impl RichCrateVersion {
-    pub fn new(index: Version, manifest: TomlManifest, derived: Derived, readme: Result<Option<Readme>, ()>, lib_file: Option<String>, path_in_repo: Option<String>, has_buildrs: bool) -> Self {
+    pub fn new(index: Version, mut manifest: TomlManifest, derived: Derived, readme: Result<Option<Readme>, ()>, lib_file: Option<String>, path_in_repo: Option<String>, has_buildrs: bool) -> Self {
+        Self::fake_categories(&mut manifest.package);
         Self {
             origin: Origin::from_crates_io_name(index.name()),
             repo: manifest.package.repository.as_ref().and_then(|r| Repo::new(r).ok()),
@@ -81,12 +83,12 @@ impl RichCrateVersion {
     pub fn keywords(&self) -> impl Iterator<Item = &str> {
         self.derived.keywords.as_ref()
             .unwrap_or(&self.manifest.package.keywords)
-            .iter().map(|s| s.as_ref())
+            .iter().map(|s| s.as_str())
     }
 
     /// Only keywords specified by the crate author. May be empty.
     pub fn raw_keywords(&self) -> impl Iterator<Item = &str> {
-        self.manifest.package.keywords.iter().map(|s| s.as_ref())
+        self.manifest.package.keywords.iter().map(|s| s.as_str())
     }
 
     /// Globally unique URL-like string identifying source & the crate within that source
@@ -268,6 +270,24 @@ impl RichCrateVersion {
             dep
         }
         Ok((convsort(normal), convsort(dev), convsort(build)))
+    }
+
+    fn fake_categories(package: &mut TomlPackage) {
+        for cat in &mut package.categories {
+            if cat == "cryptography" {
+                if package.keywords.iter().any(|k| k == "bitcoin" || k == "ethereum" || k == "exonum" || k == "blockchain") {
+                    *cat = "cryptography::cryptocurrencies".into();
+                }
+            }
+            if cat == "science" {
+                if package.keywords.iter().any(|k| k == "math" || k == "algebra" || k == "mathematics" || k == "maths") {
+                    *cat = "science::math".into();
+                }
+                else if package.keywords.iter().any(|k| k == "neural-network" || k == "machine-learning" || k == "deep-learning") {
+                    *cat = "science::ml".into();
+                }
+            }
+        }
     }
 }
 

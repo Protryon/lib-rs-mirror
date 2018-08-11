@@ -7,11 +7,10 @@ extern crate rayon;
 extern crate render_readme;
 extern crate categories;
 
-use kitchen_sink::Crate;
 use rayon::prelude::*;
 use std::path::Path;
 use std::path::PathBuf;
-use kitchen_sink::{KitchenSink, CrateData};
+use kitchen_sink::{KitchenSink, CrateData, Origin};
 use render_readme::ImageOptimAPIFilter;
 use categories::CategoryMap;
 use std::fs;
@@ -53,24 +52,24 @@ fn main() -> Result<(), failure::Error> {
     Ok(())
 }
 
-fn render_categories(cats: &CategoryMap, base: &Path, crates: &KitchenSink, done_pages: &Mutex<HashSet<String>>, image_filter: Arc<ImageOptimAPIFilter>) -> Result<(), failure::Error> {
+fn render_categories(cats: &CategoryMap, base: &Path, crates: &KitchenSink, done_pages: &Mutex<HashSet<Origin>>, image_filter: Arc<ImageOptimAPIFilter>) -> Result<(), failure::Error> {
     cats.par_iter().map(|(slug, cat)| {
         if !cat.sub.is_empty() {
             let new_base = base.join(slug);
             let _ = fs::create_dir(&new_base);
             render_categories(&cat.sub, &new_base, crates, done_pages, image_filter.clone())?;
         }
-        let render_crate = |c: Crate| {
+        let render_crate = |origin: &Origin| {
             {
                 let mut s = done_pages.lock().unwrap();
-                if s.get(c.name()).is_some() {
+                if s.get(origin).is_some() {
                     return Ok(());
                 }
-                s.insert(c.name().to_owned());
+                s.insert(origin.clone());
             }
-            let allver = crates.rich_crate(&c).context("get crate")?;
-            let ver = crates.rich_crate_version(&c, CrateData::Full).context("get rich crate")?;
-            let path = PathBuf::from(format!("public/crates/{}.html", c.name()));
+            let allver = crates.rich_crate(origin).context("get crate")?;
+            let ver = crates.rich_crate_version(origin, CrateData::Full).context("get rich crate")?;
+            let path = PathBuf::from(format!("public/crates/{}.html", ver.short_name()));
             println!("{}", path.display());
             let mut outfile = File::create(&path)
                 .with_context(|_| format!("Can't create {}", path.display()))?;
@@ -78,18 +77,18 @@ fn render_categories(cats: &CategoryMap, base: &Path, crates: &KitchenSink, done
             Ok(())
         };
 
-        crates.top_crates_in_category(&cat.slug, 75, true)
-            .context("top crates")?
-        .into_par_iter()
-        .map(|(c,_)| {
-            let msg = format!("Failed rendering crate {}", c.name());
+        crates.top_crates_in_category(&cat.slug).context("top crates")?
+        .par_iter()
+        .take(75)
+        .map(|(c, _)| {
+            let msg = format!("Failed rendering crate {}", c.to_str());
             render_crate(c).context(msg)
         })
         .collect::<Result<(), _>>()?;
 
         crates.recently_updated_crates_in_category(&cat.slug)
             .context("recently updated crates")?
-        .into_par_iter().map(render_crate)
+        .par_iter().map(render_crate)
         .collect::<Result<(), failure::Error>>()?;
 
         let path = base.join(format!("{}.html", slug));

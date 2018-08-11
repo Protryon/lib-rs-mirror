@@ -323,7 +323,7 @@ impl<'a> CratePage<'a> {
 
     /// Most relevant category for the crate and rank in that category
     pub fn top_category(&self) -> Option<(u32, &Category)> {
-        self.kitchen_sink.top_category(&self.all).and_then(|(top, slug)|{
+        self.kitchen_sink.top_category(&self.ver).and_then(|(top, slug)|{
             CATEGORIES.from_slug(slug).last().map(|c| {
                 (top, c)
             })

@@ -320,7 +320,7 @@ impl KitchenSink {
         if meta.manifest.package.categories.is_empty() && fetch_type == CrateData::Full {
             derived.categories = Some({
                 let keywords_iter = meta.manifest.package.keywords.iter().map(|s| s.as_str());
-                self.crate_db.crate_categories(&origin, keywords_iter).context("catdb")?
+                self.crate_db.guess_crate_categories(&origin, keywords_iter).context("catdb")?
                 .into_iter().map(|(_, c)| c).collect()
             });
         }
@@ -478,16 +478,18 @@ impl KitchenSink {
     }
 
     /// Returns (nth, slug)
-    pub fn top_category(&self, krate: &RichCrateVersion) -> Option<(u32, String)> {
+    pub fn top_category<'crat>(&self, krate: &'crat RichCrateVersion) -> Option<(u32, Cow<'crat, str>)> {
         let crate_origin = krate.origin();
-        // FIXME: collect all and pick the most relevant
-        for slug in krate.category_slugs() {
-            let cat = self.top_crates_in_category(&slug).ok()?;
-            if let Some(pos) = cat.iter().position(|(o, _)| o == crate_origin) {
-                return Some((pos as u32 +1, slug.to_string()));
-            }
-        }
-        return None;
+        krate.category_slugs()
+        .filter_map(|slug| {
+            self.top_crates_in_category(&slug).ok()
+            .and_then(|cat| {
+                cat.iter().position(|(o, _)| o == crate_origin).map(|pos| {
+                    (pos as u32 +1, slug)
+                })
+            })
+        })
+        .min_by_key(|a| a.0)
     }
 
     /// Returns (nth, keyword)

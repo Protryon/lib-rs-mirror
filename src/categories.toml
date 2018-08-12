@@ -37,16 +37,16 @@ short-description = """
 Core algorithms such as hashing, sorting and searching.
 """
 
-[api-bindings]
-name = "API bindings"
-title = "Rust API bindings"
-description = """
-Idiomatic wrappers of specific APIs for convenient access from \
-Rust. Includes HTTP API wrappers as well. Non-idiomatic or unsafe \
-bindings can be found in External FFI bindings.\
-"""
-short-description = """
-Idiomatic wrappers of C library APIs for convenient access from Rust."""
+# [api-bindings]
+# name = "API bindings"
+# title = "Rust API bindings"
+# description = """
+# Idiomatic wrappers of specific APIs for convenient access from \
+# Rust. Includes HTTP API wrappers as well. Non-idiomatic or unsafe \
+# bindings can be found in External FFI bindings.\
+# """
+# short-description = """
+# Idiomatic wrappers of C library APIs for convenient access from Rust."""
 
 [asynchronous]
 name = "Asynchronous"
@@ -134,12 +134,12 @@ Algorithms intended for securing data."""
 
 [cryptography.categories.cryptocurrencies]
 # fake, like the money
-name = "Cryptocurrency"
-title = "Libraries and tools for digital currencies"
+name = "Cryptocurrencies"
+title = "cryptocurrencies in Rust"
 description = """
-Libraries and tools for digital currencies and distributed ledgers.\
+Libraries and tools for digital currencies, and distributed ledgers.\
 """
-short-description = "Coins and blockchains."
+short-description = "Coins, blockchains and wallets."
 
 [database]
 name = "Database interfaces"
@@ -298,17 +298,17 @@ Encoding and/or decoding data from one data format to another.\
 short-description = """
 Encoding and/or decoding data from one data format to another."""
 
-[external-ffi-bindings]
-name = "External FFI bindings"
-title = "Rust bindings for external library"
-description = """
-Direct Rust FFI bindings to libraries written in other languages; \
-often denoted by a -sys suffix. Safe and idiomatic wrappers are in \
-the API bindings category.
-"""
-short-description = """
-Direct Rust FFI bindings to libraries written in other languages
-"""
+# [external-ffi-bindings]
+# name = "External FFI bindings"
+# title = "Rust bindings for external library"
+# description = """
+# Direct Rust FFI bindings to libraries written in other languages; \
+# often denoted by a -sys suffix. Safe and idiomatic wrappers are in \
+# the API bindings category.
+# """
+# short-description = """
+# Direct Rust FFI bindings to libraries written in other languages
+# """
 
 [filesystem]
 name = "Filesystem"
@@ -502,18 +502,17 @@ description = """
 Parsers implemented for particular formats or languages.\
 """
 short-description = """
-Parsers for particular formats or languages."""
+Parse data formats or languages."""
 
 [parsing]
-name = "Parsing"
-title = "Rust parsing library"
+name = "Parsing tools"
+title = "Parser tooling"
 description = """
-Crates to help create parsers of binary and text \
-formats. Format-specific parsers belong in other, more specific \
-categories.\
+Write or generate parsers of binary and text formats. \
+Format-specific parsers belong in other, more specific categories.
 """
 short-description = """
-Create parsers of binary and text formats."""
+Parsing tools and parser generators."""
 
 [rendering]
 name = "Rendering"
@@ -590,10 +589,9 @@ Solving problems involving math and logic."""
 name = "Machine learning"
 title = "ML/AI/statistics in Rust"
 description = """
-Artificial intelligence, neural networks, deep learning, and statistics.\
+Artificial intelligence, neural networks, deep learning, recommendation systems, and statistics.\
 """
-short-description = """
-AI, ML, NN and statistics."""
+short-description = """AI, ML, NN, etc."""
 
 [simulation]
 name = "Simulation"

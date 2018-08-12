@@ -8,6 +8,9 @@ use toml::value::{Value, Table};
 use std::collections::BTreeMap;
 use std::borrow::Cow;
 
+mod tuning;
+pub use tuning::*;
+
 const CATEGORIES_TOML: &[u8] = include_bytes!("categories.toml");
 
 #[derive(Debug, Clone)]
@@ -104,9 +107,15 @@ impl Categories {
         }).collect()
     }
 
-    pub fn fixed_category_slugs(cats: &[String]) -> impl Iterator<Item = Cow<str>> {
+    pub fn fixed_category_slugs(cats: &[String]) -> Vec<Cow<str>> {
         let mut cats = cats.iter().enumerate().filter_map(|(idx, s)| {
             if s.len() < 2 {
+                return None;
+            }
+            if s == "external-ffi-bindings" { // We pretend it doesn't exist
+                return None;
+            }
+            if s == "api-bindings" { // We pretend it doesn't exist
                 return None;
             }
             let mut chars = s.chars().peekable();
@@ -139,7 +148,7 @@ impl Categories {
             b.0.cmp(&a.0).then(a.1.cmp(&b.1))
         });
 
-        cats.into_iter().map(|(_,_,c)| c)
+        cats.into_iter().map(|(_,_,c)| c).collect()
     }
 }
 

@@ -74,14 +74,15 @@ impl<'a> CratePage<'a> {
         }
     }
     pub fn page_title(&self) -> String {
+        let slugs: Vec<_> = self.ver.category_slugs().collect();
         let kind = if self.ver.has_bin() {
-            if self.ver.category_slugs().any(|s| s == "development-tools::cargo-plugins") {
+            if slugs.iter().any(|s| s == "development-tools::cargo-plugins") {
                 "Rust/Cargo add-on"
-            } else if self.ver.category_slugs().any(|s| s == "development-tools::build-utils" || s == "development-tools") {
+            } else if slugs.iter().any(|s| s == "development-tools::build-utils" || s == "development-tools") {
                 "utility for Rust"
-            } else if self.ver.category_slugs().any(|s| s == "emulators") {
+            } else if slugs.iter().any(|s| s == "emulators") {
                 "Rust emulator"
-            } else if self.ver.category_slugs().any(|s| s == "command-line-utilities") {
+            } else if slugs.iter().any(|s| s == "command-line-utilities") {
                 "command-line utility in Rust"
             } else if self.ver.is_app() {
                 "Rust application"
@@ -90,7 +91,7 @@ impl<'a> CratePage<'a> {
             }
         } else if self.ver.is_sys() {
             "system library interface for Rust"
-        } else if let Some((_, cat)) = self.top_category() {
+        } else if let Some(cat) = slugs.get(0).and_then(|slug| CATEGORIES.from_slug(slug).last()) {
             &cat.title
         } else if self.ver.has_lib() {
             "Rust library"

@@ -102,20 +102,14 @@
             </ul>
           </div>
         </div>
-        @if p.crates.len() != p.count {
-            <div class=pager>
-                <div class="inner-col">
-                    <a href="@url.category_page(&p.cat, (p.crates.len() + 1) / 10 + 1)">Next page</a>
-                </div>
-            </div>
-        }
-
     </main>
     <footer>
+      @if let Some(related) = Some(p.related_categories()) {
+      @if !related.is_empty() {
         <div class=seealso>
         <div class="inner-col">
           See also:
-            @for (last, cat) in p.related_categories().iter().identify_last() {
+            @for (last, cat) in related.iter().identify_last() {
             @for (last, subcat) in cat.iter().identify_last() {
               <a href="@url.category(subcat)" title="@subcat.short_description">@subcat.name</a>
               @if !last {&rsaquo;}
@@ -124,5 +118,7 @@
           }
         </div>
         </div>
+      }
+      }
       </footer>
 })

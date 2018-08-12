@@ -23,6 +23,7 @@ mod download_graph;
 mod home_page;
 mod iter;
 mod urler;
+use failure::ResultExt;
 use categories::Category;
 use crate_page::*;
 use kitchen_sink::KitchenSink;
@@ -65,7 +66,8 @@ impl Page {
 pub fn render_category(out: &mut Write, cat: &Category, crates: &KitchenSink, filter: ArcImageFilter) -> Result<(), failure::Error> {
     let urler = Urler::new();
     let markup = Renderer::new_filter(Highlighter::new(), filter);
-    templates::cat_page(out, &cat_page::CatPage::new(cat, crates, &markup)?, &urler)?;
+    let page = cat_page::CatPage::new(cat, crates, &markup).context("can't prepare rendering of category page")?;
+    templates::cat_page(out, &page, &urler)?;
     Ok(())
 }
 

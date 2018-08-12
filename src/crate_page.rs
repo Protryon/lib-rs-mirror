@@ -10,6 +10,7 @@ use rich_crate::RichDep;
 use rich_crate::Readme;
 use rich_crate::RichCrate;
 use rich_crate::RichCrateVersion;
+use rich_crate::Include;
 use download_graph::DownloadsGraph;
 use kitchen_sink::CrateAuthor;
 use categories::CATEGORIES;
@@ -59,7 +60,7 @@ struct ReleaseCounts {
 
 impl<'a> CratePage<'a> {
     pub fn page(&self, url: &Urler) -> Page {
-        let keywords = self.ver.keywords().collect::<Vec<_>>().join(", ");
+        let keywords = self.ver.keywords(Include::Cleaned).collect::<Vec<_>>().join(", ");
         Page {
             title: self.page_title(),
             keywords: if keywords != "" {Some(keywords)} else {None},
@@ -74,7 +75,7 @@ impl<'a> CratePage<'a> {
         }
     }
     pub fn page_title(&self) -> String {
-        let slugs: Vec<_> = self.ver.category_slugs().collect();
+        let slugs: Vec<_> = self.ver.category_slugs(Include::Cleaned).collect();
         let kind = if self.ver.has_bin() {
             if slugs.iter().any(|s| s == "development-tools::cargo-plugins") {
                 "Rust/Cargo add-on"
@@ -349,7 +350,7 @@ impl<'a> CratePage<'a> {
     /// so that they look neater in breadcrumbs
     pub fn category_slugs_unique(&self) -> Vec<Vec<&Category>> {
         let mut seen = HashSet::new();
-        self.ver.category_slugs().map(|slug| {
+        self.ver.category_slugs(Include::Cleaned).map(|slug| {
             CATEGORIES.from_slug(slug).filter(|c| {
                 if seen.get(&c.slug).is_some() {
                     return false;

@@ -6,6 +6,7 @@
 @use iter::*;
 @use Urler;
 @use CratePage;
+@use rich_crate::Include;
 
 @(url: &Urler, c: &CratePage)
 
@@ -22,7 +23,7 @@
     </h1>
      &rsaquo;
     @if c.ver.has_categories() {
-      <span class="categories @if c.ver.keywords().next().is_some() {has-keywords}">
+      <span class="categories @if c.ver.keywords(Include::Cleaned).next().is_some() {has-keywords}">
       @for (last, (major, cat)) in c.category_slugs_unique().iter().enumerate().identify_last() {
         @for (last, (i, subcat)) in cat.iter().enumerate().identify_last() {
           @if major < 2 {
@@ -47,14 +48,14 @@
       </span>
     }
     </div>
-    @if c.ver.keywords().next().is_some() {
+    @if c.ver.keywords(Include::Cleaned).next().is_some() {
       <span class="keywords">
         <span>
-          @for key in c.ver.keywords().take(3) {
+          @for key in c.ver.keywords(Include::Cleaned).take(3) {
             <a property="applicationCategory" href="@url.keyword(key)" class=keyword><span>#</span>@key</a>
           }
         </span>
-        @for key in c.ver.keywords().skip(3) {
+        @for key in c.ver.keywords(Include::Cleaned).skip(3) {
           <a property="applicationCategory" href="@url.keyword(key)" class=keyword><span>#</span>@key</a>
         }
       </span>

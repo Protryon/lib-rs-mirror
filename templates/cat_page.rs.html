@@ -1,6 +1,7 @@
 @use templates::base;
 @use templates::labels;
 @use cat_page::CatPage;
+@use rich_crate::Include;
 @use Urler;
 @use iter::*;
 
@@ -92,7 +93,7 @@
                             <span class="version @p.version_class(c)"><span>v</span>@c.version()</span>
                             <span class=downloads title="@downloads recent downloads">@if let Some((num,unit)) = Some(p.downloads(*downloads)) {@num<b>@unit</b>}</span>
                             @:labels(c)
-                            @for k in c.keywords() {
+                            @for k in c.keywords(Include::Cleaned) {
                                 <span class=k><span>#</span>@k</span>
                             }
                         </div>

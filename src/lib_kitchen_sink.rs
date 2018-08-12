@@ -68,8 +68,8 @@ pub type CResult<T> = Result<T, CError>;
 pub enum KitchenSinkErr {
     #[fail(display = "git checkout meh")]
     GitCheckoutFailed,
-    #[fail(display = "category not found")]
-    CategoryNotFound,
+    #[fail(display = "category not found: {}", _0)]
+    CategoryNotFound(String),
     #[fail(display = "category query failed")]
     CategoryQueryFailed,
     #[fail(display = "crate not found: {:?}", _0)]
@@ -825,13 +825,22 @@ impl KitchenSink {
 
     pub fn category_crate_count(&self, slug: &str) -> Result<u32, KitchenSinkErr> {
         self.category_crate_counts.get(|| {
-            self.crate_db.category_crate_counts().ok()
+            match self.crate_db.category_crate_counts() {
+                Ok(res) => Some(res),
+                Err(err) => {
+                    eprintln!("error: can't get category counts: {}", err);
+                    None
+                },
+            }
         })
         .as_ref()
         .ok_or(KitchenSinkErr::CategoryQueryFailed)
         .and_then(|h| {
             h.get(slug).map(|&c| c)
-            .ok_or(KitchenSinkErr::CategoryNotFound)
+            .ok_or_else(|| {
+                eprintln!("Known categories: {:?}", h);
+                KitchenSinkErr::CategoryNotFound(slug.to_string())
+            })
         })
     }
 

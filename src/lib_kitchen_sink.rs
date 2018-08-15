@@ -720,7 +720,7 @@ impl KitchenSink {
     }
 
     pub fn top_crates_in_category(&self, slug: &str, limit: u32) -> CResult<Vec<(Crate, u32)>> {
-        Ok(self.crate_db.top_crates_in_category(slug, limit)?
+        Ok(self.crate_db.top_crates_in_category(slug, limit, false)?
             .iter()
             .filter_map(|(n, d)| {
                 self.crate_by_name(n).ok().map(|c| (c, *d))

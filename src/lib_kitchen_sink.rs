@@ -412,12 +412,12 @@ impl KitchenSink {
 
     /// Returns (nth, slug)
     pub fn top_category(&self, krate: &RichCrate) -> Option<(u32, String)> {
-        self.crate_db.top_category(&krate.origin())
+        self.crate_db.top_category(&krate.origin()).ok()
     }
 
     /// Returns (nth, keyword)
     pub fn top_keyword(&self, krate: &RichCrate) -> Option<(u32, String)> {
-        self.crate_db.top_keyword(&krate.origin())
+        self.crate_db.top_keyword(&krate.origin()).ok()
     }
 
     /// Maintenance: add user to local db index
@@ -524,7 +524,7 @@ impl KitchenSink {
     /// The relationship is based on directory layout of monorepos.
     pub fn parent_crate(&self, child: &RichCrateVersion) -> Option<RichCrateVersion> {
         let repo = child.repository()?;
-        let name = self.crate_db.parent_crate(repo, child.short_name())?;
+        let name = self.crate_db.parent_crate(repo, child.short_name()).ok().and_then(|v| v)?;
         let krate = self.crate_by_name(&Origin::from_crates_io_name(&name)).ok()?;
         self.rich_crate_version(&krate).ok()
     }

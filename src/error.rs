@@ -28,5 +28,8 @@ quick_error! {
             display("{}\n{}", err, String::from_utf8_lossy(data))
         }
         NotCached {}
+        Other(err: String) {
+            display("{}", err)
+        }
     }
 }

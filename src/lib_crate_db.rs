@@ -14,7 +14,7 @@ use rich_crate::RichCrateVersion;
 use rusqlite::*;
 use thread_local::ThreadLocal;
 use chrono::prelude::*;
-use std::path::PathBuf;
+use std::path::Path;
 use failure::ResultExt;
 use std::cell::RefCell;
 type Result<T> = std::result::Result<T, failure::Error>;
@@ -24,15 +24,15 @@ mod stopwords;
 use stopwords::STOPWORDS;
 
 pub struct CrateDb {
-    path: PathBuf,
+    url: String,
     pub(crate) conn: ThreadLocal<std::result::Result<RefCell<Connection>, rusqlite::Error>>,
 }
 
 impl CrateDb {
     /// Path to sqlite db file to create/update
-    pub fn new(path: impl Into<PathBuf>) -> Result<Self> {
+    pub fn new(path: impl AsRef<Path>) -> Result<Self> {
         Ok(Self {
-            path: path.into(),
+            url: format!("file:{}?cache=shared", path.as_ref().display()),
             conn: ThreadLocal::new(),
         })
     }
@@ -57,7 +57,7 @@ impl CrateDb {
     }
 
     fn connect(&self) -> std::result::Result<Connection, rusqlite::Error> {
-        let db = Self::db(&self.path)?;
+        let db = Self::db(&self.url)?;
         db.execute("PRAGMA synchronous = 0", &[])?;
         Ok(db)
     }

@@ -1,10 +1,9 @@
 use rusqlite::*;
-use std::path::Path;
 use CrateDb;
 
 impl CrateDb {
-    pub(crate) fn db(path: &Path) -> Result<Connection> {
-        let conn = Connection::open(path)?;
+    pub(crate) fn db(url: &str) -> Result<Connection> {
+        let conn = Connection::open(url)?;
         conn.execute_batch(r#"
             BEGIN;
             CREATE TABLE IF NOT EXISTS crates (

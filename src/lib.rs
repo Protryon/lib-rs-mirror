@@ -5,29 +5,29 @@ extern crate serde;
 extern crate serde_json;
 #[macro_use] extern crate quick_error;
 use rusqlite::Connection;
-use std::path::PathBuf;
+use std::path::Path;
 use thread_local::ThreadLocal;
 mod error;
 pub use error::Error;
 
 #[derive(Debug)]
 pub struct SimpleCache {
-    path: PathBuf,
+    url: String,
     conn: ThreadLocal<Result<Connection, rusqlite::Error>>,
     pub cache_only: bool,
 }
 
 impl SimpleCache {
-    pub fn new(db_path: impl Into<PathBuf>) -> Result<Self, Error> {
+    pub fn new(db_path: impl AsRef<Path>) -> Result<Self, Error> {
         Ok(Self {
-            path: db_path.into(),
+            url: format!("file:{}?cache=shared", db_path.as_ref().display()),
             conn: ThreadLocal::new(),
             cache_only: false,
         })
     }
 
     fn connect(&self) -> Result<Connection, rusqlite::Error> {
-        let conn = Connection::open(&self.path)?;
+        let conn = Connection::open(&self.url)?;
         conn.execute("PRAGMA synchronous = 0", &[])?;
         Ok(conn)
     }

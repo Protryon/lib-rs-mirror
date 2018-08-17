@@ -30,6 +30,13 @@ pub struct RichCrateVersion {
     has_buildrs: bool,
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum Include {
+    Cleaned,
+    AuthoritativeOnly,
+    RawCargoTomlOnly,
+}
+
 /// Data for a specific version of a crate.
 ///
 /// Crates.rs uses this only for the latest version of a crate.
@@ -59,16 +66,19 @@ impl RichCrateVersion {
         !self.manifest.package.categories.is_empty() || self.derived.categories.as_ref().map_or(false, |c| !c.is_empty())
     }
 
-    pub fn category_slugs(&self) -> impl Iterator<Item = Cow<str>> {
-        Categories::fixed_category_slugs(if let Some(ref assigned_categories) = self.derived.categories {
-            &assigned_categories
-        } else {
-            &self.manifest.package.categories
-        })
-    }
-
-    pub fn raw_category_slugs(&self) -> impl Iterator<Item = Cow<str>> {
-        Categories::fixed_category_slugs(&self.manifest.package.categories)
+    pub fn category_slugs(&self, include: Include) -> impl Iterator<Item = Cow<str>> {
+        match include {
+            Include::Cleaned => Categories::fixed_category_slugs(if let Some(ref assigned_categories) = self.derived.categories {
+                &assigned_categories
+            } else {
+                &self.manifest.package.categories
+            }),
+            Include::AuthoritativeOnly => Categories::fixed_category_slugs(&self.manifest.package.categories),
+            Include::RawCargoTomlOnly => {
+                let tmp: Vec<_> = self.manifest.package.categories.iter().map(From::from).collect();
+                tmp
+            }
+        }.into_iter()
     }
 
     pub fn license(&self) -> Option<&str> {
@@ -80,15 +90,19 @@ impl RichCrateVersion {
     }
 
     /// Either original keywords or guessed ones
-    pub fn keywords(&self) -> impl Iterator<Item = &str> {
-        self.derived.keywords.as_ref()
-            .unwrap_or(&self.manifest.package.keywords)
-            .iter().map(|s| s.as_str())
-    }
-
-    /// Only keywords specified by the crate author. May be empty.
-    pub fn raw_keywords(&self) -> impl Iterator<Item = &str> {
-        self.manifest.package.keywords.iter().map(|s| s.as_str())
+    pub fn keywords(&self, include: Include) -> impl Iterator<Item = &str> {
+        match include {
+            Include::RawCargoTomlOnly => &self.manifest.package.keywords,
+            Include::AuthoritativeOnly => {
+                if self.manifest.package.keywords.is_empty() {
+                    self.derived.github_keywords.as_ref()
+                } else {
+                    None
+                }.unwrap_or(&self.manifest.package.keywords)
+            },
+            Include::Cleaned => self.derived.keywords.as_ref().unwrap_or(&self.manifest.package.keywords),
+        }
+        .iter().map(|s| s.as_str())
     }
 
     /// Globally unique URL-like string identifying source & the crate within that source
@@ -177,7 +191,7 @@ impl RichCrateVersion {
         (self.links().is_some() || (
             self.short_name().ends_with("-sys") ||
             self.short_name().ends_with("_sys") ||
-            self.category_slugs().any(|c| c == "external-ffi-bindings")
+            self.category_slugs(Include::RawCargoTomlOnly).any(|c| c == "external-ffi-bindings")
             // _dll suffix is a false positive
         ))
     }
@@ -279,12 +293,16 @@ impl RichCrateVersion {
                     *cat = "cryptography::cryptocurrencies".into();
                 }
             }
-            if cat == "science" {
-                if package.keywords.iter().any(|k| k == "math" || k == "algebra" || k == "mathematics" || k == "maths") {
-                    *cat = "science::math".into();
+            if cat == "games" {
+                if package.keywords.iter().any(|k| k == "game-dev" || k == "game-development" || k == "gamedev" || k == "framework" || k == "utilities" || k == "parser" || k == "api") {
+                    *cat = "game-engines".into();
                 }
-                else if package.keywords.iter().any(|k| k == "neural-network" || k == "machine-learning" || k == "deep-learning") {
+            }
+            if cat == "science" {
+                if package.keywords.iter().any(|k| k == "neural-network" || k == "machine-learning" || k == "deep-learning") {
                     *cat = "science::ml".into();
+                } else if package.keywords.iter().any(|k| k == "math" ||  k == "calculus" || k == "algebra" || k == "linear-algebra" || k == "mathematics" || k == "maths" || k == "number-theory") {
+                    *cat = "science::math".into();
                 }
             }
         }
@@ -319,4 +337,5 @@ impl RichDep {
 pub struct Derived {
     pub categories: Option<Vec<String>>,
     pub keywords: Option<Vec<String>>,
+    pub github_keywords: Option<Vec<String>>,
 }

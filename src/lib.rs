@@ -80,10 +80,11 @@ impl SimpleCache {
     }
 
     pub fn delete(&self, cache_name: &str) -> Result<(), Error> {
-        let conn = self.conn.lock().unwrap();
-        let mut q = conn.prepare_cached("DELETE FROM cache WHERE key = ?1")?;
-        q.execute(&[&cache_name])?;
-        Ok(())
+        self.with_connection(|conn| {
+            let mut q = conn.prepare_cached("DELETE FROM cache WHERE key = ?1")?;
+            q.execute(&[&cache_name])?;
+            Ok(())
+        })
     }
 
     pub fn set(&self, cache_name: &str, data: &[u8]) -> Result<(), Error> {

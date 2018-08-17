@@ -35,6 +35,7 @@ pub use rich_crate::{Cfg, Target};
 pub use rich_crate::RichCrate;
 pub use rich_crate::RichCrateVersion;
 pub use rich_crate::Origin;
+pub use rich_crate::Include;
 
 use simple_cache::SimpleCache;
 use crate_files::CrateFile;
@@ -51,6 +52,7 @@ use rich_crate::Author;
 use rich_crate::Derived;
 use rich_crate::Readme;
 use itertools::Itertools;
+use std::collections::HashSet;
 use std::borrow::Cow;
 use std::sync::RwLock;
 use std::sync::Arc;
@@ -63,6 +65,21 @@ use crate_db::{CrateDb, RepoChange};
 
 pub type CError = failure::Error;
 pub type CResult<T> = Result<T, CError>;
+pub type Warnings = HashSet<Warning>;
+
+#[derive(Debug, Clone, Serialize, Fail, Deserialize, Hash, Eq, PartialEq)]
+pub enum Warning {
+    #[fail(display = "`Cargo.toml` doesn't have `repository` property")]
+    NoRepositoryProperty,
+    #[fail(display = "`Cargo.toml` doesn't have `readme` property")]
+    NoReadmeProperty,
+    #[fail(display = "Can't find README in repository: {}", _0)]
+    NoReadmeInRepo(String),
+    #[fail(display = "Could not clone repository: {}", _0)]
+    ErrorCloning(String),
+    #[fail(display = "{} URL is a broken link: {}", _0, _1)]
+    BrokenLink(String, String),
+}
 
 #[derive(Debug, Clone, Fail)]
 pub enum KitchenSinkErr {
@@ -214,10 +231,15 @@ impl KitchenSink {
     ///
     /// There's no support for getting anything else than the latest version.
     pub fn rich_crate_version(&self, origin: &Origin, fetch_type: CrateData) -> CResult<RichCrateVersion> {
+        self.rich_crate_version_verbose(origin, fetch_type).map(|(krate, _)| krate)
+    }
+
+    /// With warnings
+    pub fn rich_crate_version_verbose(&self, origin: &Origin, fetch_type: CrateData) -> CResult<(RichCrateVersion, Warnings)> {
         let krate = self.crate_by_name(origin)?;
         let latest = krate.latest_version().clone();
         let cache_key = format!("{}-{}", latest.name(), latest.version());
-        let d = if fetch_type != CrateData::FullNoDerived {
+        let cached = if fetch_type != CrateData::FullNoDerived {
             if let Ok(cached) = self.crate_derived_cache.get(&cache_key)
             .with_context(|_| String::new())
             .and_then(|cached| {
@@ -234,29 +256,41 @@ impl KitchenSink {
             None
         };
 
-        let d = if let Some(d) = d {d} else {
-            let d = self.rich_crate_version_data(&latest, fetch_type).context("get rich crate data")?;
+        let (d, warn) = if let Some(res) = cached {res} else {
+            let (d, warn) = self.rich_crate_version_data(&latest, fetch_type).context("get rich crate data")?;
             if fetch_type == CrateData::Full {
                 eprintln!("miss! {}", cache_key);
-                self.crate_derived_cache.set(&cache_key, &serde_json::to_vec(&d).context("ser to cache")?).context("save to cache")?;
+                self.crate_derived_cache.set(&cache_key, &serde_json::to_vec(&(&d, &warn)).context("ser to cache")?).context("save to cache")?;
             } else if fetch_type == CrateData::FullNoDerived {
                 self.crate_derived_cache.delete(&cache_key).context("clear cache")?;
             }
-            d
+            (d, warn)
         };
-        Ok(RichCrateVersion::new(latest, d.manifest, d.derived, d.readme, d.lib_file, d.path_in_repo, d.has_buildrs))
+        Ok((RichCrateVersion::new(latest, d.manifest, d.derived, d.readme, d.lib_file, d.path_in_repo, d.has_buildrs), warn))
     }
 
-    fn rich_crate_version_data(&self, latest: &crates_index::Version, fetch_type: CrateData) -> CResult<RichCrateVersionCacheData> {
+    fn rich_crate_version_data(&self, latest: &crates_index::Version, fetch_type: CrateData) -> CResult<(RichCrateVersionCacheData, Warnings)> {
+        let mut warnings = HashSet::new();
         let name = latest.name();
         let ver = latest.version();
         let mut meta = self.crate_file(name, ver).context("crate file")?;
 
+        // Guess repo URL if none was specified
+        if meta.manifest.package.repository.is_none() {
+            warnings.insert(Warning::NoRepositoryProperty);
+            if meta.manifest.package.homepage.as_ref().map_or(false, |h| Repo::looks_like_repo_url(h)) {
+                meta.manifest.package.repository = meta.manifest.package.homepage.take();
+            }
+        }
+
         let maybe_repo = meta.manifest.package.repository.as_ref().and_then(|r| Repo::new(r).ok());
 
         let has_readme = meta.readme.as_ref().ok().and_then(|opt| opt.as_ref()).is_some();
-        if !has_readme && fetch_type != CrateData::Minimal {
-            self.add_readme_from_repo(&mut meta, maybe_repo.as_ref());
+        if !has_readme {
+            warnings.insert(Warning::NoReadmeProperty);
+            if fetch_type != CrateData::Minimal {
+                warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()));
+            }
         }
 
         // Quick'n'dirty autobins substitute
@@ -308,10 +342,10 @@ impl KitchenSink {
                     _ => true
                 });
                 if !topics.is_empty() {
-                    meta.manifest.package.keywords = topics;
+                    derived.github_keywords = Some(topics);
                 }
             }
-            if meta.manifest.package.keywords.is_empty() && fetch_type != CrateData::FullNoDerived {
+            if derived.github_keywords.is_none() && fetch_type != CrateData::FullNoDerived {
                 derived.keywords = Some(self.crate_db.keywords(&origin).context("keywordsdb")?);
             }
         }
@@ -325,12 +359,6 @@ impl KitchenSink {
             });
         }
 
-        // Guess repo URL if none was specified
-        if meta.manifest.package.repository.is_none() &&
-           meta.manifest.package.homepage.as_ref().map_or(false, |h| Repo::looks_like_repo_url(h)) {
-            meta.manifest.package.repository = meta.manifest.package.homepage.take();
-        }
-
         // Delete the original docs.rs link, because we have our own
         // TODO: what if the link was to another crate or a subpage?
         if meta.manifest.package.documentation.as_ref().map_or(false, |d| d.starts_with("https://docs.rs/")) {
@@ -339,7 +367,7 @@ impl KitchenSink {
             }
         }
 
-        self.remove_redundant_links(&mut meta.manifest.package, maybe_repo.as_ref());
+        warnings.extend(self.remove_redundant_links(&mut meta.manifest.package, maybe_repo.as_ref()));
 
         if meta.manifest.package.homepage.is_none() && fetch_type != CrateData::Minimal {
             if let Some(ref repo) = maybe_repo {
@@ -351,7 +379,7 @@ impl KitchenSink {
                             } else if let Some(url) = ghrepo.homepage {
                                 meta.manifest.package.homepage = Some(url);
                             }
-                            self.remove_redundant_links(&mut meta.manifest.package, maybe_repo.as_ref());
+                            warnings.extend(self.remove_redundant_links(&mut meta.manifest.package, maybe_repo.as_ref()));
                         }
                     },
                     _ => {}, // TODO
@@ -367,17 +395,18 @@ impl KitchenSink {
             }
         });
 
-        Ok(RichCrateVersionCacheData {
+        Ok((RichCrateVersionCacheData {
             derived,
             has_buildrs: meta.has("build.rs"),
             manifest: meta.manifest,
             readme: meta.readme.map_err(|_|()),
             lib_file: meta.lib_file,
             path_in_repo,
-        })
+        }, warnings))
     }
 
-    fn add_readme_from_repo(&self, meta: &mut CrateFile, maybe_repo: Option<&Repo>) {
+    fn add_readme_from_repo(&self, meta: &mut CrateFile, maybe_repo: Option<&Repo>) -> Warnings {
+        let mut warnings = HashSet::new();
         if let Some(repo) = maybe_repo {
             let res = crate_git_checkout::checkout(repo, &self.git_checkout_path, &meta.manifest.package.name)
             .map_err(From::from)
@@ -385,17 +414,23 @@ impl KitchenSink {
                 crate_git_checkout::find_readme(&checkout, &meta.manifest.package)
             });
             match res {
-                Ok(Some(readme)) => meta.readme = Ok(Some(readme)),
-                nope => {
-                    if let Err(err) = nope {
-                        eprintln!("Checkout of {} failed: {}", meta.manifest.package.name, err);
-                    }
+                Ok(Some(readme)) => {
+                    meta.readme = Ok(Some(readme));
+                },
+                Ok(None) => {
+                    warnings.insert(Warning::NoReadmeInRepo(repo.canonical_git_url().to_string()));
+                },
+                Err(err) => {
+                    warnings.insert(Warning::ErrorCloning(repo.canonical_git_url().to_string()));
+                    eprintln!("Checkout of {} failed: {}", meta.manifest.package.name, err);
                 },
             }
         }
+        warnings
     }
 
-    fn remove_redundant_links(&self, package: &mut TomlPackage, maybe_repo: Option<&Repo>) {
+    fn remove_redundant_links(&self, package: &mut TomlPackage, maybe_repo: Option<&Repo>) -> Warnings {
+        let mut warnings = HashSet::new();
 
         // We show github link prominently, so if homepage = github, that's nothing new
         let homepage_is_repo = Self::is_same_url(package.homepage.as_ref(), package.repository.as_ref());
@@ -424,12 +459,15 @@ impl KitchenSink {
         }
 
         if package.homepage.as_ref().map_or(false, |url| !self.check_url_is_valid(url)) {
+            warnings.insert(Warning::BrokenLink("homepage".to_string(), package.homepage.as_ref().unwrap().to_string()));
             package.homepage = None;
         }
 
         if package.documentation.as_ref().map_or(false, |url| !self.check_url_is_valid(url)) {
+            warnings.insert(Warning::BrokenLink("documentation".to_string(), package.documentation.as_ref().unwrap().to_string()));
             package.documentation = None;
         }
+        warnings
     }
 
     pub fn check_url_is_valid(&self, url: &str) -> bool {
@@ -480,7 +518,7 @@ impl KitchenSink {
     /// Returns (nth, slug)
     pub fn top_category<'crat>(&self, krate: &'crat RichCrateVersion) -> Option<(u32, Cow<'crat, str>)> {
         let crate_origin = krate.origin();
-        krate.category_slugs()
+        krate.category_slugs(Include::Cleaned)
         .filter_map(|slug| {
             self.top_crates_in_category(&slug).ok()
             .and_then(|cat| {
@@ -539,7 +577,7 @@ impl KitchenSink {
         let (manif, warnings) = crate_git_checkout::find_manifests(&checkout)
             .with_context(|_| format!("find manifests in {}", url))?;
         for warn in warnings {
-            eprintln!("{}", warn);
+            eprintln!("warning: {}", warn.0);
         }
         let manif = manif.into_iter().map(|(subpath, manifest)| (subpath, manifest.package.name));
         self.crate_db.index_repo_crates(repo, manif).context("index rev repo")?;

@@ -1,20 +1,20 @@
-use crates_index::Version;
-use Author;
-use Readme;
-use Origin;
-use semver;
-use repo_url::Repo;
-use cargo_toml::TomlManifest;
 use cargo_toml::TomlDependency;
-use cargo_toml::TomlPackage;
 pub use cargo_toml::TomlDepsSet;
+use cargo_toml::TomlManifest;
+use cargo_toml::TomlPackage;
+use categories::Categories;
+use crates_index::Version;
+use repo_url::Repo;
+use semver;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::collections::HashSet;
-use categories::Categories;
+use Author;
+use Origin;
+use Readme;
 
-pub use parse_cfg::{Target, Cfg};
 pub use parse_cfg::ErrorKind as CfgErr;
+pub use parse_cfg::{Cfg, Target};
 
 #[derive(Debug, Clone)]
 pub struct RichCrateVersion {
@@ -264,8 +264,9 @@ impl RichCrateVersion {
                     let enabled = default_features.get(for_feature).is_some();
                     if enabled {
                         if let Some(with_feature) = with_feature {
-                            if !dep.dep.req_features().iter().any(|f| f == with_feature) &&
-                               !dep.with_features.iter().any(|f| f == with_feature) {
+                            if !dep.dep.req_features().iter().any(|f| f == with_feature)
+                                && !dep.with_features.iter().any(|f| f == with_feature)
+                            {
                                 dep.with_features.push(with_feature.to_string())
                             }
                         }
@@ -326,8 +327,11 @@ impl RichDep {
     }
 
     pub fn add_target(&mut self, target: &str) -> Result<(), CfgErr> {
-        self.only_for_targets.push(target.parse()
-            .unwrap_or_else(|_| Target::Cfg(Cfg::Equal("target".to_string(), target.to_string()))));
+        self.only_for_targets.push(
+            target.parse().unwrap_or_else(|_| {
+                Target::Cfg(Cfg::Equal("target".to_string(), target.to_string()))
+            }),
+        );
         Ok(())
     }
 }

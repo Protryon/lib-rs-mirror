@@ -1,8 +1,8 @@
-use git2::Oid;
-use std::collections::HashSet;
-use std::cmp::Ordering;
 use git2::Commit;
+use git2::Oid;
+use std::cmp::Ordering;
 use std::collections::BinaryHeap;
+use std::collections::HashSet;
 
 pub struct HistoryIter<'repo> {
     seen: HashSet<Oid>,

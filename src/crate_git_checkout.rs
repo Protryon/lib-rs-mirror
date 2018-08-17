@@ -1,22 +1,22 @@
-extern crate render_readme;
 extern crate cargo_toml;
-extern crate repo_url;
 extern crate failure;
 extern crate git2;
+extern crate render_readme;
+extern crate repo_url;
 extern crate urlencoding;
 
-use std::process::Command;
-use cargo_toml::TomlPackage;
-use render_readme::Readme;
-use render_readme::Markup;
 use cargo_toml::TomlManifest;
-use std::collections::{HashMap, HashSet};
+use cargo_toml::TomlPackage;
+use render_readme::Markup;
+use render_readme::Readme;
 use std::collections::hash_map::Entry::Vacant;
+use std::collections::{HashMap, HashSet};
+use std::process::Command;
 
 use repo_url::Repo;
 use std::path::Path;
 
-use git2::{Tree, Repository, build::RepoBuilder, Reference, ObjectType, Blob};
+use git2::{build::RepoBuilder, Blob, ObjectType, Reference, Repository, Tree};
 mod iter;
 use iter::HistoryIter;
 
@@ -77,7 +77,7 @@ fn get_repo(repo: &Repo, base_path: &Path, name: &str) -> Result<Repository, git
     if !repo_path.exists() {
         let old_path = base_path.join(name);
         if old_path.exists() {
-            let _= std::fs::rename(old_path, &repo_path);
+            let _ = std::fs::rename(old_path, &repo_path);
         }
     }
 
@@ -226,7 +226,6 @@ pub fn find_readme(repo: &Repository, package: &TomlPackage) -> Result<Option<Re
     })?;
     Ok(readme)
 }
-
 
 fn readme_from_repo(markup: Markup, repo_url: &Option<String>, base_dir_in_repo: &str) -> Readme {
     let repo = repo_url.as_ref().and_then(|url| Repo::new(url).ok());

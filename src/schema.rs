@@ -64,7 +64,8 @@ impl CrateDb {
             CREATE TABLE IF NOT EXISTS categories (
                 crate_id        INTEGER NOT NULL,
                 slug            TEXT NOT NULL,
-                weight          REAL NOT NULL
+                rank_weight     REAL NOT NULL,
+                relevance_weight REAL NOT NULL
             );
             CREATE UNIQUE INDEX IF NOT EXISTS categories_idx on categories(crate_id, slug);
             COMMIT;"#)?;

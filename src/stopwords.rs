@@ -1,8 +1,10 @@
+use std::collections::HashMap;
 use std::collections::HashSet;
 
 lazy_static! {
-    pub(crate) static ref STOPWORDS: HashSet<String> = [
-    "placeholder", "app", "loops", "master", "library",
+    /// ignore these as keywords
+    pub(crate) static ref STOPWORDS: HashSet<&'static str> = [
+    "sys", "ffi", "placeholder", "app", "loops", "master", "library", "rs",
     "accidentally", "additional", "adds", "against", "all", "allow", "allows",
     "already", "also", "alternative", "always", "an", "and", "any", "appropriate",
     "arbitrary", "are", "as", "at", "available", "based", "be", "because", "been",
@@ -27,6 +29,83 @@ lazy_static! {
     "very", "via", "want", "way", "well", "what", "when", "where", "which",
     "while", "will", "wip", "with", "without", "working", "works", "writing",
     "written", "yet", "you", "your",
-    ].iter().map(|s|s.to_string()).collect();
-}
+    ].iter().map(|s|*s).collect();
 
+    /// If one is present, ignore the others
+    pub(crate) static ref COND_STOPWORDS: HashMap<&'static str, Option<&'static [&'static str]>> = [
+        ("game-engine", Some(&["game", "ffi"][..])),
+        ("game-engines", Some(&["game", "ffi"])),
+        ("game-dev", Some(&["game", "games"])),
+        ("gamedev", Some(&["game", "games"])),
+        ("protocol", Some(&["game", "games"])),
+        ("framework", Some(&["game", "games"])),
+        ("engine", Some(&["ffi"])),
+        ("mock", Some(&["macro", "derive", "plugin", "cargo"])),
+
+        ("caching", Some(&["allocator"])),
+        ("aws", Some(&["ecs"])), // not game engine
+        ("raspberry", Some(&["osx", "windows"])),
+        ("linux", Some(&["windows", "winsdk", "macos", "mac", "osx"])),
+        ("cross-platform", Some(&["windows", "winsdk", "macos", "mac", "osx", "linux", "unix", "gnu"])),
+        ("portable", Some(&["windows", "winsdk", "macos", "mac", "osx", "linux", "unix", "gnu"])),
+        ("winapi", Some(&["target", "windows", "gnu", "x86", "i686", "64", "pc"])),
+        ("windows", Some(&["gnu"])),
+        ("iterator", Some(&["window"])),
+        ("web", Some(&["windows", "macos", "mac", "osx", "linux"])),
+        ("wasm", Some(&["embedded", "javascript", "no-std", "no_std", "feature:no_std"])),
+        ("javascript", Some(&["embedded", "no-std", "no_std", "feature:no_std"])),
+        ("webassembly", Some(&["embedded", "javascript", "no-std", "no_std", "feature:no_std"])),
+        ("deep-learning", Some(&["math", "statistics"])),
+        ("machine-learning", Some(&["math", "statistics"])),
+        ("neural-networks", Some(&["math", "statistics"])),
+        ("bitcoin", Some(&["http", "day", "database"])),
+        ("blockchain", Some(&["database"])),
+        ("ethereum", Some(&["http", "day", "log", "generic", "database"])),
+        ("iter", Some(&["math"])),
+        ("macro", Some(&["no-std", "no_std", "feature:no_std"])),
+        ("macros", Some(&["no-std", "no_std", "feature:no_std"])),
+        ("embedded", Some(&["no-std", "no_std", "feature:no_std"])),
+        ("arm", Some(&["no-std", "no_std", "feature:no_std"])),
+        ("float", Some(&["math"])),
+        ("emulator", Some(&["6502"])),
+        ("terminal", Some(&["math"])),
+        ("build", Some(&["logic"])), // confuses categorization
+        ("messaging", Some(&["matrix"])), // confuses categorization
+        ("chat", Some(&["matrix"])), // confuses categorization
+        ("math", Some(&["num", "symbolic", "algorithms", "algorithm", "utils"])), // confuses categorization
+        ("mathematics", Some(&["num", "numeric", "symbolic", "algorithms", "algorithm", "utils"])), // confuses categorization
+        ("cuda", Some(&["nvidia"])), // confuses categorization
+        ("subcommand", Some(&["plugin"])),
+        ("lint", Some(&["plugin"])),
+        ("template", Some(&["derive"])),
+        ("dsl", Some(&["template"])),
+        ("syn", Some(&["nom"])),
+        ("cargo", Some(&["plugin"])),
+        ("git", Some(&["terminal"])),
+        ("wide", Some(&["windows", "win32"])),
+        ("regex", Some(&["text", "linear", "time", "search"])),
+        ("language", Some(&["server"])),
+        ("codegen", Some(&["backend"])),
+        ("game", Some(&["simulator", "simulation"])),
+        ("2d", Some(&["path", "paths"])),
+        ("video", Some(&["audio"])), // have to pick one…
+        ("sound", Some(&["3d", "windows"])),
+
+        ("memory", Some(&["os", "system", "storage"])), // too generic
+
+        ("data-structure", Some(&["no-std", "no_std"])), // it's a nice feature, but not defining one
+        ("crypto", Some(&["no-std", "no_std"])), // it's a nice feature, but not defining one
+        ("macro", Some(&["no-std", "no_std"])), // it's a nice feature, but not defining one
+        ("parser", Some(&["no-std", "no_std", "game"])), // it's a nice feature, but not defining one
+        ("cryptography", Some(&["no-std", "no_std"])), // it's a nice feature, but not defining one
+        ("websocket", Some(&["http", "cli", "tokio", "client", "io", "network", "servo", "web"])), // there's a separate category for it
+
+        ("google", None), // there's a ton of auto-generated crates
+        ("ethereum", None), // there's a ton of auto-generated crates
+
+        ("placeholder", None), // spam
+        ("reserved", None), // spam
+        ("malware", None), // spam
+        ("unfinished", None), // spam
+    ].iter().map(|s|*s).collect();
+}

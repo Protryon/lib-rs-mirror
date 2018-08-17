@@ -5,12 +5,14 @@ extern crate categories;
 extern crate thread_local;
 #[macro_use] extern crate lazy_static;
 extern crate rich_crate;
+use std::collections::HashSet;
 use std::collections::HashMap;
 use rich_crate::RichCrate;
 use rich_crate::Origin;
 use rich_crate::Repo;
 use rich_crate::Markup;
 use rich_crate::RichCrateVersion;
+use rich_crate::Include;
 use rusqlite::*;
 use thread_local::ThreadLocal;
 use chrono::prelude::*;
@@ -21,7 +23,7 @@ type Result<T> = std::result::Result<T, failure::Error>;
 
 mod schema;
 mod stopwords;
-use stopwords::STOPWORDS;
+use stopwords::{STOPWORDS, COND_STOPWORDS};
 
 pub struct CrateDb {
     url: String,
@@ -31,6 +33,14 @@ pub struct CrateDb {
 impl CrateDb {
     /// Path to sqlite db file to create/update
     pub fn new(path: impl AsRef<Path>) -> Result<Self> {
+        let path = path.as_ref();
+        let db = Self::db(path)
+            .with_context(|_| format!("schema creation failed for {}", path.display()))?;
+        db.execute_batch("
+            PRAGMA cache_size = 500000;
+            PRAGMA threads = 4;
+            PRAGMA synchronous = 0;
+            PRAGMA journal_mode = TRUNCATE;")?;
         Ok(Self {
             url: format!("file:{}?cache=shared", path.as_ref().display()),
             conn: ThreadLocal::new(),
@@ -69,91 +79,145 @@ impl CrateDb {
             let mut insert_repo = tx.prepare_cached("INSERT OR REPLACE INTO crate_repos (crate_id, repo) VALUES (?1, ?2)")?;
             let mut delete_repo = tx.prepare_cached("DELETE FROM crate_repos WHERE crate_id = ?1")?;
             let mut clear_categories = tx.prepare_cached("DELETE FROM categories WHERE crate_id = ?1")?;
-            let mut clear_keywords = tx.prepare_cached("DELETE FROM crate_keywords WHERE crate_id = ?1")?;
-            let mut insert_category = tx.prepare_cached("INSERT OR IGNORE INTO categories (crate_id, slug, weight) VALUES (?1, ?2, ?3)")?;
-            let mut get_crate_id = tx.prepare_cached("SELECT id FROM crates WHERE origin = ?1")?;
+            let mut insert_category = tx.prepare_cached("INSERT OR IGNORE INTO categories (crate_id, slug, rank_weight, relevance_weight) VALUES (?1, ?2, ?3, ?4)")?;
+            let mut get_crate_id = tx.prepare_cached("SELECT id, recent_downloads FROM crates WHERE origin = ?1")?;
 
             let origin = c.origin().to_str();
 
             insert_crate.execute(&[&origin, &0]).context("insert crate")?;
-            let crate_id: u32 = get_crate_id.query_row(&[&origin], |row| row.get(0)).context("crate_id")?;
-            let mut insert_keyword = KeywordInsert::new(&tx, crate_id)?;
+            let (crate_id, downloads): (u32, u32) = get_crate_id.query_row(&[&origin], |row| (row.get(0), row.get(1))).context("crate_id")?;
+            let is_important_ish = downloads > 2000;
 
             if let Some(repo) = c.repository() {
                 let url = repo.canonical_git_url();
                 insert_repo.execute(&[&crate_id, &url.as_ref()]).context("insert repo")?;
-                insert_keyword.add(&format!(":repo:{}", url), 1., false)?; // crates in monorepo probably belong together
             } else {
                 delete_repo.execute(&[&crate_id]).context("del repo")?;
             }
 
-            clear_categories.execute(&[&crate_id]).context("clear cat")?;
-            clear_keywords.execute(&[&crate_id]).context("clear cat")?;
-
             print!("{} = {}: ", origin, crate_id);
+            clear_categories.execute(&[&crate_id]).context("clear cat")?;
 
-            let explicit_categories = c.raw_category_slugs().count();
-            let cat_w = if explicit_categories > 0 {
-                10.0 / (9.0 + explicit_categories as f64)
-            } else {
-                print!(">??? ");
-                (0.001 + c.raw_keywords().count() as f64 * 0.01).min(0.05)
-            };
-            for (i, slug) in c.category_slugs().enumerate() {
-                print!(">{}, ", slug);
-                let mut w: f64 = 95./(5.+i as f64*3.) * cat_w;
-                if slug.contains("::") {
-                    w *= 1.3; // more specific
-                }
-                let is_real = categories::CATEGORIES.from_slug(&slug).next().is_some(); // FIXME: that checks top level only
-                if is_real {
-                    insert_category.execute(&[&crate_id, &&*slug, &w]).context("insert cat")?;
-                }
-                if explicit_categories > 0 {
-                    insert_keyword.add(&*slug, w, false)?;
-                }
-            }
-            for (i, k) in c.raw_keywords().map(|k| k.to_lowercase().trim().to_string()).enumerate() {
+            let mut insert_keyword = KeywordInsert::new(&tx, crate_id)?;
+            for (i, k) in c.keywords(Include::AuthoritativeOnly).map(|k| k.trim().to_lowercase()).enumerate() {
                 print!("#{}, ", k);
-                let mut w: f64 = 100./(6.+i as f64*2.);
-                if STOPWORDS.get(&k).is_some() {
+                let mut w: f64 = 100./(6+i*2) as f64;
+                if STOPWORDS.get(k.as_str()).is_some() {
                     w *= 0.6;
                 }
-                insert_keyword.add(&k, w, true)?;
+                insert_keyword.add(&k, w, true);
             }
             for (i, k) in c.short_name().split(|c: char| !c.is_alphanumeric()).enumerate() {
                 print!("'{}, ", k);
-                let mut w: f64 = 100./(8.+i as f64*2.);
-                insert_keyword.add(k, w, false)?;
+                let mut w: f64 = 100./(8+i*2) as f64;
+                insert_keyword.add(k, w, false);
             }
             if let Some((w2,d)) = Self::extract_text(&c) {
-                for (i, k) in d.split_whitespace().map(|k| k.to_lowercase().trim_matches(|c: char| !c.is_alphanumeric()).to_string()).enumerate() {
-                    if k.len() < 2 || STOPWORDS.get(&k).is_some() {
-                        continue;
-                    }
-                    let w: f64 = w2 * 150./(80.+i as f64);
-                    insert_keyword.add(&k, w, false)?;
+                for (i, k) in d.split_whitespace()
+                    .map(|k| k.trim_right_matches("'s"))
+                    .filter(|k| k.len() >= 2)
+                    .map(|k| k.to_lowercase())
+                    .filter(|k| STOPWORDS.get(k.as_str()).is_none())
+                    .take(25)
+                    .enumerate() {
+                    let w: f64 = w2 * 150./(80+i) as f64;
+                    insert_keyword.add(&k, w, false);
                 }
             }
-            for (i, k) in c.authors().iter().filter_map(|a|a.email.as_ref().or(a.name.as_ref()).map(|a| a.to_lowercase())).enumerate() {
-                print!("@{}, ", k);
-                let mut w: f64 = 50./(100.+i as f64);
-                insert_keyword.add(&k, w, false)?;
-            }
-            if c.has_buildrs() {
-                insert_keyword.add(":has_buildrs", 0.13, false)?;
-            }
             if let Some(l) = c.links() {
-                insert_keyword.add(l, 0.54, false)?;
+                insert_keyword.add(l.trim_left_matches("lib"), 0.54, false);
             }
             for feat in c.features().keys() {
                 if feat != "default" {
-                    insert_keyword.add(&format!(":{}", feat), 0.55, false)?;
+                    insert_keyword.add(&format!("feature:{}", feat), 0.55, false);
                 }
             }
-            println!("");
+            if c.is_sys() {
+                insert_keyword.add("has:is_sys", 0.01, false);
+            }
+
+            let (categories, had_explicit_categories) = {
+                let keywords = insert_keyword.keywords.iter().map(|(k,_)| k.to_string());
+                self.extract_crate_categories(&tx, c, keywords, is_important_ish)?
+            };
+
+            {
+                let mut tmp = insert_keyword.keywords.iter().collect::<Vec<_>>();
+                tmp.sort_by(|a,b| b.1.partial_cmp(a.1).unwrap());
+                print!("#{} ", tmp.into_iter().map(|(k,_)| k.to_string()).collect::<Vec<_>>().join(" #"));
+            }
+
+            if !had_explicit_categories {
+                print!(">??? ");
+            }
+            for (rank, rel, slug) in categories {
+                print!(">{}, ", slug);
+                insert_category.execute(&[&crate_id, &slug, &rank, &rel]).context("insert cat")?;
+                if had_explicit_categories {
+                    insert_keyword.add(&slug, rel/3., false);
+                }
+            }
+            for (i, k) in c.authors().iter().filter_map(|a|a.email.as_ref().or(a.name.as_ref())).enumerate() {
+                print!("by:{}, ", k);
+                let mut w: f64 = 50./(100+i) as f64;
+                insert_keyword.add(&k, w, false);
+            }
+
+            if let Some(repo) = c.repository() {
+                let url = repo.canonical_git_url();
+                insert_keyword.add(&format!("repo:{}", url), 1., false); // crates in monorepo probably belong together
+            }
+            insert_keyword.commit()?;
             Ok(())
         })
+    }
+
+    /// (rank-relevance, relevance, slug)
+    ///
+    /// Rank relevance is normalized and biased towards one top category
+    fn extract_crate_categories(&self, conn: &Connection, c: &RichCrateVersion, keywords: impl Iterator<Item=String>, is_important_ish: bool) -> Result<(Vec<(f64, f64, String)>, bool)> {
+        let (explicit_categories, invalid_categories): (Vec<_>, Vec<_>) = c.category_slugs(Include::AuthoritativeOnly)
+            .map(|k| k.to_string())
+            .partition(|slug| {
+                categories::CATEGORIES.from_slug(&slug).next().is_some() // FIXME: that checks top level only
+            });
+        let had_explicit_categories = !explicit_categories.is_empty();
+
+        let keywords_collected = keywords.chain(invalid_categories).collect();
+
+        let categories: Vec<_> = if had_explicit_categories {
+            let cat_w = 10.0 / (9.0 + explicit_categories.len() as f64);
+            let candidates = explicit_categories.into_iter().enumerate().map(|(i, slug)| {
+                let mut w = 100./(5 + i.pow(2)) as f64 * cat_w;
+                if slug.contains("::") {
+                    w *= 1.3; // more specific
+                }
+                (slug, w)
+            }).collect();
+
+            categories::adjusted_relevance(candidates, keywords_collected, 0.01, 15)
+        } else {
+            let cat_w = 0.2 + 0.2 * c.keywords(Include::AuthoritativeOnly).count() as f64;
+            self.crate_categories_tx(conn, &c.origin(), keywords_collected, if is_important_ish {0.1} else {0.3})?.into_iter()
+            .map(|(w, slug)| {
+                ((w * cat_w).min(0.99), slug)
+            }).collect()
+        };
+
+        let max_weight = categories.iter().map(|(w, _)| *w)
+            .max_by(|a, b| a.partial_cmp(&b).unwrap())
+            .unwrap_or(0.)
+            .max(0.3); // prevents div/0, ensures odd choices stay low
+
+        let is_sys = c.is_sys();
+        let categories = categories.into_iter().map(|(relevance_weight, slug)| {
+            let rank_weight = relevance_weight/max_weight
+                * if relevance_weight >= max_weight*0.99 {1.} else {0.4} // a crate is only in 1 category
+                * if is_sys {0.92} else {1.}; // rank sys crates below their high-level wrappers // TODO do same for derive helpers
+            (rank_weight, relevance_weight, slug)
+        }).collect();
+
+        Ok((categories, had_explicit_categories))
     }
 
     /// Update crate <> repo association
@@ -292,10 +356,29 @@ impl CrateDb {
     /// Guess categories for a crate
     ///
     /// Returns category slugs
-    pub fn categories(&self, origin: &Origin) -> Result<Vec<String>> {
+    pub fn guess_crate_categories<'a>(&self, origin: &Origin, keywords: impl Iterator<Item = &'a str>) -> Result<Vec<(f64, String)>> {
         self.with_connection(|conn| {
+        self.crate_categories_tx(&conn, origin, keywords.map(|k| k.to_lowercase()).collect(), 0.1)
+        })
+    }
+
+    /// Assigned categories with their weights
+    pub fn crate_categories<'a>(&self, origin: &Origin) -> Result<Vec<(f64, String)>> {
+        let conn = self.conn.lock().unwrap();
         let mut query = conn.prepare_cached(r#"
-        select sum(cc.weight * ck.weight * relk.relevance)/(8+count(*)) as w, cc.slug
+            SELECT c.relevance_weight, c.slug
+            FROM crates k
+            JOIN categories c on c.crate_id = k.id
+            WHERE k.origin = ?1
+            ORDER by relevance_weight desc
+        "#)?;
+        let res = query.query_map(&[&origin.to_str()], |row| (row.get(0), row.get(1))).context("crate_categories")?;
+        Ok(res.collect::<std::result::Result<_,_>>()?)
+    }
+
+    fn crate_categories_tx(&self, conn: &Connection, origin: &Origin, keywords: HashSet<String>, threshold: f64) -> Result<Vec<(f64, String)>> {
+        let mut query = conn.prepare_cached(r#"
+        select cc.slug, sum(cc.relevance_weight * ck.weight * relk.relevance)/(8+count(*)) as w
         from (
         ----------------------------------
             select avg(ck.weight) * srck.weight / (8000+sum(ck.weight)) as relevance, ck.keyword_id
@@ -315,32 +398,12 @@ impl CrateDb {
         join crate_keywords ck on ck.keyword_id = relk.keyword_id
         join categories cc on cc.crate_id = ck.crate_id
         group by slug
-        having w > 0.3
-        order by 1 desc
-        limit 1"#).context("categories")?;
-        let all = query.query_map(&[&origin.to_str()], |row| row.get(1)).context("categories q")?;
-        Ok(all.collect::<std::result::Result<_,_>>()?)
-        })
-    }
+        order by 2 desc
+        limit 10"#).context("categories")?;
+        let candidates = query.query_map(&[&origin.to_str()], |row| (row.get(0), row.get(1))).context("categories q")?;
+        let candidates = candidates.collect::<std::result::Result<_, _>>()?;
 
-    /// Find most relevant category for a crate, and how popular the crate is
-    ///
-    /// Returns (top n-th, category slug)
-    pub fn top_category(&self, origin: &Origin) -> Result<(u32, String)> {
-        self.with_connection(|conn| {
-        let mut query = conn.prepare_cached(r#"
-            select count(*) as top, cc.slug from crates c
-            join categories cc on cc.crate_id = c.id
-            join categories occ on occ.slug = cc.slug
-            join crates oc on occ.crate_id = oc.id
-            where c.origin = ?1
-            and oc.recent_downloads >= c.recent_downloads
-            group by cc.slug
-            order by 1
-            limit 1
-        "#)?;
-        Ok(query.query_row(&[&origin.to_str()], |row| (row.get(0), row.get(1)))?)
-        })
+        Ok(categories::adjusted_relevance(candidates, keywords, threshold, 2))
     }
 
     /// Find most relevant keyword for the crate
@@ -372,13 +435,13 @@ impl CrateDb {
     pub fn related_categories(&self, slug: &str) -> Result<Vec<String>> {
         self.with_connection(|conn| {
         let mut query = conn.prepare_cached(r#"
-            select sum(c2.weight * c1.weight) as w, c2.slug
+            select sum(c2.relevance_weight * c1.relevance_weight) as w, c2.slug
             from categories c1
             join categories c2 on c1.crate_id = c2.crate_id
             where c1.slug = ?1
             and c2.slug != c1.slug
             group by c2.slug
-            having w > 500
+            having w > 250
             order by 1 desc
             limit 6
         "#)?;
@@ -416,7 +479,7 @@ impl CrateDb {
             AND k2.crate_id != c1.id
             AND c2.recent_downloads > 150
             GROUP by k2.crate_id
-            HAVING w > 500
+            HAVING w > 200
             ORDER by 1 desc
             LIMIT 6
         "#)?;
@@ -442,6 +505,7 @@ impl CrateDb {
             -- and divided by count(*) for tf-idf for relevance
             join crate_keywords ck on ck.keyword_id = srck.keyword_id
             join keywords k on k.id = ck.keyword_id
+            -- ignore keywords equal categories
             left join categories c on c.slug = k.keyword
             where crates.origin = ?1
             and k.visible
@@ -467,12 +531,12 @@ impl CrateDb {
     pub fn top_keywords_in_category(&self, slug: &str) -> Result<Vec<String>> {
         self.with_connection(|conn| {
         let mut query = conn.prepare_cached(r#"
-            select sum(k.weight), kk.keyword from categories c
+            select sum(k.weight * c.relevance_weight), kk.keyword from categories c
                 join crate_keywords k using(crate_id)
                 join keywords kk on kk.id = k.keyword_id
                 where explicit and c.slug = ?1
                 group by k.keyword_id
-                having sum(k.weight) > 50 and count(*) > 4
+                having sum(k.weight) > 11 and count(*) >= 4
                 order by 1 desc
                 limit 10
         "#)?;
@@ -483,26 +547,20 @@ impl CrateDb {
     }
 
     /// Most popular crates in the category
-    pub fn top_crates_in_category(&self, slug: &str, limit: u32, simple_sort: bool) -> Result<Vec<(Origin, u32)>> {
+    /// Returns recent_downloads as well
+    pub fn top_crates_in_category(&self, slug: &str, limit: u32) -> Result<Vec<(Origin, u32)>> {
         self.with_connection(|conn| {
 
-        let mut query = conn.prepare_cached(if simple_sort {
-            // sort by popularity
-            "select k.origin, k.recent_downloads from categories c
-                join crates k on c.crate_id = k.id
-                where c.slug = ?1
-                order by recent_downloads desc
-                limit ?2
-        "} else {
             // sort by relevance to the category, downrank for being removed from crates
+        let mut query = conn.prepare_cached(
             "select k.origin, k.recent_downloads from categories c
                 join crates k on c.crate_id = k.id
                 left join (select sum(weight) as w, crate_name from repo_changes where replacement is null group by crate_name) as removals
                 on k.origin = 'crates.io:' || removals.crate_name
                 where c.slug = ?1
-                order by (recent_downloads * c.weight) / (300 + coalesce(removals.w, 1)) desc
+                order by (recent_downloads * c.rank_weight) / (300 + coalesce(removals.w, 2)) desc
                 limit ?2"
-        })?;
+        )?;
 
         let q = query.query_map(&[&slug, &limit], |row| {
             let s: String = row.get(0);
@@ -577,6 +635,8 @@ pub struct KeywordInsert<'a> {
     insert_name: CachedStatement<'a>,
     insert_value: CachedStatement<'a>,
     make_visible: CachedStatement<'a>,
+    clear_keywords: CachedStatement<'a>,
+    keywords: HashMap<String, (f64, bool)>,
 }
 
 impl<'a> KeywordInsert<'a> {
@@ -588,19 +648,53 @@ impl<'a> KeywordInsert<'a> {
             insert_value: conn.prepare_cached("INSERT OR IGNORE INTO crate_keywords(keyword_id, crate_id, weight, explicit)
                 VALUES (?1, ?2, ?3, ?4)")?,
             make_visible: conn.prepare_cached("UPDATE keywords SET visible = 1 WHERE id = ?1")?,
+            clear_keywords: conn.prepare_cached("DELETE FROM crate_keywords WHERE crate_id = ?1")?,
+            keywords: HashMap::new(),
         })
     }
 
-    pub fn add(&mut self, word: &str, weight: f64, visible: bool) -> Result<()> {
-        if word.is_empty() {
-            return Ok(());
+    pub fn add(&mut self, word: &str, weight: f64, visible: bool) {
+        let word = word
+            .trim_matches(|c: char| !c.is_alphanumeric())
+            .trim_right_matches("-rs")
+            .trim_left_matches("rust-");
+        if word.is_empty() || weight <= 0.000001 {
+            return;
         }
-        self.insert_name.execute(&[&word, if visible {&1} else {&0}])?;
-        let (keyword_id, old_vis): (u32, u32) = self.select_id.query_row(&[&word],|r| (r.get(0), r.get(1))).context("get keyword")?;
-        if visible && old_vis == 0 {
-            self.make_visible.execute(&[&keyword_id]).context("keyword vis")?;
+        let word = word.to_lowercase();
+        if word == "rust" || word == "rs" {
+            return;
         }
-        self.insert_value.execute(&[&keyword_id, &self.crate_id, &weight, if visible {&1} else {&0}]).context("keyword")?;
+        let k = self.keywords.entry(word).or_insert((weight, visible));
+        if k.0 < weight {k.0 = weight}
+        if visible {k.1 = visible}
+    }
+
+    pub fn commit(mut self) -> Result<()> {
+        for (cond, stopwords) in COND_STOPWORDS.iter() {
+            if self.keywords.get(*cond).is_some() {
+                match stopwords {
+                    Some(stopwords) => for stop in stopwords.iter() {
+                        if let Some(k) = self.keywords.get_mut(*stop) {
+                            k.0 /= 3.0;
+                        }
+                    },
+                    None => for (_, (ref mut w, _)) in self.keywords.iter_mut().filter(|(k, _)| k != cond) {
+                        *w /= 2.0;
+                    }
+                }
+            }
+        }
+
+        self.clear_keywords.execute(&[&self.crate_id]).context("clear cat")?;
+        for (word, (weight, visible)) in self.keywords {
+            self.insert_name.execute(&[&word, if visible {&1} else {&0}])?;
+            let (keyword_id, old_vis): (u32, u32) = self.select_id.query_row(&[&word],|r| (r.get(0), r.get(1))).context("get keyword")?;
+            if visible && old_vis == 0 {
+                self.make_visible.execute(&[&keyword_id]).context("keyword vis")?;
+            }
+            self.insert_value.execute(&[&keyword_id, &self.crate_id, &weight, if visible {&1} else {&0}]).context("keyword")?;
+        }
         Ok(())
     }
 }

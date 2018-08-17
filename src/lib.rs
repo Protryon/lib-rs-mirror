@@ -1,9 +1,10 @@
 extern crate reqwest;
-extern crate thread_local;
 extern crate rusqlite;
 extern crate serde;
 extern crate serde_json;
-#[macro_use] extern crate quick_error;
+extern crate thread_local;
+#[macro_use]
+extern crate quick_error;
 use rusqlite::Connection;
 use std::path::Path;
 use thread_local::ThreadLocal;

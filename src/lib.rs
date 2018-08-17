@@ -28,7 +28,10 @@ impl SimpleCache {
 
     fn connect(&self) -> Result<Connection, rusqlite::Error> {
         let conn = Connection::open(&self.url)?;
-        conn.execute("PRAGMA synchronous = 0", &[])?;
+        conn.execute_batch("
+            PRAGMA synchronous = 0;
+            PRAGMA JOURNAL_MODE = OFF;
+            PRAGMA read_uncommitted;")?;
         Ok(conn)
     }
 
@@ -73,6 +76,13 @@ impl SimpleCache {
             self.set(cache_name, &data)?;
             data
         })
+    }
+
+    pub fn delete(&self, cache_name: &str) -> Result<(), Error> {
+        let conn = self.conn.lock().unwrap();
+        let mut q = conn.prepare_cached("DELETE FROM cache WHERE key = ?1")?;
+        q.execute(&[&cache_name])?;
+        Ok(())
     }
 
     pub fn set(&self, cache_name: &str, data: &[u8]) -> Result<(), Error> {

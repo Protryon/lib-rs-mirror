@@ -247,7 +247,6 @@ impl KitchenSink {
                     .map_err(|e| {eprintln!("bad cache data: {} {}", cache_key, e); e})
                     .with_context(|_| format!("parse from cache: {}", cache_key))
             }) {
-                eprintln!("hit! {}", cache_key);
                 Some(cached)
             } else {
                 None
@@ -260,7 +259,9 @@ impl KitchenSink {
             let (d, warn) = self.rich_crate_version_data(&latest, fetch_type).context("get rich crate data")?;
             if fetch_type == CrateData::Full {
                 eprintln!("miss! {}", cache_key);
-                self.crate_derived_cache.set(&cache_key, &serde_json::to_vec(&(&d, &warn)).context("ser to cache")?).context("save to cache")?;
+                if let Err(err) = self.crate_derived_cache.set(&cache_key, &serde_json::to_vec(&(&d, &warn)).context("ser to cache")?) {
+                    eprintln!("Cache error: {} ({})", err, cache_key);
+                }
             } else if fetch_type == CrateData::FullNoDerived {
                 self.crate_derived_cache.delete(&cache_key).context("clear cache")?;
             }

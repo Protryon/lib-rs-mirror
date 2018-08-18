@@ -29,7 +29,8 @@ cargo_toml = { path = "cargo_toml" }
 cargo_author = { path = "cargo_author" }
 lazyonce = { path = "lazyonce" }
 onig_sys = { git = "https://github.com/rust-onig/rust-onig.git", default-features = false }
-rusqlite = { git = "https://github.com/jgallagher/rusqlite.git" }
+toml = { git = "https://github.com/kornelski/toml-rs.git" }
+git2 = { git = "https://github.com/alexcrichton/git2-rs.git" }
 
 [patch.'https://gitlab.com/crates.rs/categories.git']
 categories = { path = "categories" }

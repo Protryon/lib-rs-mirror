@@ -16,6 +16,7 @@ use rich_crate::Repo;
 use rich_crate::RichCrate;
 use rich_crate::RichCrateVersion;
 use rusqlite::*;
+use std::sync::Mutex;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -29,7 +30,8 @@ use stopwords::{COND_STOPWORDS, STOPWORDS};
 
 pub struct CrateDb {
     url: String,
-    pub(crate) conn: ThreadLocal<std::result::Result<RefCell<Connection>, rusqlite::Error>>,
+    conn: ThreadLocal<std::result::Result<RefCell<Connection>, rusqlite::Error>>,
+    exclusive_conn: Mutex<Option<Connection>>,
 }
 
 impl CrateDb {
@@ -39,6 +41,7 @@ impl CrateDb {
         Ok(Self {
             url: format!("file:{}?cache=shared", path.display()),
             conn: ThreadLocal::new(),
+            exclusive_conn: Mutex::new(None),
         })
     }
 
@@ -53,12 +56,13 @@ impl CrateDb {
 
     #[inline]
     fn with_tx<F, T>(&self, cb: F) -> Result<T> where F: FnOnce(&Connection) -> Result<T> {
-        self.with_connection(|conn| {
-            let tx = conn.transaction()?;
-            let res = cb(&tx)?;
-            tx.commit()?;
-            Ok(res)
-        })
+        let mut conn = self.exclusive_conn.lock().unwrap();
+        let conn = conn.get_or_insert_with(|| self.connect().unwrap());
+
+        let tx = conn.transaction()?;
+        let res = cb(&tx)?;
+        tx.commit()?;
+        Ok(res)
     }
 
     fn connect(&self) -> std::result::Result<Connection, rusqlite::Error> {
@@ -167,6 +171,7 @@ impl CrateDb {
                 insert_keyword.add(&format!("repo:{}", url), 1., false); // crates in monorepo probably belong together
             }
             insert_keyword.commit()?;
+            println!();
             Ok(())
         })
     }

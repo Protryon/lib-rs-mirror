@@ -17,7 +17,9 @@ pub struct UserDb {
 impl UserDb {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
         let db = Self::db(path.as_ref())?;
-        db.execute("PRAGMA synchronous = 0", &[])?;
+        db.execute_batch("
+            PRAGMA synchronous = 0;
+            PRAGMA journal_mode = TRUNCATE;")?;
         Ok(Self {
             conn: Mutex::new(db),
         })

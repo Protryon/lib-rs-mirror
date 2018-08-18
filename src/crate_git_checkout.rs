@@ -20,6 +20,8 @@ use git2::{build::RepoBuilder, Blob, ObjectType, Reference, Repository, Tree};
 mod iter;
 use iter::HistoryIter;
 
+#[derive(Debug, Clone)]
+pub struct ParseError(pub String);
 
 fn commit_history_iter<'a>(repo: &Repository, commit: &Reference<'a>) -> Result<HistoryIter<'a>, git2::Error> {
     if repo.is_shallow() {
@@ -111,21 +113,21 @@ fn get_repo(repo: &Repo, base_path: &Path, name: &str) -> Result<Repository, git
     }
 }
 
-pub fn find_manifests(repo: &Repository) -> Result<(Vec<(String, TomlManifest)>, HashSet<String>), failure::Error> {
+pub fn find_manifests(repo: &Repository) -> Result<(Vec<(String, TomlManifest)>, Vec<ParseError>), failure::Error> {
     let head = repo.head()?;
     let tree = head.peel_to_tree()?;
     find_manifests_in_tree(&repo, &tree)
 }
 
-fn find_manifests_in_tree(repo: &Repository, tree: &Tree) -> Result<(Vec<(String, TomlManifest)>, HashSet<String>), failure::Error> {
+fn find_manifests_in_tree(repo: &Repository, tree: &Tree) -> Result<(Vec<(String, TomlManifest)>, Vec<ParseError>), failure::Error> {
     let mut tomls = Vec::with_capacity(8);
-    let mut warnings = HashSet::new();
+    let mut warnings = Vec::new();
     iter_blobs(repo, tree, |inner_path, name, blob| {
         if name == "Cargo.toml" {
             match TomlManifest::from_slice(blob.content()) {
                 Ok(toml) => tomls.push((inner_path.to_owned(), toml)),
                 Err(err) => {
-                    warnings.insert(format!("warning: can't parse {}/{}/{}: {}", repo.path().display(), inner_path, name, err));
+                    warnings.push(ParseError(format!("Can't parse {}/{}/{}: {}", repo.path().display(), inner_path, name, err)));
                 },
             }
         }

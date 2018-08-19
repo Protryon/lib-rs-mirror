@@ -15,6 +15,7 @@ pub struct Repo {
 pub enum RepoHost {
     GitHub(SimpleRepo),
     GitLab(SimpleRepo),
+    BitBucket(SimpleRepo),
     Other,
 }
 
@@ -57,6 +58,9 @@ impl Repo {
                 (Some("gitlab.com"), Some(path)) => {
                     RepoHost::GitLab(Self::repo_from_path(path)?)
                 },
+                (Some("bitbucket.org"), Some(path)) => {
+                    RepoHost::BitBucket(Self::repo_from_path(path)?)
+                },
                 _ => RepoHost::Other,
             },
             url,
@@ -76,6 +80,7 @@ impl Repo {
             match url.host_str() {
                 Some("github.com") | Some("www.github.com") => true,
                 Some("gitlab.com") | Some("www.gitlab.com") => true,
+                Some("bitbucket.org") => true,
                 _ => false,
             }
         })
@@ -99,6 +104,10 @@ impl Repo {
             RepoHost::GitLab(SimpleRepo {ref owner, ref repo}) => {
                 format!("https://gitlab.com/{}/{}/graphs/master", owner, repo).into()
             },
+            RepoHost::BitBucket(SimpleRepo {ref owner, ref repo}) => {
+                // not really…
+                format!("https://bitbucket.org/{}/{}/commits/all", owner, repo).into()
+            },
             RepoHost::Other => self.url.as_str().into(),
         }
     }
@@ -108,6 +117,7 @@ impl Repo {
         match self.host {
             RepoHost::GitHub(..) => "GitHub",
             RepoHost::GitLab(..) => "GitLab",
+            RepoHost::BitBucket(..) => "BitBucket",
             RepoHost::Other => "Source Code",
         }
     }
@@ -125,6 +135,7 @@ impl Repo {
             RepoHost::GitLab(SimpleRepo {ref owner, ref repo}) => {
                 format!("https://gitlab.com/{}/{}/blob/master/{}{}", owner, repo, base_dir_in_repo, slash)
             },
+            RepoHost::BitBucket(_) |  // FIXME: needs commit hash!
             RepoHost::Other => self.url.to_string() // FIXME: how to add base dir?
         }
     }
@@ -142,6 +153,7 @@ impl Repo {
             RepoHost::GitLab(SimpleRepo {ref owner, ref repo}) => {
                 format!("https://gitlab.com/{}/{}/raw/master/{}{}", owner, repo, base_dir_in_repo, slash)
             },
+            RepoHost::BitBucket(_) |  // FIXME: needs commit hash!
             RepoHost::Other => self.url.to_string() // FIXME: how to add base dir?
         }
     }
@@ -157,6 +169,9 @@ impl Repo {
             RepoHost::GitLab(SimpleRepo {ref owner, ref repo}) => {
                 format!("https://gitlab.com/{}/{}{}{}", owner, repo, slash, base_dir_in_repo).into()
             },
+            RepoHost::BitBucket(SimpleRepo {ref owner, ref repo}) => {
+                format!("https://bitbucket.org/{}/{}", owner, repo).into() // FIXME: needs hash
+            },
             RepoHost::Other => self.url.as_str().into(), // FIXME: how to add base dir?
         }
     }
@@ -169,7 +184,10 @@ impl Repo {
             },
             RepoHost::GitLab(SimpleRepo {ref owner, ref repo}) => {
                 format!("https://gitlab.com/{}/{}.git", owner, repo).into()
-            }
+            },
+            RepoHost::BitBucket(SimpleRepo {ref owner, ref repo}) => {
+                format!("https://bitbucket.org/{}/{}", owner, repo).into()
+            },
             RepoHost::Other => self.url.as_str().into(),
         }
     }
@@ -177,20 +195,22 @@ impl Repo {
     pub fn owner_name(&self) -> Option<&str> {
         match self.host {
             RepoHost::GitHub(SimpleRepo {ref owner, ..}) |
+            RepoHost::BitBucket(SimpleRepo {ref owner, ..}) |
             RepoHost::GitLab(SimpleRepo {ref owner, ..}) => {
                 return Some(owner)
             },
-            _ => None,
+            RepoHost::Other => None,
         }
     }
 
     pub fn repo_name(&self) -> Option<&str> {
         match self.host {
             RepoHost::GitHub(SimpleRepo {ref repo, ..}) |
+            RepoHost::BitBucket(SimpleRepo {ref repo, ..}) |
             RepoHost::GitLab(SimpleRepo {ref repo, ..}) => {
                 return Some(repo)
             },
-            _ => None,
+            RepoHost::Other => None,
         }
     }
 }

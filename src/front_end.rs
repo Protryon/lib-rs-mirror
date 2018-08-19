@@ -16,6 +16,7 @@ extern crate rich_crate;
 extern crate semver;
 extern crate urlencoding;
 extern crate locale;
+extern crate url;
 
 mod cat_page;
 mod crate_page;

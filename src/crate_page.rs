@@ -11,13 +11,16 @@ use rich_crate::Readme;
 use rich_crate::RichCrate;
 use rich_crate::RichCrateVersion;
 use rich_crate::Include;
+use rich_crate::RepoHost;
 use download_graph::DownloadsGraph;
 use kitchen_sink::CrateAuthor;
 use categories::CATEGORIES;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::hash::Hash;
 use urler::Urler;
+use url::Url;
 use Page;
 use locale::Numeric;
 use std::fmt::Display;
@@ -340,6 +343,79 @@ impl<'a> CratePage<'a> {
             None
         }
     }
+
+    fn url_domain(url: &str) -> Option<Cow<'static, str>> {
+        Url::parse(url).ok()
+        .and_then(|url| {
+            url.host_str()
+            .and_then(|host| {
+                if host.ends_with(".github.io") {
+                    Some("github.io".into())
+                } else if host.ends_with(".githubusercontent.com") {
+                    None
+                } else {
+                    Some(host.to_string().into())
+                }
+            })
+        })
+    }
+
+    /// `(url, label)`
+    pub fn homepage_link(&self) -> Option<(&str, Cow<str>)> {
+        self.ver.homepage()
+        .map(|url| {
+            let label = Self::url_domain(url)
+                .map(|host| {
+                    let docs_on_same_host = self.ver.documentation()
+                        .and_then(Self::url_domain)
+                        .map_or(false, |doc_host| doc_host == host);
+
+                    if docs_on_same_host {
+                        Cow::Borrowed("Home") // there will be verbose label on docs link, so repeating it would be noisy
+                    } else {
+                        format!("Home ({})", host).into()
+                    }
+                })
+                .unwrap_or_else(|| "Homepage".into());
+            (url, label)
+        })
+    }
+
+    /// `(url, label)`
+    pub fn documentation_link(&self) -> Option<(&str, Cow<str>)> {
+        self.ver.documentation()
+        .map(|url| {
+            let label = Self::url_domain(url)
+                .map(|host| {
+                    if host == "docs.rs" {
+                        "API Reference".into()
+                    } else {
+                        Cow::Owned(format!("Documentation ({})", host))
+                    }
+                })
+                .unwrap_or_else(|| "Documentation".into());
+            (url, label)
+        })
+    }
+
+    /// `(url, label)`
+    pub fn repository_link(&self) -> Option<(Cow<str>, String)> {
+        self.ver.repository_http_url().map(|(repo, url)| {
+            let label_prefix = repo.site_link_label();
+            let label = match repo.host() {
+                RepoHost::GitHub(ref host) | RepoHost::GitLab(ref host) => {
+                    format!("{} ({})", label_prefix, host.owner)
+                },
+                RepoHost::Other => {
+                    Self::url_domain(&url)
+                        .map(|host| format!("{} ({})", label_prefix, host))
+                        .unwrap_or_else(|| label_prefix.to_string())
+                }
+            };
+            (url, label)
+        })
+    }
+
 
     /// Most relevant keyword for this crate and rank in listing for that keyword
     pub fn top_keyword(&self) -> Option<(u32, String)> {

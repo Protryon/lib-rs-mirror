@@ -362,7 +362,7 @@ impl KitchenSink {
 
         // Delete the original docs.rs link, because we have our own
         // TODO: what if the link was to another crate or a subpage?
-        if meta.manifest.package.documentation.as_ref().map_or(false, |d| d.starts_with("https://docs.rs/")) {
+        if meta.manifest.package.documentation.as_ref().map_or(false, |d| d.starts_with("https://docs.rs/") || d.starts_with("https://crates.fyi/")) {
             if self.has_docs_rs(name, ver) {
                 meta.manifest.package.documentation = None; // docs.rs is not proper docs
             }
@@ -455,7 +455,7 @@ impl KitchenSink {
             package.documentation = None;
         }
 
-        if package.homepage.as_ref().map_or(false, |d| d.starts_with("https://docs.rs/") || d.starts_with("https://crates.rs/") || d.starts_with("https://crates.io/")) {
+        if package.homepage.as_ref().map_or(false, |d| d.starts_with("https://docs.rs/") || d.starts_with("https://crates.fyi/") || d.starts_with("https://crates.rs/") || d.starts_with("https://crates.io/")) {
             package.homepage = None;
         }
 
@@ -484,12 +484,12 @@ impl KitchenSink {
     }
 
     fn is_same_url<A: AsRef<str> + std::fmt::Debug>(a: Option<A>, b: Option<&String>) -> bool {
-        fn trim_hash(s: &str) -> &str {
-            s.split('#').next().unwrap()
+        fn trim_suffix(s: &str) -> &str {
+            s.split('#').next().unwrap().trim_right_matches("/index.html").trim_right_matches('/')
         }
 
         match (a, b) {
-            (Some(ref a), Some(ref b)) if trim_hash(a.as_ref()).eq_ignore_ascii_case(trim_hash(b)) => true,
+            (Some(ref a), Some(ref b)) if trim_suffix(a.as_ref()).eq_ignore_ascii_case(trim_suffix(b)) => true,
             _ => false,
         }
     }

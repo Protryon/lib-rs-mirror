@@ -14,6 +14,7 @@ use kitchen_sink::{KitchenSink, CrateData, Origin};
 use render_readme::ImageOptimAPIFilter;
 use categories::CategoryMap;
 use std::fs;
+use std::io::BufWriter;
 use std::fs::File;
 use std::sync::{Arc, Mutex};
 use std::collections::HashSet;
@@ -25,7 +26,7 @@ use failure::ResultExt;
 ///
 #[allow(deprecated)] // failure bug
 fn main() -> Result<(), failure::Error> {
-    let mut out = File::create("public/index.html").expect("write to public/index.html");
+    let mut out = BufWriter::new(File::create("public/index.html").expect("write to public/index.html"));
     let crates = KitchenSink::new_default().expect("init caches, data, etc.");
     let done_pages = Mutex::new(HashSet::new());
     let image_filter = Arc::new(render_readme::ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_path())?);
@@ -71,8 +72,8 @@ fn render_categories(cats: &CategoryMap, base: &Path, crates: &KitchenSink, done
             let ver = crates.rich_crate_version(origin, CrateData::Full).context("get rich crate")?;
             let path = PathBuf::from(format!("public/crates/{}.html", ver.short_name()));
             println!("{}", path.display());
-            let mut outfile = File::create(&path)
-                .with_context(|_| format!("Can't create {}", path.display()))?;
+            let mut outfile = BufWriter::new(File::create(&path)
+                .with_context(|_| format!("Can't create {}", path.display()))?);
             front_end::render_crate_page(&mut outfile, &allver, &ver, crates, image_filter.clone());
             Ok(())
         };
@@ -92,8 +93,8 @@ fn render_categories(cats: &CategoryMap, base: &Path, crates: &KitchenSink, done
         .collect::<Result<(), failure::Error>>()?;
 
         let path = base.join(format!("{}.html", slug));
-        let mut out = File::create(&path)
-            .with_context(|_| format!("Can't create {}", path.display()))?;
+        let mut out = BufWriter::new(File::create(&path)
+            .with_context(|_| format!("Can't create {}", path.display()))?);
         front_end::render_category(&mut out, cat, crates, image_filter.clone())?;
         println!("{}", path.display());
         Ok(())

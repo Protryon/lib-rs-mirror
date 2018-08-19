@@ -355,10 +355,12 @@ impl CrateDb {
             }
 
             for dl in all.daily_downloads() {
-                let period = dl.date.and_hms(0,0,0).timestamp();
-                let ver = dl.version.map(|v| v.num.as_str()); // `NULL` means all versions together
                 let downloads = dl.downloads as u32;
-                insert_dl.execute(&[&crate_id, &period, &ver, &downloads]).context("insert dl")?;
+                if downloads > 0 {
+                    let period = dl.date.and_hms(0,0,0).timestamp();
+                    let ver = dl.version.map(|v| v.num.as_str()); // `NULL` means all versions together
+                    insert_dl.execute(&[&crate_id, &period, &ver, &downloads]).context("insert dl")?; // FIXME: ignore 0s?
+                }
             }
             Ok(())
         })
@@ -440,6 +442,17 @@ impl CrateDb {
             order by top + (top+30.0)/total
         "#)?;
             Ok(query.query_row(&[&origin.to_str()], |row| (row.get(0), row.get(1)))?)
+        })
+    }
+
+    /// Number of crates with a given keyword
+    ///
+    /// NB: must be lowercase
+    pub fn crates_with_keyword(&self, keyword: &str) -> Result<u32> {
+        self.with_connection(|conn| {
+            let mut query = conn.prepare_cached("SELECT count(*) FROM crate_keywords
+                WHERE explicit AND keyword_id = (SELECT id FROM keywords WHERE keyword = ?1)")?;
+            Ok(query.query_row(&[&keyword], |row| row.get(0))?)
         })
     }
 

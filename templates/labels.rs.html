@@ -9,6 +9,9 @@
   @if ver.is_sys() {
     <span title="system library" class="sys">sys</span>
   }
+  @if ver.is_no_std() {
+    <span title="works without std" class="no-std">no-std</span>
+  }
   @if ver.is_app() {
     <span title="contains executables" class="bin">app</span>
   } else {

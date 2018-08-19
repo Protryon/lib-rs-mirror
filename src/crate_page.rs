@@ -116,6 +116,12 @@ impl<'a> CratePage<'a> {
         }
     }
 
+    /// If true, there are many other crates with this keyword. Populated first.
+    pub fn keywords_populated(&self) -> Option<Vec<(String, bool)>> {
+        let k = self.kitchen_sink.keywords_populated(self.ver);
+        if k.is_empty() {None} else {Some(k)}
+    }
+
     pub fn parent_crate(&self) -> Option<RichCrateVersion> {
         self.kitchen_sink.parent_crate(self.ver)
     }
@@ -403,7 +409,7 @@ impl<'a> CratePage<'a> {
         self.ver.repository_http_url().map(|(repo, url)| {
             let label_prefix = repo.site_link_label();
             let label = match repo.host() {
-                RepoHost::GitHub(ref host) | RepoHost::GitLab(ref host) => {
+                RepoHost::GitHub(ref host) | RepoHost::GitLab(ref host)| RepoHost::BitBucket(ref host) => {
                     format!("{} ({})", label_prefix, host.owner)
                 },
                 RepoHost::Other => {

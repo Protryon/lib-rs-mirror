@@ -39,6 +39,16 @@ pub struct DownloadWeek {
 }
 
 impl CrateDownloadsFile {
+    pub fn is_stale(&self) -> bool {
+        self.version_downloads.iter()
+            .max_by_key(|a| &a.date)
+            .map(|max| {
+                let date = parse_date(&max.date);
+                (Utc::today() - date).num_weeks() > 3
+            })
+            .unwrap_or(true)
+    }
+
     pub fn weekly_downloads(&self) -> Vec<DownloadWeek> {
         let ver_dl = &self.version_downloads;
         let other_dl = &self.meta.extra_downloads;

@@ -65,7 +65,17 @@ impl CratesIoClient {
     }
 
     pub fn crate_downloads(&self, crate_name: &str, as_of_version: &str) -> Result<CrateDownloadsFile, Error> {
-        self.get_json(&format!("{}-{}/downloads", crate_name, as_of_version), format!("{}/downloads", crate_name))
+        let cache_key = format!("{}-{}/downloads", crate_name, as_of_version);
+        let url = format!("{}/downloads", crate_name);
+        let data: CrateDownloadsFile = self.get_json(&cache_key, &url)?;
+        if data.is_stale() {
+            let _ = self.cache.delete(&cache_key);
+            let fresh: CrateDownloadsFile = self.get_json(&cache_key, &url)?;
+            assert!(!fresh.is_stale());
+            Ok(fresh)
+        } else {
+            Ok(data)
+        }
     }
 
     pub fn crate_owners(&self, crate_name: &str, as_of_version: &str) -> Result<Vec<CrateOwner>, Error> {

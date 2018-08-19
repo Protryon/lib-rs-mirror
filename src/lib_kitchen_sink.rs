@@ -296,7 +296,7 @@ impl KitchenSink {
 
         // Quick'n'dirty autobins substitute
         if meta.manifest.bin.is_empty() {
-            if let Some(path) = meta.find(|p| p.starts_with("src/bin")).map(|t| t.display().to_string()) {
+            if let Some(path) = meta.find(|p| p.starts_with("src/bin/") || p.starts_with("src/main.rs")).map(|t| t.display().to_string()) {
                 meta.manifest.bin.push(TomlLibOrBin {
                     path: Some(path),
                     name: Some(meta.manifest.package.name.clone()),

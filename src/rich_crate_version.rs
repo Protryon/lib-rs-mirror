@@ -190,6 +190,12 @@ impl RichCrateVersion {
         self.has_bin() && !self.has_lib()
     }
 
+    pub fn is_no_std(&self) -> bool {
+        self.category_slugs(Include::RawCargoTomlOnly).any(|c| c == "no-std")
+            || self.keywords(Include::RawCargoTomlOnly).any(|k| k == "no-std" || k == "no_std")
+            || self.features().iter().any(|(k,_)| k == "no-std" || k == "no_std")
+    }
+
     pub fn is_sys(&self) -> bool {
         !self.has_bin() &&
         self.has_buildrs() &&

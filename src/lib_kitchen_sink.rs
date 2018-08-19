@@ -662,6 +662,7 @@ impl KitchenSink {
                     }
                     Some(by_login)
                 }),
+                RepoHost::BitBucket(..) |
                 RepoHost::GitLab(..) |
                 RepoHost::Other => None, // TODO: could use git checkout...
             }
@@ -856,6 +857,18 @@ impl KitchenSink {
 
     pub fn top_keywords_in_category(&self, slug: &str) -> CResult<Vec<String>> {
         Ok(self.crate_db.top_keywords_in_category(slug)?)
+    }
+
+    /// True if there are multiple crates with that keyword. Populated first.
+    pub fn keywords_populated(&self, krate: &RichCrateVersion) -> Vec<(String, bool)> {
+        let mut keywords: Vec<_> = krate.keywords(Include::Cleaned)
+        .map(|k| {
+            let populated = self.crate_db.crates_with_keyword(&k.to_lowercase()).unwrap() >= 3;
+            (k.to_owned(), populated)
+        })
+        .collect();
+        keywords.sort_by_key(|&(_, v)| !v); // populated first; relies on stable sort
+        keywords
     }
 
     pub fn recently_updated_crates_in_category(&self, slug: &str) -> CResult<Vec<Origin>> {

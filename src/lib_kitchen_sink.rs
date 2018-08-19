@@ -22,6 +22,7 @@ extern crate user_db;
 extern crate reqwest;
 extern crate simple_cache;
 extern crate itertools;
+extern crate semver_parser;
 
 pub use crates_index::Crate;
 use crates_io_client::CrateOwner;
@@ -91,6 +92,8 @@ pub enum KitchenSinkErr {
     CategoryQueryFailed,
     #[fail(display = "crate not found: {:?}", _0)]
     CrateNotFound(Origin),
+    #[fail(display = "crate has no versions")]
+    NoVersions,
     #[fail(display = "Environment variable CRATES_DATA_DIR is not set.\nChoose a dir where it's OK to store lots of data, and export it like CRATES_DATA_DIR=/var/lib/crates.rs")]
     CratesDataDirEnvVarMissing,
     #[fail(display = "{} does not exist\nPlease get data files from https://crates.rs/data and put them in that directory, or set CRATES_DATA_DIR to their location.", _0)]
@@ -219,10 +222,16 @@ impl KitchenSink {
     pub fn rich_crate(&self, origin: &Origin) -> CResult<RichCrate> {
         let krate = self.crate_by_name(origin)?;
         let name = krate.name();
-        let cache_bust = krate.latest_version().version();
+        let cache_bust = Self::latest_version(&krate)?.version();
         let meta = self.crates_io.krate(name, cache_bust)
             .with_context(|_| format!("crates.io meta for {} {}", name, cache_bust))?;
          Ok(RichCrate::new(meta))
+    }
+
+    fn latest_version(krate: &Crate) -> Result<&crates_index::Version, KitchenSinkErr> {
+        krate.versions().iter()
+            .max_by_key(|a| (!a.is_yanked(), semver_parser::version::parse(a.version()).expect("semver")))
+            .ok_or(KitchenSinkErr::NoVersions)
     }
 
     /// Wrapper for the latest version of a given crate.
@@ -237,7 +246,7 @@ impl KitchenSink {
     /// With warnings
     pub fn rich_crate_version_verbose(&self, origin: &Origin, fetch_type: CrateData) -> CResult<(RichCrateVersion, Warnings)> {
         let krate = self.crate_by_name(origin)?;
-        let latest = krate.latest_version().clone();
+        let latest = Self::latest_version(&krate)?;
         let cache_key = format!("{}-{}", latest.name(), latest.version());
         let cached = if fetch_type != CrateData::FullNoDerived {
             if let Ok(cached) = self.crate_derived_cache.get(&cache_key)
@@ -256,9 +265,8 @@ impl KitchenSink {
         };
 
         let (d, warn) = if let Some(res) = cached {res} else {
-            let (d, warn) = self.rich_crate_version_data(&latest, fetch_type).context("get rich crate data")?;
+            let (d, warn) = self.rich_crate_version_data(latest, fetch_type).context("get rich crate data")?;
             if fetch_type == CrateData::Full {
-                eprintln!("miss! {}", cache_key);
                 if let Err(err) = self.crate_derived_cache.set(&cache_key, &serde_json::to_vec(&(&d, &warn)).context("ser to cache")?) {
                     eprintln!("Cache error: {} ({})", err, cache_key);
                 }
@@ -267,7 +275,7 @@ impl KitchenSink {
             }
             (d, warn)
         };
-        Ok((RichCrateVersion::new(latest, d.manifest, d.derived, d.readme, d.lib_file, d.path_in_repo, d.has_buildrs), warn))
+        Ok((RichCrateVersion::new(latest.clone(), d.manifest, d.derived, d.readme, d.lib_file, d.path_in_repo, d.has_buildrs), warn))
     }
 
     fn rich_crate_version_data(&self, latest: &crates_index::Version, fetch_type: CrateData) -> CResult<(RichCrateVersionCacheData, Warnings)> {

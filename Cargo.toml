@@ -36,4 +36,5 @@ lazycell = "0.6.0"
 rayon = "1.0.1"
 reqwest = "0.8.6"
 itertools = "0.7.8"
+semver-parser = "0.9.0"
 

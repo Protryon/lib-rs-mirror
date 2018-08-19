@@ -54,6 +54,7 @@ impl RichCrateVersion {
         }
     }
 
+    #[inline]
     pub fn homepage(&self) -> Option<&str> {
         self.manifest.package.homepage.as_ref().map(|s| s.as_ref())
     }
@@ -106,6 +107,7 @@ impl RichCrateVersion {
     }
 
     /// Globally unique URL-like string identifying source & the crate within that source
+    #[inline]
     pub fn origin(&self) -> &Origin {
         &self.origin
     }
@@ -119,6 +121,7 @@ impl RichCrateVersion {
     }
 
     /// Readable name
+    #[inline]
     pub fn short_name(&self) -> &str {
         self.index.name()
     }
@@ -133,14 +136,15 @@ impl RichCrateVersion {
         &self.authors
     }
 
+    #[inline]
     pub fn repository(&self) -> Option<&Repo> {
         self.repo.as_ref()
     }
 
-    pub fn repository_link(&self) -> Option<(Cow<str>, &str)> {
+    pub fn repository_http_url(&self) -> Option<(&Repo, Cow<str>)> {
         self.repository().map(|repo| {
             let relpath = self.path_in_repo.as_ref().map(|s| s.as_str()).unwrap_or("");
-            (repo.canonical_http_url(relpath), repo.site_link_label())
+            (repo, repo.canonical_http_url(relpath))
         })
     }
 
@@ -161,6 +165,7 @@ impl RichCrateVersion {
         self.manifest.package.links.as_ref().map(|s| s.as_str())
     }
 
+    #[inline]
     pub fn version(&self) -> &str {
         self.index.version()
     }

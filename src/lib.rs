@@ -20,6 +20,7 @@ pub use rich_crate_version::*;
 pub use render_readme::Markup;
 pub use render_readme::Readme;
 pub use repo_url::Repo;
+pub use repo_url::RepoHost;
 
 /// URL-like identifier of location where crate has been published + normalized crate name
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]

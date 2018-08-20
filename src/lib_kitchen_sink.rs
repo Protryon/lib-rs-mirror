@@ -952,6 +952,11 @@ pub struct CrateAuthor<'a> {
 }
 
 impl<'a> CrateAuthor<'a> {
+    pub fn likely_a_team(&self) -> bool {
+        let unattributed_name = self.github.is_none() && self.info.as_ref().map_or(true, |a| a.email.is_none() && a.url.is_none());
+        unattributed_name || self.name().ends_with(" Developers")
+    }
+
     pub fn name(&self) -> &str {
         if let Some(ref info) = self.info {
             if let Some(ref name) = &info.name {

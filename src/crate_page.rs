@@ -61,6 +61,16 @@ struct ReleaseCounts {
     breaking_recent: usize,
 }
 
+pub(crate) struct Contributors<'a> {
+    pub authors: Vec<CrateAuthor<'a>>,
+    pub owners: Vec<CrateAuthor<'a>>,
+    pub co_owned: bool,
+    pub contributors: usize,
+    pub period_after_authors: bool,
+    pub contributors_as_a_team: bool,
+}
+
+
 impl<'a> CratePage<'a> {
     pub fn page(&self, url: &Urler) -> Page {
         let keywords = self.ver.keywords(Include::Cleaned).collect::<Vec<_>>().join(", ");
@@ -173,10 +183,15 @@ impl<'a> CratePage<'a> {
         self.all.downloads_recent() < 100
     }
 
-    pub fn all_contributors(&self) -> (Vec<CrateAuthor<'a>>, Vec<CrateAuthor<'a>>, bool, usize, bool) {
+    pub(crate) fn all_contributors(&self) -> Contributors {
         let (authors, owners, co_owned, contributors) = self.kitchen_sink.all_contributors(&self.ver);
         let period_after_authors = !owners.is_empty() && contributors == 0;
-        (authors, owners, co_owned, contributors, period_after_authors)
+        let contributors_as_a_team = authors.last().map_or(false, |last| last.likely_a_team());
+        Contributors {
+            authors, owners, co_owned, contributors,
+            contributors_as_a_team,
+            period_after_authors,
+        }
     }
 
     pub fn format_number(&self, num: impl Display) -> String {
@@ -479,7 +494,6 @@ impl<'a> CratePage<'a> {
         .ok()
     }
 }
-
 
 impl ReleaseCounts {
 

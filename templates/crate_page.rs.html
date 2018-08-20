@@ -6,6 +6,7 @@
 @use iter::*;
 @use Urler;
 @use CratePage;
+@use Contributors;
 @use rich_crate::Include;
 
 @(url: &Urler, c: &CratePage)
@@ -81,7 +82,7 @@
         was
       }
       by
-      @if let Some((authors, owners, co_owned, contrib, period_after_authors)) = Some(c.all_contributors()) {
+      @if let Some(Contributors {authors, owners, co_owned, contributors, period_after_authors, contributors_as_a_team}) = Some(c.all_contributors()) {
         @for (last, a) in authors.iter().identify_last() {
           @if let Some(url) = url.author(a) {
             <a href="@url" property="author" typeof="Person"><span property="name">@a.name()</span></a>@if !last {,} else {@if period_after_authors {.}}
@@ -89,16 +90,12 @@
             @a.name()@if !last {,} else {@if period_after_authors {.}}
           }
         }
-        @if contrib > 1 {
-          <span class=contributors>and
+        @if contributors > 1 {
+          <span class=contributors>@if !contributors_as_a_team {and}
           @if let Some(repo) = c.ver.repository() {
-            <a href="@repo.contributors_http_url()">
-              @if contrib == 100 {
-                over
-              }
-              @contrib contributors</a>@if !owners.is_empty() {.}
+            @if contributors_as_a_team {(}<a href="@repo.contributors_http_url()">@if contributors == 100 {over }@contributors contributors</a>@if contributors_as_a_team {)}@if !owners.is_empty() {.}
           } else {
-            @contrib contributors@if !owners.is_empty() {.}
+            @contributors contributors@if contributors_as_a_team {)}@if !owners.is_empty() {.}
           }
           </span>
         }

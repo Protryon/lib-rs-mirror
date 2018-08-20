@@ -360,7 +360,7 @@ impl<'a> CratePage<'a> {
                 } else if host.ends_with(".githubusercontent.com") {
                     None
                 } else {
-                    Some(host.to_string().into())
+                    Some(host.trim_left_matches("www.").to_string().into())
                 }
             })
         })

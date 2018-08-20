@@ -37,7 +37,7 @@ lazy_static! {
         ("game-engines", Some(&["game", "ffi"])),
         ("game-dev", Some(&["game", "games"])),
         ("gamedev", Some(&["game", "games"])),
-        ("protocol", Some(&["game", "games"])),
+        ("protocol", Some(&["game", "games", "container"])),
         ("framework", Some(&["game", "games"])),
         ("engine", Some(&["ffi"])),
         ("mock", Some(&["macro", "derive", "plugin", "cargo"])),
@@ -85,6 +85,7 @@ lazy_static! {
         ("wide", Some(&["windows", "win32"])),
         ("regex", Some(&["text", "linear", "time", "search"])),
         ("language", Some(&["server"])),
+        ("medical", Some(&["image"])),
         ("codegen", Some(&["backend"])),
         ("game", Some(&["simulator", "simulation"])),
         ("2d", Some(&["path", "paths"])),
@@ -105,6 +106,9 @@ lazy_static! {
 
         ("placeholder", None), // spam
         ("reserved", None), // spam
+        ("name-squatting", None), // spam
+        ("parked", None), // spam
+        ("squatting", None), // spam
         ("malware", None), // spam
         ("unfinished", None), // spam
     ].iter().map(|s|*s).collect();

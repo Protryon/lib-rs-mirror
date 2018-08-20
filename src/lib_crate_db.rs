@@ -138,6 +138,9 @@ impl CrateDb {
             if c.is_sys() {
                 insert_keyword.add("has:is_sys", 0.01, false);
             }
+            if c.has_bin() {
+                insert_keyword.add("has:bin", 0.01, false);
+            }
 
             let (categories, had_explicit_categories) = {
                 let keywords = insert_keyword.keywords.iter().map(|(k,_)| k.to_string());

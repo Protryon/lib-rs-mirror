@@ -17,10 +17,9 @@
     <div class="inner-col">
     <div class="breadcrumbs" typeof="BreadcrumbList">
     <h1>
-      <span property="itemListElement" typeof="ListItem">
-        <a property="item" typeof="WebPage" href="/"><span property="name">Crates</span>.rs</a>
-        <meta property="position" content="1">
-      </span>
+      <span property="itemListElement" typeof="ListItem"><a property="item"
+        typeof="WebPage" href="/"><span property="name">Crates</span>.rs</a><meta
+        property="position" content="1"></span>
     </h1>
      &rsaquo;
     @if c.ver.has_categories() {
@@ -28,10 +27,9 @@
       @for (last, (major, cat)) in c.category_slugs_unique().iter().enumerate().identify_last() {
         @for (last, (i, subcat)) in cat.iter().enumerate().identify_last() {
           @if major < 2 {
-            <span property="itemListElement" typeof="ListItem">
-              <a href="@url.category(subcat)" title="@subcat.short_description" property="item" typeof="WebPage"><span property="name">@subcat.name</span></a>
-              <meta property="position" content="@(i+2)">
-            </span>
+            <span property="itemListElement" typeof="ListItem"><a href="@url.category(subcat)"
+              title="@subcat.short_description" property="item" typeof="WebPage"><span
+              property="name">@subcat.name</span></a><meta property="position" content="@(i+2)"></span>
           } else {
             <a href="@url.category(subcat)" title="@subcat.short_description">@subcat.name</a>
           }
@@ -40,11 +38,7 @@
         @if !last {|}
       }
       @if let Some(parent) = c.parent_crate() {
-        › <span>
-          <a href="@url.krate(&parent)">
-            @parent.short_name()
-          </a>
-        </span>
+        › <span><a href="@url.krate(&parent)">@CratePage::capitalized(parent.short_name())</a></span>
       }
       </span>
     }

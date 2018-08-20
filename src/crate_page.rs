@@ -112,18 +112,23 @@ impl<'a> CratePage<'a> {
         } else {
             "Rust crate"
         };
-        let mut name_capital = String::new();
-        let mut ch = self.ver.short_name().chars();
-        if let Some(f) = ch.next() {
-            name_capital.extend(f.to_uppercase());
-            name_capital.extend(ch);
-        }
+        let name_capital = Self::capitalized(self.ver.short_name());
 
         if self.ver.is_yanked() {
             format!("{} {} [deprecated] — {}", name_capital, self.ver.version(), kind)
         } else {
             format!("{} — {}", name_capital, kind)
         }
+    }
+
+    pub fn capitalized(name: &str) -> String {
+        let mut name_capital = String::new();
+        let mut ch = name.chars();
+        if let Some(f) = ch.next() {
+            name_capital.extend(f.to_uppercase());
+            name_capital.extend(ch);
+        }
+        name_capital
     }
 
     /// If true, there are many other crates with this keyword. Populated first.

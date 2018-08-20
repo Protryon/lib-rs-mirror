@@ -230,7 +230,12 @@ impl KitchenSink {
 
     fn latest_version(krate: &Crate) -> Result<&crates_index::Version, KitchenSinkErr> {
         krate.versions().iter()
-            .max_by_key(|a| (!a.is_yanked(), semver_parser::version::parse(a.version()).expect("semver")))
+            .max_by_key(|a| {
+                let ver = semver_parser::version::parse(a.version())
+                    .map_err(|e| eprintln!("{} has invalid version {}: {}", krate.name(), a.version(), e))
+                    .ok();
+                (!a.is_yanked(), ver)
+            })
             .ok_or(KitchenSinkErr::NoVersions)
     }
 

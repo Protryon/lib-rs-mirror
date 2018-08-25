@@ -1,7 +1,6 @@
 use cargo_toml::TomlDependency;
 pub use cargo_toml::TomlDepsSet;
 use cargo_toml::TomlManifest;
-use cargo_toml::TomlPackage;
 use categories::Categories;
 use crates_index::Version;
 use repo_url::Repo;
@@ -42,7 +41,7 @@ pub enum Include {
 /// Crates.rs uses this only for the latest version of a crate.
 impl RichCrateVersion {
     pub fn new(index: Version, mut manifest: TomlManifest, derived: Derived, readme: Result<Option<Readme>, ()>, lib_file: Option<String>, path_in_repo: Option<String>, has_buildrs: bool) -> Self {
-        Self::fake_categories(&mut manifest.package);
+        Self::fake_categories(&mut manifest);
         Self {
             origin: Origin::from_crates_io_name(index.name()),
             repo: manifest.package.repository.as_ref().and_then(|r| Repo::new(r).ok()),
@@ -298,22 +297,27 @@ impl RichCrateVersion {
         Ok((convsort(normal), convsort(dev), convsort(build)))
     }
 
-    fn fake_categories(package: &mut TomlPackage) {
-        for cat in &mut package.categories {
+    fn fake_categories(manifest: &mut TomlManifest) {
+        for cat in &mut manifest.package.categories {
+            if cat == "parsers" {
+                if manifest.dependencies.keys().any(|k| k == "nom") {
+                    *cat = "parser-implementations".into();
+                }
+            }
             if cat == "cryptography" {
-                if package.keywords.iter().any(|k| k == "bitcoin" || k == "ethereum" || k == "exonum" || k == "blockchain") {
+                if manifest.package.keywords.iter().any(|k| k == "bitcoin" || k == "ethereum" || k == "exonum" || k == "blockchain") {
                     *cat = "cryptography::cryptocurrencies".into();
                 }
             }
             if cat == "games" {
-                if package.keywords.iter().any(|k| k == "game-dev" || k == "game-development" || k == "gamedev" || k == "framework" || k == "utilities" || k == "parser" || k == "api") {
+                if manifest.package.keywords.iter().any(|k| k == "game-dev" || k == "game-development" || k == "gamedev" || k == "framework" || k == "utilities" || k == "parser" || k == "api") {
                     *cat = "game-engines".into();
                 }
             }
             if cat == "science" {
-                if package.keywords.iter().any(|k| k == "neural-network" || k == "machine-learning" || k == "deep-learning") {
+                if manifest.package.keywords.iter().any(|k| k == "neural-network" || k == "machine-learning" || k == "deep-learning") {
                     *cat = "science::ml".into();
-                } else if package.keywords.iter().any(|k| k == "math" ||  k == "calculus" || k == "algebra" || k == "linear-algebra" || k == "mathematics" || k == "maths" || k == "number-theory") {
+                } else if manifest.package.keywords.iter().any(|k| k == "math" ||  k == "calculus" || k == "algebra" || k == "linear-algebra" || k == "mathematics" || k == "maths" || k == "number-theory") {
                     *cat = "science::math".into();
                 }
             }

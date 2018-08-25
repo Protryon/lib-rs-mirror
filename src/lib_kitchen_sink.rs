@@ -23,6 +23,7 @@ extern crate reqwest;
 extern crate simple_cache;
 extern crate itertools;
 extern crate semver_parser;
+extern crate chrono;
 
 pub use crates_index::Crate;
 use crates_io_client::CrateOwner;
@@ -38,6 +39,7 @@ pub use rich_crate::RichCrateVersion;
 pub use rich_crate::Origin;
 pub use rich_crate::Include;
 
+use chrono::DateTime;
 use simple_cache::SimpleCache;
 use crate_files::CrateFile;
 use cargo_toml::TomlLibOrBin;
@@ -202,6 +204,23 @@ impl KitchenSink {
     /// so `rich_crate`/`rich_crate_version` is needed to do more.
     pub fn all_crates(&self) -> crates_index::Crates {
         self.index.crates()
+    }
+
+    pub fn all_new_crates<'a>(&'a self) -> CResult<impl Iterator<Item = RichCrate> + 'a> {
+        let min_timestamp = self.crate_db.latest_crate_update_timestamp()?;
+        Ok(self.index.crates()
+        .filter_map(move |k| {
+            self.rich_crate(&Origin::from_crates_io_name(k.name())).ok()
+        })
+        .filter(move |k| {
+            let latest = k.versions().map(|v| v.created_at.as_str()).max().unwrap_or("");
+            if let Ok(timestamp) = DateTime::parse_from_rfc3339(latest) {
+                timestamp.timestamp() >= min_timestamp as i64
+            } else {
+                eprintln!("Can't parse {} of {}", latest, k.name());
+                true
+            }
+        }))
     }
 
     pub fn crate_by_name(&self, name: &Origin) -> Result<Crate, KitchenSinkErr> {

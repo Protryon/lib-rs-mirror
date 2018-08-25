@@ -1,21 +1,37 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use lazyonce::LazyOnce;
-use crates_index::Crate;
 use rich_crate::Origin;
 use std::path::PathBuf;
 use crates_index;
+use crates_index::Crate;
+use crates_index::Version;
+use std::rc::Rc;
+use std::iter;
 use KitchenSinkErr;
+use KitchenSink;
+use semver::VersionReq;
+use semver::Version as SemVer;
 
 pub struct Index {
+    uid: usize,
     index: crates_index::Index,
     crate_path_index: LazyOnce<HashMap<Origin, PathBuf>>,
+    cache: HashMap<(Box<str>, Features), DepSet>,
 }
 
 impl Index {
+    pub fn new_default() -> Result<Self, KitchenSinkErr> {
+        Ok(Self::new(KitchenSink::data_path()?.join("index")))
+    }
+
     pub fn new(path: PathBuf) -> Self {
         Self {
+            uid: 0,
             index: crates_index::Index::new(path),
             crate_path_index: LazyOnce::new(),
+            cache: HashMap::new(),
         }
     }
 
@@ -42,4 +58,151 @@ impl Index {
         .ok_or_else(|| KitchenSinkErr::CrateNotFound(name.clone()))
     }
 
+    pub fn deps_of(&mut self, krate: &Origin, default: bool, all_optional: bool, dev: bool) -> Result<Dep, KitchenSinkErr> {
+        let krate = self.crate_by_name(krate)?;
+        let latest = krate.latest_version();
+        let mut features = Vec::with_capacity(if all_optional {latest.features().len()} else {0});
+        if all_optional {
+            features.extend(latest.features().keys().map(|c| c.to_string().into_boxed_str()));
+        };
+        Ok(Dep {
+            uid: self.uid(),
+            runtime: self.deps_of_ver(latest, Features {
+                all_targets: all_optional,
+                default,
+                build: false,
+                dev,
+                features: features.clone().into_boxed_slice(),
+            })?,
+            build: self.deps_of_ver(latest, Features {
+                all_targets: all_optional,
+                default,
+                build: true,
+                dev,
+                features: features.into_boxed_slice(),
+            })?,
+        })
+    }
+
+    pub fn deps_of_ver(&mut self, ver: &Version, wants: Features) -> Result<DepSet, KitchenSinkErr> {
+        let key = (format!("{}-{}", ver.name(), ver.version()).into(), wants.clone());
+        if let Some(cached) = self.cache.get(&key) {
+            return Ok(cached.clone());
+        }
+
+        let mut to_enable = HashMap::new();
+        let ver_features = ver.features(); // available features
+        let all_wanted_features = wants.features.iter()
+                        .map(|s| s.as_ref())
+                        .chain(iter::repeat("default").take(if wants.default {1} else {0}));
+        for feat in all_wanted_features {
+            if let Some(enable) = ver_features.get(feat) {
+                for enable in enable {
+                    let mut t = enable.splitn(2, '/');
+                    let dep_name = t.next().unwrap();
+                    let enabled = to_enable.entry(dep_name.to_owned())
+                        .or_insert(HashSet::new());
+                    if let Some(enable) = t.next() {
+                        enabled.insert(enable);
+                    }
+                }
+            } else {
+                to_enable.entry(feat.to_owned()).or_insert(HashSet::new());
+            }
+        }
+
+        let mut set: HashMap<DepName, (_, _, HashSet<String>)> = HashMap::new();
+        for d in ver.dependencies() {
+            if d.target().is_some() {
+                continue; // FIXME: allow common targets?
+            }
+            match d.kind() {
+                Some("normal") | None => (),
+                Some("build") if wants.build => (),
+                Some("dev") if wants.dev => (),
+                _ => continue,
+            }
+
+            let enable_dep_features = to_enable.get(d.name());
+            if d.is_optional() && enable_dep_features.is_none() {
+                continue;
+            }
+
+            let req = VersionReq::parse(d.requirement())
+                .map_err(|_| KitchenSinkErr::SemverParsingError)?;
+            let name = d.name();
+            let krate = self.crate_by_name(&Origin::from_crates_io_name(name))?;
+            let matched = krate.versions().iter().rev()
+                .filter(|v| !v.is_yanked())
+                .find(|v| {
+                    if let Ok(v) = SemVer::parse(v.version()) {
+                        req.matches(&v)
+                    } else {false}
+                });
+
+            let matched = matched.ok_or(KitchenSinkErr::MissingDependency)?;
+            let key = (name.into(), matched.version().into());
+
+            let (_, _, all_features) = set.entry(key)
+                .or_insert_with(|| (d, matched.clone(), HashSet::new()));
+            all_features.extend(d.features().iter().cloned());
+            if let Some(s) = enable_dep_features {
+                all_features.extend(s.iter().map(|s| s.to_string()));
+            }
+        }
+
+        // break infinite recursion. Must be inserted first, since depth-first search
+        // may end up requesting it.
+        let result = Rc::new(RefCell::new(HashMap::new()));
+        self.cache.insert(key, result.clone());
+
+        let set: Result<_,_> = set.into_iter().map(|(k, (d, matched, all_features))| {
+            let all_features = all_features.into_iter().map(Into::into).collect::<Vec<_>>().into_boxed_slice();
+            let runtime = self.deps_of_ver(&matched, Features {
+                all_targets: wants.all_targets,
+                build: false,
+                dev: false, // dev is only for top-level
+                default: d.has_default_features(),
+                features: all_features.clone(),
+            })?;
+            let build = self.deps_of_ver(&matched, Features {
+                all_targets: wants.all_targets,
+                build: true,
+                dev: false, // dev is only for top-level
+                default: d.has_default_features(),
+                features: all_features,
+            })?;
+            Ok((k, Dep {
+                uid: self.uid(),
+                runtime,
+                build,
+            }))
+        }).collect();
+
+        *result.borrow_mut() = set?;
+        Ok(result)
+    }
+
+    fn uid(&mut self) -> usize {
+        self.uid += 1;
+        self.uid
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct Features {
+    pub all_targets: bool,
+    pub default: bool,
+    pub build: bool,
+    pub dev: bool,
+    pub features: Box<[Box<str>]>,
+}
+
+pub type DepName = (Box<str>, Box<str>);
+pub type DepSet = Rc<RefCell<HashMap<DepName, Dep>>>;
+
+pub struct Dep {
+    pub uid: usize,
+    pub runtime: DepSet,
+    pub build: DepSet,
 }

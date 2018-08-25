@@ -22,6 +22,7 @@ extern crate user_db;
 extern crate reqwest;
 extern crate simple_cache;
 extern crate itertools;
+extern crate semver;
 extern crate semver_parser;
 extern crate chrono;
 
@@ -103,6 +104,10 @@ pub enum KitchenSinkErr {
     CratesDataDirEnvVarMissing,
     #[fail(display = "{} does not exist\nPlease get data files from https://crates.rs/data and put them in that directory, or set CRATES_DATA_DIR to their location.", _0)]
     CacheDbMissing(String),
+    #[fail(display = "Error when parsing verison")]
+    SemverParsingError,
+    #[fail(display = "No matching dependency")]
+    MissingDependency,
 }
 
 /// This is a collection of various data sources. It mostly acts as a starting point and a factory for other objects.
@@ -169,7 +174,7 @@ impl KitchenSink {
         }
     }
 
-    fn data_path() -> Result<PathBuf, KitchenSinkErr> {
+    pub(crate) fn data_path() -> Result<PathBuf, KitchenSinkErr> {
         match env::var("CRATES_DATA_DIR") {
             Ok(d) => {
                 if !Path::new(&d).join("cache.db").exists() {

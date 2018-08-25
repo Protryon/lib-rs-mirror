@@ -25,6 +25,9 @@ extern crate itertools;
 extern crate semver_parser;
 extern crate chrono;
 
+mod index;
+pub use index::*;
+
 pub use crates_index::Crate;
 use crates_io_client::CrateOwner;
 pub use crates_io_client::CrateDependency;
@@ -104,7 +107,7 @@ pub enum KitchenSinkErr {
 
 /// This is a collection of various data sources. It mostly acts as a starting point and a factory for other objects.
 pub struct KitchenSink {
-    index: crates_index::Index,
+    pub index: Index,
     crates_io: crates_io_client::CratesIoClient,
     docs_rs: docs_rs_client::DocsRsClient,
     crate_db: CrateDb,
@@ -112,7 +115,6 @@ pub struct KitchenSink {
     gh: github_info::GitHub,
     crate_derived_cache: SimpleCache,
     category_crate_counts: LazyOnce<Option<HashMap<String, u32>>>,
-    crate_path_index: LazyOnce<HashMap<Origin, PathBuf>>,
     top_crates_cached: RwLock<HashMap<String, Arc<Vec<(Origin, u32)>>>>,
     git_checkout_path: PathBuf,
     main_cache_path: PathBuf,
@@ -145,7 +147,7 @@ impl KitchenSink {
     pub fn new(data_path: &Path, github_token: &str) -> CResult<Self> {
         let main_cache_path = Self::assert_exists(data_path.join("cache.db"))?;
         Ok(Self {
-            index: crates_index::Index::new(Self::assert_exists(data_path.join("index"))?),
+            index: Index::new(Self::assert_exists(data_path.join("index"))?),
             docs_rs: docs_rs_client::DocsRsClient::new(&main_cache_path)?,
             crate_db: CrateDb::new(Self::assert_exists(data_path.join("crate_data.db"))?)?,
             user_db: user_db::UserDb::new(Self::assert_exists(data_path.join("users.db"))?)?,
@@ -153,7 +155,6 @@ impl KitchenSink {
             crates_io: crates_io_client::CratesIoClient::new(data_path)?,
             crate_derived_cache: SimpleCache::new(&data_path.join("crate_derived.db"))?,
             git_checkout_path: data_path.join("git"),
-            crate_path_index: LazyOnce::new(),
             category_crate_counts: LazyOnce::new(),
             top_crates_cached: RwLock::new(HashMap::new()),
             main_cache_path,
@@ -223,23 +224,9 @@ impl KitchenSink {
         }))
     }
 
-    pub fn crate_by_name(&self, name: &Origin) -> Result<Crate, KitchenSinkErr> {
-        self.crate_path_index.get(|| {
-            self.index.crate_index_paths()
-                .filter_map(|p| {
-                    let f = p.file_name().and_then(|f| f.to_str()).map(|s| s.to_lowercase());
-                    f.map(|f| (Origin::from_crates_io_name(&f), p))
-                })
-                .collect()
-        })
-        .get(name)
-        .map(Crate::new)
-        .ok_or_else(|| KitchenSinkErr::CrateNotFound(name.clone()))
-    }
-
     /// Wrapper object for metadata common for all versions of a crate
     pub fn rich_crate(&self, origin: &Origin) -> CResult<RichCrate> {
-        let krate = self.crate_by_name(origin)?;
+        let krate = self.index.crate_by_name(origin)?;
         let name = krate.name();
         let cache_bust = Self::latest_version(&krate)?.version();
         let meta = self.crates_io.krate(name, cache_bust)
@@ -269,7 +256,7 @@ impl KitchenSink {
 
     /// With warnings
     pub fn rich_crate_version_verbose(&self, origin: &Origin, fetch_type: CrateData) -> CResult<(RichCrateVersion, Warnings)> {
-        let krate = self.crate_by_name(origin)?;
+        let krate = self.index.crate_by_name(origin)?;
         let latest = Self::latest_version(&krate)?;
         let cache_key = format!("{}-{}", latest.name(), latest.version());
         let cached = if fetch_type != CrateData::FullNoDerived {

@@ -75,6 +75,12 @@ impl CrateDb {
         Ok(db)
     }
 
+    pub fn latest_crate_update_timestamp(&self) -> Result<u32> {
+        self.with_connection(|conn| {
+            Ok(conn.query_row("SELECT max(created) FROM crate_versions", &[], |row| row.get(0))?)
+        })
+    }
+
     /// Add data of the latest version of a crate to the index
     pub fn index_latest(&self, c: &RichCrateVersion) -> Result<()> {
         self.with_tx(|tx| {

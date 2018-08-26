@@ -106,8 +106,6 @@ pub enum KitchenSinkErr {
     CacheDbMissing(String),
     #[fail(display = "Error when parsing verison")]
     SemverParsingError,
-    #[fail(display = "No matching dependency")]
-    MissingDependency,
 }
 
 /// This is a collection of various data sources. It mostly acts as a starting point and a factory for other objects.

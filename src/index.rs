@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use lazyonce::LazyOnce;
@@ -7,18 +6,20 @@ use std::path::PathBuf;
 use crates_index;
 use crates_index::Crate;
 use crates_index::Version;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use std::iter;
 use KitchenSinkErr;
 use KitchenSink;
 use semver::VersionReq;
 use semver::Version as SemVer;
+use std::sync::RwLock;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub struct Index {
-    uid: usize,
+    uid: AtomicUsize,
     index: crates_index::Index,
-    crate_path_index: LazyOnce<HashMap<Origin, PathBuf>>,
-    cache: HashMap<(Box<str>, Features), DepSet>,
+    crate_path_index: LazyOnce<HashMap<Origin, Crate>>,
+    cache: RwLock<HashMap<(Box<str>, Features), DepSet>>,
 }
 
 impl Index {
@@ -28,10 +29,10 @@ impl Index {
 
     pub fn new(path: PathBuf) -> Self {
         Self {
-            uid: 0,
+            uid: AtomicUsize::new(0),
             index: crates_index::Index::new(path),
             crate_path_index: LazyOnce::new(),
-            cache: HashMap::new(),
+            cache: RwLock::new(HashMap::new()),
         }
     }
 
@@ -43,27 +44,25 @@ impl Index {
         self.index.crates()
     }
 
-
-    pub fn crate_by_name(&self, name: &Origin) -> Result<Crate, KitchenSinkErr> {
+    pub fn crate_by_name(&self, name: &Origin) -> Result<&Crate, KitchenSinkErr> {
         self.crate_path_index.get(|| {
             self.index.crate_index_paths()
                 .filter_map(|p| {
                     let f = p.file_name().and_then(|f| f.to_str()).map(|s| s.to_lowercase());
                     f.map(|f| (Origin::from_crates_io_name(&f), p))
                 })
+                .map(|(k, c)| (k, Crate::new(c)))
                 .collect()
         })
         .get(name)
-        .map(Crate::new)
         .ok_or_else(|| KitchenSinkErr::CrateNotFound(name.clone()))
     }
 
-    pub fn deps_of(&mut self, krate: &Origin, default: bool, all_optional: bool, dev: bool) -> Result<Dep, KitchenSinkErr> {
-        let krate = self.crate_by_name(krate)?;
+    pub fn deps_of_crate(&self, krate: &Crate, DepQuery {default, all_optional, dev}: DepQuery) -> Result<Dep, KitchenSinkErr> {
         let latest = krate.latest_version();
         let mut features = Vec::with_capacity(if all_optional {latest.features().len()} else {0});
         if all_optional {
-            features.extend(latest.features().keys().map(|c| c.to_string().into_boxed_str()));
+            features.extend(latest.features().iter().filter(|(_,v)| !v.is_empty()).map(|(c, _)| c.to_string().into_boxed_str()));
         };
         Ok(Dep {
             uid: self.uid(),
@@ -84,9 +83,9 @@ impl Index {
         })
     }
 
-    pub fn deps_of_ver(&mut self, ver: &Version, wants: Features) -> Result<DepSet, KitchenSinkErr> {
+    pub fn deps_of_ver(&self, ver: &Version, wants: Features) -> Result<DepSet, KitchenSinkErr> {
         let key = (format!("{}-{}", ver.name(), ver.version()).into(), wants.clone());
-        if let Some(cached) = self.cache.get(&key) {
+        if let Some(cached) = self.cache.read().unwrap().get(&key) {
             return Ok(cached.clone());
         }
 
@@ -138,9 +137,9 @@ impl Index {
                     if let Ok(v) = SemVer::parse(v.version()) {
                         req.matches(&v)
                     } else {false}
-                });
+                })
+                .unwrap_or_else(|| krate.latest_version());
 
-            let matched = matched.ok_or(KitchenSinkErr::MissingDependency)?;
             let key = (name.into(), matched.version().into());
 
             let (_, _, all_features) = set.entry(key)
@@ -153,8 +152,8 @@ impl Index {
 
         // break infinite recursion. Must be inserted first, since depth-first search
         // may end up requesting it.
-        let result = Rc::new(RefCell::new(HashMap::new()));
-        self.cache.insert(key, result.clone());
+        let result = Arc::new(Mutex::new(HashMap::new()));
+        self.cache.write().unwrap().insert(key, result.clone());
 
         let set: Result<_,_> = set.into_iter().map(|(k, (d, matched, all_features))| {
             let all_features = all_features.into_iter().map(Into::into).collect::<Vec<_>>().into_boxed_slice();
@@ -179,13 +178,12 @@ impl Index {
             }))
         }).collect();
 
-        *result.borrow_mut() = set?;
+        *result.lock().unwrap() = set?;
         Ok(result)
     }
 
-    fn uid(&mut self) -> usize {
-        self.uid += 1;
-        self.uid
+    fn uid(&self) -> usize {
+        self.uid.fetch_add(1, Ordering::SeqCst)
     }
 }
 
@@ -199,10 +197,17 @@ pub struct Features {
 }
 
 pub type DepName = (Box<str>, Box<str>);
-pub type DepSet = Rc<RefCell<HashMap<DepName, Dep>>>;
+pub type DepSet = Arc<Mutex<HashMap<DepName, Dep>>>;
 
 pub struct Dep {
     pub uid: usize,
     pub runtime: DepSet,
     pub build: DepSet,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct DepQuery {
+    pub default: bool,
+    pub all_optional: bool,
+    pub dev: bool,
 }

@@ -30,8 +30,8 @@ fn commit_history_iter<'a>(repo: &Repository, commit: &Reference<'a>) -> Result<
     Ok(HistoryIter::new(commit.peel_to_commit()?))
 }
 
-pub fn checkout(repo: &Repo, base_path: &Path, name: &str) -> Result<Repository, git2::Error> {
-    let repo = get_repo(repo, base_path, name)?;
+pub fn checkout(repo: &Repo, base_path: &Path) -> Result<Repository, git2::Error> {
+    let repo = get_repo(repo, base_path)?;
     Ok(repo)
 }
 
@@ -71,17 +71,11 @@ fn iter_blobs_recurse<F>(repo: &Repository, tree: &Tree, path: &mut String, cb: 
     Ok(())
 }
 
-fn get_repo(repo: &Repo, base_path: &Path, name: &str) -> Result<Repository, git2::Error> {
+fn get_repo(repo: &Repo, base_path: &Path) -> Result<Repository, git2::Error> {
     let shallow = false;
     let url = &*repo.canonical_git_url();
 
     let repo_path = base_path.join(urlencoding::encode(url));
-    if !repo_path.exists() {
-        let old_path = base_path.join(name);
-        if old_path.exists() {
-            let _ = std::fs::rename(old_path, &repo_path);
-        }
-    }
 
     match Repository::open(&repo_path) {
         Ok(repo) => Ok(repo),

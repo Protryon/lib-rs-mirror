@@ -30,9 +30,10 @@ impl DocsRsClient {
     }
 
     pub fn build_status(&self, crate_name: &str, version: &str) -> Result<Vec<BuildStatus>, Error> {
-        let cache_file = format!("meta/{}-{}.docsrs.json", crate_name, version);
+        let old = format!("meta/{}-{}.docsrs.json", crate_name, version);
         let url = format!("https://docs.rs/crate/{}/{}/builds.json", crate_name, version);
-        self.cache.get_json(&cache_file, url)
+        let new = format!("docs.rs/{}", crate_name);
+        self.cache.get_json((&new, version), &old, url)
     }
 }
 

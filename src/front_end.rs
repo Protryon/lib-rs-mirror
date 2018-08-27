@@ -28,7 +28,7 @@ use failure::ResultExt;
 use categories::Category;
 use crate_page::*;
 use kitchen_sink::KitchenSink;
-use render_readme::{Renderer, Highlighter, ArcImageFilter};
+use render_readme::Renderer;
 use rich_crate::RichCrate;
 use rich_crate::RichCrateVersion;
 use std::fs::read_to_string;
@@ -64,10 +64,9 @@ impl Page {
 }
 
 /// See `cat_page.rs.html`
-pub fn render_category(out: &mut Write, cat: &Category, crates: &KitchenSink, filter: ArcImageFilter) -> Result<(), failure::Error> {
+pub fn render_category(out: &mut Write, cat: &Category, crates: &KitchenSink, markup: &Renderer) -> Result<(), failure::Error> {
     let urler = Urler::new();
-    let markup = Renderer::new_filter(Highlighter::new(), filter);
-    let page = cat_page::CatPage::new(cat, crates, &markup).context("can't prepare rendering of category page")?;
+    let page = cat_page::CatPage::new(cat, crates, markup).context("can't prepare rendering of category page")?;
     templates::cat_page(out, &page, &urler)?;
     Ok(())
 }
@@ -80,8 +79,7 @@ pub fn render_homepage(out: &mut Write, crates: &KitchenSink) -> Result<(), fail
 }
 
 /// See `crate_page.rs.html`
-pub fn render_crate_page(out: &mut Write, all: &RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, filter: ArcImageFilter) -> String {
-    let markup = &Renderer::new_filter(Highlighter::new(), filter);
+pub fn render_crate_page(out: &mut Write, all: &RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, markup: &Renderer) -> String {
     let urler = Urler::new();
     let c = CratePage {
         all, ver, kitchen_sink, markup,

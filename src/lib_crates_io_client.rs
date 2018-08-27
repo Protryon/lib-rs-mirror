@@ -1,4 +1,5 @@
 extern crate serde;
+extern crate rand;
 extern crate simple_cache;
 extern crate chrono;
 #[macro_use] extern crate serde_derive;
@@ -71,7 +72,7 @@ impl CratesIoClient {
         let url = format!("{}/downloads", crate_name);
         let new_key = (url.as_str(), as_of_version);
         let data: CrateDownloadsFile = self.get_json(&old, new_key, &url)?;
-        if data.is_stale() {
+        if data.is_stale() && rand::random::<u8>() > 200 {
             let _ = self.cache.delete(new_key, &old);
             let fresh: CrateDownloadsFile = self.get_json(&old, new_key, &url)?;
             assert!(!fresh.is_stale());

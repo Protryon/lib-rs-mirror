@@ -432,7 +432,7 @@ impl KitchenSink {
     fn add_readme_from_repo(&self, meta: &mut CrateFile, maybe_repo: Option<&Repo>) -> Warnings {
         let mut warnings = HashSet::new();
         if let Some(repo) = maybe_repo {
-            let res = crate_git_checkout::checkout(repo, &self.git_checkout_path, &meta.manifest.package.name)
+            let res = crate_git_checkout::checkout(repo, &self.git_checkout_path)
             .map_err(From::from)
             .and_then(|checkout| {
                 crate_git_checkout::find_readme(&checkout, &meta.manifest.package)
@@ -594,9 +594,9 @@ impl KitchenSink {
         Ok(())
     }
 
-    pub fn index_repo(&self, repo: &Repo, crate_name: &str) -> CResult<()> {
+    pub fn index_repo(&self, repo: &Repo, as_of_version: &str) -> CResult<()> {
         let url = repo.canonical_git_url();
-        let checkout = crate_git_checkout::checkout(repo, &self.git_checkout_path, crate_name)?;
+        let checkout = crate_git_checkout::checkout(repo, &self.git_checkout_path)?;
 
         let (manif, warnings) = crate_git_checkout::find_manifests(&checkout)
             .with_context(|_| format!("find manifests in {}", url))?;
@@ -605,6 +605,15 @@ impl KitchenSink {
         }
         let manif = manif.into_iter().map(|(subpath, manifest)| (subpath, manifest.package.name));
         self.crate_db.index_repo_crates(repo, manif).context("index rev repo")?;
+
+        if let Repo{host:RepoHost::GitHub(ref repo), ..} = repo {
+            if let Ok(commits) = self.repo_commits(repo, as_of_version) {
+                for c in commits {
+                    self.index_user(&c.author, &c.commit.author)?;
+                    self.index_user(&c.committer, &c.commit.committer)?;
+                }
+            }
+        }
 
         let mut changes = Vec::new();
 

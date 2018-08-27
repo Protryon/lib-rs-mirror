@@ -10,6 +10,6 @@ path = "src/lib_user_db.rs"
 
 [dependencies]
 rusqlite = "0.14.0"
-github_info = { git = "https://gitlab.com/crates.rs/github_info.git" }
+github_info = { git = "https://gitlab.com/crates.rs/github_info.git", version = "0.6.0" }
 repo_url = { git = "https://gitlab.com/crates.rs/repo_url.git" }
 failure = "0.1.1"

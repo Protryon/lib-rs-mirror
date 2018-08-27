@@ -82,6 +82,7 @@ impl SimpleCache {
             if self.cache_only {
                 return Err(Error::NotCached);
             }
+            eprintln!("cache miss {}@{}", key.0, key.1);
             let data = self.fetch(url.as_ref())?;
             self.set(key, cache_name_old, &data)?;
             data
@@ -108,7 +109,6 @@ impl SimpleCache {
     }
 
     fn fetch(&self, url: &str) -> Result<Vec<u8>, Error> {
-        eprintln!("cache miss {}", url);
         let client = reqwest::Client::new();
         if url.contains("crates.io") {
             // Please don't remove this.

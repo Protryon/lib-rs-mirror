@@ -30,6 +30,7 @@ impl SimpleCache {
     fn connect(&self) -> Result<Connection, rusqlite::Error> {
         let conn = Connection::open(&self.url)?;
         conn.execute_batch("
+            CREATE TABLE IF NOT EXISTS cache2 (key TEXT NOT NULL PRIMARY KEY, ver TEXT NOT NULL, data BLOB NOT NULL);
             PRAGMA synchronous = 0;
             PRAGMA JOURNAL_MODE = OFF;
             PRAGMA read_uncommitted;")?;
@@ -45,20 +46,28 @@ impl SimpleCache {
         }
     }
 
-    pub fn get_json<B>(&self, cache_name: &str, url: impl AsRef<str>) -> Result<B, Error>
+    pub fn get_json<B>(&self, key: (&str, &str), cache_name_old: &str, url: impl AsRef<str>) -> Result<B, Error>
         where B: for<'a> serde::Deserialize<'a>
     {
-        let data = self.get_cached(cache_name, url)?;
+        let data = self.get_cached(key, cache_name_old, url)?;
         match serde_json::from_slice(&data) {
             Ok(res) => Ok(res),
             Err(parse) => Err(Error::Parse(parse, data)),
         }
     }
 
-    pub fn get(&self, cache_name: &str) -> Result<Vec<u8>, Error> {
+    pub fn get(&self, key: (&str, &str), cache_name_old: &str) -> Result<Vec<u8>, Error> {
         self.with_connection(|conn| {
+            let mut q = conn.prepare_cached("SELECT data FROM cache2 WHERE key = ?1 AND ver = ?2")?;
+            let row: Result<Vec<u8>, _> = q.query_row(&[&key.0, &key.1], |r| r.get(0));
+            if let Ok(res) = row {
+                return Ok(res);
+            }
+
             let mut q = conn.prepare_cached("SELECT value FROM cache WHERE key = ?1")?;
-            if let Ok(res) = q.query_row(&[&cache_name], |r| r.get(0)) {
+            let row: Result<Vec<u8>, _> = q.query_row(&[&cache_name_old], |r| r.get(0));
+            if let Ok(res) = row {
+                self.set(key, cache_name_old, &res)?;
                 Ok(res)
             } else {
                 Err(Error::NotCached)
@@ -66,31 +75,34 @@ impl SimpleCache {
         })
     }
 
-    pub fn get_cached(&self, cache_name: &str, url: impl AsRef<str>) -> Result<Vec<u8>, Error> {
-        Ok(if let Ok(data) = self.get(cache_name) {
+    pub fn get_cached(&self, key: (&str, &str), cache_name_old: &str, url: impl AsRef<str>) -> Result<Vec<u8>, Error> {
+        Ok(if let Ok(data) = self.get(key, cache_name_old) {
             data
         } else {
             if self.cache_only {
                 return Err(Error::NotCached);
             }
             let data = self.fetch(url.as_ref())?;
-            self.set(cache_name, &data)?;
+            self.set(key, cache_name_old, &data)?;
             data
         })
     }
 
-    pub fn delete(&self, cache_name: &str) -> Result<(), Error> {
+    pub fn delete(&self, key: (&str, &str), cache_name_old: &str) -> Result<(), Error> {
         self.with_connection(|conn| {
             let mut q = conn.prepare_cached("DELETE FROM cache WHERE key = ?1")?;
-            q.execute(&[&cache_name])?;
+            q.execute(&[&cache_name_old])?;
+            let mut q = conn.prepare_cached("DELETE FROM cache2 WHERE key = ?1")?;
+            q.execute(&[&key.0])?;
             Ok(())
         })
     }
 
-    pub fn set(&self, cache_name: &str, data: &[u8]) -> Result<(), Error> {
+    pub fn set(&self, key: (&str, &str), cache_name_old: &str, data: &[u8]) -> Result<(), Error> {
         self.with_connection(|conn| {
-            let mut q = conn.prepare_cached("INSERT OR REPLACE INTO cache(key, value) VALUES(?1, ?2)")?;
-            q.execute(&[&cache_name, &data])?;
+            self.delete(key, cache_name_old)?;
+            let mut q = conn.prepare_cached("INSERT OR REPLACE INTO cache2(key, ver, data) VALUES(?1, ?2, ?3)")?;
+            q.execute(&[&key.0, &key.1, &data])?;
             Ok(())
         })
     }

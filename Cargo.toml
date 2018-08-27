@@ -10,16 +10,16 @@ path = "src/lib_kitchen_sink.rs"
 
 [dependencies]
 crates-index = "0.12.0"
-crates_io_client = { git = "https://gitlab.com/crates.rs/crates_io_client.git", version = "0.3.2" }
+crates_io_client = { git = "https://gitlab.com/crates.rs/crates_io_client.git", version = "0.4.0" }
 docs_rs_client = { git = "https://gitlab.com/crates.rs/docs_rs_client.git", version = "0.4.0" }
-github_info = { git = "https://gitlab.com/crates.rs/github_info.git", version = "0.5.0" }
+github_info = { git = "https://gitlab.com/crates.rs/github_info.git", version = "0.6.0" }
 crate_git_checkout = { git = "https://gitlab.com/crates.rs/crate_git_checkout.git", version = "0.3.0" }
 crate_files = { git = "https://gitlab.com/crates.rs/crate_files.git" }
 user_db = { git = "https://gitlab.com/crates.rs/user_db.git" }
 crate_db = { git = "https://gitlab.com/crates.rs/crate_db.git", version = "0.2.2" }
 categories = { git = "https://gitlab.com/crates.rs/categories.git" }
 rich_crate = { git = "https://gitlab.com/crates.rs/rich_crate.git" }
-simple_cache = { git = "https://gitlab.com/crates.rs/simple_cache.git" }
+simple_cache = { git = "https://gitlab.com/crates.rs/simple_cache.git", version = "0.4.0" }
 lazyonce = "0.2.0"
 repo_url = { git = "https://gitlab.com/crates.rs/repo_url.git", version = "0.3.0" }
 cargo_toml = "0.3.0"

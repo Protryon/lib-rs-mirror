@@ -261,14 +261,15 @@ impl KitchenSink {
     pub fn rich_crate_version_verbose(&self, origin: &Origin, fetch_type: CrateData) -> CResult<(RichCrateVersion, Warnings)> {
         let krate = self.index.crate_by_name(origin)?;
         let latest = Self::latest_version(&krate)?;
-        let cache_key = format!("{}-{}", latest.name(), latest.version());
+        let old_key = format!("{}-{}", latest.name(), latest.version());
+        let new_key = (latest.name(), latest.version());
         let cached = if fetch_type != CrateData::FullNoDerived {
-            if let Ok(cached) = self.crate_derived_cache.get(&cache_key)
+            if let Ok(cached) = self.crate_derived_cache.get(new_key, &old_key)
             .with_context(|_| String::new())
             .and_then(|cached| {
                 serde_json::from_slice(&cached)
-                    .map_err(|e| {eprintln!("bad cache data: {} {}", cache_key, e); e})
-                    .with_context(|_| format!("parse from cache: {}", cache_key))
+                    .map_err(|e| {eprintln!("bad cache data: {} {}", old_key, e); e})
+                    .with_context(|_| format!("parse from cache: {}", old_key))
             }) {
                 Some(cached)
             } else {
@@ -281,11 +282,11 @@ impl KitchenSink {
         let (d, warn) = if let Some(res) = cached {res} else {
             let (d, warn) = self.rich_crate_version_data(latest, fetch_type).context("get rich crate data")?;
             if fetch_type == CrateData::Full {
-                if let Err(err) = self.crate_derived_cache.set(&cache_key, &serde_json::to_vec(&(&d, &warn)).context("ser to cache")?) {
-                    eprintln!("Cache error: {} ({})", err, cache_key);
+                if let Err(err) = self.crate_derived_cache.set(new_key, &old_key, &serde_json::to_vec(&(&d, &warn)).context("ser to cache")?) {
+                    eprintln!("Cache error: {} ({})", err, old_key);
                 }
             } else if fetch_type == CrateData::FullNoDerived {
-                self.crate_derived_cache.delete(&cache_key).context("clear cache")?;
+                self.crate_derived_cache.delete(new_key, &old_key).context("clear cache")?;
             }
             (d, warn)
         };
@@ -356,7 +357,7 @@ impl KitchenSink {
         if meta.manifest.package.keywords.is_empty() && fetch_type != CrateData::Minimal {
             let gh = maybe_repo.as_ref()
                 .and_then(|repo| if let RepoHost::GitHub(ref gh) = repo.host() {
-                    self.gh.topics(gh).ok()
+                    self.gh.topics(gh, ver).ok()
                 } else {None});
             if let Some(mut topics) = gh {
                 topics.retain(|t| match t.as_str() {
@@ -396,7 +397,7 @@ impl KitchenSink {
             if let Some(ref repo) = maybe_repo {
                 match repo.host() {
                     RepoHost::GitHub(ref repo) => {
-                        if let Ok(ghrepo) = self.gh.repo(repo) {
+                        if let Ok(ghrepo) = self.gh.repo(repo, ver) {
                             if let Some(url) = ghrepo.github_page_url {
                                 meta.manifest.package.homepage = Some(url);
                             } else if let Some(url) = ghrepo.homepage {
@@ -671,7 +672,7 @@ impl KitchenSink {
         let mut contributors = krate.repository().as_ref().and_then(|repo| {
             match repo.host() {
                 // TODO: warn on errors?
-                RepoHost::GitHub(ref repo) => self.gh.contributors(repo).ok().and_then(|contributors| {
+                RepoHost::GitHub(ref repo) => self.gh.contributors(repo, krate.version()).ok().and_then(|contributors| {
                     let mut by_login = HashMap::new();
                     for contr in contributors {
                         let count = contr.weeks.iter()
@@ -924,8 +925,8 @@ impl KitchenSink {
         Ok(crate_files::read_archive(&data[..], name, ver)?)
     }
 
-    pub fn repo_commits(&self, repo: &SimpleRepo) -> CResult<Vec<github_info::CommitMeta>> {
-        Ok(self.gh.commits(repo)?)
+    fn repo_commits(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Vec<github_info::CommitMeta>> {
+        Ok(self.gh.commits(repo, as_of_version)?)
     }
 }
 

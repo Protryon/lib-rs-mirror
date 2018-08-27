@@ -121,6 +121,17 @@ impl<'a> CratePage<'a> {
         }
     }
 
+    pub fn dependents_stats(&self) -> Option<(usize, usize)> {
+        self.kitchen_sink.dependents_stats_of(self.ver)
+        .map(|d| {
+            (d.runtime.0 + d.runtime.1 + d.build.0 + d.build.1 + d.dev,
+             d.direct)
+        })
+        .filter(|d| {
+            d.0 > 0
+        })
+    }
+
     pub fn capitalized(name: &str) -> String {
         let mut name_capital = String::new();
         let mut ch = name.chars();

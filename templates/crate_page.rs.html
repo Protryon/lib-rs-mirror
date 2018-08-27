@@ -227,7 +227,9 @@
           } else {
             <p class="error">Dependencies unknown</p>
           }
-          <p><a href="@url.reverse_deps(&c.ver)">Reverse deps</a></p>
+          @if let Some((deps, direct)) = c.dependents_stats() {
+              <p>Used in <strong>@deps</strong> crates (<a href="@url.reverse_deps(&c.ver)">@direct directly</a>)</p>
+          }
         </section>
       </section>
     </div>

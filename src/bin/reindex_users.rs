@@ -4,11 +4,8 @@ extern crate kitchen_sink;
 extern crate rayon;
 extern crate repo_url;
 extern crate user_db;
-use repo_url::Repo;
-use repo_url::RepoHost;
 use std::sync::Arc;
 use std::sync::mpsc;
-use std::sync::Mutex;
 use std::thread;
 use std::collections::HashSet;
 use kitchen_sink::{KitchenSink, CrateData, Origin};
@@ -23,14 +20,12 @@ fn main() {
     });
     let crates2 = crates.clone();
     let (tx, rx) = mpsc::sync_channel(64);
-    let seen_repo = Arc::new(Mutex::new(HashSet::new()));
 
     thread::spawn(move || {
         let tx1 = tx.clone();
         rayon::scope(move |s1| {
             for k in crates.all_crates() {
                 let crates = Arc::clone(&crates);
-                let seen_repo = Arc::clone(&seen_repo);
                 let tx = tx1.clone();
                 s1.spawn(move |_| {
                     println!("{:?}", k.name());
@@ -45,7 +40,7 @@ fn main() {
                     });
                     if let Err(e) = res {
                         eprintln!("••• error: {}", e);
-                        for c in e.causes() {
+                        for c in e.iter_chain() {
                             eprintln!("•   error: -- {}", c);
                         }
                     }

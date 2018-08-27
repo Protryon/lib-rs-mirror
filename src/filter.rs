@@ -53,7 +53,7 @@ impl ImageFilter for ImageOptimAPIFilter {
 
     fn image_size(&self, url: &str) -> Option<(u32, u32)> {
         let api_url = format!("https://img.gs/{}/meta,timeout=90/{}", self.api_id, url);
-        self.cache.get_json(&url, api_url)
+        self.cache.get_json((url, ""), &url, api_url)
             .map_err(|e| {
                 eprintln!("warning: image req to meta of {} failed: {}", url, e);
             })

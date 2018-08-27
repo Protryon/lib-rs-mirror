@@ -13,13 +13,13 @@ use KitchenSink;
 use semver::VersionReq;
 use semver::Version as SemVer;
 use std::sync::RwLock;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use deps_stats::DepsStats;
 
 pub struct Index {
-    uid: AtomicUsize,
     index: crates_index::Index,
     crate_path_index: LazyOnce<HashMap<Origin, Crate>>,
-    cache: RwLock<HashMap<(Box<str>, Features), DepSet>>,
+    cache: RwLock<HashMap<(Box<str>, Features), ArcDepSet>>,
+    deps_stats: LazyOnce<DepsStats>,
 }
 
 impl Index {
@@ -29,10 +29,10 @@ impl Index {
 
     pub fn new(path: PathBuf) -> Self {
         Self {
-            uid: AtomicUsize::new(0),
             index: crates_index::Index::new(path),
             crate_path_index: LazyOnce::new(),
             cache: RwLock::new(HashMap::new()),
+            deps_stats: LazyOnce::new(),
         }
     }
 
@@ -42,6 +42,12 @@ impl Index {
     /// so `rich_crate`/`rich_crate_version` is needed to do more.
     pub fn crates(&self) -> crates_index::Crates {
         self.index.crates()
+    }
+
+    pub fn deps_stats(&self) -> &DepsStats {
+        self.deps_stats.get(|| {
+            self.get_deps_stats()
+        })
     }
 
     pub fn crate_by_name(&self, name: &Origin) -> Result<&Crate, KitchenSinkErr> {
@@ -65,7 +71,6 @@ impl Index {
             features.extend(latest.features().iter().filter(|(_,v)| !v.is_empty()).map(|(c, _)| c.to_string().into_boxed_str()));
         };
         Ok(Dep {
-            uid: self.uid(),
             runtime: self.deps_of_ver(latest, Features {
                 all_targets: all_optional,
                 default,
@@ -83,7 +88,7 @@ impl Index {
         })
     }
 
-    pub fn deps_of_ver(&self, ver: &Version, wants: Features) -> Result<DepSet, KitchenSinkErr> {
+    pub fn deps_of_ver(&self, ver: &Version, wants: Features) -> Result<ArcDepSet, KitchenSinkErr> {
         let key = (format!("{}-{}", ver.name(), ver.version()).into(), wants.clone());
         if let Some(cached) = self.cache.read().unwrap().get(&key) {
             return Ok(cached.clone());
@@ -172,7 +177,6 @@ impl Index {
                 features: all_features,
             })?;
             Ok((k, Dep {
-                uid: self.uid(),
                 runtime,
                 build,
             }))
@@ -180,10 +184,6 @@ impl Index {
 
         *result.lock().unwrap() = set?;
         Ok(result)
-    }
-
-    fn uid(&self) -> usize {
-        self.uid.fetch_add(1, Ordering::SeqCst)
     }
 }
 
@@ -196,13 +196,13 @@ pub struct Features {
     pub features: Box<[Box<str>]>,
 }
 
-pub type DepName = (Box<str>, Box<str>);
-pub type DepSet = Arc<Mutex<HashMap<DepName, Dep>>>;
+pub type DepName = (Arc<str>, Box<str>);
+pub type DepSet = HashMap<DepName, Dep>;
+pub type ArcDepSet = Arc<Mutex<DepSet>>;
 
 pub struct Dep {
-    pub uid: usize,
-    pub runtime: DepSet,
-    pub build: DepSet,
+    pub runtime: ArcDepSet,
+    pub build: ArcDepSet,
 }
 
 #[derive(Debug, Copy, Clone)]

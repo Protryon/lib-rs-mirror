@@ -22,12 +22,15 @@ extern crate user_db;
 extern crate reqwest;
 extern crate simple_cache;
 extern crate itertools;
+extern crate rayon;
 extern crate semver;
 extern crate semver_parser;
 extern crate chrono;
 
 mod index;
 pub use index::*;
+mod deps_stats;
+pub use deps_stats::*;
 
 pub use crates_index::Crate;
 use crates_io_client::CrateOwner;
@@ -515,6 +518,11 @@ impl KitchenSink {
             (Some(ref a), Some(ref b)) if trim_suffix(a.as_ref()).eq_ignore_ascii_case(trim_suffix(b)) => true,
             _ => false,
         }
+    }
+
+    pub fn dependents_stats_of(&self, krate: &RichCrateVersion) -> Option<Counts> {
+        let deps = self.index.deps_stats();
+        deps.counts.get(krate.short_name()).cloned()
     }
 
     /// "See also"

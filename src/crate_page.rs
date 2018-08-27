@@ -121,6 +121,22 @@ impl<'a> CratePage<'a> {
         }
     }
 
+    pub fn is_build_or_dev(&self) -> (bool, bool) {
+        self.kitchen_sink.dependents_stats_of(self.ver)
+            .map(|d| {
+                let is_build = d.build.0 > (d.runtime.0 + d.runtime.1 + 5) * 2;
+                let is_dev = !is_build && d.dev > (d.runtime.0 * 2 + d.runtime.1 + d.build.0 * 2 + d.build.1 + 5);
+                if is_build {
+                    eprintln!("http://localhost:3000/crates/{} is a build tool", self.ver.short_name());
+                }
+                if is_dev {
+                    eprintln!("http://localhost:3000/crates/{} is a dev tool", self.ver.short_name());
+                }
+                (is_build, is_dev)
+            })
+            .unwrap_or((false, false))
+    }
+
     pub fn dependents_stats(&self) -> Option<(usize, usize)> {
         self.kitchen_sink.dependents_stats_of(self.ver)
         .map(|d| {

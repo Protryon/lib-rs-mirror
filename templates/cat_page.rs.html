@@ -92,7 +92,7 @@
                         <div class=meta>
                             <span class="version @p.version_class(c)"><span>v</span>@c.version()</span>
                             <span class=downloads title="@downloads recent downloads">@if let Some((num,unit)) = Some(p.downloads(*downloads)) {@num<b>@unit</b>}</span>
-                            @:labels(c)
+                            @:labels(c, (false, false))
                             @for k in c.keywords(Include::Cleaned) {
                                 <span class=k><span>#</span>@k</span>
                             }

@@ -57,7 +57,7 @@
     }
     </h1>
     <h2>
-      @:labels(&c.ver)
+      @:labels(&c.ver, c.is_build_or_dev())
 
       <span property="name">
       @if c.ver.is_yanked() {
@@ -228,7 +228,11 @@
             <p class="error">Dependencies unknown</p>
           }
           @if let Some((deps, direct)) = c.dependents_stats() {
-              <p>Used in <strong>@deps</strong> crates (<a href="@url.reverse_deps(&c.ver)">@direct directly</a>)</p>
+              @if deps != direct {
+                <p>Used in <strong>@deps</strong> crate@if deps != 1 {s} (<a href="@url.reverse_deps(&c.ver)">@direct&nbsp;directly</a>)</p>
+              } else {
+                <p><a href="@url.reverse_deps(&c.ver)">Used in <strong>@deps</strong>&nbsp;crate@if deps != 1 {s}</a></p>
+              }
           }
         </section>
       </section>

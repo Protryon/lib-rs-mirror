@@ -1,6 +1,6 @@
 @use rich_crate::RichCrateVersion;
 
-@(ver: &RichCrateVersion)
+@(ver: &RichCrateVersion, build_or_dev: (bool, bool))
 
 <span class="labels">
   @if ver.is_yanked() {
@@ -15,8 +15,16 @@
   @if ver.is_app() {
     <span title="contains executables" class="bin">app</span>
   } else {
-    @if ver.has_bin() {
-      <span title="contains executables" class="bin">bin</span>
+    @if build_or_dev.0 {
+      <span title="built-time tool" class="build">build</span>
+    } else {
+      @if build_or_dev.1 {
+        <span title="dev tool" class="dev">dev</span>
+      } else {
+        @if ver.has_bin() {
+          <span title="contains executables" class="bin">bin</span>
+        }
+      }
     }
   }
 </span>

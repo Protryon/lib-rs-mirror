@@ -47,9 +47,10 @@ impl CratesIoClient {
     }
 
     pub fn crate_data(&self, crate_name: &str, version: &str) -> Result<Vec<u8>, Error> {
-        let key = format!("crates/{}-{}.crate", crate_name, version);
+        let oldkey = format!("crates/{}-{}.crate", crate_name, version);
+        let newkey = format!("{}.crate", crate_name);
         let url = format!("https://crates.io/api/v1/crates/{}/{}/download", crate_name, version);
-        self.crates.get_cached(&key, &url)
+        self.crates.get_cached((&newkey, version), &oldkey, &url)
     }
 
     pub fn krate(&self, crate_name: &str, cache_buster: &str) -> Result<CratesIoCrate, Error> {
@@ -61,16 +62,18 @@ impl CratesIoClient {
     }
 
     pub fn crate_meta(&self, crate_name: &str, as_of_version: &str) -> Result<CrateMetaFile, Error> {
-        self.get_json(&format!("meta/{}{}.json", crate_name, as_of_version), crate_name)
+        let old = format!("meta/{}{}.json", crate_name, as_of_version);
+        self.get_json(&old, (crate_name, as_of_version), crate_name)
     }
 
     pub fn crate_downloads(&self, crate_name: &str, as_of_version: &str) -> Result<CrateDownloadsFile, Error> {
-        let cache_key = format!("{}-{}/downloads", crate_name, as_of_version);
+        let old = format!("{}-{}/downloads", crate_name, as_of_version);
         let url = format!("{}/downloads", crate_name);
-        let data: CrateDownloadsFile = self.get_json(&cache_key, &url)?;
+        let new_key = (url.as_str(), as_of_version);
+        let data: CrateDownloadsFile = self.get_json(&old, new_key, &url)?;
         if data.is_stale() {
-            let _ = self.cache.delete(&cache_key);
-            let fresh: CrateDownloadsFile = self.get_json(&cache_key, &url)?;
+            let _ = self.cache.delete(new_key, &old);
+            let fresh: CrateDownloadsFile = self.get_json(&old, new_key, &url)?;
             assert!(!fresh.is_stale());
             Ok(fresh)
         } else {
@@ -79,18 +82,23 @@ impl CratesIoClient {
     }
 
     pub fn crate_owners(&self, crate_name: &str, as_of_version: &str) -> Result<Vec<CrateOwner>, Error> {
-        let u: CrateOwnersFile = self.get_json(&format!("user/{}.u{}.json", crate_name, as_of_version), format!("{}/owner_user", crate_name))?;
-        let mut t: CrateTeamsFile = self.get_json(&format!("user/{}.t{}.json", crate_name, as_of_version), format!("{}/owner_team", crate_name))?;
+        let old = format!("user/{}.u{}.json", crate_name, as_of_version);
+        let url = format!("{}/owner_user", crate_name);
+        let u: CrateOwnersFile = self.get_json(&old, (&url, as_of_version), &url)?;
+
+        let old = format!("user/{}.t{}.json", crate_name, as_of_version);
+        let url = format!("{}/owner_team", crate_name);
+        let mut t: CrateTeamsFile = self.get_json(&old, (&url, as_of_version), &url)?;
         let mut out = u.users;
         out.append(&mut t.teams);
         Ok(out)
     }
 
-    fn get_json<B>(&self, cache_name: &str, path: impl AsRef<str>) -> Result<B, Error>
+    fn get_json<B>(&self, old_key: &str, key: (&str, &str), path: impl AsRef<str>) -> Result<B, Error>
         where B: for<'a> serde::Deserialize<'a>
     {
         let url = format!("https://crates.io/api/v1/crates/{}", path.as_ref());
-        self.cache.get_json(cache_name, url)
+        self.cache.get_json(key, old_key, url)
     }
 }
 

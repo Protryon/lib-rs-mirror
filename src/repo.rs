@@ -11,7 +11,7 @@ pub struct Repo {
     pub host: RepoHost,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub enum RepoHost {
     GitHub(SimpleRepo),
     GitLab(SimpleRepo),
@@ -19,7 +19,7 @@ pub enum RepoHost {
     Other,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct SimpleRepo {
     pub owner: String,
     pub repo: String,

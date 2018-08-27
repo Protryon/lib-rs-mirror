@@ -9,8 +9,6 @@ use std::sync::{Arc, Mutex};
 use std::collections::HashSet;
 extern crate rand;
 
-use rand::{thread_rng, Rng};
-
 fn main() {
     let crates = Arc::new(match kitchen_sink::KitchenSink::new_default() {
         Ok(a) => a,
@@ -21,30 +19,31 @@ fn main() {
     });
 
     let seen_repos = &Mutex::new(HashSet::new());
-    let repos = false;
+    let repos = true;
 
     rayon::scope(move |s1| {
-        let mut c = crates.all_crates().map(|c| c.name().to_string()).collect::<Vec<_>>();
-        thread_rng().shuffle(&mut c);
-        let total = c.len();
-        for (i, k) in c.into_iter().enumerate() {
+        let c = crates.all_new_crates().unwrap().map(|c| c.origin().clone());
+        for (i, k) in c.enumerate() {
             let crates = Arc::clone(&crates);
             s1.spawn(move |s2| {
-                print!("{} ", i*100/total);
-                match index_crate(&crates, &Origin::from_crates_io_name(&k)) {
-                    Ok(v) => if repos {s2.spawn(move |_| {
-                        if let Some(ref repo) = v.repository() {
-                            {
-                                let mut s = seen_repos.lock().unwrap();
-                                let url = repo.canonical_git_url().to_string();
-                                if s.contains(&url) {
-                                    return;
+                print!("{} ", i);
+                match index_crate(&crates, &k) {
+                    Ok(v) => if repos {
+                        s2.spawn(move |_| {
+                            if let Some(ref repo) = v.repository() {
+                                {
+                                    let mut s = seen_repos.lock().unwrap();
+                                    let url = repo.canonical_git_url().to_string();
+                                    if s.contains(&url) {
+                                        return;
+                                    }
+                                    println!("Indexing {}", url);
+                                    s.insert(url);
                                 }
-                                s.insert(url);
+                                print_res(crates.index_repo(repo, v.version()));
                             }
-                            print_res(crates.index_repo(repo, v.short_name()));
-                        }
-                    })},
+                        })
+                    },
                     err => print_res(err),
                 }
             });

@@ -160,7 +160,7 @@ impl GitHub {
             Ok(serde_json::from_slice(&cached)?)
         } else {
             let client = &self.client()?;
-            eprintln!("Cache miss {}", old_key);
+            eprintln!("Cache miss {}@{}", new_key.0, new_key.1);
             let (headers, status, body) = cb(&*client)?;
             eprintln!("Recvd {} {:?} {:?}", old_key, status, headers);
             if let (Some(rl), Some(rs)) = (rate_limit_remaining(&headers), rate_limit_reset(&headers)) {

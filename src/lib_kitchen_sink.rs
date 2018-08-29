@@ -689,22 +689,33 @@ impl KitchenSink {
 
     /// Merge authors, owners, contributors
     pub fn all_contributors<'a>(&self, krate: &'a RichCrateVersion) -> (Vec<CrateAuthor<'a>>, Vec<CrateAuthor<'a>>, bool, usize) {
-        let mut contributors = krate.repository().as_ref().and_then(|repo| {
-            match repo.host() {
+        let mut contributors = krate.repository().as_ref().and_then(|crate_repo| {
+            match crate_repo.host() {
                 // TODO: warn on errors?
-                RepoHost::GitHub(ref repo) => self.gh.contributors(repo, krate.version()).ok().and_then(|contributors| {
-                    let mut by_login = HashMap::new();
-                    for contr in contributors {
-                        let count = contr.weeks.iter()
-                            .map(|w| {
-                                w.commits as f64 +
-                                ((w.added + w.deleted*2) as f64).sqrt()
-                            }).sum::<f64>();
-                        by_login.entry(contr.author.login.to_lowercase())
-                            .or_insert((0., contr.author)).0 += count;
-                    }
-                    Some(by_login)
-                }),
+                RepoHost::GitHub(ref repo) => {
+                    // multiple crates share a repo, which causes cache churn when version "changes"
+                    // so pick one of them and track just that one version
+                    let ver_name = self.crate_db.first_crate_for_repo(crate_repo).ok()?;
+                    let cachebust = if ver_name == krate.short_name() {
+                        krate.version()
+                    } else {
+                        let k = self.index.crate_by_name(&Origin::from_crates_io_name(&ver_name)).ok()?;
+                        k.latest_version().version()
+                    };
+                    self.gh.contributors(repo, cachebust).ok().and_then(|contributors| {
+                        let mut by_login = HashMap::new();
+                        for contr in contributors {
+                            let count = contr.weeks.iter()
+                                .map(|w| {
+                                    w.commits as f64 +
+                                    ((w.added + w.deleted*2) as f64).sqrt()
+                                }).sum::<f64>();
+                            by_login.entry(contr.author.login.to_lowercase())
+                                .or_insert((0., contr.author)).0 += count;
+                        }
+                        Some(by_login)
+                    })
+                },
                 RepoHost::BitBucket(..) |
                 RepoHost::GitLab(..) |
                 RepoHost::Other => None, // TODO: could use git checkout...

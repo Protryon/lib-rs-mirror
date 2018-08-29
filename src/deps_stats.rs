@@ -19,14 +19,14 @@ pub struct Counts {
     pub direct: usize,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
 enum DepTy {
     Runtime,
     Build,
     Dev,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
 struct DepInf {
     direct: bool,
     default: bool,
@@ -116,15 +116,15 @@ impl Index {
     }
 }
 
-fn flatten(dep: &Dep, depinf: DepInf, collected: &mut HashMap<Arc<str>, DepInf>, node_visited: &mut HashSet<*const Mutex<DepSet>>) {
+fn flatten(dep: &Dep, depinf: DepInf, collected: &mut HashMap<Arc<str>, DepInf>, node_visited: &mut HashSet<(DepInf, *const Mutex<DepSet>)>) {
     flatten_set(&dep.runtime, depinf, collected, node_visited);
     let ty = if depinf.ty == DepTy::Dev {DepTy::Dev} else {DepTy::Build};
     flatten_set(&dep.build, DepInf {ty, ..depinf}, collected, node_visited);
 }
 
-fn flatten_set(depset: &ArcDepSet, depinf: DepInf, collected: &mut HashMap<Arc<str>, DepInf>, node_visited: &mut HashSet<*const Mutex<DepSet>>) {
+fn flatten_set(depset: &ArcDepSet, depinf: DepInf, collected: &mut HashMap<Arc<str>, DepInf>, node_visited: &mut HashSet<(DepInf, *const Mutex<DepSet>)>) {
     let target_addr: &Mutex<HashMap<DepName, Dep>> = &*depset;
-    if node_visited.insert(target_addr as *const _) {
+    if node_visited.insert((depinf, target_addr as *const _)) {
         if let Ok(depset) = depset.try_lock() {
             for ((name, _), dep) in depset.iter() {
                 collected.entry(name.clone())

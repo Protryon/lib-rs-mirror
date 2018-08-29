@@ -31,7 +31,7 @@ impl Index {
         Self {
             index: crates_index::Index::new(path),
             crate_path_index: LazyOnce::new(),
-            cache: RwLock::new(HashMap::new()),
+            cache: RwLock::new(HashMap::with_capacity(5000)),
             deps_stats: LazyOnce::new(),
         }
     }
@@ -113,7 +113,7 @@ impl Index {
             }
         }
 
-        let mut set: HashMap<DepName, (_, _, HashSet<String>)> = HashMap::new();
+        let mut set: HashMap<DepName, (_, _, HashSet<String>)> = HashMap::with_capacity(60);
         for d in ver.dependencies() {
             if d.target().is_some() {
                 continue; // FIXME: allow common targets?

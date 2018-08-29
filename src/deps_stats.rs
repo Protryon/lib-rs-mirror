@@ -39,8 +39,8 @@ impl Index {
         let crates: Vec<_> = crates
         .par_iter()
         .filter_map(|(_, c)| {
-            let mut collected = HashMap::new();
-            let mut node_visited = HashSet::new();
+            let mut collected = HashMap::with_capacity(120);
+            let mut node_visited = HashSet::with_capacity(120);
 
             flatten(&self.deps_of_crate(c, DepQuery {
                 default: true,
@@ -80,7 +80,7 @@ impl Index {
         }).collect();
 
         let total = crates.len();
-        let mut counts = HashMap::new();
+        let mut counts = HashMap::with_capacity(total);
         for deps in crates {
             for (name, depinf) in deps {
                 let n = counts.entry(name.clone()).or_insert(Counts::default());

@@ -266,6 +266,14 @@ impl CrateDb {
         })
     }
 
+    /// Multiple crates can share a repo. Consistently pick one of them (any one)
+    pub fn first_crate_for_repo(&self, repo: &Repo) -> Result<String> {
+        self.with_connection(|conn| {
+            let mut q = conn.prepare_cached("SELECT crate_name FROM repo_crates WHERE repo = ?1 ORDER BY path, crate_name LIMIT 1")?;
+            Ok(q.query_row(&[&repo.canonical_git_url()], |r| r.get(0))?)
+        })
+    }
+
     /// Returns crate name (not origin)
     pub fn parent_crate(&self, repo: &Repo, child_name: &str) -> Result<Option<String>> {
         self.with_connection(|conn| {

@@ -35,14 +35,14 @@ struct DepInf {
 
 impl Index {
     pub(crate) fn get_deps_stats(&self) -> DepsStats {
-        let crates = self.crates().collect::<Vec<_>>();
+        let crates = self.crates();
         let crates: Vec<_> = crates
-        .into_par_iter()
-        .filter_map(|c| {
+        .par_iter()
+        .filter_map(|(_, c)| {
             let mut collected = HashMap::new();
             let mut node_visited = HashSet::new();
 
-            flatten(&self.deps_of_crate(&c, DepQuery {
+            flatten(&self.deps_of_crate(c, DepQuery {
                 default: true,
                 all_optional: false,
                 dev: false,
@@ -52,7 +52,7 @@ impl Index {
                 ty: DepTy::Runtime,
             }, &mut collected, &mut node_visited);
 
-            flatten(&self.deps_of_crate(&c, DepQuery {
+            flatten(&self.deps_of_crate(c, DepQuery {
                 default: true,
                 all_optional: true,
                 dev: false,
@@ -62,7 +62,7 @@ impl Index {
                 ty: DepTy::Runtime,
             }, &mut collected, &mut node_visited);
 
-            flatten(&self.deps_of_crate(&c, DepQuery {
+            flatten(&self.deps_of_crate(c, DepQuery {
                     default: true,
                     all_optional: true,
                     dev: true,

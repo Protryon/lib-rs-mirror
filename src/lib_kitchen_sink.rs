@@ -209,15 +209,15 @@ impl KitchenSink {
     ///
     /// It returns only a thin and mostly useless data from the index itself,
     /// so `rich_crate`/`rich_crate_version` is needed to do more.
-    pub fn all_crates(&self) -> crates_index::Crates {
+    pub fn all_crates(&self) -> &HashMap<Origin, Crate> {
         self.index.crates()
     }
 
     pub fn all_new_crates<'a>(&'a self) -> CResult<impl Iterator<Item = RichCrate> + 'a> {
         let min_timestamp = self.crate_db.latest_crate_update_timestamp()?;
-        Ok(self.index.crates()
+        Ok(self.index.crates().values()
         .filter_map(move |k| {
-            self.rich_crate(&Origin::from_crates_io_name(k.name())).ok()
+            self.rich_crate_from_index(k).ok()
         })
         .filter(move |k| {
             let latest = k.versions().map(|v| v.created_at.as_str()).max().unwrap_or("");
@@ -232,7 +232,10 @@ impl KitchenSink {
 
     /// Wrapper object for metadata common for all versions of a crate
     pub fn rich_crate(&self, origin: &Origin) -> CResult<RichCrate> {
-        let krate = self.index.crate_by_name(origin)?;
+        self.rich_crate_from_index(self.index.crate_by_name(origin)?)
+    }
+
+    fn rich_crate_from_index(&self, krate: &Crate) -> CResult<RichCrate> {
         let name = krate.name();
         let cache_bust = Self::latest_version(&krate)?.version();
         let meta = self.crates_io.krate(name, cache_bust)

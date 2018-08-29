@@ -40,8 +40,14 @@ impl Index {
     ///
     /// It returns only a thin and mostly useless data from the index itself,
     /// so `rich_crate`/`rich_crate_version` is needed to do more.
-    pub fn crates(&self) -> crates_index::Crates {
-        self.index.crates()
+    pub fn crates(&self) -> &HashMap<Origin, Crate> {
+        self.crate_path_index.get(|| {
+            self.index.crates()
+                .map(|c| {
+                    (Origin::from_crates_io_name(c.name()), c)
+                })
+                .collect()
+        })
     }
 
     pub fn deps_stats(&self) -> &DepsStats {
@@ -51,15 +57,7 @@ impl Index {
     }
 
     pub fn crate_by_name(&self, name: &Origin) -> Result<&Crate, KitchenSinkErr> {
-        self.crate_path_index.get(|| {
-            self.index.crate_index_paths()
-                .filter_map(|p| {
-                    let f = p.file_name().and_then(|f| f.to_str()).map(|s| s.to_lowercase());
-                    f.map(|f| (Origin::from_crates_io_name(&f), p))
-                })
-                .map(|(k, c)| (k, Crate::new(c)))
-                .collect()
-        })
+        self.crates()
         .get(name)
         .ok_or_else(|| KitchenSinkErr::CrateNotFound(name.clone()))
     }

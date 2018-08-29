@@ -25,12 +25,12 @@ pub use repo_url::RepoHost;
 /// URL-like identifier of location where crate has been published + normalized crate name
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Origin {
-    CratesIO(String),
+    CratesIO(Box<str>),
 }
 
 impl Origin {
     pub fn from_crates_io_name(name: &str) -> Self {
-        Origin::CratesIO(name.to_lowercase())
+        Origin::CratesIO(name.to_lowercase().into())
     }
 
     pub fn from_string(s: impl AsRef<str>) -> Self {

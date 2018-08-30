@@ -41,6 +41,7 @@ quick_error! {
         Parse(err: toml::de::Error) {
             display("Categories parse error: {}", err)
             from()
+            cause(err)
         }
     }
 }

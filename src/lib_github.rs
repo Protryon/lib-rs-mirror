@@ -78,10 +78,9 @@ impl GitHub {
                 return Ok(Some(user));
             }
         }
-        let new_key = format!("search/{}", email);
+        let key = format!("search/{}", email);
         let enc_email = encode(email);
-        let old_key = format!("user-{}.json", enc_email);
-        let res: SearchResults<User> = self.get_cached(&old_key, (&new_key, ""), |client| client.get()
+        let res: SearchResults<User> = self.get_cached((&key, ""), |client| client.get()
                        .custom_endpoint(&format!("search/users?q=in:email%20{}", enc_email))
                        .execute())?;
         Ok(res.items.into_iter().next())
@@ -89,17 +88,15 @@ impl GitHub {
 
     pub fn user_by_login(&self, login: &str) -> CResult<User> {
         let enc_login = encode(&login.to_lowercase());
-        let old_key = format!("user-{}.json", enc_login);
-        let new_key = format!("user/{}", enc_login);
-        Ok(self.get_cached(&old_key, (&new_key, ""), |client| client.get()
+        let key = format!("user/{}", enc_login);
+        Ok(self.get_cached((&key, ""), |client| client.get()
                        .users().username(login)
                        .execute())?)
     }
 
     pub fn commits(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Vec<CommitMeta>> {
-        let old_key = format!("{}-{}-commit.json", repo.owner, repo.repo);
-        let new_key = format!("commits/{}/{}", repo.owner, repo.repo);
-        self.get_cached(&old_key, (&new_key, as_of_version), |client| client.get()
+        let key = format!("commits/{}/{}", repo.owner, repo.repo);
+        self.get_cached((&key, as_of_version), |client| client.get()
                            .repos().owner(&repo.owner).repo(&repo.repo)
                            .commits()
                            .execute())
@@ -108,7 +105,7 @@ impl GitHub {
     pub fn topics(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Vec<String>> {
         let key = format!("{}/{}/topcs", repo.owner, repo.repo);
         let path = format!("repos/{}/{}/topics", repo.owner, repo.repo);
-        let t: Topics = self.get_cached(&key, (&key, as_of_version), |client| client.get()
+        let t: Topics = self.get_cached((&key, as_of_version), |client| client.get()
                            .custom_endpoint(&path)
                            .set_header(Accept(vec![qitem("application/vnd.github.mercy-preview+json".parse().unwrap())]))
                            .execute())?;
@@ -117,7 +114,7 @@ impl GitHub {
 
     pub fn repo(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<GitHubRepo> {
         let key = format!("{}/{}/repo", repo.owner, repo.repo);
-        let mut ghdata: GitHubRepo = self.get_cached(&key, (&key, as_of_version), |client| client.get()
+        let mut ghdata: GitHubRepo = self.get_cached((&key, as_of_version), |client| client.get()
                            .repos().owner(&repo.owner).repo(&repo.repo)
                            .execute())?;
 
@@ -137,32 +134,31 @@ impl GitHub {
     }
 
     pub fn contributors(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Vec<UserContrib>> {
-        let old_key = format!("{}-{}-contrib.json", repo.owner, repo.repo);
         let path = format!("repos/{}/{}/stats/contributors", repo.owner, repo.repo);
-        let new_key = (path.as_str(), as_of_version);
+        let key = (path.as_str(), as_of_version);
         let callback = |client: &client::Github| {
             client.get().custom_endpoint(&path).execute()
         };
-        match self.get_cached(&old_key, new_key, callback) {
+        match self.get_cached(key, callback) {
             Err(Error::TryAgainLater) => {
                 thread::sleep(Duration::from_secs(1));
-                self.get_cached(&old_key, new_key, callback)
+                self.get_cached(key, callback)
             },
             res => res,
         }
     }
 
-    fn get_cached<F, B>(&self, old_key: &str, new_key: (&str, &str), cb: F) -> CResult<B>
+    fn get_cached<F, B>(&self, key: (&str, &str), cb: F) -> CResult<B>
         where B: for<'de> serde::Deserialize<'de>,
         F: FnOnce(&client::Github) -> Result<(Headers, StatusCode, Option<serde_json::Value>), github_rs::errors::Error>
     {
-        if let Ok(cached) = self.cache.get(new_key, old_key) {
+        if let Ok(cached) = self.cache.get(key, key.0) {
             Ok(serde_json::from_slice(&cached)?)
         } else {
             let client = &self.client()?;
-            eprintln!("Cache miss {}@{}", new_key.0, new_key.1);
+            eprintln!("Cache miss {}@{}", key.0, key.1);
             let (headers, status, body) = cb(&*client)?;
-            eprintln!("Recvd {} {:?} {:?}", old_key, status, headers);
+            eprintln!("Recvd {}@{} {:?} {:?}", key.0, key.1, status, headers);
             if let (Some(rl), Some(rs)) = (rate_limit_remaining(&headers), rate_limit_reset(&headers)) {
                 let end_timestamp = Duration::from_secs(rs.into());
                 let now = SystemTime::now().duration_since(UNIX_EPOCH)?;
@@ -185,7 +181,7 @@ impl GitHub {
             };
 
             if allow {
-                self.cache.set(new_key, old_key, stats.to_string().as_bytes())?;
+                self.cache.set(key, key.0, stats.to_string().as_bytes())?;
             }
             Ok(serde_json::from_value(stats)?)
         }

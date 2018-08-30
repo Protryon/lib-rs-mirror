@@ -19,7 +19,7 @@ use github_rs::client::Executor;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::time::Duration;
 use std::thread;
-use simple_cache::SimpleCache;
+use simple_cache::TempCache;
 use github_rs::headers::{rate_limit_remaining, rate_limit_reset};
 use hyper::header::{Accept, qitem};
 
@@ -38,31 +38,37 @@ quick_error! {
             display("Accepted, but no data available yet")
         }
         Cache(err: Box<simple_cache::Error>) {
+            display("GH can't start cache: {}", err)
             from(e: simple_cache::Error) -> (Box::new(e))
-            display("Can't start cache: {}", err)
+            cause(err)
         }
         GitHub(err: String) {
+            display("{}", err)
             from(e: github_rs::errors::Error) -> (e.to_string()) // non-Sync
         }
         Json(err: Box<serde_json::Error>) {
+            display("JSON decode error {}", err)
             from(e: serde_json::Error) -> (Box::new(e))
+            cause(err)
         }
         Time(err: std::time::SystemTimeError) {
+            display("{}", err)
             from()
+            cause(err)
         }
     }
 }
 
 pub struct GitHub {
     token: String,
-    cache: SimpleCache,
+    cache: TempCache<(String, Payload)>,
 }
 
 impl GitHub {
     pub fn new(cache_path: impl AsRef<Path>, token: impl Into<String>) -> CResult<Self> {
         Ok(Self {
             token: token.into(),
-            cache: SimpleCache::new(cache_path.as_ref())?,
+            cache: TempCache::new(&cache_path.as_ref().with_extension("bin"))?,
         })
     }
 
@@ -74,27 +80,27 @@ impl GitHub {
         let std_suffix = "@users.noreply.github.com";
         if email.ends_with(std_suffix) {
             let login = email[0..email.len()-std_suffix.len()].split('+').last().unwrap();
-            if let Ok(user) = self.user_by_login(login) {
+            if let Some(user) = self.user_by_login(login)? {
                 return Ok(Some(user));
             }
         }
         let key = format!("search/{}", email);
         let enc_email = encode(email);
-        let res: SearchResults<User> = self.get_cached((&key, ""), |client| client.get()
+        let res: Option<SearchResults<User>> = self.get_cached((&key, ""), |client| client.get()
                        .custom_endpoint(&format!("search/users?q=in:email%20{}", enc_email))
                        .execute())?;
-        Ok(res.items.into_iter().next())
+        Ok(res.and_then(|res| res.items.into_iter().next()))
     }
 
-    pub fn user_by_login(&self, login: &str) -> CResult<User> {
+    pub fn user_by_login(&self, login: &str) -> CResult<Option<User>> {
         let enc_login = encode(&login.to_lowercase());
         let key = format!("user/{}", enc_login);
-        Ok(self.get_cached((&key, ""), |client| client.get()
+        self.get_cached((&key, ""), |client| client.get()
                        .users().username(login)
-                       .execute())?)
+                       .execute())
     }
 
-    pub fn commits(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Vec<CommitMeta>> {
+    pub fn commits(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Option<Vec<CommitMeta>>> {
         let key = format!("commits/{}/{}", repo.owner, repo.repo);
         self.get_cached((&key, as_of_version), |client| client.get()
                            .repos().owner(&repo.owner).repo(&repo.repo)
@@ -102,21 +108,27 @@ impl GitHub {
                            .execute())
     }
 
-    pub fn topics(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Vec<String>> {
+    pub fn topics(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Option<Vec<String>>> {
         let key = format!("{}/{}/topcs", repo.owner, repo.repo);
         let path = format!("repos/{}/{}/topics", repo.owner, repo.repo);
-        let t: Topics = self.get_cached((&key, as_of_version), |client| client.get()
+        let t: Topics = match self.get_cached((&key, as_of_version), |client| client.get()
                            .custom_endpoint(&path)
                            .set_header(Accept(vec![qitem("application/vnd.github.mercy-preview+json".parse().unwrap())]))
-                           .execute())?;
-        Ok(t.names)
+                           .execute())? {
+            Some(data) => data,
+            None => return Ok(None),
+        };
+        Ok(Some(t.names))
     }
 
-    pub fn repo(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<GitHubRepo> {
+    pub fn repo(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Option<GitHubRepo>> {
         let key = format!("{}/{}/repo", repo.owner, repo.repo);
-        let mut ghdata: GitHubRepo = self.get_cached((&key, as_of_version), |client| client.get()
+        let mut ghdata: GitHubRepo = match self.get_cached((&key, as_of_version), |client| client.get()
                            .repos().owner(&repo.owner).repo(&repo.repo)
-                           .execute())?;
+                           .execute())? {
+            Some(data) => data,
+            None => return Ok(None),
+        };
 
         // Keep GH-specific logic in here
         if ghdata.has_pages {
@@ -130,10 +142,10 @@ impl GitHub {
         if !ghdata.has_issues {
             ghdata.open_issues_count = None;
         }
-        Ok(ghdata)
+        Ok(Some(ghdata))
     }
 
-    pub fn contributors(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Vec<UserContrib>> {
+    pub fn contributors(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Option<Vec<UserContrib>>> {
         let path = format!("repos/{}/{}/stats/contributors", repo.owner, repo.repo);
         let key = (path.as_str(), as_of_version);
         let callback = |client: &client::Github| {
@@ -148,45 +160,155 @@ impl GitHub {
         }
     }
 
-    fn get_cached<F, B>(&self, key: (&str, &str), cb: F) -> CResult<B>
-        where B: for<'de> serde::Deserialize<'de>,
+    fn get_cached<F, B>(&self, key: (&str, &str), cb: F) -> CResult<Option<B>>
+        where B: for<'de> serde::Deserialize<'de> + Payloadable,
         F: FnOnce(&client::Github) -> Result<(Headers, StatusCode, Option<serde_json::Value>), github_rs::errors::Error>
     {
-        if let Ok(cached) = self.cache.get(key, key.0) {
-            Ok(serde_json::from_slice(&cached)?)
-        } else {
-            let client = &self.client()?;
-            eprintln!("Cache miss {}@{}", key.0, key.1);
-            let (headers, status, body) = cb(&*client)?;
-            eprintln!("Recvd {}@{} {:?} {:?}", key.0, key.1, status, headers);
-            if let (Some(rl), Some(rs)) = (rate_limit_remaining(&headers), rate_limit_reset(&headers)) {
-                let end_timestamp = Duration::from_secs(rs.into());
-                let now = SystemTime::now().duration_since(UNIX_EPOCH)?;
-                let wait = (end_timestamp.checked_sub(now)).and_then(|d| d.checked_div(rl + 1));
-                if let Some(wait) = wait {
-                    if wait.as_secs() > 0 {
-                        eprintln!("need to wait! {:?}", wait);
-                        thread::sleep(wait);
-                    }
+        if let Some((ver, payload)) = self.cache.get(key.0)? {
+            if ver == key.1 {
+                return Ok(B::from(payload));
+            }
+        }
+
+        let client = &self.client()?;
+        eprintln!("Cache miss {}@{}", key.0, key.1);
+        let (headers, status, body) = cb(&*client)?;
+        eprintln!("Recvd {}@{} {:?} {:?}", key.0, key.1, status, headers);
+        if let (Some(rl), Some(rs)) = (rate_limit_remaining(&headers), rate_limit_reset(&headers)) {
+            let end_timestamp = Duration::from_secs(rs.into());
+            let now = SystemTime::now().duration_since(UNIX_EPOCH)?;
+            let wait = (end_timestamp.checked_sub(now)).and_then(|d| d.checked_div(rl + 2));
+            if let Some(wait) = wait {
+                if wait.as_secs() > 0 {
+                    eprintln!("need to wait! {:?}", wait);
+                    thread::sleep(wait);
                 }
             }
-            let stats = body.ok_or(Error::NoBody)?;
-            let allow = match status {
-                StatusCode::Accepted |
-                StatusCode::Created => return Err(Error::TryAgainLater),
-                StatusCode::NotFound |
-                StatusCode::Gone |
-                StatusCode::MovedPermanently => true,
-                _ => status.is_success(),
-            };
+        }
 
-            if allow {
-                self.cache.set(key, key.0, stats.to_string().as_bytes())?;
-            }
-            Ok(serde_json::from_value(stats)?)
+        let non_parsable_body = match status {
+            StatusCode::Accepted |
+            StatusCode::Created => return Err(Error::TryAgainLater),
+            StatusCode::NoContent |
+            StatusCode::NotFound |
+            StatusCode::Gone |
+            StatusCode::MovedPermanently => true,
+            _ => false,
+        };
+
+        let keep_cached = match status {
+            StatusCode::NotFound |
+            StatusCode::Gone |
+            StatusCode::MovedPermanently => true,
+            _ => status.is_success(),
+        };
+
+        match body.ok_or(Error::NoBody).and_then(|stats| Ok(serde_json::from_value(stats)?)) {
+            Ok(val) => {
+                let val: B = val;
+                if keep_cached {
+                    self.cache.set(key.0, (key.1.to_string(), val.to()))?;
+                }
+                Ok(Some(val))
+            },
+            Err(_) if non_parsable_body => {
+                if keep_cached {
+                    self.cache.set(key.0, (key.1.to_string(), Payload::Dud))?;
+                }
+                Ok(None)
+            },
+            Err(err) => Err(err)?
         }
     }
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+enum Payload {
+    Meta(Vec<CommitMeta>),
+    Contrib(Vec<UserContrib>),
+    Res(SearchResults<User>),
+    User(User),
+    Topics(Topics),
+    GitHubRepo(GitHubRepo),
+    Dud,
+}
+
+impl Payloadable for Vec<CommitMeta> {
+    fn to(&self) -> Payload {
+        Payload::Meta(self.clone())
+    }
+
+    fn from(p: Payload) -> Option<Self> {
+        match p {
+            Payload::Meta(d) => Some(d), _ => None,
+        }
+    }
+}
+
+impl Payloadable for Vec<UserContrib> {
+    fn to(&self) -> Payload {
+        Payload::Contrib(self.clone())
+    }
+
+    fn from(p: Payload) -> Option<Self> {
+        match p {
+            Payload::Contrib(d) => Some(d), _ => None,
+        }
+    }
+}
+
+impl Payloadable for SearchResults<User> {
+    fn to(&self) -> Payload {
+        Payload::Res(self.clone())
+    }
+
+    fn from(p: Payload) -> Option<Self> {
+        match p {
+            Payload::Res(d) => Some(d), _ => None,
+        }
+    }
+}
+
+impl Payloadable for GitHubRepo {
+    fn to(&self) -> Payload {
+        Payload::GitHubRepo(self.clone())
+    }
+
+    fn from(p: Payload) -> Option<Self> {
+        match p {
+            Payload::GitHubRepo(d) => Some(d), _ => None,
+        }
+    }
+}
+
+impl Payloadable for User {
+    fn to(&self) -> Payload {
+        Payload::User(self.clone())
+    }
+
+    fn from(p: Payload) -> Option<Self> {
+        match p {
+            Payload::User(d) => Some(d), _ => None,
+        }
+    }
+}
+impl Payloadable for Topics {
+    fn to(&self) -> Payload {
+        Payload::Topics(self.clone())
+    }
+
+    fn from(p: Payload) -> Option<Self> {
+        match p {
+            Payload::Topics(d) => Some(d), _ => None,
+        }
+    }
+}
+
+pub(crate) trait Payloadable: Sized {
+    fn to(&self) -> Payload;
+    fn from(val: Payload) -> Option<Self>;
+}
+
 
 #[test]
 fn github_contrib() {
@@ -209,3 +331,4 @@ fn test_user_by_email() {
     let user = gh.user_by_email("github@pornel.net").unwrap().unwrap();
     assert_eq!("kornelski", user.login);
 }
+

@@ -3,10 +3,13 @@
 pub enum UserType {
     Org,
     User,
+    Bot,
 }
 
+use serde::Serializer;
 use serde::de;
 use serde::de::{Deserializer, Visitor};
+use serde::Serialize;
 use serde::Deserialize;
 use std::fmt;
 
@@ -21,14 +24,15 @@ impl<'de> Deserialize<'de> for UserType {
             type Value = UserType;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("user or org")
+                formatter.write_str("user/org/bot")
             }
 
             fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
                 match v.to_lowercase().as_str() {
                     "org" | "organization" => Ok(UserType::Org),
                     "user" => Ok(UserType::User),
-                    x => Err(de::Error::unknown_variant(x, &["user", "org"])),
+                    "bot" => Ok(UserType::Bot),
+                    x => Err(de::Error::unknown_variant(x, &["user", "org", "bot"])),
                 }
             }
 
@@ -41,7 +45,19 @@ impl<'de> Deserialize<'de> for UserType {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+impl Serialize for UserType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer,
+    {
+        serializer.serialize_str(match *self {
+            UserType::User => "user",
+            UserType::Org => "org",
+            UserType::Bot => "bot",
+        })
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub id: u32,
     pub login: String,
@@ -54,7 +70,7 @@ pub struct User {
     pub user_type: UserType,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContribWeek {
     #[serde(rename="w")]
     pub week_timestamp: u32,
@@ -66,26 +82,26 @@ pub struct ContribWeek {
     pub commits: u32,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchResults<T> {
     pub items: Vec<T>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserContrib {
-    pub total: usize,
+    pub total: u32,
     pub weeks: Vec<ContribWeek>,
-    pub author: User,
+    pub author: Option<User>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GitCommitAuthor {
     pub date: String, // "2018-04-30T16:24:52Z",
     pub email: String,
     pub name: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GitCommit {
     pub author: GitCommitAuthor,
     pub committer: GitCommitAuthor,
@@ -94,16 +110,16 @@ pub struct GitCommit {
     // tree.sha
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommitMeta {
     pub sha: String, // TODO: deserialize to bin
-    pub author: User,
-    pub committer: User,
+    pub author: Option<User>,
+    pub committer: Option<User>,
     pub commit: GitCommit,
     // parents: [{sha}]
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GitHubRepo {
     pub name: String,
     pub description: Option<String>,
@@ -128,7 +144,7 @@ pub struct GitHubRepo {
     pub github_page_url: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Topics {
     pub names: Vec<String>,
 }

@@ -1,6 +1,6 @@
 [package]
 name = "simple_cache"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["Kornel <kornel@geekhood.net>"]
 description = "Minimal wrapper for a HTTP client to cache results on disk, forever"
 license = "CC0-1.0"
@@ -12,3 +12,6 @@ serde_json = "1.0.20"
 serde = "1.0.66"
 rusqlite = "0.14.0"
 thread_local = "0.3.6"
+bincode = "1.0.1"
+tempfile = "3.0.3"
+rmp-serde = "0.13.7"

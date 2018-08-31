@@ -28,7 +28,7 @@ impl<'repo> HistoryIter<'repo> {
             num:0, nth:0,
         });
         Self {
-            seen: HashSet::new(),
+            seen: HashSet::with_capacity(500),
             to_visit,
         }
     }
@@ -44,12 +44,7 @@ impl<'repo> Iterator for HistoryIter<'repo> {
             self.to_visit.extend(commit.parents()
                 .take(1)
                 .filter(|commit| {
-                    let oid = commit.id();
-                    if seen.contains(&oid) {
-                        return false;
-                    }
-                    seen.insert(oid);
-                    true
+                    seen.insert(commit.id())
                 })
                 .enumerate()
                 .map(|(nth, commit)| {

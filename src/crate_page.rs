@@ -126,12 +126,6 @@ impl<'a> CratePage<'a> {
             .map(|d| {
                 let is_build = d.build.0 > (d.runtime.0 + d.runtime.1 + 5) * 2;
                 let is_dev = !is_build && d.dev > (d.runtime.0 * 2 + d.runtime.1 + d.build.0 * 2 + d.build.1 + 5);
-                if is_build {
-                    eprintln!("http://localhost:3000/crates/{} is a build tool", self.ver.short_name());
-                }
-                if is_dev {
-                    eprintln!("http://localhost:3000/crates/{} is a dev tool", self.ver.short_name());
-                }
                 (is_build, is_dev)
             })
             .unwrap_or((false, false))

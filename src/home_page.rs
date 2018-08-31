@@ -38,7 +38,7 @@ impl<'a> HomePage<'a> {
 
     /// List of all categories, sorted, with their most popular and newest crates.
     pub fn all_categories(&self) -> Vec<HomeCategory> {
-        let seen =  &mut HashSet::new();
+        let seen =  &mut HashSet::with_capacity(5000);
         let mut all = self.make_all_categories(&CATEGORIES.root, seen);
         self.add_updated_to_all_categories(&mut all, seen);
         all

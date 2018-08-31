@@ -68,15 +68,11 @@ impl<'a> CatPage<'a> {
 
     /// "See also" feature
     pub fn related_categories(&self) -> Vec<Vec<&Category>> {
-        let mut seen = HashSet::new();
+        let mut seen = HashSet::with_capacity(self.related.len());
         self.related.iter().map(|slug| {
-            CATEGORIES.from_slug(slug).filter(|c| {
-                if seen.get(&c.slug).is_some() {
-                    return false;
-                }
-                seen.insert(&c.slug);
-                true
-            }).collect()
+            CATEGORIES.from_slug(slug)
+                .filter(|c| seen.insert(&c.slug))
+                .collect()
         })
         .filter(|v: &Vec<_>| !v.is_empty())
         .collect()

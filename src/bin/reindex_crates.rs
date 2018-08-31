@@ -5,6 +5,7 @@ extern crate rayon;
 use kitchen_sink::{KitchenSink, CrateData};
 use kitchen_sink::RichCrateVersion;
 use kitchen_sink::Origin;
+use kitchen_sink::stopped;
 use std::sync::{Arc, Mutex};
 use std::collections::HashSet;
 extern crate rand;
@@ -24,6 +25,10 @@ fn main() {
     rayon::scope(move |s1| {
         let c = crates.all_new_crates().unwrap().map(|c| c.origin().clone());
         for (i, k) in c.enumerate() {
+            if stopped() {
+                eprintln!("STOPPING");
+                return;
+            }
             let crates = Arc::clone(&crates);
             s1.spawn(move |s2| {
                 print!("{} ", i);
@@ -53,7 +58,7 @@ fn main() {
 
 fn index_crate(crates: &KitchenSink, c: &Origin) -> Result<RichCrateVersion, failure::Error> {
     let v = crates.rich_crate_version(c, CrateData::FullNoDerived)?;
-    crates.index_crate_latest_version(&v)?;
+    crates.index_crate_highest_version(&v)?;
     let k = crates.rich_crate(c)?;
     crates.index_crate(&k)?;
     Ok(v)

@@ -4,11 +4,12 @@ extern crate kitchen_sink;
 extern crate rayon;
 extern crate repo_url;
 extern crate user_db;
+use kitchen_sink::stopped;
 use std::sync::Arc;
 use std::sync::mpsc;
 use std::thread;
 use std::collections::HashSet;
-use kitchen_sink::{KitchenSink, CrateData, Origin};
+use kitchen_sink::{KitchenSink, CrateData};
 
 fn main() {
     let crates = Arc::new(match KitchenSink::new_default() {
@@ -23,13 +24,19 @@ fn main() {
 
     thread::spawn(move || {
         let tx1 = tx.clone();
+        let all_crates = crates.all_crates();
+        let crates = Arc::clone(&crates);
         rayon::scope(move |s1| {
-            for k in crates.all_crates() {
+            for (o, k) in all_crates {
+                if stopped() {
+                    eprintln!("STOPPING");
+                    break;
+                }
                 let crates = Arc::clone(&crates);
                 let tx = tx1.clone();
                 s1.spawn(move |_| {
                     println!("{:?}", k.name());
-                    let r1 = crates.rich_crate_version(&Origin::from_crates_io_name(k.name()), CrateData::Minimal);
+                    let r1 = crates.rich_crate_version(o, CrateData::Minimal);
                     let res = r1.and_then(|c| {
                         for a in c.authors().iter().filter(|a| a.email.is_some()) {
                             if let Some(email) = a.email.as_ref() {
@@ -60,6 +67,8 @@ fn main() {
         }
         seen.insert(email.clone());
 
-        crates2.index_email(&email, name.as_ref().map(|s| s.as_str())).unwrap();
+        if let Err(err) = crates2.index_email(&email, name.as_ref().map(|s| s.as_str())) {
+            eprintln!("•• {}: {}", email, err);
+        }
     }
 }

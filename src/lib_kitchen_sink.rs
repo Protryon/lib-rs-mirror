@@ -7,7 +7,7 @@ extern crate crates_index;
 extern crate crates_io_client;
 extern crate crate_git_checkout;
 extern crate docs_rs_client;
-extern crate file;
+extern crate ctrlc;
 extern crate github_info;
 extern crate lazyonce;
 extern crate regex;
@@ -31,6 +31,9 @@ mod index;
 pub use index::*;
 mod deps_stats;
 pub use deps_stats::*;
+
+mod ctrlcbreak;
+pub use ctrlcbreak::*;
 
 pub use crates_index::Crate;
 use crates_io_client::CrateOwner;
@@ -109,6 +112,8 @@ pub enum KitchenSinkErr {
     CacheDbMissing(String),
     #[fail(display = "Error when parsing verison")]
     SemverParsingError,
+    #[fail(display = "Stopped")]
+    Stopped,
 }
 
 /// This is a collection of various data sources. It mostly acts as a starting point and a factory for other objects.
@@ -236,6 +241,7 @@ impl KitchenSink {
     }
 
     fn rich_crate_from_index(&self, krate: &Crate) -> CResult<RichCrate> {
+        if stopped() {Err(KitchenSinkErr::Stopped)?;}
         let name = krate.name();
         let cache_bust = Self::latest_version(&krate)?.version();
         let meta = self.crates_io.krate(name, cache_bust)
@@ -260,6 +266,7 @@ impl KitchenSink {
     ///
     /// There's no support for getting anything else than the latest version.
     pub fn rich_crate_version(&self, origin: &Origin, fetch_type: CrateData) -> CResult<RichCrateVersion> {
+        if stopped() {Err(KitchenSinkErr::Stopped)?;}
         self.rich_crate_version_verbose(origin, fetch_type).map(|(krate, _)| krate)
     }
 
@@ -572,6 +579,7 @@ impl KitchenSink {
 
     /// Maintenance: add user to local db index
     pub fn index_user(&self, user: &User, commit: &GitCommitAuthor) -> CResult<()> {
+        if stopped() {Err(KitchenSinkErr::Stopped)?;}
         if !self.user_db.email_has_github(&commit.email)? {
             println!("{} => {}", commit.email, user.login);
             self.user_db.index_user(&user, Some(&commit.email), commit.name.as_ref().map(|s|s.as_str()))?;
@@ -581,6 +589,7 @@ impl KitchenSink {
 
     /// Maintenance: add user to local db index
     pub fn index_email(&self, email: &str, name: Option<&str>) -> CResult<()> {
+        if stopped() {Err(KitchenSinkErr::Stopped)?;}
         if !self.user_db.email_has_github(&email)? {
             match self.gh.user_by_email(&email) {
                 Ok(Some(user)) => {
@@ -596,16 +605,19 @@ impl KitchenSink {
 
     /// Maintenance: add crate to local db index
     pub fn index_crate(&self, k: &RichCrate) -> CResult<()> {
+        if stopped() {Err(KitchenSinkErr::Stopped)?;}
         self.crate_db.index_versions(k)?;
         Ok(())
     }
 
     pub fn index_crate_latest_version(&self, v: &RichCrateVersion) -> CResult<()> {
+        if stopped() {Err(KitchenSinkErr::Stopped)?;}
         self.crate_db.index_latest(v)?;
         Ok(())
     }
 
     pub fn index_repo(&self, repo: &Repo, as_of_version: &str) -> CResult<()> {
+        if stopped() {Err(KitchenSinkErr::Stopped)?;}
         let url = repo.canonical_git_url();
         let checkout = crate_git_checkout::checkout(repo, &self.git_checkout_path)?;
 

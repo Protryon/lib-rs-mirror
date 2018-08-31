@@ -1,6 +1,6 @@
 [package]
 name = "kitchen_sink"
-version = "0.5.0"
+version = "0.5.1"
 authors = ["Kornel <kornel@geekhood.net>"]
 publish = false
 
@@ -26,7 +26,6 @@ cargo_toml = "0.3.0"
 serde = "1.0.43"
 serde_derive = "1.0.70"
 serde_json = "1.0.24"
-file = "1.1.1"
 toml = "0.4.6"
 lazy_static = "1.0.0"
 regex = "1.0.0"
@@ -39,4 +38,5 @@ itertools = "0.7.8"
 semver-parser = "0.9.0"
 chrono = "0.4.5"
 semver = "0.9.0"
+ctrlc = "3.1.1"
 

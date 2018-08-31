@@ -16,8 +16,7 @@ use std::sync::RwLock;
 use deps_stats::DepsStats;
 
 pub struct Index {
-    index: crates_index::Index,
-    crate_path_index: LazyOnce<HashMap<Origin, Crate>>,
+    crates: HashMap<Origin, Crate>,
     cache: RwLock<HashMap<(Box<str>, Features), ArcDepSet>>,
     deps_stats: LazyOnce<DepsStats>,
 }
@@ -28,26 +27,23 @@ impl Index {
     }
 
     pub fn new(path: PathBuf) -> Self {
+        let index = crates_index::Index::new(path);
+        let crates = index.crates()
+                .map(|c| (Origin::from_crates_io_name(c.name()), c))
+                .collect();
         Self {
-            index: crates_index::Index::new(path),
-            crate_path_index: LazyOnce::new(),
             cache: RwLock::new(HashMap::with_capacity(5000)),
             deps_stats: LazyOnce::new(),
+            crates,
         }
     }
 
-    /// Iterator over all crates available in the index
+    /// All crates available in the index
     ///
     /// It returns only a thin and mostly useless data from the index itself,
     /// so `rich_crate`/`rich_crate_version` is needed to do more.
     pub fn crates(&self) -> &HashMap<Origin, Crate> {
-        self.crate_path_index.get(|| {
-            self.index.crates()
-                .map(|c| {
-                    (Origin::from_crates_io_name(c.name()), c)
-                })
-                .collect()
-        })
+        &self.crates
     }
 
     pub fn deps_stats(&self) -> &DepsStats {

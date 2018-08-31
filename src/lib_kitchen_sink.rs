@@ -632,8 +632,12 @@ impl KitchenSink {
         if let Repo{host:RepoHost::GitHub(ref repo), ..} = repo {
             if let Ok(commits) = self.repo_commits(repo, as_of_version) {
                 for c in commits {
-                    self.index_user(&c.author, &c.commit.author)?;
-                    self.index_user(&c.committer, &c.commit.committer)?;
+                    if let Some(a) = c.author {
+                        self.index_user(&a, &c.commit.author)?;
+                    }
+                    if let Some(a) = c.committer {
+                        self.index_user(&a, &c.commit.committer)?;
+                    }
                 }
             }
         }
@@ -1007,7 +1011,7 @@ pub struct CrateAuthor<'a> {
 impl<'a> CrateAuthor<'a> {
     pub fn likely_a_team(&self) -> bool {
         let unattributed_name = self.github.is_none() && self.info.as_ref().map_or(true, |a| a.email.is_none() && a.url.is_none());
-        unattributed_name || self.name().ends_with(" Developers")
+        unattributed_name || self.name().ends_with(" Developers") || self.name().ends_with(" contributors")
     }
 
     pub fn name(&self) -> &str {

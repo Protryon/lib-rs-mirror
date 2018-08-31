@@ -10,6 +10,7 @@ extern crate categories;
 use rayon::prelude::*;
 use std::path::Path;
 use std::path::PathBuf;
+use kitchen_sink::running;
 use kitchen_sink::{KitchenSink, CrateData, Origin};
 use render_readme::ImageOptimAPIFilter;
 use render_readme::{Renderer, Highlighter};
@@ -29,7 +30,7 @@ use failure::ResultExt;
 fn main() -> Result<(), failure::Error> {
     let mut out = BufWriter::new(File::create("public/index.html").expect("write to public/index.html"));
     let crates = KitchenSink::new_default().expect("init caches, data, etc.");
-    let done_pages = Mutex::new(HashSet::new());
+    let done_pages = Mutex::new(HashSet::with_capacity(5000));
     let image_filter = Arc::new(ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_path())?);
     let markup = Renderer::new_filter(Highlighter::new(), image_filter);
 
@@ -57,6 +58,8 @@ fn main() -> Result<(), failure::Error> {
 
 fn render_categories(cats: &CategoryMap, base: &Path, crates: &KitchenSink, done_pages: &Mutex<HashSet<Origin>>, markup: &Renderer) -> Result<(), failure::Error> {
     cats.par_iter().map(|(slug, cat)| {
+        running()?;
+
         if !cat.sub.is_empty() {
             let new_base = base.join(slug);
             let _ = fs::create_dir(&new_base);

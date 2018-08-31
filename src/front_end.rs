@@ -24,6 +24,7 @@ mod download_graph;
 mod home_page;
 mod iter;
 mod urler;
+use kitchen_sink::stopped;
 use failure::ResultExt;
 use categories::Category;
 use crate_page::*;
@@ -80,6 +81,11 @@ pub fn render_homepage(out: &mut Write, crates: &KitchenSink) -> Result<(), fail
 
 /// See `crate_page.rs.html`
 pub fn render_crate_page(out: &mut Write, all: &RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, markup: &Renderer) -> String {
+    if stopped() {
+        eprintln!("STOPPING");
+        return "???".to_owned();
+    }
+
     let urler = Urler::new();
     let c = CratePage {
         all, ver, kitchen_sink, markup,

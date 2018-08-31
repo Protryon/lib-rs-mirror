@@ -1,4 +1,5 @@
 #![allow(unused_imports)]
+use kitchen_sink::stopped;
 use std::path::PathBuf;
 use categories::Category;
 use categories::CategoryMap;
@@ -72,7 +73,7 @@ impl<'a> HomePage<'a> {
     /// A crate can be in multiple categories, so `seen` ensures every crate is shown only once
     /// across all categories.
     fn make_all_categories(&self, root: &'static CategoryMap, seen: &mut HashSet<Origin>) -> Vec<HomeCategory> {
-        let mut c: Vec<_> = root.iter().map(|(_, cat)| {
+        let mut c: Vec<_> = root.iter().take_while(|_| !stopped()).map(|(_, cat)| {
             // depth first - important!
             let sub = self.make_all_categories(&cat.sub, seen);
             let own_pop = self.crates.category_crate_count(&cat.slug).unwrap_or(0) as usize;

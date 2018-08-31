@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateMetaFile {
     #[serde(rename = "crate")]
     pub krate: CrateMeta,
@@ -17,19 +17,19 @@ impl CrateMetaFile {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateMetaBadge {
     pub badge_type: String,
     pub attributes: CrateMetaBadgeAttr
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateMetaBadgeAttr {
     pub repository: Option<String>,
     pub branch: Option<String>
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateMeta {
     pub id: String, // "cargo-deb",
     pub name: String, // "cargo-deb",
@@ -54,7 +54,7 @@ pub struct CrateMeta {
     pub repository: Option<String>, // "https://github.com/mmstick/cargo-deb",
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateMetaVersion {
     pub id: usize, // 79188,
     #[serde(rename = "crate")]
@@ -70,7 +70,7 @@ pub struct CrateMetaVersion {
     pub license: Option<String>, // "MIT",
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateMetaKeyword {
     pub id: String, // "cargo",
     pub keyword: String, // "cargo",
@@ -78,7 +78,7 @@ pub struct CrateMetaKeyword {
     pub crates_cnt: usize, // 92
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateMetaCategory {
     pub id: String, // "development-tools::build-utils",
     pub category: String, // "Development tools::Build Utils",

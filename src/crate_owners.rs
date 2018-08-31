@@ -1,22 +1,22 @@
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateOwnersFile {
     pub users: Vec<CrateOwner>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateTeamsFile {
     pub teams: Vec<CrateOwner>,
 }
 
-#[derive(Debug, Copy, Eq, PartialEq, Clone, Deserialize)]
+#[derive(Debug, Copy, Eq, PartialEq, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum OwnerKind {
     Team,
     User,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateOwner {
     pub id: usize, // 362,
     pub login: String, // "github:rust-bus:maintainers",

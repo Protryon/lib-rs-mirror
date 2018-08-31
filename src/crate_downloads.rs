@@ -4,19 +4,19 @@ use std::collections::HashMap;
 use chrono::Duration;
 use chrono::prelude::*;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateDownloadsFile {
     pub version_downloads: Vec<CrateVersionDailyDownload>,
     pub meta: CrateDownloadsExtra,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateDownloadsExtra {
     #[serde(default)]
     pub extra_downloads: Vec<CrateExtraDailyDownload>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateVersionDailyDownload {
     id: usize,
     pub version: usize,
@@ -24,7 +24,7 @@ pub struct CrateVersionDailyDownload {
     pub date: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateExtraDailyDownload {
     pub downloads: usize,
     pub date: String,

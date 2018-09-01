@@ -22,7 +22,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::Path;
 use thread_local::ThreadLocal;
-type Result<T> = std::result::Result<T, failure::Error>;
+type FResult<T> = std::result::Result<T, failure::Error>;
 
 mod schema;
 mod stopwords;
@@ -36,7 +36,7 @@ pub struct CrateDb {
 
 impl CrateDb {
     /// Path to sqlite db file to create/update
-    pub fn new(path: impl AsRef<Path>) -> Result<Self> {
+    pub fn new(path: impl AsRef<Path>) -> FResult<Self> {
         let path = path.as_ref();
         Ok(Self {
             url: format!("file:{}?cache=shared", path.display()),
@@ -46,7 +46,7 @@ impl CrateDb {
     }
 
     #[inline]
-    fn with_connection<F, T>(&self, cb: F) -> Result<T> where F: FnOnce(&mut Connection) -> Result<T> {
+    fn with_connection<F, T>(&self, cb: F) -> FResult<T> where F: FnOnce(&mut Connection) -> FResult<T> {
         let conn = self.conn.get_or(|| Box::new(self.connect().map(RefCell::new)));
         match conn {
             Ok(conn) => cb(&mut *conn.borrow_mut()),
@@ -55,7 +55,7 @@ impl CrateDb {
     }
 
     #[inline]
-    fn with_tx<F, T>(&self, cb: F) -> Result<T> where F: FnOnce(&Connection) -> Result<T> {
+    fn with_tx<F, T>(&self, cb: F) -> FResult<T> where F: FnOnce(&Connection) -> FResult<T> {
         let mut conn = self.exclusive_conn.lock().unwrap();
         let conn = conn.get_or_insert_with(|| self.connect().unwrap());
 
@@ -75,14 +75,14 @@ impl CrateDb {
         Ok(db)
     }
 
-    pub fn latest_crate_update_timestamp(&self) -> Result<u32> {
+    pub fn latest_crate_update_timestamp(&self) -> FResult<Option<u32>> {
         self.with_connection(|conn| {
-            Ok(conn.query_row("SELECT max(created) FROM crate_versions", &[], |row| row.get(0))?)
+            Ok(none_rows(conn.query_row("SELECT max(created) FROM crate_versions", &[], |row| row.get(0)))?)
         })
     }
 
     /// Add data of the latest version of a crate to the index
-    pub fn index_latest(&self, c: &RichCrateVersion) -> Result<()> {
+    pub fn index_latest(&self, c: &RichCrateVersion) -> FResult<()> {
         self.with_tx(|tx| {
             let mut insert_crate = tx.prepare_cached("INSERT OR IGNORE INTO crates (origin, recent_downloads) VALUES (?1, ?2)")?;
             let mut insert_repo = tx.prepare_cached("INSERT OR REPLACE INTO crate_repos (crate_id, repo) VALUES (?1, ?2)")?;
@@ -188,7 +188,7 @@ impl CrateDb {
     /// (rank-relevance, relevance, slug)
     ///
     /// Rank relevance is normalized and biased towards one top category
-    fn extract_crate_categories(&self, conn: &Connection, c: &RichCrateVersion, keywords: impl Iterator<Item=String>, is_important_ish: bool) -> Result<(Vec<(f64, f64, String)>, bool)> {
+    fn extract_crate_categories(&self, conn: &Connection, c: &RichCrateVersion, keywords: impl Iterator<Item=String>, is_important_ish: bool) -> FResult<(Vec<(f64, f64, String)>, bool)> {
         let (explicit_categories, invalid_categories): (Vec<_>, Vec<_>) = c.category_slugs(Include::AuthoritativeOnly)
             .map(|k| k.to_string())
             .partition(|slug| {
@@ -253,7 +253,7 @@ impl CrateDb {
     ///    finds location of the crate within the repo, adding extra precision to the
     ///    crate's repo URL (needed for e.g. GitHub README relative links), and adds
     ///    interesting relationship information for crates.
-    pub fn index_repo_crates(&self, repo: &Repo, paths_and_names: impl Iterator<Item = (impl AsRef<str>, impl AsRef<str>)>) -> Result<()> {
+    pub fn index_repo_crates(&self, repo: &Repo, paths_and_names: impl Iterator<Item = (impl AsRef<str>, impl AsRef<str>)>) -> FResult<()> {
         let repo = repo.canonical_git_url();
         self.with_tx(|tx| {
             let mut insert_repo = tx.prepare_cached("INSERT OR IGNORE INTO repo_crates (repo, path, crate_name) VALUES (?1, ?2, ?3)")?;
@@ -267,15 +267,15 @@ impl CrateDb {
     }
 
     /// Multiple crates can share a repo. Consistently pick one of them (any one)
-    pub fn first_crate_for_repo(&self, repo: &Repo) -> Result<String> {
+    pub fn first_crate_for_repo(&self, repo: &Repo) -> FResult<Option<String>> {
         self.with_connection(|conn| {
             let mut q = conn.prepare_cached("SELECT crate_name FROM repo_crates WHERE repo = ?1 ORDER BY path, crate_name LIMIT 1")?;
-            Ok(q.query_row(&[&repo.canonical_git_url()], |r| r.get(0))?)
+            Ok(none_rows(q.query_row(&[&repo.canonical_git_url()], |r| r.get(0)))?)
         })
     }
 
     /// Returns crate name (not origin)
-    pub fn parent_crate(&self, repo: &Repo, child_name: &str) -> Result<Option<String>> {
+    pub fn parent_crate(&self, repo: &Repo, child_name: &str) -> FResult<Option<String>> {
         self.with_connection(|conn| {
             let mut paths = conn.prepare_cached("SELECT path, crate_name FROM repo_crates WHERE repo = ?1 LIMIT 100")?;
             let mut paths: HashMap<String, String> = paths
@@ -326,7 +326,7 @@ impl CrateDb {
         })
     }
 
-    pub fn index_repo_changes(&self, repo: &Repo, changes: &[RepoChange]) -> Result<()> {
+    pub fn index_repo_changes(&self, repo: &Repo, changes: &[RepoChange]) -> FResult<()> {
         let repo = repo.canonical_git_url();
         self.with_tx(|tx| {
             let mut insert_change = tx.prepare_cached("INSERT OR IGNORE INTO repo_changes (repo, crate_name, replacement, weight) VALUES (?1, ?2, ?3, ?4)")?;
@@ -344,16 +344,16 @@ impl CrateDb {
         })
     }
 
-    pub fn path_in_repo(&self, repo: &Repo, crate_name: &str) -> Result<String> {
+    pub fn path_in_repo(&self, repo: &Repo, crate_name: &str) -> FResult<Option<String>> {
         let repo = repo.canonical_git_url();
         self.with_connection(|conn| {
-        let mut get_path = conn.prepare_cached("SELECT path FROM repo_crates WHERE repo = ?1 AND crate_name = ?2")?;
-        Ok(get_path.query_row(&[&repo, &crate_name], |row| row.get(0)).context("path_in_repo")?)
+            let mut get_path = conn.prepare_cached("SELECT path FROM repo_crates WHERE repo = ?1 AND crate_name = ?2")?;
+            Ok(none_rows(get_path.query_row(&[&repo, &crate_name], |row| row.get(0))).context("path_in_repo")?)
         })
     }
 
     /// Update download counts of the crate
-    pub fn index_versions(&self, all: &RichCrate) -> Result<()> {
+    pub fn index_versions(&self, all: &RichCrate) -> FResult<()> {
         self.with_tx(|tx| {
             let mut update_recent = tx.prepare_cached("UPDATE crates SET recent_downloads = ?1 WHERE id = ?2")?;
             let mut get_crate_id = tx.prepare_cached("SELECT id FROM crates WHERE origin = ?1")?;
@@ -386,14 +386,14 @@ impl CrateDb {
     /// Guess categories for a crate
     ///
     /// Returns category slugs
-    pub fn guess_crate_categories<'a>(&self, origin: &Origin, keywords: impl Iterator<Item = &'a str>) -> Result<Vec<(f64, String)>> {
+    pub fn guess_crate_categories<'a>(&self, origin: &Origin, keywords: impl Iterator<Item = &'a str>) -> FResult<Vec<(f64, String)>> {
         self.with_connection(|conn| {
             self.crate_categories_tx(&conn, origin, keywords.map(|k| k.to_lowercase()).collect(), 0.1)
         })
     }
 
     /// Assigned categories with their weights
-    pub fn crate_categories<'a>(&self, origin: &Origin) -> Result<Vec<(f64, String)>> {
+    pub fn crate_categories<'a>(&self, origin: &Origin) -> FResult<Vec<(f64, String)>> {
         self.with_connection(|conn| {
             let mut query = conn.prepare_cached(r#"
                 SELECT c.relevance_weight, c.slug
@@ -407,7 +407,7 @@ impl CrateDb {
         })
     }
 
-    fn crate_categories_tx(&self, conn: &Connection, origin: &Origin, keywords: HashSet<String>, threshold: f64) -> Result<Vec<(f64, String)>> {
+    fn crate_categories_tx(&self, conn: &Connection, origin: &Origin, keywords: HashSet<String>, threshold: f64) -> FResult<Vec<(f64, String)>> {
         let mut query = conn.prepare_cached(r#"
         select cc.slug, sum(cc.relevance_weight * ck.weight * relk.relevance)/(8+count(*)) as w
         from (
@@ -440,7 +440,7 @@ impl CrateDb {
     /// Find most relevant keyword for the crate
     ///
     /// Returns (top n-th for the keyword, the keyword)
-    pub fn top_keyword(&self, origin: &Origin) -> Result<(u32, String)> {
+    pub fn top_keyword(&self, origin: &Origin) -> FResult<Option<(u32, String)>> {
         self.with_connection(|conn| {
             let mut query = conn.prepare_cached(r#"
             select top, keyword from (
@@ -457,24 +457,24 @@ impl CrateDb {
                         having count(*) >= 5
                 ) as tmp
             order by top + (top+30.0)/total
-        "#)?;
-            Ok(query.query_row(&[&origin.to_str()], |row| (row.get(0), row.get(1)))?)
+            "#)?;
+            Ok(none_rows(query.query_row(&[&origin.to_str()], |row| (row.get(0), row.get(1))))?)
         })
     }
 
     /// Number of crates with a given keyword
     ///
     /// NB: must be lowercase
-    pub fn crates_with_keyword(&self, keyword: &str) -> Result<u32> {
+    pub fn crates_with_keyword(&self, keyword: &str) -> FResult<u32> {
         self.with_connection(|conn| {
             let mut query = conn.prepare_cached("SELECT count(*) FROM crate_keywords
                 WHERE explicit AND keyword_id = (SELECT id FROM keywords WHERE keyword = ?1)")?;
-            Ok(query.query_row(&[&keyword], |row| row.get(0))?)
+            Ok(none_rows(query.query_row(&[&keyword], |row| row.get(0)))?.unwrap_or(0))
         })
     }
 
     /// Categories similar to the given category
-    pub fn related_categories(&self, slug: &str) -> Result<Vec<String>> {
+    pub fn related_categories(&self, slug: &str) -> FResult<Vec<String>> {
         self.with_connection(|conn| {
             let mut query = conn.prepare_cached(r#"
                 select sum(c2.relevance_weight * c1.relevance_weight) as w, c2.slug
@@ -492,7 +492,7 @@ impl CrateDb {
         })
     }
 
-    pub fn replacement_crates(&self, crate_name: &str) -> Result<Vec<String>> {
+    pub fn replacement_crates(&self, crate_name: &str) -> FResult<Vec<String>> {
         self.with_connection(|conn| {
             let mut query = conn.prepare_cached(r#"
                 SELECT sum(weight) as w, replacement
@@ -509,7 +509,7 @@ impl CrateDb {
         })
     }
 
-    pub fn related_crates(&self, origin: &Origin) -> Result<Vec<Origin>> {
+    pub fn related_crates(&self, origin: &Origin) -> FResult<Vec<Origin>> {
         self.with_connection(|conn| {
             let mut query = conn.prepare_cached(r#"
                 SELECT sum(k2.weight * k1.weight) as w, c2.origin
@@ -534,7 +534,7 @@ impl CrateDb {
     }
 
     /// Find keywords that may be most relevant to the crate
-    pub fn keywords(&self, origin: &Origin) -> Result<Vec<String>> {
+    pub fn keywords(&self, origin: &Origin) -> FResult<Vec<String>> {
         self.with_connection(|conn| {
             let mut query = conn.prepare_cached(r#"
                 select avg(ck.weight) * srck.weight, k.keyword
@@ -570,7 +570,7 @@ impl CrateDb {
     }
 
     /// Find most relevant/popular keywords in the category
-    pub fn top_keywords_in_category(&self, slug: &str) -> Result<Vec<String>> {
+    pub fn top_keywords_in_category(&self, slug: &str) -> FResult<Vec<String>> {
         self.with_connection(|conn| {
             let mut query = conn.prepare_cached(r#"
                 select sum(k.weight * c.relevance_weight), kk.keyword from categories c
@@ -589,7 +589,7 @@ impl CrateDb {
     }
 
     /// Crate & total weighed removals (when dependency was removed from a crate)
-    pub fn removals(&self) -> Result<HashMap<Origin, f64>> {
+    pub fn removals(&self) -> FResult<HashMap<Origin, f64>> {
         self.with_connection(|conn| {
             let mut query = conn.prepare("SELECT crate_name, sum(weight) as w
                 FROM repo_changes
@@ -606,7 +606,7 @@ impl CrateDb {
 
     /// Most popular crates in the category
     /// Returns recent_downloads and weight/importance as well
-    pub fn top_crates_in_category_partially_ranked(&self, slug: &str, limit: u32) -> Result<Vec<(Origin, u32, f64)>> {
+    pub fn top_crates_in_category_partially_ranked(&self, slug: &str, limit: u32) -> FResult<Vec<(Origin, u32, f64)>> {
         self.with_connection(|conn| {
             // sort by relevance to the category, downrank for being removed from crates
             let mut query = conn.prepare_cached(
@@ -630,7 +630,7 @@ impl CrateDb {
     /// Newly added or updated crates in the category
     ///
     /// Returns `origin` strings
-    pub fn recently_updated_crates_in_category(&self, slug: &str) -> Result<Vec<Origin>> {
+    pub fn recently_updated_crates_in_category(&self, slug: &str) -> FResult<Vec<Origin>> {
         self.with_connection(|conn| {
             let mut query = conn.prepare_cached(r#"
                 select max(created), k.origin
@@ -652,7 +652,7 @@ impl CrateDb {
     }
 
     /// Number of crates in every category
-    pub fn category_crate_counts(&self) -> Result<HashMap<String, u32>> {
+    pub fn category_crate_counts(&self) -> FResult<HashMap<String, u32>> {
         self.with_connection(|conn| {
             let mut q = conn.prepare(r#"
                 select c.slug, count(*) as cnt from categories c group by c.slug
@@ -696,7 +696,7 @@ pub struct KeywordInsert<'a> {
 }
 
 impl<'a> KeywordInsert<'a> {
-    pub fn new(conn: &'a Connection, crate_id: u32) -> Result<Self> {
+    pub fn new(conn: &'a Connection, crate_id: u32) -> FResult<Self> {
         Ok(Self {
             crate_id,
             select_id: conn.prepare_cached("SELECT id, visible FROM keywords WHERE keyword = ?1")?,
@@ -726,7 +726,7 @@ impl<'a> KeywordInsert<'a> {
         if visible {k.1 = visible}
     }
 
-    pub fn commit(mut self) -> Result<()> {
+    pub fn commit(mut self) -> FResult<()> {
         for (cond, stopwords) in COND_STOPWORDS.iter() {
             if self.keywords.get(*cond).is_some() {
                 match stopwords {
@@ -755,3 +755,11 @@ impl<'a> KeywordInsert<'a> {
     }
 }
 
+#[inline]
+fn none_rows<T>(res: std::result::Result<T, rusqlite::Error>) -> std::result::Result<Option<T>, rusqlite::Error> {
+    match res {
+        Ok(dat) => Ok(Some(dat)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(err) => Err(err),
+    }
+}

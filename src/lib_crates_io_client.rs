@@ -19,11 +19,21 @@ pub use crate_owners::*;
 pub use crate_downloads::*;
 pub use simple_cache::Error;
 use simple_cache::SimpleCache;
+use simple_cache::TempCache;
 
-#[derive(Debug)]
 pub struct CratesIoClient {
     cache: SimpleCache,
+    cache2: TempCache<(String, Payload)>,
     crates: SimpleCache,
+}
+
+macro_rules! cioopt {
+    ($e:expr) => {
+        match $e {
+            Some(ok) => ok,
+            None => return Ok(None),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -37,6 +47,7 @@ impl CratesIoClient {
     pub fn new(cache_base_path: &Path) -> Result<Self, Error> {
         Ok(Self {
             cache: SimpleCache::new(&cache_base_path.join("cache.db"))?,
+            cache2: TempCache::new(&cache_base_path.join("cratesio.bin"))?,
             crates: SimpleCache::new(&cache_base_path.join("crates.db"))?,
         })
     }
@@ -47,60 +58,119 @@ impl CratesIoClient {
         self
     }
 
-    pub fn crate_data(&self, crate_name: &str, version: &str) -> Result<Vec<u8>, Error> {
-        let oldkey = format!("crates/{}-{}.crate", crate_name, version);
+    pub fn crate_data(&self, crate_name: &str, version: &str) -> Result<Option<Vec<u8>>, Error> {
         let newkey = format!("{}.crate", crate_name);
         let url = format!("https://crates.io/api/v1/crates/{}/{}/download", crate_name, version);
-        self.crates.get_cached((&newkey, version), &oldkey, &url)
+        self.crates.get_cached((&newkey, version), &url)
     }
 
-    pub fn krate(&self, crate_name: &str, cache_buster: &str) -> Result<CratesIoCrate, Error> {
-        Ok(CratesIoCrate {
-            meta: self.crate_meta(crate_name, cache_buster)?,
-            downloads: self.crate_downloads(crate_name, cache_buster)?,
-            owners: self.crate_owners(crate_name, cache_buster)?,
-        })
+    pub fn krate(&self, crate_name: &str, cache_buster: &str) -> Result<Option<CratesIoCrate>, Error> {
+        let meta = match self.crate_meta(crate_name, cache_buster)? {
+            Some(d) => d,
+            None => return Ok(None),
+        };
+        let downloads = match self.crate_downloads(crate_name, cache_buster)? {
+            Some(d) => d,
+            None => return Ok(None),
+        };
+        let owners = match self.crate_owners(crate_name, cache_buster)? {
+            Some(d) => d,
+            None => return Ok(None),
+        };
+        Ok(Some(CratesIoCrate {
+            meta,
+            downloads,
+            owners,
+        }))
     }
 
-    pub fn crate_meta(&self, crate_name: &str, as_of_version: &str) -> Result<CrateMetaFile, Error> {
-        let old = format!("meta/{}{}.json", crate_name, as_of_version);
-        self.get_json(&old, (crate_name, as_of_version), crate_name)
+    pub fn crate_meta(&self, crate_name: &str, as_of_version: &str) -> Result<Option<CrateMetaFile>, Error> {
+        self.get_json((crate_name, as_of_version), crate_name)
     }
 
-    pub fn crate_downloads(&self, crate_name: &str, as_of_version: &str) -> Result<CrateDownloadsFile, Error> {
-        let old = format!("{}-{}/downloads", crate_name, as_of_version);
+    pub fn crate_downloads(&self, crate_name: &str, as_of_version: &str) -> Result<Option<CrateDownloadsFile>, Error> {
         let url = format!("{}/downloads", crate_name);
         let new_key = (url.as_str(), as_of_version);
-        let data: CrateDownloadsFile = self.get_json(&old, new_key, &url)?;
-        if data.is_stale() && rand::random::<u8>() > 200 {
-            let _ = self.cache.delete(new_key, &old);
-            let fresh: CrateDownloadsFile = self.get_json(&old, new_key, &url)?;
+        let data: CrateDownloadsFile = cioopt!(self.get_json(new_key, &url)?);
+        if data.is_stale() && rand::random::<u8>() > 252 {
+            eprintln!("downloads expired");
+            let _ = self.cache.delete(new_key);
+            let _ = self.cache2.delete(new_key.0);
+            let fresh: CrateDownloadsFile = cioopt!(self.get_json(new_key, &url)?);
             assert!(!fresh.is_stale());
-            Ok(fresh)
+            Ok(Some(fresh))
         } else {
-            Ok(data)
+            Ok(Some(data))
         }
     }
 
-    pub fn crate_owners(&self, crate_name: &str, as_of_version: &str) -> Result<Vec<CrateOwner>, Error> {
-        let old = format!("user/{}.u{}.json", crate_name, as_of_version);
+    pub fn crate_owners(&self, crate_name: &str, as_of_version: &str) -> Result<Option<Vec<CrateOwner>>, Error> {
         let url = format!("{}/owner_user", crate_name);
-        let u: CrateOwnersFile = self.get_json(&old, (&url, as_of_version), &url)?;
+        let u: CrateOwnersFile = cioopt!(self.get_json((&url, as_of_version), &url)?);
 
-        let old = format!("user/{}.t{}.json", crate_name, as_of_version);
         let url = format!("{}/owner_team", crate_name);
-        let mut t: CrateTeamsFile = self.get_json(&old, (&url, as_of_version), &url)?;
+        let mut t: CrateTeamsFile = cioopt!(self.get_json((&url, as_of_version), &url)?);
         let mut out = u.users;
         out.append(&mut t.teams);
-        Ok(out)
+        Ok(Some(out))
     }
 
-    fn get_json<B>(&self, old_key: &str, key: (&str, &str), path: impl AsRef<str>) -> Result<B, Error>
-        where B: for<'a> serde::Deserialize<'a>
+    fn get_json<B>(&self, key: (&str, &str), path: impl AsRef<str>) -> Result<Option<B>, Error>
+        where B: for<'a> serde::Deserialize<'a> + Payloadable
     {
+        let _ = self.cache.delete(key);
+        if let Some((ver, res)) = self.cache2.get(key.0)? {
+            if ver == key.1 {
+                return Ok(Some(B::from(res)));
+            }
+        }
+
         let url = format!("https://crates.io/api/v1/crates/{}", path.as_ref());
-        self.cache.get_json(key, old_key, url)
+        let res: Option<B> = self.cache.get_json(key, url)?;
+        match res {
+            Some(res) => {
+                self.cache2.set(key.0, (key.1.to_string(), res.to()))?;
+                Ok(Some(res))
+            },
+            None => {
+                self.cache2.delete(key.0)?;
+                Ok(None)
+            }
+        }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+enum Payload {
+    CrateMetaFile(CrateMetaFile),
+    CrateOwnersFile(CrateOwnersFile),
+    CrateTeamsFile(CrateTeamsFile),
+    CrateDownloadsFile(CrateDownloadsFile),
+}
+
+pub(crate) trait Payloadable {
+    fn to(&self) -> Payload;
+    fn from(val: Payload) -> Self;
+}
+
+impl Payloadable for CrateMetaFile {
+    fn to(&self) -> Payload { Payload::CrateMetaFile(self.clone()) }
+    fn from(val: Payload) -> Self { match val { Payload::CrateMetaFile(d) => d, _ => panic!("bad cache") } }
+}
+
+impl Payloadable for CrateOwnersFile {
+    fn to(&self) -> Payload { Payload::CrateOwnersFile(self.clone()) }
+    fn from(val: Payload) -> Self { match val { Payload::CrateOwnersFile(d) => d, _ => panic!("bad cache") } }
+}
+
+impl Payloadable for CrateDownloadsFile {
+    fn to(&self) -> Payload { Payload::CrateDownloadsFile(self.clone()) }
+    fn from(val: Payload) -> Self { match val { Payload::CrateDownloadsFile(d) => d, _ => panic!("bad cache") } }
+}
+
+impl Payloadable for CrateTeamsFile {
+    fn to(&self) -> Payload { Payload::CrateTeamsFile(self.clone()) }
+    fn from(val: Payload) -> Self { match val { Payload::CrateTeamsFile(d) => d, _ => panic!("bad cache") } }
 }
 
 pub struct DailyVersionDownload<'a> {
@@ -145,10 +215,10 @@ fn cratesioclient() {
     let client = CratesIoClient::new(Path::new("../data")).expect("new");
 
     client.crate_meta("capi", "0.0.1").expect("cargo-deb");
-    let owners = client.crate_owners("cargo-deb", "1.10.0").expect("crate_owners");
+    let owners = client.crate_owners("cargo-deb", "1.10.0").expect("crate_owners").expect("found some");
     assert_eq!(2, owners.len(), "that will fail when metadata updates");
-    match CratesIoClient::new(Path::new("../data")).expect("new").cache_only(true).crate_data("fail404","999") {
-        Err(Error::NotCached) => {},
-        e => panic!("{:?}", e),
+    match CratesIoClient::new(Path::new("../data")).expect("new").cache_only(true).crate_data("fail404","999").unwrap() {
+        None => {},
+        Some(e) => panic!("{:?}", e),
     }
 }

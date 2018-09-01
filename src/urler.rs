@@ -63,7 +63,7 @@ impl Urler {
         if let Some(ref gh) = author.github {
             Some(match gh.user_type {
                 UserType::User => format!("https://crates.io/users/{}", encode(&gh.login)),
-                UserType::Org => format!("https://github.com/{}", encode(&gh.login)),
+                UserType::Org | UserType::Bot => format!("https://github.com/{}", encode(&gh.login)),
             })
         } else if let Some(ref info) = author.info {
             if let Some(ref em) = info.email {

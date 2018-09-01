@@ -54,6 +54,7 @@ impl UserDb {
                 blog: None,
                 user_type: match (||  -> String {row.get(6)})().as_str() {
                     "org" => UserType::Org,
+                    "bot" => UserType::Bot,
                     _ => UserType::User,
                 },
             }
@@ -89,6 +90,7 @@ impl UserDb {
                 blog: None,
                 user_type: match (||  -> String {row.get(6)})().as_str() {
                     "org" => UserType::Org,
+                    "bot" => UserType::Bot,
                     _ => UserType::User,
                 },
             }
@@ -114,6 +116,7 @@ impl UserDb {
             let t = match user.user_type {
                 UserType::User => "user",
                 UserType::Org => "org",
+                UserType::Bot => "bot",
             };
             insert_user.execute(&[&user.id, &user.login.to_lowercase(), &user.name, &user.avatar_url, &user.gravatar_id, &user.html_url, &t])?;
 

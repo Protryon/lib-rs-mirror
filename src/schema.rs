@@ -41,8 +41,8 @@ impl CrateDb {
                 weight          REAL NOT NULL DEFAULT 1.0
             );
             CREATE UNIQUE INDEX IF NOT EXISTS repo_changes_idx on repo_changes(repo, crate_name, replacement);
-            CREATE INDEX IF NOT EXISTS repo_changes_idx on repo_changes(crate_name);
-            CREATE INDEX IF NOT EXISTS repo_changes_idx on repo_changes(replacement);
+            CREATE INDEX IF NOT EXISTS repo_changes_idx2 on repo_changes(crate_name);
+            CREATE INDEX IF NOT EXISTS repo_changes_idx3 on repo_changes(replacement);
 
             CREATE TABLE IF NOT EXISTS crate_versions (
                 crate_id        INTEGER NOT NULL,

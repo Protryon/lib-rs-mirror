@@ -588,24 +588,39 @@ impl CrateDb {
         })
     }
 
+    /// Crate & total weighed removals (when dependency was removed from a crate)
+    pub fn removals(&self) -> Result<HashMap<Origin, f64>> {
+        self.with_connection(|conn| {
+            let mut query = conn.prepare("SELECT crate_name, sum(weight) as w
+                FROM repo_changes
+                WHERE replacement IS NULL
+                GROUP BY crate_name")?;
+            let q = query.query_map(&[], |row| {
+                let s: String = row.get(0);
+                (Origin::from_crates_io_name(&s), row.get(1))
+            })?;
+            let q = q.filter_map(|r| r.ok());
+            Ok(q.collect())
+        })
+    }
+
     /// Most popular crates in the category
-    /// Returns recent_downloads as well
-    pub fn top_crates_in_category(&self, slug: &str, limit: u32) -> Result<Vec<(Origin, u32)>> {
+    /// Returns recent_downloads and weight/importance as well
+    pub fn top_crates_in_category_partially_ranked(&self, slug: &str, limit: u32) -> Result<Vec<(Origin, u32, f64)>> {
         self.with_connection(|conn| {
             // sort by relevance to the category, downrank for being removed from crates
             let mut query = conn.prepare_cached(
-            "select k.origin, k.recent_downloads from categories c
-                join crates k on c.crate_id = k.id
-                left join (select sum(weight) as w, crate_name from repo_changes where replacement is null group by crate_name) as removals
-                on k.origin = 'crates.io:' || removals.crate_name
-                where c.slug = ?1
-                order by (recent_downloads * c.rank_weight) / (300 + coalesce(removals.w, 2)) desc
-                limit ?2"
+            "SELECT k.origin, k.recent_downloads, (k.recent_downloads * c.rank_weight) as w
+                FROM categories c
+                JOIN crates k on c.crate_id = k.id
+                WHERE c.slug = ?1
+                ORDER by w desc
+                LIMIT ?2"
             )?;
 
             let q = query.query_map(&[&slug, &limit], |row| {
                 let s: String = row.get(0);
-                (Origin::from_string(s), row.get(1))
+                (Origin::from_string(s), row.get(1), row.get(2))
             })?;
             let q = q.filter_map(|r| r.ok());
             Ok(q.collect())

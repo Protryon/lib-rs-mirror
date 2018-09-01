@@ -10,6 +10,7 @@ quick_error! {
         TomlParse(err: cargo_toml::Error) {
             display("Cargo.toml parsing error: {}", err)
             from()
+            cause(err)
         }
         Io(err: String) {
             from(err: io::Error) -> (err.to_string())

@@ -129,7 +129,13 @@ impl Index {
             let req = VersionReq::parse(d.requirement())
                 .map_err(|_| KitchenSinkErr::SemverParsingError)?;
             let name = d.name();
-            let krate = self.crate_by_name(&Origin::from_crates_io_name(name))?;
+            let krate = match self.crate_by_name(&Origin::from_crates_io_name(name)) {
+                Ok(k) => k,
+                Err(e) => {
+                    eprintln!("{} depends on missing crate {}: {}", ver.name(), name, e);
+                    continue;
+                },
+            };
             let matched = krate.versions().iter().rev()
                 .filter(|v| !v.is_yanked())
                 .find(|v| {

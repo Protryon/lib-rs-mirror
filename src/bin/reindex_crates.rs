@@ -2,13 +2,17 @@ extern crate crate_db;
 extern crate kitchen_sink;
 extern crate failure;
 extern crate rayon;
+extern crate either;
+extern crate rand;
+use rand::Rng;
+use rand::thread_rng;
 use kitchen_sink::{KitchenSink, CrateData};
 use kitchen_sink::RichCrateVersion;
 use kitchen_sink::Origin;
 use kitchen_sink::stopped;
 use std::sync::{Arc, Mutex};
 use std::collections::HashSet;
-extern crate rand;
+use either::*;
 
 fn main() {
     let crates = Arc::new(match kitchen_sink::KitchenSink::new_default() {
@@ -19,12 +23,19 @@ fn main() {
         },
     });
 
-    let seen_repos = &Mutex::new(HashSet::new());
-    let repos = true;
+    let everything = false;
+    let repos = !everything;
 
+    let seen_repos = &Mutex::new(HashSet::new());
     rayon::scope(move |s1| {
-        let c = crates.all_new_crates().unwrap().map(|c| c.origin().clone());
-        for (i, k) in c.enumerate() {
+        let c = if everything {
+            let mut c: Vec<_> = crates.all_crates().keys().cloned().collect::<Vec<_>>();
+            thread_rng().shuffle(&mut c);
+            Either::Left(c)
+        } else {
+            Either::Right(crates.all_new_crates().unwrap().map(|c| c.origin().clone()))
+        };
+        for (i, k) in c.into_iter().enumerate() {
             if stopped() {
                 eprintln!("STOPPING");
                 return;

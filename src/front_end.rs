@@ -24,7 +24,7 @@ mod download_graph;
 mod home_page;
 mod iter;
 mod urler;
-use kitchen_sink::stopped;
+use kitchen_sink::{stopped, KitchenSinkErr};
 use failure::ResultExt;
 use categories::Category;
 use crate_page::*;
@@ -80,18 +80,19 @@ pub fn render_homepage(out: &mut Write, crates: &KitchenSink) -> Result<(), fail
 }
 
 /// See `crate_page.rs.html`
-pub fn render_crate_page(out: &mut Write, all: &RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, markup: &Renderer) -> String {
+pub fn render_crate_page(out: &mut Write, all: &RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, markup: &Renderer) -> Result<String, failure::Error> {
     if stopped() {
-        eprintln!("STOPPING");
-        return "???".to_owned();
+        Err(KitchenSinkErr::Stopped)?;
     }
 
     let urler = Urler::new();
     let c = CratePage {
+        top_keyword: kitchen_sink.top_keyword(all).context("top keyword")?,
+        all_contributors: kitchen_sink.all_contributors(ver).context("all contrib")?,
         all, ver, kitchen_sink, markup,
     };
-    templates::crate_page(out, &urler, &c).unwrap();
-    c.page_title()
+    templates::crate_page(out, &urler, &c).context("crate page io")?;
+    Ok(c.page_title())
 }
 
 

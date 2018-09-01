@@ -20,16 +20,24 @@ use std::io::BufWriter;
 use std::fs::File;
 use std::sync::{Arc, Mutex};
 use std::collections::HashSet;
-use failure::Fail;
 use failure::ResultExt;
 
 ///
 /// See home_page.rs for interesting bits
 ///
-#[allow(deprecated)] // failure bug
-fn main() -> Result<(), failure::Error> {
-    let mut out = BufWriter::new(File::create("public/index.html").expect("write to public/index.html"));
-    let crates = KitchenSink::new_default().expect("init caches, data, etc.");
+fn main() {
+    if let Err(e) = run() {
+        eprintln!("Website generation failed: {}", e);
+        for c in e.iter_chain() {
+            eprintln!("error: -- {}", c);
+        }
+        std::process::exit(1);
+    }
+}
+
+fn run() -> Result<(), failure::Error> {
+    let mut out = BufWriter::new(File::create("public/index.html").context("write to public/index.html")?);
+    let crates = KitchenSink::new_default().context("init caches, data, etc.")?;
     let done_pages = Mutex::new(HashSet::with_capacity(5000));
     let image_filter = Arc::new(ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_path())?);
     let markup = Renderer::new_filter(Highlighter::new(), image_filter);
@@ -43,14 +51,8 @@ fn main() -> Result<(), failure::Error> {
         render_categories(&categories::CATEGORIES.root, Path::new("public"), &crates, &done_pages, &markup)
         .context("Failed rendering categories")
     });
-
-    if let Err(e) = res1.and_then(|_| res2) {
-        eprintln!("Website generation failed: {}", e);
-        for c in e.causes() {
-            eprintln!("error: -- {}", c);
-        }
-        std::process::exit(1);
-    }
+    res1?;
+    res2?;
 
     println!("http://localhost:3000/");
     Ok(())
@@ -79,7 +81,7 @@ fn render_categories(cats: &CategoryMap, base: &Path, crates: &KitchenSink, done
             println!("{}", path.display());
             let mut outfile = BufWriter::new(File::create(&path)
                 .with_context(|_| format!("Can't create {}", path.display()))?);
-            front_end::render_crate_page(&mut outfile, &allver, &ver, crates, markup);
+            front_end::render_crate_page(&mut outfile, &allver, &ver, crates, markup).context("render crate page")?;
             Ok(())
         };
 

@@ -31,6 +31,8 @@ pub struct CratePage<'a> {
     pub ver: &'a RichCrateVersion,
     pub kitchen_sink: &'a KitchenSink,
     pub markup: &'a Renderer,
+    pub top_keyword: Option<(u32, String)>,
+    pub all_contributors: (Vec<CrateAuthor<'a>>, Vec<CrateAuthor<'a>>, bool, usize),
 }
 
 /// Helper used to find most "interesting" versions
@@ -210,11 +212,13 @@ impl<'a> CratePage<'a> {
     }
 
     pub(crate) fn all_contributors(&self) -> Contributors {
-        let (authors, owners, co_owned, contributors) = self.kitchen_sink.all_contributors(&self.ver);
+        let (ref authors, ref owners, co_owned, contributors) = self.all_contributors;
         let period_after_authors = !owners.is_empty() && contributors == 0;
         let contributors_as_a_team = authors.last().map_or(false, |last| last.likely_a_team());
         Contributors {
-            authors, owners, co_owned, contributors,
+            authors: authors.clone(),
+            owners: owners.clone(),
+            co_owned, contributors,
             contributors_as_a_team,
             period_after_authors,
         }
@@ -466,7 +470,7 @@ impl<'a> CratePage<'a> {
 
     /// Most relevant keyword for this crate and rank in listing for that keyword
     pub fn top_keyword(&self) -> Option<(u32, String)> {
-        self.kitchen_sink.top_keyword(&self.all)
+        self.top_keyword.clone()
     }
 
     /// Categories and subcategories, but deduplicated

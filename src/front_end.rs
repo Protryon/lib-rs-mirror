@@ -14,6 +14,7 @@ extern crate rayon;
 extern crate render_readme;
 extern crate rich_crate;
 extern crate semver;
+extern crate semver_parser;
 extern crate urlencoding;
 extern crate locale;
 extern crate url;

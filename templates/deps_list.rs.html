@@ -2,7 +2,8 @@
 @use rich_crate::RichDep;
 @use kitchen_sink::Target;
 @use Urler;
-@(url: &Urler, set: &[RichDep], label: &str)
+@use CratePage;
+@(c: &CratePage, url: &Urler, set: &[RichDep], label: &str)
 
 @for d in set.iter() {
     <li property="requirements" class="@if d.dep.optional() {optional}">
@@ -28,6 +29,6 @@
           <span class="cfg k">@t</span>
         }
       }
-      <a href="@url.dependency(d)">@d.name</a>&nbsp;<span class="version">@d.dep.req()</span>@for f in d.dep.req_features() {<span class="with-feature"><wbr>+<span>@f</span></span>}
+      <a href="@url.dependency(d)">@d.name</a>&nbsp;<span class="version @c.up_to_date_class(d)">@c.pretty_print_req(d.dep.req())</span>@for f in d.dep.req_features() {<span class="with-feature"><wbr>+<span>@f</span></span>}
     </li>
 }

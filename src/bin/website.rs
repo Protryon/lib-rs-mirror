@@ -29,7 +29,7 @@ fn main() {
     if let Err(e) = run() {
         eprintln!("Website generation failed: {}", e);
         for c in e.iter_chain() {
-            eprintln!("error: -- {}", c);
+            eprintln!("error: -- {} {:?}", c, c);
         }
         std::process::exit(1);
     }

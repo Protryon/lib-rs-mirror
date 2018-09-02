@@ -1,4 +1,4 @@
-use semver;
+use semver_parser;
 use chrono::prelude::*;
 use chrono::Duration;
 use kitchen_sink::KitchenSink;
@@ -24,6 +24,7 @@ use url::Url;
 use Page;
 use locale::Numeric;
 use std::fmt::Display;
+use semver::Version as SemVer;
 
 /// Data sources used in `crate_page.rs.html`
 pub struct CratePage<'a> {
@@ -45,7 +46,7 @@ pub struct VersionGroup<'a> {
 pub struct Version<'a> {
     pub downloads: usize,
     pub num: &'a str,
-    pub semver: semver::Version,
+    pub semver: SemVer,
     pub yanked: bool,
     pub created_at: DateTime<FixedOffset>,
 }
@@ -238,6 +239,47 @@ impl<'a> CratePage<'a> {
 
     pub fn dependencies(&self) -> Option<(Vec<RichDep>, Vec<RichDep>, Vec<RichDep>)> {
         self.ver.dependencies().ok()
+    }
+
+    pub fn up_to_date_class(&self, richdep: &RichDep) -> &str {
+        let (matches_latest, pop) = richdep.dep.req().parse().ok()
+            .map(|req| self.kitchen_sink.version_popularity(&richdep.name, req))
+            .unwrap_or((false, 0.));
+        match pop {
+            x if x >= 0.5 && matches_latest => "top",
+            x if x >= 0.75 || matches_latest => "common",
+            x if x >= 0.25 => "outdated",
+            _ => "obsolete",
+        }
+    }
+
+    /// The rule is - last displayed digit may change (except 0.x)
+    pub fn pretty_print_req(&self, reqstr: &str) -> String {
+        if let Ok(req) = semver_parser::range::parse(reqstr) {
+            if req.predicates.len() == 1 {
+                let pred = &req.predicates[0];
+                if pred.pre.is_empty() {
+                    use semver_parser::range::Op::*;
+                    use semver_parser::range::WildcardVersion;
+                    match pred.op {
+                        Tilde | Compatible | Wildcard(_) => { // There's no `Wildcard(*)`
+                            let detailed = pred.op == Tilde || pred.op == Wildcard(WildcardVersion::Patch);
+                            return if detailed || pred.major == 0 {
+                                if detailed || pred.patch.map_or(false, |p| p > 0) {
+                                    format!("{}.{}.{}", pred.major, pred.minor.unwrap_or(0), pred.patch.unwrap_or(0))
+                                } else {
+                                    format!("{}.{}", pred.major, pred.minor.unwrap_or(0))
+                                }
+                            } else {
+                                format!("{}.{}", pred.major, pred.minor.unwrap_or(0))
+                            }
+                        },
+                        _ => {}
+                    }
+                }
+            }
+        }
+        reqstr.to_string()
     }
 
     pub fn top_versions(&self) -> impl Iterator<Item = VersionGroup<'a>> {
@@ -503,7 +545,7 @@ impl<'a> CratePage<'a> {
             yanked: v.yanked,
             downloads: v.downloads,
             num: &v.num,
-            semver: semver::Version::parse(&v.num).expect("semver parse"),
+            semver: SemVer::parse(&v.num).expect("semver parse"),
             created_at: DateTime::parse_from_rfc3339(&v.created_at).expect("created_at parse"),
         })
     }

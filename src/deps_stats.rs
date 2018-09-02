@@ -4,19 +4,21 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use index::*;
 use rayon::prelude::*;
+use semver::Version as SemVer;
 
 pub struct DepsStats {
     pub total: usize,
     pub counts: HashMap<Arc<str>, Counts>,
 }
 
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Counts {
     /// Default, optional
     pub runtime: (usize, usize),
     pub build: (usize, usize),
     pub dev: usize,
     pub direct: usize,
+    pub versions: HashMap<SemVer, u32>,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
@@ -82,8 +84,9 @@ impl Index {
         let total = crates.len();
         let mut counts = HashMap::with_capacity(total);
         for deps in crates {
-            for (name, depinf) in deps {
+            for (name, (depinf, semver)) in deps {
                 let n = counts.entry(name.clone()).or_insert(Counts::default());
+                *n.versions.entry(semver).or_insert(0) += 1;
                 if depinf.direct {
                     n.direct += 1;
                 }
@@ -116,28 +119,31 @@ impl Index {
     }
 }
 
-fn flatten(dep: &Dep, depinf: DepInf, collected: &mut HashMap<Arc<str>, DepInf>, node_visited: &mut HashSet<(DepInf, *const Mutex<DepSet>)>) {
+fn flatten(dep: &Dep, depinf: DepInf, collected: &mut HashMap<Arc<str>, (DepInf, SemVer)>, node_visited: &mut HashSet<(DepInf, *const Mutex<DepSet>)>) {
     flatten_set(&dep.runtime, depinf, collected, node_visited);
     let ty = if depinf.ty == DepTy::Dev {DepTy::Dev} else {DepTy::Build};
     flatten_set(&dep.build, DepInf {ty, ..depinf}, collected, node_visited);
 }
 
-fn flatten_set(depset: &ArcDepSet, depinf: DepInf, collected: &mut HashMap<Arc<str>, DepInf>, node_visited: &mut HashSet<(DepInf, *const Mutex<DepSet>)>) {
+fn flatten_set(depset: &ArcDepSet, depinf: DepInf, collected: &mut HashMap<Arc<str>, (DepInf, SemVer)>, node_visited: &mut HashSet<(DepInf, *const Mutex<DepSet>)>) {
     let target_addr: &Mutex<HashMap<DepName, Dep>> = &*depset;
     if node_visited.insert((depinf, target_addr as *const _)) {
         if let Ok(depset) = depset.try_lock() {
             for ((name, _), dep) in depset.iter() {
                 collected.entry(name.clone())
-                    .and_modify(|old| {
+                    .and_modify(|(old, semver)| {
                         if depinf.default {old.default = true;}
-                        if depinf.direct {old.direct = true;}
+                        if depinf.direct {
+                            old.direct = true;
+                            *semver = dep.semver.clone(); // direct version is most important; used for estimating out-of-date versions
+                        }
                         match (old.ty, depinf.ty) {
                             (_, DepTy::Runtime) => {old.ty = DepTy::Runtime;},
                             (DepTy::Dev, DepTy::Build) => {old.ty = DepTy::Build;},
                             _ => {},
                         }
                     })
-                    .or_insert(depinf);
+                    .or_insert((depinf, dep.semver.clone()));
                 flatten(dep, DepInf {direct: false, ..depinf}, collected, node_visited);
             }
         }

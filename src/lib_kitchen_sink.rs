@@ -45,11 +45,13 @@ pub use github_info::User;
 pub use github_info::UserType;
 pub use rich_crate::{Cfg, Target};
 pub use rich_crate::RichCrate;
+pub use rich_crate::RichDep;
 pub use rich_crate::RichCrateVersion;
 pub use rich_crate::Origin;
 pub use rich_crate::Include;
 
 use chrono::DateTime;
+use semver::VersionReq;
 use simple_cache::TempCache;
 use crate_files::CrateFile;
 use cargo_toml::TomlLibOrBin;
@@ -247,22 +249,11 @@ impl KitchenSink {
     fn rich_crate_from_index(&self, krate: &Crate) -> CResult<RichCrate> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
         let name = krate.name();
-        let cache_bust = Self::latest_version(&krate)?.version();
+        let cache_bust = krate.latest_version().version(); // most recently published version
         let meta = self.crates_io.krate(name, cache_bust)
             .with_context(|_| format!("crates.io meta for {} {}", name, cache_bust))?;
          meta.map(|meta| RichCrate::new(meta))
             .ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)).into())
-    }
-
-    fn latest_version(krate: &Crate) -> Result<&crates_index::Version, KitchenSinkErr> {
-        krate.versions().iter()
-            .max_by_key(|a| {
-                let ver = semver_parser::version::parse(a.version())
-                    .map_err(|e| eprintln!("{} has invalid version {}: {}", krate.name(), a.version(), e))
-                    .ok();
-                (!a.is_yanked(), ver)
-            })
-            .ok_or(KitchenSinkErr::NoVersions)
     }
 
     /// Wrapper for the latest version of a given crate.
@@ -277,9 +268,8 @@ impl KitchenSink {
 
     /// With warnings
     pub fn rich_crate_version_verbose(&self, origin: &Origin, fetch_type: CrateData) -> CResult<(RichCrateVersion, Warnings)> {
-        let krate = self.index.crate_by_name(origin).context("rich_crate_version")?;
-        let latest = Self::latest_version(&krate)?;
-        let key = (latest.name(), latest.version());
+        let krate = self.index.crate_ver_by_name(origin).context("rich_crate_version")?;
+        let key = (krate.name(), krate.version());
         let cached = if fetch_type != CrateData::FullNoDerived {
             match self.crate_derived_cache.get(key.0)? {
                 Some((ver, res, warn)) => {
@@ -297,7 +287,7 @@ impl KitchenSink {
         };
 
         let (d, warn) = if let Some(res) = cached {res} else {
-            let (d, warn) = self.rich_crate_version_data(latest, fetch_type).context("get rich crate data")?;
+            let (d, warn) = self.rich_crate_version_data(krate, fetch_type).context("get rich crate data")?;
             if fetch_type == CrateData::Full {
                 self.crate_derived_cache.set(key.0, (key.1.to_string(), d.clone(), warn.clone()))?;
             } else if fetch_type == CrateData::FullNoDerived {
@@ -305,7 +295,7 @@ impl KitchenSink {
             }
             (d, warn)
         };
-        Ok((RichCrateVersion::new(latest.clone(), d.manifest, d.derived, d.readme, d.lib_file, d.path_in_repo, d.has_buildrs), warn))
+        Ok((RichCrateVersion::new(krate.clone(), d.manifest, d.derived, d.readme, d.lib_file, d.path_in_repo, d.has_buildrs), warn))
     }
 
     fn rich_crate_version_data(&self, latest: &crates_index::Version, fetch_type: CrateData) -> CResult<(RichCrateVersionCacheData, Warnings)> {
@@ -540,6 +530,13 @@ impl KitchenSink {
         deps.counts.get(krate.short_name()).cloned()
     }
 
+    /// (latest, pop)
+    /// 0 = not used
+    /// 1 = everyone uses it
+    pub fn version_popularity(&self, crate_name: &str, requirement: VersionReq) -> (bool, f32) {
+        self.index.version_popularity(crate_name, requirement)
+    }
+
     /// "See also"
     pub fn related_categories(&self, slug: &str) -> CResult<Vec<String>> {
         self.crate_db.related_categories(slug)
@@ -615,7 +612,7 @@ impl KitchenSink {
         Ok(())
     }
 
-    pub fn index_crate_latest_version(&self, v: &RichCrateVersion) -> CResult<()> {
+    pub fn index_crate_highest_version(&self, v: &RichCrateVersion) -> CResult<()> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
         self.crate_db.index_latest(v)?;
         Ok(())
@@ -716,25 +713,27 @@ impl KitchenSink {
                 RepoHost::GitHub(ref repo) => {
                     // multiple crates share a repo, which causes cache churn when version "changes"
                     // so pick one of them and track just that one version
-                    let cachebust = match self.crate_db.first_crate_for_repo(crate_repo)? {
+                    let cachebust = match self.crate_db.first_crate_for_repo(crate_repo).context("repo cache_bust")? {
                         Some(ref ver_name) if ver_name == krate.short_name() => krate.version(),
                         None => krate.version(),
                         Some(ref ver_name) => {
-                            let k = self.index.crate_by_name(&Origin::from_crates_io_name(ver_name))
+                            let k = self.index.crate_ver_by_name(&Origin::from_crates_io_name(ver_name))
                                 .context("repo crate cache buster")?;
-                            k.latest_version().version()
+                            k.version()
                         }
                     };
-                    let contributors = self.gh.contributors(repo, cachebust)?.unwrap_or_default();
+                    let contributors = self.gh.contributors(repo, cachebust).context("contributors")?.unwrap_or_default();
                     let mut by_login = HashMap::new();
                     for contr in contributors {
-                        let count = contr.weeks.iter()
-                            .map(|w| {
-                                w.commits as f64 +
-                                ((w.added + w.deleted*2) as f64).sqrt()
-                            }).sum::<f64>();
-                        by_login.entry(contr.author.login.to_lowercase())
-                            .or_insert((0., contr.author)).0 += count;
+                        if let Some(author) = contr.author {
+                            let count = contr.weeks.iter()
+                                .map(|w| {
+                                    w.commits as f64 +
+                                    ((w.added + w.deleted*2) as f64).sqrt()
+                                }).sum::<f64>();
+                            by_login.entry(author.login.to_lowercase())
+                                .or_insert((0., author)).0 += count;
+                        }
                     }
                     by_login
                 },
@@ -909,7 +908,7 @@ impl KitchenSink {
     }
 
     fn crate_owners(&self, krate: &RichCrateVersion) -> CResult<Vec<CrateOwner>> {
-        Ok(self.crates_io.crate_owners(krate.short_name(), krate.version())?.unwrap_or_default())
+        Ok(self.crates_io.crate_owners(krate.short_name(), krate.version()).context("crate_owners")?.unwrap_or_default())
     }
 
     // Sorted from the top, returns `(origin, recent_downloads)`

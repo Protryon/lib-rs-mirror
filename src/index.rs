@@ -58,13 +58,30 @@ impl Index {
         .ok_or_else(|| KitchenSinkErr::CrateNotFound(name.clone()))
     }
 
+    pub fn crate_ver_by_name(&self, name: &Origin) -> Result<&Version, KitchenSinkErr> {
+        Ok(Self::highest_version(self.crate_by_name(name)?))
+    }
+
+    pub fn highest_version(krate: &Crate) -> &Version {
+        krate.versions()
+            .iter()
+            .max_by_key(|a| {
+                let ver = SemVer::parse(a.version())
+                    .map_err(|e| eprintln!("{} has invalid version {}: {}", krate.name(), a.version(), e))
+                    .ok();
+                (!a.is_yanked(), ver)
+            })
+            .unwrap_or_else(|| krate.latest_version()) // latest_version = most recently published version
+    }
+
     pub fn deps_of_crate(&self, krate: &Crate, DepQuery {default, all_optional, dev}: DepQuery) -> Result<Dep, KitchenSinkErr> {
-        let latest = krate.latest_version();
+        let latest = Self::highest_version(krate);
         let mut features = Vec::with_capacity(if all_optional {latest.features().len()} else {0});
         if all_optional {
             features.extend(latest.features().iter().filter(|(_,v)| !v.is_empty()).map(|(c, _)| c.to_string().into_boxed_str()));
         };
         Ok(Dep {
+            semver: semver_parse(latest.version()),
             runtime: self.deps_of_ver(latest, Features {
                 all_targets: all_optional,
                 default,
@@ -109,7 +126,7 @@ impl Index {
             }
         }
 
-        let mut set: HashMap<DepName, (_, _, HashSet<String>)> = HashMap::with_capacity(60);
+        let mut set: HashMap<DepName, (_, _, SemVer, HashSet<String>)> = HashMap::with_capacity(60);
         for d in ver.dependencies() {
             if d.target().is_some() {
                 continue; // FIXME: allow common targets?
@@ -136,19 +153,22 @@ impl Index {
                     continue;
                 },
             };
-            let matched = krate.versions().iter().rev()
+            let (matched, semver) = krate.versions().iter().rev()
                 .filter(|v| !v.is_yanked())
-                .find(|v| {
-                    if let Ok(v) = SemVer::parse(v.version()) {
-                        req.matches(&v)
-                    } else {false}
+                .filter_map(|v| Some((v, SemVer::parse(v.version()).ok()?)))
+                .find(|(_, semver)| {
+                    req.matches(&semver)
                 })
-                .unwrap_or_else(|| krate.latest_version());
+                .unwrap_or_else(|| {
+                    let ver = krate.latest_version(); // bad version, but it shouldn't happen anywya
+                    let semver = semver_parse(ver.version());
+                    (ver, semver)
+                });
 
             let key = (name.into(), matched.version().into());
 
-            let (_, _, all_features) = set.entry(key)
-                .or_insert_with(|| (d, matched.clone(), HashSet::new()));
+            let (_, _, _, all_features) = set.entry(key)
+                .or_insert_with(|| (d, matched.clone(), semver, HashSet::new()));
             all_features.extend(d.features().iter().cloned());
             if let Some(s) = enable_dep_features {
                 all_features.extend(s.iter().map(|s| s.to_string()));
@@ -160,7 +180,7 @@ impl Index {
         let result = Arc::new(Mutex::new(HashMap::new()));
         self.cache.write().unwrap().insert(key, result.clone());
 
-        let set: Result<_,_> = set.into_iter().map(|(k, (d, matched, all_features))| {
+        let set: Result<_,_> = set.into_iter().map(|(k, (d, matched, semver, all_features))| {
             let all_features = all_features.into_iter().map(Into::into).collect::<Vec<_>>().into_boxed_slice();
             let runtime = self.deps_of_ver(&matched, Features {
                 all_targets: wants.all_targets,
@@ -177,6 +197,7 @@ impl Index {
                 features: all_features,
             })?;
             Ok((k, Dep {
+                semver,
                 runtime,
                 build,
             }))
@@ -185,6 +206,58 @@ impl Index {
         *result.lock().unwrap() = set?;
         Ok(result)
     }
+
+    /// (is_latest, popularity)
+    /// 0 = not used
+    /// 1 = everyone uses it
+    pub fn version_popularity(&self, crate_name: &str, requirement: VersionReq) -> (bool, f32) {
+        if is_deprecated(crate_name) {
+            return (false, 0.);
+        }
+
+        let matches_latest = self.crate_by_name(&Origin::from_crates_io_name(crate_name))
+        .ok()
+        .and_then(|krate| {
+            Self::highest_version(krate).version().parse().ok()
+        })
+        .map_or(false, |latest| {
+            requirement.matches(&latest)
+        });
+
+        let stats = self.deps_stats();
+        let pop = stats.counts.get(crate_name)
+        .map(|stats| {
+            let mut matches = 0;
+            let mut unmatches = 0;
+            for (ver, count) in &stats.versions {
+                if requirement.matches(ver) {
+                    matches += count; // TODO: this should be (slighly) weighed by crate's popularity?
+                } else {
+                    unmatches += count;
+                }
+            }
+            matches += 1; // one to denoise unpopular crates; div/0
+            matches as f32 / (matches + unmatches) as f32
+        })
+        .unwrap_or(0.);
+
+        (matches_latest, pop)
+    }
+}
+
+
+/// TODO: check if the repo is rust-lang-deprecated.
+/// Note: the repo URL in the crate is outdated, and it may be a redirect to the deprecated
+fn is_deprecated(name: &str) -> bool {
+    match name {
+        "rustc-serialize" | "gcc" | "rustc-benchmarks" | "time" | "tempdir" => true,
+        _ => false,
+    }
+}
+
+fn semver_parse(ver: &str) -> SemVer {
+    SemVer::parse(ver)
+        .unwrap_or_else(|_| SemVer::parse("0.0.0").expect("must parse"))
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -201,6 +274,7 @@ pub type DepSet = HashMap<DepName, Dep>;
 pub type ArcDepSet = Arc<Mutex<DepSet>>;
 
 pub struct Dep {
+    pub semver: SemVer,
     pub runtime: ArcDepSet,
     pub build: ArcDepSet,
 }

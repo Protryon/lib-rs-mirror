@@ -29,6 +29,7 @@ extern crate chrono;
 
 mod index;
 pub use index::*;
+use rayon::prelude::*;
 mod deps_stats;
 pub use deps_stats::*;
 
@@ -226,7 +227,8 @@ impl KitchenSink {
 
     pub fn all_new_crates<'a>(&'a self) -> CResult<impl Iterator<Item = RichCrate> + 'a> {
         let min_timestamp = self.crate_db.latest_crate_update_timestamp()?.unwrap_or(0);
-        Ok(self.index.crates().values()
+        let res: Vec<RichCrate> = self.index.crates()
+        .par_iter().map(|(_, v)| v)
         .filter_map(move |k| {
             self.rich_crate_from_index(k).ok()
         })
@@ -238,7 +240,8 @@ impl KitchenSink {
                 eprintln!("Can't parse {} of {}", latest, k.name());
                 true
             }
-        }))
+        }).collect();
+        Ok(res.into_iter())
     }
 
     /// Wrapper object for metadata common for all versions of a crate

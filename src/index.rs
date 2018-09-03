@@ -59,23 +59,24 @@ impl Index {
     }
 
     pub fn crate_ver_by_name(&self, name: &Origin) -> Result<&Version, KitchenSinkErr> {
-        Ok(Self::highest_version(self.crate_by_name(name)?))
+        Ok(Self::highest_version(self.crate_by_name(name)?, false))
     }
 
-    pub fn highest_version(krate: &Crate) -> &Version {
+    pub fn highest_version(krate: &Crate, stable_only: bool) -> &Version {
         krate.versions()
             .iter()
             .max_by_key(|a| {
                 let ver = SemVer::parse(a.version())
                     .map_err(|e| eprintln!("{} has invalid version {}: {}", krate.name(), a.version(), e))
                     .ok();
-                (!a.is_yanked(), ver)
+                let bad = a.is_yanked() || (stable_only && !ver.as_ref().map_or(false, |v| v.pre.is_empty()));
+                (!bad, ver)
             })
             .unwrap_or_else(|| krate.latest_version()) // latest_version = most recently published version
     }
 
     pub fn deps_of_crate(&self, krate: &Crate, DepQuery {default, all_optional, dev}: DepQuery) -> Result<Dep, KitchenSinkErr> {
-        let latest = Self::highest_version(krate);
+        let latest = Self::highest_version(krate, true);
         let mut features = Vec::with_capacity(if all_optional {latest.features().len()} else {0});
         if all_optional {
             features.extend(latest.features().iter().filter(|(_,v)| !v.is_empty()).map(|(c, _)| c.to_string().into_boxed_str()));
@@ -218,7 +219,7 @@ impl Index {
         let matches_latest = self.crate_by_name(&Origin::from_crates_io_name(crate_name))
         .ok()
         .and_then(|krate| {
-            Self::highest_version(krate).version().parse().ok()
+            Self::highest_version(krate, true).version().parse().ok()
         })
         .map_or(false, |latest| {
             requirement.matches(&latest)

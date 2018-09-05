@@ -129,7 +129,7 @@ impl Index {
 
         let mut set: HashMap<DepName, (_, _, SemVer, HashSet<String>)> = HashMap::with_capacity(60);
         for d in ver.dependencies() {
-            if d.target().is_some() {
+            if !wants.all_targets && d.target().is_some() {
                 continue; // FIXME: allow common targets?
             }
             match d.kind() {

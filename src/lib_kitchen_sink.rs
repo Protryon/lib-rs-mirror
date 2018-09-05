@@ -163,14 +163,24 @@ impl KitchenSink {
 
     pub fn new(data_path: &Path, github_token: &str) -> CResult<Self> {
         let main_cache_path = Self::assert_exists(data_path.join("cache.db"))?;
+        let gh_path = Self::assert_exists(data_path.join("github.db"))?;
+        let index_path = Self::assert_exists(data_path.join("index"))?;
+
+        let (crates_io, gh) = rayon::join(
+            || crates_io_client::CratesIoClient::new(data_path),
+            || github_info::GitHub::new(&gh_path, github_token));
+        let (index, crate_derived_cache) = rayon::join(
+            || Index::new(index_path),
+            || TempCache::new(&data_path.join("crate_derived.db")));
+        index.deps_stats(); // prewarm
         Ok(Self {
-            index: Index::new(Self::assert_exists(data_path.join("index"))?),
+            crates_io: crates_io?,
+            index,
             docs_rs: docs_rs_client::DocsRsClient::new(&main_cache_path)?,
             crate_db: CrateDb::new(Self::assert_exists(data_path.join("crate_data.db"))?)?,
             user_db: user_db::UserDb::new(Self::assert_exists(data_path.join("users.db"))?)?,
-            gh: github_info::GitHub::new(&Self::assert_exists(data_path.join("github.db"))?, github_token)?,
-            crates_io: crates_io_client::CratesIoClient::new(data_path)?,
-            crate_derived_cache: TempCache::new(&data_path.join("crate_derived.db"))?,
+            gh: gh?,
+            crate_derived_cache: crate_derived_cache?,
             git_checkout_path: data_path.join("git"),
             category_crate_counts: LazyOnce::new(),
             removals: LazyOnce::new(),
@@ -547,19 +557,23 @@ impl KitchenSink {
 
     /// Recommendations
     pub fn related_crates(&self, krate: &RichCrateVersion) -> CResult<Vec<RichCrateVersion>> {
-        let replacements = self.crate_db.replacement_crates(krate.short_name()).context("related_crates1")?;
-        let related = self.crate_db.related_crates(krate.origin()).context("related_crates2")?;
+        let (replacements, related) = rayon::join(
+            || self.crate_db.replacement_crates(krate.short_name()).context("related_crates1"),
+            || self.crate_db.related_crates(krate.origin()).context("related_crates2"));
 
-        Ok(replacements.into_iter()
-        .map(|name| Origin::from_crates_io_name(&name))
-        .chain(related)
-        .unique()
-        .take(10)
-        .map(|origin| {
-            self.rich_crate_version(&origin, CrateData::Minimal)
-        })
-        .filter_map(|res| res.map_err(|e| eprintln!("related crate err: {}", e)).ok())
-        .collect())
+        let replacements: Vec<_> = replacements?.into_iter()
+            .map(|name| Origin::from_crates_io_name(&name))
+            .chain(related?)
+            .unique()
+            .take(10)
+            .collect();
+        Ok(replacements.into_par_iter()
+            .with_max_len(1)
+            .map(|origin| {
+                self.rich_crate_version(&origin, CrateData::Minimal)
+            })
+            .filter_map(|res| res.map_err(|e| eprintln!("related crate err: {}", e)).ok())
+            .collect())
     }
 
     /// Returns (nth, slug)

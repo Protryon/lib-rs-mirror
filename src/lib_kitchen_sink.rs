@@ -365,7 +365,7 @@ impl KitchenSink {
         if meta.manifest.package.keywords.is_empty() && fetch_type != CrateData::Minimal {
             let gh = match maybe_repo.as_ref() {
                 Some(repo) => if let RepoHost::GitHub(ref gh) = repo.host() {
-                    self.gh.topics(gh, ver)?
+                    self.gh.topics(gh, &self.cachebust_string_for_repo(repo)?)?
                 } else {None},
                 _ => None,
             };
@@ -708,6 +708,17 @@ impl KitchenSink {
         self.rich_crate_version(&Origin::from_crates_io_name(&name), CrateData::Minimal).ok()
     }
 
+    pub fn cachebust_string_for_repo(&self, crate_repo: &Repo) -> CResult<String> {
+        Ok(match self.crate_db.first_crate_for_repo(crate_repo).context("repo cache_bust")? {
+            None => "*".to_string(),
+            Some(ref ver_name) => {
+                let k = self.index.crate_ver_by_name(&Origin::from_crates_io_name(ver_name))
+                    .context("repo crate cache buster")?;
+                k.version().to_string()
+            }
+        })
+    }
+
     /// Merge authors, owners, contributors
     pub fn all_contributors<'a>(&self, krate: &'a RichCrateVersion) -> CResult<(Vec<CrateAuthor<'a>>, Vec<CrateAuthor<'a>>, bool, usize)> {
         let mut contributors = match krate.repository().as_ref() {
@@ -716,16 +727,8 @@ impl KitchenSink {
                 RepoHost::GitHub(ref repo) => {
                     // multiple crates share a repo, which causes cache churn when version "changes"
                     // so pick one of them and track just that one version
-                    let cachebust = match self.crate_db.first_crate_for_repo(crate_repo).context("repo cache_bust")? {
-                        Some(ref ver_name) if ver_name == krate.short_name() => krate.version(),
-                        None => krate.version(),
-                        Some(ref ver_name) => {
-                            let k = self.index.crate_ver_by_name(&Origin::from_crates_io_name(ver_name))
-                                .context("repo crate cache buster")?;
-                            k.version()
-                        }
-                    };
-                    let contributors = self.gh.contributors(repo, cachebust).context("contributors")?.unwrap_or_default();
+                    let cachebust = self.cachebust_string_for_repo(crate_repo)?;
+                    let contributors = self.gh.contributors(repo, &cachebust).context("contributors")?.unwrap_or_default();
                     let mut by_login = HashMap::new();
                     for contr in contributors {
                         if let Some(author) = contr.author {

@@ -277,7 +277,7 @@ impl KitchenSink {
             match self.crate_derived_cache.get(key.0)? {
                 Some((ver, res, warn)) => {
                     if key.1 != ver {
-                        self.crate_derived_cache.delete(key.0).context("clear cache 1")?;
+                        eprintln!("•• Stale cache {} {} vs {}", krate.name(), key.1, ver);
                         None
                     } else {
                         Some((res, warn))

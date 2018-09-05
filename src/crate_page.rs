@@ -171,15 +171,8 @@ impl<'a> CratePage<'a> {
 
     pub fn render_lib_intro(&self) -> Option<templates::Html<String>> {
         if let Some(lib) = self.ver.lib_file() {
-            let mut out = String::new();
-            for l in lib.lines() {
-                let l = l.trim_left();
-                if l.starts_with("//!") {
-                    out.push_str(&l[3..]);
-                    out.push('\n');
-                }
-            }
-            if !out.is_empty() {
+            let out = extract_doc_comments(lib);
+            if !out.trim().is_empty() {
                 let docs_url = self.ver.docs_rs_url();
                 let base = docs_url.as_ref().map(|u| (u.as_str(),u.as_str()));
                 return Some(templates::Html(self.markup.page(&Markup::Markdown(out), base, self.nofollow())));
@@ -605,4 +598,37 @@ impl ReleaseCounts {
             format!("{} release{} ({} {})", self.total, if self.total==1 {""} else {"s"}, n, label)
         }
     }
+}
+
+fn extract_doc_comments(code: &str) -> String {
+    let mut out = String::with_capacity(code.len()/2);
+    let mut is_in_block_mode = false;
+    for l in code.lines() {
+        let l = l.trim_left();
+        if is_in_block_mode {
+            if let Some(offset) = l.find("*/") {
+                is_in_block_mode = false;
+                out.push_str(&l[0..offset]);
+            } else {
+                out.push_str(l);
+            }
+            out.push('\n');
+        } else if l.starts_with("/*!") && !l.contains("*/") {
+            is_in_block_mode = true;
+            let rest = &l[3..];
+            out.push_str(rest);
+            if !rest.trim().is_empty() {
+                out.push('\n');
+            }
+        } else if l.starts_with("//!") {
+            out.push_str(&l[3..]);
+            out.push('\n');
+        }
+    }
+    out
+}
+
+#[test]
+fn parse() {
+    assert_eq!("hello\nworld", extract_doc_comments("/*!\nhello\nworld */").trim());
 }

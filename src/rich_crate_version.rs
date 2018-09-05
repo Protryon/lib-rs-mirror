@@ -208,6 +208,7 @@ impl RichCrateVersion {
 
     pub fn has_runtime_deps(&self) -> bool {
         !self.manifest.dependencies.is_empty()
+        || self.manifest.target.values().any(|target| !target.dependencies.is_empty())
     }
 
     pub fn features(&self) -> &BTreeMap<String, Vec<String>> {

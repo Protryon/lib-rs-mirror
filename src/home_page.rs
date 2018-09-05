@@ -59,6 +59,7 @@ impl<'a> HomePage<'a> {
                 .take(3)
                 .collect();
             let new: Vec<_> = new.into_par_iter()
+                .with_max_len(1)
                 .filter_map(|c| {
                     self.crates.rich_crate_version(&c, CrateData::Full).ok()
                 })
@@ -106,6 +107,7 @@ impl<'a> HomePage<'a> {
                 })
                 .collect();
             cat.top.par_extend(top.into_par_iter()
+                .with_max_len(1)
                 .filter_map(|c| {
                     self.crates.rich_crate_version(&c, CrateData::Full).ok()
                 }));

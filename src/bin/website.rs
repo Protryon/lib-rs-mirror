@@ -88,6 +88,7 @@ fn render_categories(cats: &CategoryMap, base: &Path, crates: &KitchenSink, done
         crates.top_crates_in_category(&cat.slug).context("top crates")?
         .par_iter()
         .take(75)
+        .with_max_len(1)
         .map(|(c, _)| {
             let msg = format!("Failed rendering crate {}", c.to_str());
             render_crate(c).context(msg)
@@ -96,7 +97,7 @@ fn render_categories(cats: &CategoryMap, base: &Path, crates: &KitchenSink, done
 
         crates.recently_updated_crates_in_category(&cat.slug)
             .context("recently updated crates")?
-        .par_iter().map(render_crate)
+        .par_iter().with_max_len(1).map(render_crate)
         .collect::<Result<(), failure::Error>>()?;
 
         let path = base.join(format!("{}.html", slug));

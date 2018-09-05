@@ -26,6 +26,7 @@ impl<'a> CatPage<'a> {
             keywords: crates.top_keywords_in_category(&cat.slug)?,
             related: crates.related_categories(&cat.slug)?,
             crates: crates.top_crates_in_category(&cat.slug)?.par_iter()
+                .with_max_len(1)
                 .filter_map(|&(ref c, d)| {
                     let c = match crates.rich_crate_version(&c, CrateData::Full) {
                         Ok(c) => c,

@@ -227,16 +227,9 @@ impl RichCrateVersion {
             })
         }
         let mut normal: BTreeMap<String, RichDep> = self.manifest.dependencies.iter().map(to_dep).collect();
-        let mut dev: BTreeMap<String, RichDep> = self.manifest.dev_dependencies.iter().map(to_dep).collect();
         let mut build: BTreeMap<String, RichDep> = self.manifest.build_dependencies.iter().map(to_dep).collect();
-        // Don't display deps twice if they're required anyway
-        for dep in normal.keys() {
-            dev.remove(dep);
-            build.remove(dep);
-        }
-        for dep in build.keys() {
-            dev.remove(dep);
-        }
+        let mut dev: BTreeMap<String, RichDep> = self.manifest.dev_dependencies.iter().map(to_dep).collect();
+
         fn add_targets(dest: &mut BTreeMap<String, RichDep>, src: &TomlDepsSet, target: &str) -> Result<(), CfgErr> {
             for (k, v) in src {
                 use std::collections::btree_map::Entry::*;
@@ -257,8 +250,18 @@ impl RichCrateVersion {
         }
         for (ref target, ref plat) in &self.manifest.target {
             add_targets(&mut normal, &plat.dependencies, target)?;
-            add_targets(&mut dev, &plat.dev_dependencies, target)?;
             add_targets(&mut build, &plat.build_dependencies, target)?;
+            add_targets(&mut dev, &plat.dev_dependencies, target)?;
+        }
+
+
+        // Don't display deps twice if they're required anyway
+        for dep in normal.keys() {
+            dev.remove(dep);
+            build.remove(dep);
+        }
+        for dep in build.keys() {
+            dev.remove(dep);
         }
 
         let default_features = self.features().get("default")

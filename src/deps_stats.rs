@@ -22,17 +22,57 @@ pub struct RevDependencies {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
-enum DepTy {
+pub enum DepTy {
     Runtime,
     Build,
     Dev,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
-struct DepInf {
-    direct: bool,
-    default: bool,
-    ty: DepTy,
+pub struct DepInf {
+    pub direct: bool,
+    pub default: bool,
+    pub ty: DepTy,
+}
+
+pub struct DepVisitor {
+    node_visited: HashSet<(DepInf, *const Mutex<DepSet>)>,
+}
+
+impl DepVisitor {
+    pub fn new() -> Self {
+        Self {
+            node_visited: HashSet::with_capacity(120),
+        }
+    }
+
+    pub fn visit(&mut self, depinf: DepInf, depset: &ArcDepSet, mut cb: impl FnMut(&mut Self, &DepName, &Dep)) {
+        let target_addr: &Mutex<HashMap<DepName, Dep>> = &*depset;
+        if self.node_visited.insert((depinf, target_addr as *const _)) {
+            if let Ok(depset) = depset.try_lock() {
+                for (name, dep) in depset.iter() {
+                    cb(self, name, dep);
+                }
+            }
+        }
+    }
+
+    #[inline]
+    pub fn start(&mut self, dep: &Dep, depinf: DepInf, cb: impl FnMut(&mut DepVisitor, &ArcDepSet, DepInf)) {
+        self.recurse_inner(dep, DepInf {direct: true, ..depinf}, cb)
+    }
+
+    #[inline]
+    pub fn recurse(&mut self, dep: &Dep, depinf: DepInf, cb: impl FnMut(&mut DepVisitor, &ArcDepSet, DepInf)) {
+        self.recurse_inner(dep, DepInf {direct: false, ..depinf}, cb)
+    }
+
+    #[inline]
+    fn recurse_inner(&mut self, dep: &Dep, depinf: DepInf, mut cb: impl FnMut(&mut DepVisitor, &ArcDepSet, DepInf)) {
+        cb(self, &dep.runtime, depinf);
+        let ty = if depinf.ty == DepTy::Dev {DepTy::Dev} else {DepTy::Build};
+        cb(self, &dep.build, DepInf {ty, ..depinf});
+    }
 }
 
 impl Index {

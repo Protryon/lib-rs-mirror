@@ -246,6 +246,12 @@ impl Index {
     }
 }
 
+use std::fmt;
+impl fmt::Debug for Dep {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Dep {{ {}, runtime: x{}, build: x{} }}", self.semver, self.runtime.lock().unwrap().len(), self.build.lock().unwrap().len())
+    }
+}
 
 /// TODO: check if the repo is rust-lang-deprecated.
 /// Note: the repo URL in the crate is outdated, and it may be a redirect to the deprecated

@@ -21,14 +21,14 @@ pub struct RevDependencies {
     pub versions: HashMap<SemVer, u32>,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum DepTy {
     Runtime,
     Build,
     Dev,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct DepInf {
     pub direct: bool,
     pub default: bool,

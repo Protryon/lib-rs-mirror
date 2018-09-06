@@ -157,7 +157,7 @@
                   <p class="top-n">#<b>@top</b> in <a href="@url.keyword(&keyword)">#@keyword</a></p>
                 }
               }
-              @:downloads(&c.download_graph())
+              @:downloads(&c.download_graph(209, 60))
               <p><b>@c.format_number(c.all.downloads_per_month())</b> downloads per month</p>
             </section>
           </section>

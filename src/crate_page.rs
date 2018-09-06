@@ -543,8 +543,8 @@ impl<'a> CratePage<'a> {
     }
 
     /// Data for weekly breakdown of recent downloads
-    pub fn download_graph(&self) -> DownloadsGraph {
-        DownloadsGraph::new(self.all.weekly_downloads(), self.ver.has_bin())
+    pub fn download_graph(&self, width: usize, height: usize) -> DownloadsGraph {
+        DownloadsGraph::new(self.all.weekly_downloads(), self.ver.has_bin(), width, height)
     }
 
     pub fn related_crates(&self) -> Option<Vec<RichCrateVersion>> {

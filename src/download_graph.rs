@@ -15,20 +15,24 @@ pub struct DownloadsGraph {
     exp: u32,
     is_bin: bool,
     scale: usize,
+    pub width: usize,
+    pub height: usize,
     pub data: Vec<DownloadWeek>,
 }
 
 impl DownloadsGraph {
-    pub fn new(data: Vec<DownloadWeek>, is_bin: bool) -> Self {
+    pub fn new(data: Vec<DownloadWeek>, is_bin: bool, width: usize, height: usize) -> Self {
         // scale from all data is fine, will demote crates that lost popularity
         let (exp, scale) = Self::downloads_scale(&data);
         Self {
-            exp, scale, data, is_bin,
+            exp, scale, data, is_bin, width, height,
         }
     }
 
     /// Lines in the background of the chart
-    pub fn ticks(&self, chart_y: usize, chart_height: usize) -> Vec<(f32, f32)> {
+    pub fn ticks(&self) -> Vec<(f32, f32)> {
+        let chart_y = 1;
+        let chart_height = self.height - 1;
         match self.exp {
             0..=2 => {
                 // When values are very low it seems nice to reuse the tick line to show maximum
@@ -77,7 +81,12 @@ impl DownloadsGraph {
 
     /// returns (x,y,width,height,color,label)
     /// TODO: make it a struct
-    pub fn graph_data(&self, chart_x: usize, chart_y: usize, chart_width: usize, chart_height: usize) -> Vec<(usize,usize,usize,usize,String,String)> {
+    pub fn graph_data(&self) -> Vec<(usize,usize,usize,usize,String,String)> {
+        let chart_x = 1;
+        let chart_y = 1;
+        let chart_width = self.width - 1;
+        let chart_height = self.height - 1;
+
         let scale = self.scale;
         // max half year (but we have only 14 weeks of data anyway)
         let max_time_span = 26;

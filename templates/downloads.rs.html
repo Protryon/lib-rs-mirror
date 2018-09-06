@@ -1,13 +1,13 @@
 @use download_graph::DownloadsGraph;
 
 @(dg: &DownloadsGraph)
-<svg viewBox="0 0 209 60" width=209 height=60>
+<svg viewBox="0 0 @dg.width @dg.height" width=@dg.width height=@dg.height>
     <title>Download history</title>
-    @for (y,w) in dg.ticks(1, 58) {
-        <line x1=1.5 x2=208.5 y1=@y y2=@y stroke="black" stroke-width=@w  stroke-linecap=square stroke-opacity=0.3 />
+    @for (y,w) in dg.ticks() {
+        <line x1=1.5 x2="(@dg.width as f64 - 1.5)" y1=@y y2=@y stroke="black" stroke-width=@w  stroke-linecap=square stroke-opacity=0.3 />
     }
-    @for (x, y, w, h, f, l) in dg.graph_data(1, 1, 208, 58) {
+    @for (x, y, w, h, f, l) in dg.graph_data() {
         <rect x=@x y=@y width=@w height=@h fill="@f" fill-opacity="0.95"><title>@l</title></rect>
     }
-    <rect x=0.5 y=0.5 width=208 height=59 stroke="black" fill=none stroke-opacity=0.3 stroke-linecap=square stroke-width=1>
+    <rect x=0.5 y=0.5 width="@(dg.width - 1)" height="@(dg.height - 1)" stroke="black" fill=none stroke-opacity=0.3 stroke-linecap=square stroke-width=1>
 </svg>

@@ -6,6 +6,7 @@ extern crate crates_io_client;
 extern crate parse_cfg;
 extern crate render_readme;
 extern crate repo_url;
+extern crate udedokei;
 extern crate semver;
 extern crate serde;
 #[macro_use]

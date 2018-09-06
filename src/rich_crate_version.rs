@@ -5,6 +5,7 @@ use categories::Categories;
 use crates_index::Version;
 use repo_url::Repo;
 use semver;
+use udedokei;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::collections::HashSet;
@@ -361,4 +362,5 @@ pub struct Derived {
     pub categories: Option<Vec<String>>,
     pub keywords: Option<Vec<String>>,
     pub github_keywords: Option<Vec<String>>,
+    pub language_stats: udedokei::Stats,
 }

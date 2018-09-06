@@ -182,13 +182,7 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn is_readme_short(&self) -> bool {
-        if let Ok(Some(ref r)) = self.ver.readme() {
-            match r.markup {
-                Markup::Markdown(ref s) | Markup::Rst(ref s) => s.len() < 1000,
-            }
-        } else {
-            true
-        }
+        self.kitchen_sink.is_readme_short(self.ver.readme())
     }
 
     pub fn render_readme(&self, readme: &Readme) -> templates::Html<String> {

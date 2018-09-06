@@ -50,6 +50,7 @@ pub use rich_crate::RichDep;
 pub use rich_crate::RichCrateVersion;
 pub use rich_crate::Origin;
 pub use rich_crate::Include;
+pub use rich_crate::Markup;
 
 use chrono::DateTime;
 use semver::VersionReq;
@@ -172,7 +173,6 @@ impl KitchenSink {
         let (index, crate_derived_cache) = rayon::join(
             || Index::new(index_path),
             || TempCache::new(&data_path.join("crate_derived.db")));
-        index.deps_stats(); // prewarm
         Ok(Self {
             crates_io: crates_io?,
             index,
@@ -353,7 +353,7 @@ impl KitchenSink {
         }
 
         // quick and dirty autolibs substitute
-        if meta.manifest.lib.is_none() && meta.has("src/lib.rs") {
+        if meta.manifest.lib.is_none() && (meta.lib_file.is_some() || meta.has("src/lib.rs")) {
             meta.manifest.lib = Some(TomlLibOrBin {
                 path: Some("src/lib.rs".to_owned()),
                 name: Some(meta.manifest.package.name.clone()),
@@ -431,6 +431,11 @@ impl KitchenSink {
             }
         }
 
+        // lib file takes majority of space in cache, so remove it if it won't be used
+        if !self.is_readme_short(meta.readme.as_ref().map(|r| r.as_ref()).map_err(|_|())) {
+            meta.lib_file = None;
+        }
+
         let path_in_repo = match maybe_repo.as_ref() {
             Some(repo) => if fetch_type != CrateData::Minimal {
                 self.crate_db.path_in_repo(repo, name)?
@@ -448,6 +453,16 @@ impl KitchenSink {
             lib_file: meta.lib_file,
             path_in_repo,
         }, warnings))
+    }
+
+    pub fn is_readme_short(&self, readme: Result<Option<&Readme>, ()>) -> bool {
+        if let Ok(Some(ref r)) = readme {
+            match r.markup {
+                Markup::Markdown(ref s) | Markup::Rst(ref s) => s.len() < 1000,
+            }
+        } else {
+            true
+        }
     }
 
     fn add_readme_from_repo(&self, meta: &mut CrateFile, maybe_repo: Option<&Repo>) -> Warnings {

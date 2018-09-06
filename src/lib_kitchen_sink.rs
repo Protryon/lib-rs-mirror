@@ -381,7 +381,11 @@ impl KitchenSink {
             });
         }
 
+        let has_buildrs = meta.has("build.rs");
+
         let mut derived = Derived::default();
+        derived.language_stats = meta.language_stats;
+
         let origin = Origin::from_crates_io_name(name);
 
         // Guess keywords if none were specified
@@ -461,7 +465,7 @@ impl KitchenSink {
 
         Ok((RichCrateVersionCacheData {
             derived,
-            has_buildrs: meta.has("build.rs"),
+            has_buildrs,
             manifest: meta.manifest,
             readme: meta.readme.map_err(|_|()),
             lib_file: meta.lib_file,

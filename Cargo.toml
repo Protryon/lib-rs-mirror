@@ -13,9 +13,10 @@ ructe = "0.4.0"
 
 [dependencies]
 kitchen_sink = { git = "https://gitlab.com/crates.rs/kitchen_sink.git", version = "0.5.1" }
-rich_crate = { git = "https://gitlab.com/crates.rs/rich_crate.git", version = "0.3.0" }
-render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git", version = "0.3.0" }
+rich_crate = { git = "https://gitlab.com/crates.rs/rich_crate.git", version = "0.3.2" }
+render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git", version = "0.4.0" }
 categories = { git = "https://gitlab.com/crates.rs/categories.git" }
+udedokei = { git = "https://gitlab.com/crates.rs/udedokei.git" }
 rayon = "1.0.1"
 failure = "0.1.2"
 chrono = "0.4.2"

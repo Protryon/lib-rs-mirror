@@ -18,6 +18,7 @@ extern crate semver_parser;
 extern crate urlencoding;
 extern crate locale;
 extern crate url;
+extern crate udedokei;
 
 mod cat_page;
 mod crate_page;

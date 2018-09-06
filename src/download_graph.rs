@@ -82,10 +82,10 @@ impl DownloadsGraph {
     /// returns (x,y,width,height,color,label)
     /// TODO: make it a struct
     pub fn graph_data(&self) -> Vec<(usize,usize,usize,usize,String,String)> {
-        let chart_x = 1;
-        let chart_y = 1;
-        let chart_width = self.width - 1;
-        let chart_height = self.height - 1;
+        let chart_x = 0;
+        let chart_y = 0;
+        let chart_width = self.width;
+        let chart_height = self.height;
 
         let scale = self.scale;
         // max half year (but we have only 14 weeks of data anyway)

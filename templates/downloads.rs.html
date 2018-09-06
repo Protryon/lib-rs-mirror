@@ -4,7 +4,7 @@
 <svg viewBox="0 0 @dg.width @dg.height" width=@dg.width height=@dg.height>
     <title>Download history</title>
     @for (y,w) in dg.ticks() {
-        <line x1=1.5 x2="(@dg.width as f64 - 1.5)" y1=@y y2=@y stroke="black" stroke-width=@w  stroke-linecap=square stroke-opacity=0.3 />
+        <line x1=1 x2="@(dg.width - 1)" y1=@y y2=@y stroke="black" stroke-width=@w stroke-linecap="butt" stroke-opacity=0.3 />
     }
     @for (x, y, w, h, f, l) in dg.graph_data() {
         <rect x=@x y=@y width=@w height=@h fill="@f" fill-opacity="0.95"><title>@l</title></rect>

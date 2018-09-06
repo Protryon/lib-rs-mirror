@@ -130,7 +130,13 @@
         <div>
           <section class="about-crate">
             <section id="versions">
-              <h3>@c.version_stats_summary()</h3>
+              @if let Some(parts) = Some(c.version_stats_summary()) {
+                <h3>@parts.0
+                  @if let Some(extra) = parts.1 {
+                    <span>@extra</span>
+                  }
+                </h3>
+              }
               <table>
                 @for (i,gr) in c.top_versions().enumerate() {
                   <tr><th content="@gr.ver.num" property="@if i == 0 {softwareVersion}">
@@ -157,9 +163,49 @@
                   <p class="top-n">#<b>@top</b> in <a href="@url.keyword(&keyword)">#@keyword</a></p>
                 }
               }
-              @:downloads(&c.download_graph(209, 60))
+              @if let Some((deps, direct)) = c.dependents_stats() {
+                  @if deps != direct {
+                    <p>Used in <strong>@c.format_number(deps)</strong> crate@if deps != 1 {s} (<a href="@url.reverse_deps(&c.ver)">@c.format_number(direct)&nbsp;directly</a>)</p>
+                  } else {
+                    <p>Used in <a href="@url.reverse_deps(&c.ver)"><strong>@c.format_number(deps)</strong>&nbsp;crate@if deps != 1 {s}</a></p>
+                  }
+              }
+              @:downloads(&c.download_graph(182, 56))
               <p><b>@c.format_number(c.all.downloads_per_month())</b> downloads per month</p>
             </section>
+
+            @if let Some((tarball, raw, lang_stats)) = c.crate_size(360) {
+              <section id="sloc">
+                <p>
+                  <span title="@c.format_kbytes(tarball) as tarball">@if tarball > 1000000 || raw > 10000000 {
+                    <b>@c.format_kbytes(tarball.max(raw))</b>
+                  } else {
+                    @c.format_kbytes(tarball.max(raw))
+                  }</span>
+                  @if let Some((total, _)) = lang_stats {
+                    @if total >= 50 {
+                      <br>
+                      @if total >= 1000 {
+                        @if let Some((val, unit)) = Some(c.format_knumber(total)) {
+                          <span title="@c.format_number(total)"><b>@val</b>@unit</span> <abbr title="Lines of code, excluding comments">SLoC</abbr>
+                        }
+                      } else {
+                        @total <span title="Lines of code, excluding comments">lines</span>
+                      }
+                    }
+                  }
+                </p>
+                @if let Some((total, sloc)) = lang_stats {
+                  @if sloc.len() > 1 && total > 1000 {
+                    <svg viewBox="-1 -1 59 59" width="60" height="60">
+                      @for (lang, lines, (x, w)) in sloc {
+                        <path d="@CratePage::svg_path_for_slice(x,if x+w < 359 {w+1} else {w},360,58)" fill="@lang.color()"><title>@lang.name() @if let Some((val,unit)) = Some(c.format_knumber(lines.code)) {@val@unit} SLoC @if lines.comments > 1 { // @c.format_fraction(lines.comments as f64 / (lines.code+lines.comments) as f64) comments }</title></path>
+                      }
+                    </svg>
+                  }
+                }
+              </section>
+            }
           </section>
 
           @if let Ok(readme) = c.ver.readme() {
@@ -226,13 +272,6 @@
             </div>
           } else {
             <p class="error">Dependencies unknown</p>
-          }
-          @if let Some((deps, direct)) = c.dependents_stats() {
-              @if deps != direct {
-                <p>Used in <strong>@deps</strong> crate@if deps != 1 {s} (<a href="@url.reverse_deps(&c.ver)">@direct&nbsp;directly</a>)</p>
-              } else {
-                <p><a href="@url.reverse_deps(&c.ver)">Used in <strong>@deps</strong>&nbsp;crate@if deps != 1 {s}</a></p>
-              }
           }
         </section>
       </section>

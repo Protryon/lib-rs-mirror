@@ -1,3 +1,5 @@
+use udedokei::Language;
+use udedokei::Lines;
 use semver_parser;
 use chrono::prelude::*;
 use chrono::Duration;
@@ -19,6 +21,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::hash::Hash;
+use std::f64::consts::PI;
 use urler::Urler;
 use url::Url;
 use Page;
@@ -216,6 +219,35 @@ impl<'a> CratePage<'a> {
         Numeric::english().format_int(num)
     }
 
+    pub fn format_knumber(&self, num: usize) -> (String, &'static str) {
+        let (num, unit) = match num {
+            0 ..= 899 => (num, ""),
+            0 ..= 8000 => return (format!("{}", ((num+250)/500) as f64 * 0.5), "K"), // 3.5K
+            0 ..= 899_999 => ((num+500)/1000, "K"),
+            0 ..= 9_999_999 => return (format!("{}", ((num+250_000)/500_000) as f64 * 0.5), "M"), // 3.5M
+            _ => ((num+500_000)/1_000_000, "M"), // 10M
+        };
+        (Numeric::english().format_int(num), unit)
+    }
+
+    pub fn format_kbytes(&self, bytes: usize) -> String {
+        let (num, unit) = match bytes {
+            0 ..= 800_000 => ((bytes+999)/1000, "KB"),
+            0 ..= 9_999_999 => return format!("{}MB", ((bytes+250_000)/500_000) as f64 * 0.5),
+            _ => ((bytes+500_000)/1_000_000, "MB"),
+        };
+        format!("{}{}", Numeric::english().format_int(num), unit)
+    }
+
+    /// Display number 0..1 as percent
+    pub fn format_fraction(&self, num: f64) -> String {
+        if num < 1.9 {
+            format!("{:0.1}%", num)
+        } else {
+            format!("{}%", Numeric::english().format_int(num.round() as usize))
+        }
+    }
+
     pub fn format(date: &DateTime<FixedOffset>) -> String {
         date.format("%b %e, %Y").to_string()
     }
@@ -357,7 +389,7 @@ impl<'a> CratePage<'a> {
     }
 
     /// String describing how often breaking changes are made
-    pub fn version_stats_summary(&self) -> String {
+    pub fn version_stats_summary(&self) -> (String, Option<String>) {
         self.version_stats().summary()
     }
 
@@ -552,12 +584,66 @@ impl<'a> CratePage<'a> {
         .map_err(|e| eprintln!("related crates fail: {}", e))
         .ok()
     }
+
+    fn language_stats(&self, width_px: usize) -> Option<LanguageStats> {
+        let mut res: Vec<_> = self.ver.language_stats().langs.iter()
+            .filter(|(lang, lines)| lines.code > 0 && lang.is_code())
+            .map(|(a, b)| (a.clone(), b.clone()))
+            .collect();
+        if !res.is_empty() {
+            res.sort_by_key(|(_, lines)| lines.code);
+            let total = res.iter().map(|(_, lines)| lines.code).sum::<usize>();
+            let biggest = res.last().cloned().unwrap();
+            let res = if biggest.0 != Language::Rust || biggest.1.code < total * 9/10 {
+                let mut remaining_px = width_px;
+                let mut remaining_lines = total;
+                res.into_iter().map(|(lang, lines)| {
+                    let width = (lines.code * remaining_px / remaining_lines.max(1)).max(1);
+                    let xpos = width_px - remaining_px;
+                    remaining_px -= width;
+                    remaining_lines -= lines.code;
+                    (lang, lines, (xpos, width))
+                }).rev().collect()
+            } else {
+                Vec::new() // if crate is 90% Rust, don't bother with stats
+            };
+            Some((total, res))
+        } else {
+            None
+        }
+    }
+
+    pub fn svg_path_for_slice(start: usize, len: usize, total: usize, diameter: usize) -> String {
+        fn coords(val: usize, total: usize, radius: f64) -> (f64, f64) {
+            ((2. * PI * val as f64 / total as f64).sin() * radius + radius,
+             (PI + 2. * PI * val as f64 / total as f64).cos() * radius + radius)
+        }
+        let radius = diameter / 2;
+        let big_arc = len > total / 2;
+        let end = coords(start + len, total, radius as f64);
+        let start = coords(start, total, radius as f64);
+        format!("M {startx:.1} {starty:.1} A {radius} {radius} 0 {arcflag} 1 {endx:.1} {endy:.1} L {radius} {radius}",
+            startx = start.0.round(),
+            starty = start.1.round(),
+            radius = radius,
+            arcflag = if big_arc {"1"} else {"0"},
+            endx = end.0,
+            endy = end.1,
+        )
+    }
+
+    pub fn crate_size(&self, width_px: usize) -> Option<(usize, usize, Option<LanguageStats>)> {
+        let (a, b) = self.ver.crate_size();
+        Some((a, b, self.language_stats(width_px)))
+    }
 }
+
+type LanguageStats = (usize, Vec<(Language, Lines, (usize, usize))>);
 
 impl ReleaseCounts {
 
     /// Judge how often the crate makes breaking or stable releases
-    pub fn summary(&self) -> String {
+    pub fn summary(&self) -> (String, Option<String>) {
         // TODO take yanked into account
         // show (n this year|n last year)
         let (n,label,n2,label2,majorinfo) = if self.stable > 0 {
@@ -580,16 +666,19 @@ impl ReleaseCounts {
         };
         if n == self.total || (n > 7 && n * 10 >= self.total * 8) {
             if majorinfo {
-                format!("{} {} release{} ({} {})", n, label, if n==1 {""} else {"s"}, n2, label2)
+                (format!("{} {} release{}", n, label, if n==1 {""} else {"s"}),
+                 Some(format!("({} {})", n2, label2)))
             } else {
-                format!("{} {} release{}", n, label, if n==1 {""} else {"s"},)
+                (format!("{} {} release{}", n, label, if n==1 {""} else {"s"}), None)
             }
         }
         else if n * 3 >= self.total * 2 {
-            format!("{} release{} ({})", self.total, if self.total==1 {""} else {"s"}, label)
+            (format!("{} release{}", self.total, if self.total==1 {""} else {"s"}),
+             Some(format!("({})", label)))
         }
         else {
-            format!("{} release{} ({} {})", self.total, if self.total==1 {""} else {"s"}, n, label)
+            (format!("{} release{}", self.total, if self.total==1 {""} else {"s"}),
+             Some(format!("({} {})", n, label)))
         }
     }
 }
@@ -625,4 +714,10 @@ fn extract_doc_comments(code: &str) -> String {
 #[test]
 fn parse() {
     assert_eq!("hello\nworld", extract_doc_comments("/*!\nhello\nworld */").trim());
+}
+
+#[test]
+fn pie() {
+    assert_eq!("M 10.0 5.0 A 5 5 0 0 1 5.0 10.0 L 5 5", CratePage::svg_path_for_slice(1, 1, 4, 10));
+    assert_eq!("M 28.0 0.0 A 28 28 0 1 1 28.0 0.0 L 28 28", CratePage::svg_path_for_slice(0, 10, 10, 56));
 }

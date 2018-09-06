@@ -75,7 +75,7 @@ fn render_categories(cats: &CategoryMap, base: &Path, crates: &KitchenSink, done
                 }
                 s.insert(origin.clone());
             }
-            let allver = crates.rich_crate(origin).context("get crate")?;
+            let allver = crates.rich_crate(origin).context("get crate all versions")?;
             let ver = crates.rich_crate_version(origin, CrateData::Full).context("get rich crate")?;
             let path = PathBuf::from(format!("public/crates/{}.html", ver.short_name()));
             println!("{}", path.display());
@@ -90,7 +90,7 @@ fn render_categories(cats: &CategoryMap, base: &Path, crates: &KitchenSink, done
         .take(75)
         .with_max_len(1)
         .map(|(c, _)| {
-            let msg = format!("Failed rendering crate {}", c.to_str());
+            let msg = format!("Failed rendering crate {} from category {}", c.to_str(), slug);
             render_crate(c).context(msg)
         })
         .collect::<Result<(), _>>()?;

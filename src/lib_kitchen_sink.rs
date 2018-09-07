@@ -329,7 +329,12 @@ impl KitchenSink {
         let mut warnings = HashSet::new();
         let name = latest.name();
         let ver = latest.version();
-        let mut meta = self.crate_file(name, ver).context("crate file")?;
+
+        let crate_tarball = self.crates_io.crate_data(name, ver).context("crate_file")?
+            .ok_or_else(|| KitchenSinkErr::DataNotFound)?;
+        let crate_compressed_size = crate_tarball.len();
+        let mut meta = crate_files::read_archive(&crate_tarball[..], name, ver)?;
+        drop(crate_tarball);
 
         // Guess repo URL if none was specified
         if meta.manifest.package.repository.is_none() {
@@ -385,6 +390,8 @@ impl KitchenSink {
 
         let mut derived = Derived::default();
         derived.language_stats = meta.language_stats;
+        derived.crate_compressed_size = crate_compressed_size;
+        derived.crate_decompressed_size = meta.decompressed_size;
 
         let origin = Origin::from_crates_io_name(name);
 
@@ -1030,13 +1037,6 @@ impl KitchenSink {
                 KitchenSinkErr::CategoryNotFound(slug.to_string())
             })
         })
-    }
-
-    /// Read tarball
-    fn crate_file(&self, name: &str, ver: &str) -> CResult<crate_files::CrateFile> {
-        let data = self.crates_io.crate_data(name, ver).context("crate_file")?
-            .ok_or_else(|| KitchenSinkErr::DataNotFound)?;
-        Ok(crate_files::read_archive(&data[..], name, ver)?)
     }
 
     fn repo_commits(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Option<Vec<github_info::CommitMeta>>> {

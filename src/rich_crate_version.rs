@@ -328,6 +328,15 @@ impl RichCrateVersion {
             }
         }
     }
+
+    pub fn language_stats(&self) -> &udedokei::Stats {
+        &self.derived.language_stats
+    }
+
+    /// compressed (whole tarball) and decompressed (extracted files only)
+    pub fn crate_size(&self) -> (usize, usize) {
+        (self.derived.crate_compressed_size, self.derived.crate_decompressed_size)
+    }
 }
 
 pub struct RichDep {
@@ -363,4 +372,6 @@ pub struct Derived {
     pub keywords: Option<Vec<String>>,
     pub github_keywords: Option<Vec<String>>,
     pub language_stats: udedokei::Stats,
+    pub crate_compressed_size: usize,
+    pub crate_decompressed_size: usize,
 }

@@ -203,7 +203,7 @@ impl KitchenSink {
     pub(crate) fn data_path() -> Result<PathBuf, KitchenSinkErr> {
         match env::var("CRATES_DATA_DIR") {
             Ok(d) => {
-                if !Path::new(&d).join("cache.db").exists() {
+                if !Path::new(&d).join("crates.db").exists() {
                     return Err(KitchenSinkErr::CacheDbMissing(d));
                 }
                 Ok(d.into())
@@ -211,7 +211,7 @@ impl KitchenSink {
             Err(_) => {
                 for path in &["../data", "./data", "/var/lib/crates.rs/data", "/www/crates.rs/data"] {
                     let path = Path::new(path);
-                    if path.exists() && path.join("cache.db").exists() {
+                    if path.exists() && path.join("crates.db").exists() {
                         return Ok(path.to_owned());
                     }
                 }
@@ -268,8 +268,8 @@ impl KitchenSink {
         let cache_bust = krate.latest_version().version(); // most recently published version
         let meta = self.crates_io.krate(name, cache_bust)
             .with_context(|_| format!("crates.io meta for {} {}", name, cache_bust))?;
-         meta.map(|meta| RichCrate::new(meta))
-            .ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)).into())
+        let meta = meta.ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?;
+        Ok(RichCrate::new(meta))
     }
 
     /// Wrapper for the latest version of a given crate.
@@ -308,7 +308,6 @@ impl KitchenSink {
             match self.crate_derived_cache.get(key.0)? {
                 Some((ver, res, warn)) => {
                     if key.1 != ver {
-                        eprintln!("•• Stale cache {} {} vs {}", krate.name(), key.1, ver);
                         None
                     } else {
                         Some((res, warn))
@@ -770,7 +769,8 @@ impl KitchenSink {
     pub fn parent_crate(&self, child: &RichCrateVersion) -> Option<RichCrateVersion> {
         let repo = child.repository()?;
         let name = self.crate_db.parent_crate(repo, child.short_name()).ok().and_then(|v| v)?;
-        self.rich_crate_version(&Origin::from_crates_io_name(&name), CrateData::Minimal).ok()
+        self.rich_crate_version(&Origin::from_crates_io_name(&name), CrateData::Minimal)
+            .map_err(|e| eprintln!("parent crate: {}", e)).ok()
     }
 
     pub fn cachebust_string_for_repo(&self, crate_repo: &Repo) -> CResult<String> {

@@ -79,6 +79,7 @@ use std::collections::HashMap;
 use std::path::{PathBuf, Path};
 use std::env;
 use crate_db::{CrateDb, RepoChange};
+pub use semver::Version as SemVer;
 
 pub type CError = failure::Error;
 pub type CResult<T> = Result<T, CError>;
@@ -575,6 +576,10 @@ impl KitchenSink {
             (Some(ref a), Some(ref b)) if trim_suffix(a.as_ref()).eq_ignore_ascii_case(trim_suffix(b)) => true,
             _ => false,
         }
+    }
+
+    pub fn all_dependencies_flattened(&self, origin: &Origin) -> Result<HashMap<Arc<str>, (DepInf, SemVer)>, KitchenSinkErr> {
+        self.index.all_dependencies_flattened(self.index.crate_by_name(origin)?)
     }
 
     pub fn dependents_stats_of(&self, krate: &RichCrateVersion) -> Option<RevDependencies> {

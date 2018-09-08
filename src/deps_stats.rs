@@ -1,3 +1,5 @@
+use KitchenSinkErr;
+use crates_index::Crate;
 use std::sync::Mutex;
 use std::sync::Arc;
 use std::collections::HashMap;
@@ -76,49 +78,51 @@ impl DepVisitor {
 }
 
 impl Index {
-    pub(crate) fn get_deps_stats(&self) -> DepsStats {
-        let crates = self.crates();
-        let crates: Vec<_> = crates
-        .par_iter()
-        .filter_map(|(_, c)| {
-            let mut collected = HashMap::with_capacity(120);
-            let mut visitor = DepVisitor::new();
+    pub fn all_dependencies_flattened(&self, c: &Crate) -> Result<HashMap<Arc<str>, (DepInf, SemVer)>, KitchenSinkErr> {
+        let mut collected = HashMap::with_capacity(120);
+        let mut visitor = DepVisitor::new();
 
-            flatten(&self.deps_of_crate(c, DepQuery {
-                default: true,
-                all_optional: false,
-                dev: false,
-            }).ok()?, DepInf {
-                default: true,
-                direct: true,
-                ty: DepTy::Runtime,
-            }, &mut collected, &mut visitor);
+        flatten(&self.deps_of_crate(c, DepQuery {
+            default: true,
+            all_optional: false,
+            dev: false,
+        })?, DepInf {
+            default: true,
+            direct: true,
+            ty: DepTy::Runtime,
+        }, &mut collected, &mut visitor);
 
-            flatten(&self.deps_of_crate(c, DepQuery {
+        flatten(&self.deps_of_crate(c, DepQuery {
+            default: true,
+            all_optional: true,
+            dev: false,
+        })?, DepInf {
+            default: false, // false, because real defaults have already been set
+            direct: true,
+            ty: DepTy::Runtime,
+        }, &mut collected, &mut visitor);
+
+        flatten(&self.deps_of_crate(c, DepQuery {
                 default: true,
                 all_optional: true,
-                dev: false,
-            }).ok()?, DepInf {
-                default: false, // false, because real defaults have already been set
-                direct: true,
-                ty: DepTy::Runtime,
-            }, &mut collected, &mut visitor);
+                dev: true,
+            })?, DepInf {
+            default: false,  // false, because real defaults have already been set
+            direct: true,
+            ty: DepTy::Dev,
+        }, &mut collected, &mut visitor);
 
-            flatten(&self.deps_of_crate(c, DepQuery {
-                    default: true,
-                    all_optional: true,
-                    dev: true,
-                }).ok()?, DepInf {
-                default: false,  // false, because real defaults have already been set
-                direct: true,
-                ty: DepTy::Dev,
-            }, &mut collected, &mut visitor);
+        Ok(collected)
+    }
 
-            if collected.is_empty() {
-                None
-            } else {
-                Some(collected)
-            }
+    pub(crate) fn get_deps_stats(&self) -> DepsStats {
+        let crates = self.crates();
+        let crates: Vec<HashMap<_,_>> = crates
+        .par_iter()
+        .filter_map(|(_, c)| {
+            self.all_dependencies_flattened(c)
+            .ok()
+            .filter(|collected| !collected.is_empty())
         }).collect();
 
         let total = crates.len();

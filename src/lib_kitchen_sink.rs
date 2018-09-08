@@ -136,7 +136,7 @@ pub struct KitchenSink {
     removals: LazyOnce<HashMap<Origin, f64>>,
     top_crates_cached: RwLock<HashMap<String, Arc<Vec<(Origin, u32)>>>>,
     git_checkout_path: PathBuf,
-    main_cache_path: PathBuf,
+    main_cache_dir: PathBuf,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -164,7 +164,7 @@ impl KitchenSink {
     }
 
     pub fn new(data_path: &Path, github_token: &str) -> CResult<Self> {
-        let main_cache_path = Self::assert_exists(data_path.join("cache.db"))?;
+        let main_cache_dir = data_path.to_owned();
         let index_path = Self::assert_exists(data_path.join("index"))?;
 
         let (crates_io, gh) = rayon::join(
@@ -186,7 +186,7 @@ impl KitchenSink {
             category_crate_counts: LazyOnce::new(),
             removals: LazyOnce::new(),
             top_crates_cached: RwLock::new(HashMap::new()),
-            main_cache_path,
+            main_cache_dir,
         })
     }
 
@@ -218,8 +218,8 @@ impl KitchenSink {
         }
     }
 
-    pub fn main_cache_path(&self) -> &Path {
-        &self.main_cache_path
+    pub fn main_cache_dir(&self) -> &Path {
+        &self.main_cache_dir
     }
 
     /// Don't make requests to crates.io

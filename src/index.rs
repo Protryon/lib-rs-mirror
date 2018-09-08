@@ -286,3 +286,12 @@ pub struct DepQuery {
     pub all_optional: bool,
     pub dev: bool,
 }
+
+#[test]
+fn index_test() {
+    let idx = Index::new_default().unwrap();
+    let stats = idx.deps_stats();
+    assert!(stats.total > 13800);
+    let lode = stats.counts.get("lodepng").unwrap();
+    assert_eq!(8, lode.runtime.0);
+}

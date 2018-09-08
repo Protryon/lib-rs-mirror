@@ -3,12 +3,14 @@ use std::collections::HashMap;
 use serde::de::DeserializeOwned;
 use error::Error;
 use serde::*;
+use serde_json;
 use std::path::PathBuf;
 use std::fs::File;
 use std::fs;
 use tempfile::NamedTempFile;
 use rmp_serde;
 use std::io::BufReader;
+use SimpleCache;
 
 struct Inner<T> {
     data: T,
@@ -18,7 +20,7 @@ struct Inner<T> {
 
 pub struct TempCache<T: Serialize + DeserializeOwned + Clone + Send> {
     path: PathBuf,
-    data: RwLock<Inner<HashMap<String, T>>>,
+    data: RwLock<Inner<HashMap<Box<str>, T>>>,
 }
 
 impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
@@ -43,10 +45,10 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
 
     #[inline]
     pub fn set(&self, key: impl Into<String>, value: T) -> Result<(), Error> {
-        self.set_(key.into(), value)
+        self.set_(key.into().into_boxed_str(), value)
     }
 
-    pub fn set_(&self, key: String, value: T) -> Result<(), Error> {
+    pub fn set_(&self, key: Box<str>, value: T) -> Result<(), Error> {
 
         // sanity check
         let value = rmp_serde::to_vec(&value).map_err(|e| Error::from(e))
@@ -86,6 +88,27 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
         let _: HashMap<String, T> = rmp_serde::from_slice(&ser)?;
         tmp_path.persist(&self.path).map_err(|e| e.error)?;
         Ok(())
+    }
+
+
+    pub fn get_json<B>(&self, key: &str, url: impl AsRef<str>, cb: impl FnOnce(B) -> Option<T>) -> Result<Option<T>, Error>
+        where B: for<'a> Deserialize<'a>
+    {
+        if let Some(res) = self.get(key)? {
+            return Ok(Some(res));
+        }
+
+        let data = SimpleCache::fetch(url.as_ref())?;
+        match serde_json::from_slice(&data) {
+            Ok(res) => {
+                let res = cb(res);
+                if let Some(ref res) = res {
+                    self.set(key, res.clone())?
+                }
+                Ok(res)
+            },
+            Err(parse) => Err(Error::Parse(parse, data)),
+        }
     }
 }
 

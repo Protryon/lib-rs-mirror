@@ -397,7 +397,8 @@ impl KitchenSink {
         let mut derived = Derived::default();
         derived.language_stats = meta.language_stats;
         derived.crate_compressed_size = crate_compressed_size;
-        derived.crate_decompressed_size = meta.decompressed_size;
+        // sometimes uncompressed sources without junk are smaller than tarball with junk
+        derived.crate_decompressed_size = meta.decompressed_size.max(crate_compressed_size);
 
         let origin = Origin::from_crates_io_name(name);
 

@@ -208,8 +208,8 @@ impl Index {
         Ok(result)
     }
 
-    /// (is_latest, popularity)
-    /// 0 = not used
+    /// For crate being outdated. Returns (is_latest, popularity)
+    /// 0 = not used *or deprecated*
     /// 1 = everyone uses it
     pub fn version_popularity(&self, crate_name: &str, requirement: VersionReq) -> (bool, f32) {
         if is_deprecated(crate_name) {
@@ -243,6 +243,21 @@ impl Index {
         .unwrap_or(0.);
 
         (matches_latest, pop)
+    }
+
+    /// How likely it is that this exact crate will be installed in any project
+    pub fn version_commonality(&self, crate_name: &str, version: &SemVer) -> f32 {
+        if "libc" == crate_name || "winapi" == crate_name { // bindings' SLoC looks heavier than actual overhead
+            return 0.92;
+        }
+
+        let stats = self.deps_stats();
+        stats.counts.get(crate_name)
+        .and_then(|c| {
+            c.versions.get(version)
+            .map(|&ver| ver as f32 / stats.total as f32)
+        })
+        .unwrap_or(0.)
     }
 }
 

@@ -165,19 +165,18 @@ impl KitchenSink {
 
     pub fn new(data_path: &Path, github_token: &str) -> CResult<Self> {
         let main_cache_path = Self::assert_exists(data_path.join("cache.db"))?;
-        let gh_path = Self::assert_exists(data_path.join("github.db"))?;
         let index_path = Self::assert_exists(data_path.join("index"))?;
 
         let (crates_io, gh) = rayon::join(
             || crates_io_client::CratesIoClient::new(data_path),
-            || github_info::GitHub::new(&gh_path, github_token));
+            || github_info::GitHub::new(&data_path.join("github.db"), github_token));
         let (index, crate_derived_cache) = rayon::join(
             || Index::new(index_path),
             || TempCache::new(&data_path.join("crate_derived.db")));
         Ok(Self {
             crates_io: crates_io?,
             index,
-            docs_rs: docs_rs_client::DocsRsClient::new(&main_cache_path)?,
+            docs_rs: docs_rs_client::DocsRsClient::new(data_path.join("docsrs.db"))?,
             crate_db: CrateDb::new(Self::assert_exists(data_path.join("crate_data.db"))?)?,
             user_db: user_db::UserDb::new(Self::assert_exists(data_path.join("users.db"))?)?,
             gh: gh?,

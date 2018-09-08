@@ -22,8 +22,7 @@ use simple_cache::SimpleCache;
 use simple_cache::TempCache;
 
 pub struct CratesIoClient {
-    cache: SimpleCache,
-    cache2: TempCache<(String, Payload)>,
+    cache: TempCache<(String, Payload)>,
     crates: SimpleCache,
 }
 
@@ -46,8 +45,7 @@ pub struct CratesIoCrate {
 impl CratesIoClient {
     pub fn new(cache_base_path: &Path) -> Result<Self, Error> {
         Ok(Self {
-            cache: SimpleCache::new(&cache_base_path.join("cache.db"))?,
-            cache2: TempCache::new(&cache_base_path.join("cratesio.bin"))?,
+            cache: TempCache::new(&cache_base_path.join("cratesio.bin"))?,
             crates: SimpleCache::new(&cache_base_path.join("crates.db"))?,
         })
     }
@@ -94,8 +92,7 @@ impl CratesIoClient {
         let data: CrateDownloadsFile = cioopt!(self.get_json(new_key, &url)?);
         if data.is_stale() && rand::random::<u8>() > 252 {
             eprintln!("downloads expired");
-            let _ = self.cache.delete(new_key);
-            let _ = self.cache2.delete(new_key.0);
+            let _ = self.cache.delete(new_key.0);
             let fresh: CrateDownloadsFile = cioopt!(self.get_json(new_key, &url)?);
             assert!(!fresh.is_stale());
             Ok(Some(fresh))
@@ -118,25 +115,19 @@ impl CratesIoClient {
     fn get_json<B>(&self, key: (&str, &str), path: impl AsRef<str>) -> Result<Option<B>, Error>
         where B: for<'a> serde::Deserialize<'a> + Payloadable
     {
-        let _ = self.cache.delete(key);
-        if let Some((ver, res)) = self.cache2.get(key.0)? {
+        if let Some((ver, res)) = self.cache.get(key.0)? {
             if ver == key.1 {
                 return Ok(Some(B::from(res)));
             }
+            eprintln!("Cache near miss {}@{} vs {}", key.0, ver, key.1);
         }
 
         let url = format!("https://crates.io/api/v1/crates/{}", path.as_ref());
-        let res: Option<B> = self.cache.get_json(key, url)?;
-        match res {
-            Some(res) => {
-                self.cache2.set(key.0, (key.1.to_string(), res.to()))?;
-                Ok(Some(res))
-            },
-            None => {
-                self.cache2.delete(key.0)?;
-                Ok(None)
-            }
-        }
+
+        let res = self.cache.get_json(key.0, url, |raw: B| {
+            Some((key.1.to_string(), raw.to()))
+        })?;
+        Ok(res.map(|(_, res)| B::from(res)))
     }
 }
 

@@ -538,7 +538,7 @@ impl KitchenSink {
         }
     }
 
-    pub fn dependents_stats_of(&self, krate: &RichCrateVersion) -> Option<Counts> {
+    pub fn dependents_stats_of(&self, krate: &RichCrateVersion) -> Option<RevDependencies> {
         let deps = self.index.deps_stats();
         deps.counts.get(krate.short_name()).cloned()
     }

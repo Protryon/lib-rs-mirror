@@ -9,5 +9,5 @@ libflate = "0.1.14"
 cargo_toml = "0.3.1"
 render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git" }
 repo_url = { git = "https://gitlab.com/crates.rs/repo_url.git" }
+udedokei = { git = "https://gitlab.com/crates.rs/udedokei.git" }
 quick-error = "1.2.2"
-udedokei = { path = "../udedokei" }

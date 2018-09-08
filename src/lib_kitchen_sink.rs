@@ -37,6 +37,7 @@ mod ctrlcbreak;
 pub use ctrlcbreak::*;
 
 pub use crates_index::Crate;
+use crates_index::Version;
 use crates_io_client::CrateOwner;
 pub use crates_io_client::CrateDependency;
 pub use crates_io_client::CrateDepKind;
@@ -132,7 +133,7 @@ pub struct KitchenSink {
     user_db: user_db::UserDb,
     gh: github_info::GitHub,
     crate_derived_cache: TempCache<(String, RichCrateVersionCacheData, Warnings)>,
-    loaded_rich_crate_version_cache: RwLock<HashMap<Origin, RichCrateVersion>>,
+    loaded_rich_crate_version_cache: RwLock<HashMap<Box<str>, RichCrateVersion>>,
     category_crate_counts: LazyOnce<Option<HashMap<String, u32>>>,
     removals: LazyOnce<HashMap<Origin, f64>>,
     top_crates_cached: RwLock<HashMap<String, Arc<Vec<(Origin, u32)>>>>,
@@ -278,24 +279,30 @@ impl KitchenSink {
     /// There's no support for getting anything else than the latest version.
     pub fn rich_crate_version(&self, origin: &Origin, fetch_type: CrateData) -> CResult<RichCrateVersion> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
+        let ver = self.index.crate_version_latest_unstable(origin).context("rich_crate_version")?;
+
+        self.rich_crate_version_from_index( ver, fetch_type)
+    }
+
+    pub fn rich_crate_version_from_index(&self, krate: &Version, fetch_type: CrateData) -> CResult<RichCrateVersion> {
+        let cache_key = format!("{}-{}", krate.name(), krate.version()).into_boxed_str();
 
         if fetch_type != CrateData::FullNoDerived {
             let cache = self.loaded_rich_crate_version_cache.read().unwrap();
-            if let Some(krate) = cache.get(origin) {
+            if let Some(krate) = cache.get(&cache_key) {
                 return Ok(krate.clone());
             }
         }
 
-        let krate = self.rich_crate_version_verbose(origin, fetch_type).map(|(krate, _)| krate)?;
+        let krate = self.rich_crate_version_verbose(krate, fetch_type).map(|(krate, _)| krate)?;
         if fetch_type == CrateData::Full {
-            self.loaded_rich_crate_version_cache.write().unwrap().insert(origin.clone(), krate.clone());
+            self.loaded_rich_crate_version_cache.write().unwrap().insert(cache_key, krate.clone());
         }
         Ok(krate)
     }
 
     /// With warnings
-    pub fn rich_crate_version_verbose(&self, origin: &Origin, fetch_type: CrateData) -> CResult<(RichCrateVersion, Warnings)> {
-        let krate = self.index.crate_ver_by_name(origin).context("rich_crate_version")?;
+    pub fn rich_crate_version_verbose(&self, krate: &Version, fetch_type: CrateData) -> CResult<(RichCrateVersion, Warnings)> {
         let key = (krate.name(), krate.version());
         let cached = if fetch_type != CrateData::FullNoDerived {
             match self.crate_derived_cache.get(key.0)? {
@@ -770,7 +777,7 @@ impl KitchenSink {
         Ok(match self.crate_db.first_crate_for_repo(crate_repo).context("repo cache_bust")? {
             None => "*".to_string(),
             Some(ref ver_name) => {
-                let k = self.index.crate_ver_by_name(&Origin::from_crates_io_name(ver_name))
+                let k = self.index.crate_version_latest_unstable(&Origin::from_crates_io_name(ver_name))
                     .context("repo crate cache buster")?;
                 k.version().to_string()
             }

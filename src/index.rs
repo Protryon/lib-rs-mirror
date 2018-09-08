@@ -58,7 +58,7 @@ impl Index {
         .ok_or_else(|| KitchenSinkErr::CrateNotFound(name.clone()))
     }
 
-    pub fn crate_ver_by_name(&self, name: &Origin) -> Result<&Version, KitchenSinkErr> {
+    pub fn crate_version_latest_unstable(&self, name: &Origin) -> Result<&Version, KitchenSinkErr> {
         Ok(Self::highest_version(self.crate_by_name(name)?, false))
     }
 

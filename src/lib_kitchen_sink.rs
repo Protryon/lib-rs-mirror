@@ -131,6 +131,7 @@ pub struct KitchenSink {
     user_db: user_db::UserDb,
     gh: github_info::GitHub,
     crate_derived_cache: TempCache<(String, RichCrateVersionCacheData, Warnings)>,
+    loaded_rich_crate_version_cache: RwLock<HashMap<Origin, RichCrateVersion>>,
     category_crate_counts: LazyOnce<Option<HashMap<String, u32>>>,
     removals: LazyOnce<HashMap<Origin, f64>>,
     top_crates_cached: RwLock<HashMap<String, Arc<Vec<(Origin, u32)>>>>,
@@ -181,6 +182,7 @@ impl KitchenSink {
             user_db: user_db::UserDb::new(Self::assert_exists(data_path.join("users.db"))?)?,
             gh: gh?,
             crate_derived_cache: crate_derived_cache?,
+            loaded_rich_crate_version_cache: RwLock::new(HashMap::new()),
             git_checkout_path: data_path.join("git"),
             category_crate_counts: LazyOnce::new(),
             removals: LazyOnce::new(),
@@ -276,7 +278,19 @@ impl KitchenSink {
     /// There's no support for getting anything else than the latest version.
     pub fn rich_crate_version(&self, origin: &Origin, fetch_type: CrateData) -> CResult<RichCrateVersion> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
-        self.rich_crate_version_verbose(origin, fetch_type).map(|(krate, _)| krate)
+
+        if fetch_type != CrateData::FullNoDerived {
+            let cache = self.loaded_rich_crate_version_cache.read().unwrap();
+            if let Some(krate) = cache.get(origin) {
+                return Ok(krate.clone());
+            }
+        }
+
+        let krate = self.rich_crate_version_verbose(origin, fetch_type).map(|(krate, _)| krate)?;
+        if fetch_type == CrateData::Full {
+            self.loaded_rich_crate_version_cache.write().unwrap().insert(origin.clone(), krate.clone());
+        }
+        Ok(krate)
     }
 
     /// With warnings

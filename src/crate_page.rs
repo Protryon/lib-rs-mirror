@@ -1,9 +1,8 @@
-use udedokei::Language;
-use udedokei::Lines;
+use kitchen_sink::CResult;
 use semver_parser;
 use chrono::prelude::*;
 use chrono::Duration;
-use kitchen_sink::KitchenSink;
+use kitchen_sink::{KitchenSink, Origin, DepTy, CrateData};
 use categories::Category;
 use render_readme::Renderer;
 use render_readme::Markup;
@@ -28,6 +27,7 @@ use Page;
 use locale::Numeric;
 use std::fmt::Display;
 use semver::Version as SemVer;
+use udedokei::{Language, Lines, Stats};
 
 /// Data sources used in `crate_page.rs.html`
 pub struct CratePage<'a> {
@@ -37,6 +37,9 @@ pub struct CratePage<'a> {
     pub markup: &'a Renderer,
     pub top_keyword: Option<(u32, String)>,
     pub all_contributors: (Vec<CrateAuthor<'a>>, Vec<CrateAuthor<'a>>, bool, usize),
+    /// own, deps (tarball, uncompressed source); last one is sloc
+    pub sizes: Option<((usize, usize), (usize, usize, usize))>,
+    pub lang_stats: Option<(usize, Stats)>,
 }
 
 /// Helper used to find most "interesting" versions
@@ -78,6 +81,24 @@ pub(crate) struct Contributors<'a> {
 
 
 impl<'a> CratePage<'a> {
+    pub fn new(all: &'a RichCrate, ver: &'a RichCrateVersion, kitchen_sink: &'a KitchenSink, markup: &'a Renderer) -> CResult<Self> {
+        let mut page = Self {
+            top_keyword: kitchen_sink.top_keyword(all)?,
+            all_contributors: kitchen_sink.all_contributors(ver)?,
+            all, ver, kitchen_sink, markup,
+            sizes: None,
+            lang_stats: None,
+        };
+        let (own_size, dep_size, lang_stats) = page.crate_size()?;
+        page.sizes = Some((own_size, dep_size));
+
+        let total = lang_stats.langs.iter()
+            .filter(|(lang, _)| lang.is_code())
+            .map(|(_, lines)| lines.code).sum::<usize>();
+        page.lang_stats = Some((total, lang_stats));
+        Ok(page)
+    }
+
     pub fn page(&self, url: &Urler) -> Page {
         let keywords = self.ver.keywords(Include::Cleaned).collect::<Vec<_>>().join(", ");
         Page {
@@ -585,29 +606,29 @@ impl<'a> CratePage<'a> {
         .ok()
     }
 
-    fn language_stats(&self, width_px: usize) -> Option<LanguageStats> {
-        let mut res: Vec<_> = self.ver.language_stats().langs.iter()
+    /// data for piechart
+    pub fn langs_chart(&self, stats: &Stats, width_px: usize) -> Option<LanguageStats> {
+        let mut res: Vec<_> = stats.langs.iter()
             .filter(|(lang, lines)| lines.code > 0 && lang.is_code())
             .map(|(a, b)| (a.clone(), b.clone()))
             .collect();
         if !res.is_empty() {
             res.sort_by_key(|(_, lines)| lines.code);
-            let total = res.iter().map(|(_, lines)| lines.code).sum::<usize>();
             let biggest = res.last().cloned().unwrap();
-            let res = if biggest.0 != Language::Rust || biggest.1.code < total * 9/10 {
+            let total = res.iter().map(|(_, lines)| lines.code).sum::<usize>();
+            if biggest.0 != Language::Rust || biggest.1.code < total * 9/10 {
                 let mut remaining_px = width_px;
                 let mut remaining_lines = total;
-                res.into_iter().map(|(lang, lines)| {
+                Some(res.into_iter().map(|(lang, lines)| {
                     let width = (lines.code * remaining_px / remaining_lines.max(1)).max(1);
                     let xpos = width_px - remaining_px;
                     remaining_px -= width;
                     remaining_lines -= lines.code;
                     (lang, lines, (xpos, width))
-                }).rev().collect()
+                }).rev().collect())
             } else {
-                Vec::new() // if crate is 90% Rust, don't bother with stats
-            };
-            Some((total, res))
+                None // if crate is 90% Rust, don't bother with stats
+            }
         } else {
             None
         }
@@ -632,13 +653,85 @@ impl<'a> CratePage<'a> {
         )
     }
 
-    pub fn crate_size(&self, width_px: usize) -> Option<(usize, usize, Option<LanguageStats>)> {
-        let (a, b) = self.ver.crate_size();
-        Some((a, b, self.language_stats(width_px)))
+    fn crate_size(&self) -> CResult<((usize, usize), (usize, usize, usize), Stats)> {
+        let deps = self.kitchen_sink.all_dependencies_flattened(self.ver.origin())?;
+
+        let mut main_lang_stats = self.ver.language_stats().clone();
+        let mut main_crate_size = self.ver.crate_size();
+        let mut deps_size = (0, 0, 0);
+
+        for (name, (depinf, semver)) in deps.into_iter() {
+            if depinf.ty == DepTy::Dev {
+                continue;
+            }
+            if &*name == "clippy" && !depinf.default {
+                continue; // nobody will enable it
+            }
+
+            // if optional, make it look less problematic (indirect - who knows, maybe platform-specific?)
+            let weight = if depinf.default {1.} else if depinf.direct {0.25} else {0.15} *
+                // if it's common, it's more likelty to be installed anyway,
+                // so it's likely to be less costly to add it
+                (1. - self.kitchen_sink.index.version_commonality(&name, &semver)) *
+                // Build deps aren't a big deal [but still include some in case somebody did something awful]
+                if depinf.ty == DepTy::Runtime {1.} else {
+                    match &*name {
+                        "bindgen" | "clang-sys" | "cmake" | "cc" if depinf.default => 1., // you deserve full weight of it
+                        _ => 0.1,
+                    }
+                };
+
+
+            let krate = match self.get_crate_of_dependency(&name, &semver) {
+                Ok(k) => k,
+                Err(e) => {
+                    eprintln!("bad dep not counted: {}", e);
+                    continue;
+                },
+            };
+            let crate_size = krate.crate_size();
+            let tarball_weighed = (crate_size.0 as f32 * weight) as usize;
+            let uncompr_weighed = (crate_size.1 as f32 * weight) as usize;
+            let crate_stats = krate.language_stats();
+
+            if depinf.direct && Self::is_same_project(&self.ver, &krate) {
+                main_crate_size.0 += tarball_weighed;
+                main_crate_size.1 += uncompr_weighed;
+
+                for (&lang, val) in &crate_stats.langs {
+                    let e = main_lang_stats.langs.entry(lang).or_insert(Lines::default());
+                    e.code += (val.code as f32 * weight) as usize;
+                    e.comments += (val.comments as f32 * weight) as usize;
+                }
+            } else {
+                deps_size.0 += tarball_weighed;
+                deps_size.1 += uncompr_weighed;
+                let sloc = crate_stats.langs.iter().filter(|(l, _)| l.is_code()).map(|(_,v)| v.code).sum::<usize>();
+                deps_size.2 += (sloc as f32 * weight) as usize;
+            }
+        }
+
+        Ok((main_crate_size, deps_size, main_lang_stats))
+    }
+
+    fn get_crate_of_dependency(&self, name: &str, semver: &SemVer) -> CResult<RichCrateVersion> {
+        let krate = self.kitchen_sink.index.crate_by_name(&Origin::from_crates_io_name(name))?;
+        let ver = krate.versions()
+            .iter().rev()
+            .find(|k| SemVer::parse(k.version()).ok().map_or(false, |v| &v == semver))
+            .unwrap_or_else(|| krate.latest_version());
+        self.kitchen_sink.rich_crate_version_from_index(ver, CrateData::Full)
+    }
+
+    fn is_same_project(one: &RichCrateVersion, two: &RichCrateVersion) -> bool {
+        match (one.repository(), two.repository()) {
+            (Some(a), Some(b)) if a.host == b.host => return true,
+            _ => false,
+        }
     }
 }
 
-type LanguageStats = (usize, Vec<(Language, Lines, (usize, usize))>);
+type LanguageStats = Vec<(Language, Lines, (usize, usize))>;
 
 impl ReleaseCounts {
 

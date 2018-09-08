@@ -8,6 +8,7 @@
 @use CratePage;
 @use Contributors;
 @use rich_crate::Include;
+@use std::ops::Div;
 
 @(url: &Urler, c: &CratePage)
 
@@ -163,31 +164,51 @@
                   <p class="top-n">#<b>@top</b> in <a href="@url.keyword(&keyword)">#@keyword</a></p>
                 }
               }
-              @if let Some((deps, direct)) = c.dependents_stats() {
-                  @if deps != direct {
-                    <p>Used in <strong>@c.format_number(deps)</strong> crate@if deps != 1 {s} (<a href="@url.reverse_deps(&c.ver)">@c.format_number(direct)&nbsp;directly</a>)</p>
-                  } else {
-                    <p>Used in <a href="@url.reverse_deps(&c.ver)"><strong>@c.format_number(deps)</strong>&nbsp;crate@if deps != 1 {s}</a></p>
-                  }
-              }
               @:downloads(&c.download_graph(182, 56))
-              <p><b>@c.format_number(c.all.downloads_per_month())</b> downloads per month</p>
+              <p><b>@c.format_number(c.all.downloads_per_month())</b> downloads per month
+                @if let Some((deps, direct)) = c.dependents_stats() {
+                  <br>
+                    @if deps != direct {
+                      Used in <strong>@c.format_number(deps)</strong> crate@if deps != 1 {s} (<a href="@url.reverse_deps(&c.ver)">@c.format_number(direct)&nbsp;directly</a>)
+                    } else {
+                      Used in <a href="@url.reverse_deps(&c.ver)"><strong>@c.format_number(deps)</strong>&nbsp;crate@if deps != 1 {s}</a>
+                    }
+                }
+              </p>
             </section>
+            <section id="sloc">
+              <section id="license">
+                @if let Some(lic) = c.ver.license_name() {
+                  <b property="license">@lic</b>
+                  @if lic.len() < 8 {
+                    license
+                  }
+                }
+                @if let Some(filename) = c.ver.license_file() {
+                  <b title="@filename">Custom license</b>
+                }
+              </section>
 
-            @if let Some((tarball, raw, lang_stats)) = c.crate_size(360) {
-              <section id="sloc">
+              @if let Some(((tarball, raw), _)) = c.sizes {
                 <p>
                   <span title="@c.format_kbytes(tarball) as tarball">@if tarball > 1000000 || raw > 10000000 {
                     <b>@c.format_kbytes(tarball.max(raw))</b>
                   } else {
                     @c.format_kbytes(tarball.max(raw))
                   }</span>
-                  @if let Some((total, _)) = lang_stats {
+                  @if let Some((total, _)) = c.lang_stats {
                     @if total >= 50 {
                       <br>
                       @if total >= 1000 {
                         @if let Some((val, unit)) = Some(c.format_knumber(total)) {
-                          <span title="@c.format_number(total)"><b>@val</b>@unit</span> <abbr title="Lines of code, excluding comments">SLoC</abbr>
+                          <span title="@c.format_number(total)">
+                            if total > 20000 {
+                              <b>@val@unit</b>
+                            } else {
+                              @val@unit
+                            }
+                          </span>
+                          <abbr title="Lines of code, excluding comments">SLoC</abbr>
                         }
                       } else {
                         @total <span title="Lines of code, excluding comments">lines</span>
@@ -195,17 +216,19 @@
                     }
                   }
                 </p>
-                @if let Some((total, sloc)) = lang_stats {
-                  @if sloc.len() > 1 && total > 1000 {
-                    <svg viewBox="-1 -1 59 59" width="60" height="60">
-                      @for (lang, lines, (x, w)) in sloc {
-                        <path d="@CratePage::svg_path_for_slice(x,if x+w < 359 {w+1} else {w},360,58)" fill="@lang.color()"><title>@lang.name() @if let Some((val,unit)) = Some(c.format_knumber(lines.code)) {@val@unit} SLoC @if lines.comments > 1 { // @c.format_fraction(lines.comments as f64 / (lines.code+lines.comments) as f64) comments }</title></path>
-                      }
-                    </svg>
+                @if let Some((total, stats)) = &c.lang_stats {
+                  @if let Some(sloc) = c.langs_chart(stats, 360) {
+                    @if sloc.len() > 1 && *total > 1000 {
+                      <svg viewBox="-1 -1 59 59" width="60" height="60">
+                        @for (lang, lines, (x, w)) in sloc {
+                          <path d="@CratePage::svg_path_for_slice(x,if x+w < 359 {w+1} else {w},360,58)" fill="@lang.color()"><title>@lang.name() @if let Some((val,unit)) = Some(c.format_knumber(lines.code)) {@val@unit} SLoC @if lines.comments > 1 { // @c.format_fraction(lines.comments as f64 / (lines.code+lines.comments) as f64) comments }</title></path>
+                        }
+                      </svg>
+                    }
                   }
                 }
-              </section>
-            }
+              }
+            </section>
           </section>
 
           @if let Ok(readme) = c.ver.readme() {
@@ -237,27 +260,32 @@
           }
         </div>
         <section id="deps">
-          <section id="license">
-            <b property="license">@if let Some(lic) = c.ver.license() {
-              @lic
-            }
-            @if let Some(filename) = c.ver.license_file() {
-              <span title="@filename">Custom</span>
-            }</b>
-            license
-          </section>
-
           @if let Some((normal, dev, build)) = c.dependencies() {
-            @if c.has_runtime_deps() {
+            @if c.has_runtime_deps() || c.ver.links().is_some() {
               <h4><a href="@url.deps(&c.ver)">Dependencies</a></h4>
+            } else {
+              <h4>No runtime deps</h4>
+            }
+            @if let Some(((main_tarball, _), (deps_tarball, deps_raw, deps_sloc))) = c.sizes {
+              @if deps_tarball > 1000000 || deps_tarball > main_tarball.div(2) {
+                <p>
+                  <span title="amortized size; approx. @c.format_kbytes(deps_tarball) compressed">@if deps_tarball > 8000000 || deps_raw > 50000000 {
+                    ~<b>@c.format_kbytes(deps_tarball.max(deps_raw))</b>
+                  } else {
+                    ~@c.format_kbytes(deps_tarball.max(deps_raw))
+                  }</span>
+                  <br>
+                  @if deps_sloc >= 10000 {
+                    @if let Some((val, unit)) = Some(c.format_knumber(deps_sloc)) {
+                      <span title="estimated">~@val@unit</span> <abbr title="approx. additional lines of code">SLoC</abbr>
+                    }
+                  }
+                </p>
+              }
             }
             <div>
             <ul class="@if normal.len() > 4 {long}">
-              @if !c.has_runtime_deps() {
-                <li>No runtime deps</li>
-              } else {
-                @:deps_list(c, url, &normal, "")
-              }
+              @:deps_list(c, url, &normal, "")
               @if let Some(links) = c.ver.links() {
                 <li><span class="label label-build">links</span> <code>@links</code></li>
               }

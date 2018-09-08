@@ -88,11 +88,7 @@ pub fn render_crate_page(out: &mut Write, all: &RichCrate, ver: &RichCrateVersio
     }
 
     let urler = Urler::new();
-    let c = CratePage {
-        top_keyword: kitchen_sink.top_keyword(all).context("top keyword")?,
-        all_contributors: kitchen_sink.all_contributors(ver).context("all contrib")?,
-        all, ver, kitchen_sink, markup,
-    };
+    let c = CratePage::new(all, ver, kitchen_sink, markup).context("New crate page")?;
     templates::crate_page(out, &urler, &c).context("crate page io")?;
     Ok(c.page_title())
 }

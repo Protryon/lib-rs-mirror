@@ -46,7 +46,7 @@ impl DepVisitor {
         }
     }
 
-    pub fn visit(&mut self, depinf: DepInf, depset: &ArcDepSet, mut cb: impl FnMut(&mut Self, &DepName, &Dep)) {
+    pub fn visit(&mut self, depset: &ArcDepSet, depinf: DepInf, mut cb: impl FnMut(&mut Self, &DepName, &Dep)) {
         let target_addr: &Mutex<HashMap<DepName, Dep>> = &*depset;
         if self.node_visited.insert((depinf, target_addr as *const _)) {
             if let Ok(depset) = depset.try_lock() {
@@ -82,7 +82,7 @@ impl Index {
         .par_iter()
         .filter_map(|(_, c)| {
             let mut collected = HashMap::with_capacity(120);
-            let mut node_visited = HashSet::with_capacity(120);
+            let mut visitor = DepVisitor::new();
 
             flatten(&self.deps_of_crate(c, DepQuery {
                 default: true,
@@ -92,7 +92,7 @@ impl Index {
                 default: true,
                 direct: true,
                 ty: DepTy::Runtime,
-            }, &mut collected, &mut node_visited);
+            }, &mut collected, &mut visitor);
 
             flatten(&self.deps_of_crate(c, DepQuery {
                 default: true,
@@ -102,7 +102,7 @@ impl Index {
                 default: false, // false, because real defaults have already been set
                 direct: true,
                 ty: DepTy::Runtime,
-            }, &mut collected, &mut node_visited);
+            }, &mut collected, &mut visitor);
 
             flatten(&self.deps_of_crate(c, DepQuery {
                     default: true,
@@ -112,7 +112,7 @@ impl Index {
                 default: false,  // false, because real defaults have already been set
                 direct: true,
                 ty: DepTy::Dev,
-            }, &mut collected, &mut node_visited);
+            }, &mut collected, &mut visitor);
 
             if collected.is_empty() {
                 None
@@ -159,33 +159,26 @@ impl Index {
     }
 }
 
-fn flatten(dep: &Dep, depinf: DepInf, collected: &mut HashMap<Arc<str>, (DepInf, SemVer)>, node_visited: &mut HashSet<(DepInf, *const Mutex<DepSet>)>) {
-    flatten_set(&dep.runtime, depinf, collected, node_visited);
-    let ty = if depinf.ty == DepTy::Dev {DepTy::Dev} else {DepTy::Build};
-    flatten_set(&dep.build, DepInf {ty, ..depinf}, collected, node_visited);
+fn flatten(dep: &Dep, depinf: DepInf, collected: &mut HashMap<Arc<str>, (DepInf, SemVer)>, visitor: &mut DepVisitor) {
+    visitor.start(dep, depinf, |vis, dep, depinf| flatten_set(dep, depinf, collected, vis));
 }
 
-fn flatten_set(depset: &ArcDepSet, depinf: DepInf, collected: &mut HashMap<Arc<str>, (DepInf, SemVer)>, node_visited: &mut HashSet<(DepInf, *const Mutex<DepSet>)>) {
-    let target_addr: &Mutex<HashMap<DepName, Dep>> = &*depset;
-    if node_visited.insert((depinf, target_addr as *const _)) {
-        if let Ok(depset) = depset.try_lock() {
-            for ((name, _), dep) in depset.iter() {
-                collected.entry(name.clone())
-                    .and_modify(|(old, semver)| {
-                        if depinf.default {old.default = true;}
-                        if depinf.direct {
-                            old.direct = true;
-                            *semver = dep.semver.clone(); // direct version is most important; used for estimating out-of-date versions
-                        }
-                        match (old.ty, depinf.ty) {
-                            (_, DepTy::Runtime) => {old.ty = DepTy::Runtime;},
-                            (DepTy::Dev, DepTy::Build) => {old.ty = DepTy::Build;},
-                            _ => {},
-                        }
-                    })
-                    .or_insert((depinf, dep.semver.clone()));
-                flatten(dep, DepInf {direct: false, ..depinf}, collected, node_visited);
-            }
-        }
-    }
+fn flatten_set(depset: &ArcDepSet, depinf: DepInf, collected: &mut HashMap<Arc<str>, (DepInf, SemVer)>, visitor: &mut DepVisitor) {
+    visitor.visit(depset, depinf, |vis, (name, _), dep| {
+        collected.entry(name.clone())
+            .and_modify(|(old, semver)| {
+                if depinf.default {old.default = true;}
+                if depinf.direct {
+                    old.direct = true;
+                    *semver = dep.semver.clone(); // direct version is most important; used for estimating out-of-date versions
+                }
+                match (old.ty, depinf.ty) {
+                    (_, DepTy::Runtime) => {old.ty = DepTy::Runtime;},
+                    (DepTy::Dev, DepTy::Build) => {old.ty = DepTy::Build;},
+                    _ => {},
+                }
+            })
+            .or_insert((depinf, dep.semver.clone()));
+        vis.recurse(dep, depinf, |vis, dep, depinf| flatten_set(dep, depinf, collected, vis));
+    })
 }

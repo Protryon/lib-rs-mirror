@@ -3,6 +3,7 @@ extern crate libflate;
 extern crate render_readme;
 extern crate repo_url;
 extern crate tar;
+extern crate udedokei;
 
 #[macro_use] extern crate quick_error;
 
@@ -33,6 +34,8 @@ pub struct CrateFile {
     pub lib_file: Option<String>,
     pub files: Vec<PathBuf>,
     pub readme: Result<Option<Readme>>,
+    pub language_stats: udedokei::Stats,
+    pub decompressed_size: usize,
 }
 
 impl CrateFile {

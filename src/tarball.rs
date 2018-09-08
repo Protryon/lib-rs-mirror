@@ -6,14 +6,15 @@ use std::path::Path;
 use tar::Archive;
 use readme_from_repo;
 use is_readme_filename;
-use Result;
-use {UnarchiverError, CrateFile};
+use {Result, UnarchiverError, CrateFile};
+use udedokei;
 
 enum ReadAs {
     Toml,
     ReadmeMarkdown(String),
     ReadmeRst(String),
     Lib,
+    GetStatsOfFile(udedokei::Language)
 }
 
 pub fn read_archive(archive: impl Read, prefix: &Path) -> Result<CrateFile> {
@@ -24,49 +25,67 @@ pub fn read_archive(archive: impl Read, prefix: &Path) -> Result<CrateFile> {
     let mut markup = None;
     let mut files = Vec::new();
     let mut lib_file = None;
+    let mut stats = udedokei::Collect::new();
+    let mut decompressed_size = 0;
 
     for file in a.entries()? {
         let mut file = file?;
 
-        let path_match = match file.header().path() {
-            Ok(ref p) => if let Ok(relpath) = p.strip_prefix(prefix) {
-                files.push(relpath.to_owned());
-                match relpath {
-                    p if p == Path::new("Cargo.toml") || p == Path::new("cargo.toml") => ReadAs::Toml,
-                    p if p == Path::new("src/lib.rs") => ReadAs::Lib,
-                    p => if is_readme_filename(p, manifest.as_ref().map(|m| &m.package)) {
-                        let path_prefix = p.parent().unwrap().display().to_string();
-                        if p.extension().map_or(false, |e| e == "rst") {
-                            ReadAs::ReadmeRst(path_prefix)
-                        } else {
-                            ReadAs::ReadmeMarkdown(path_prefix)
-                        }
+        let path_match = {
+            let path = file.header().path();
+            let relpath = match path {
+                Ok(ref p) => match p.strip_prefix(prefix) {
+                    Ok(relpath) => relpath,
+                    _ => continue,
+                },
+                _ => continue,
+            };
+            files.push(relpath.to_owned());
+
+            match relpath {
+                p if p == Path::new("Cargo.toml") || p == Path::new("cargo.toml") => ReadAs::Toml,
+                p if p == Path::new("src/lib.rs") => ReadAs::Lib,
+                p if is_readme_filename(p, manifest.as_ref().map(|m| &m.package)) => {
+                    let path_prefix = p.parent().unwrap().display().to_string();
+                    if p.extension().map_or(false, |e| e == "rst") {
+                        ReadAs::ReadmeRst(path_prefix)
+                    } else {
+                        ReadAs::ReadmeMarkdown(path_prefix)
+                    }
+                },
+                p => if let Some(lang) = is_source_code_file(p) {
+                    if lang.is_code() {
+                        ReadAs::GetStatsOfFile(lang)
                     } else {
                         continue;
-                    },
-                }
-            } else {
-                eprintln!("warning: bad prefix {} in {}", prefix.display(), p.display());
-                continue
-            },
-            _ => continue,
+                    }
+                } else {
+                    continue;
+                },
+            }
         };
 
-        let mut data = String::with_capacity(file.header().size()? as usize);
-        file.read_to_string(&mut data)?;
+        let mut data = Vec::with_capacity(file.header().size()? as usize);
+        file.read_to_end(&mut data)?;
+        decompressed_size += data.len();
+        let data = String::from_utf8_lossy(&data);
 
         match path_match {
             ReadAs::Lib => {
-                lib_file = Some(data);
+                stats.add_to_stats(udedokei::Language::from_path("lib.rs").unwrap(), &data);
+                lib_file = Some(data.to_string());
             },
             ReadAs::Toml => {
                 manifest = Some(TomlManifest::from_slice(data.as_bytes())?);
             },
             ReadAs::ReadmeMarkdown(path_prefix) => {
-                markup = Some((path_prefix, Markup::Markdown(data)));
+                markup = Some((path_prefix, Markup::Markdown(data.to_string())));
             },
             ReadAs::ReadmeRst(path_prefix) => {
-                markup = Some((path_prefix, Markup::Rst(data)));
+                markup = Some((path_prefix, Markup::Rst(data.to_string())));
+            },
+            ReadAs::GetStatsOfFile(lang) => {
+                stats.add_to_stats(lang, &data);
             },
         }
     }
@@ -76,9 +95,27 @@ pub fn read_archive(archive: impl Read, prefix: &Path) -> Result<CrateFile> {
     ))?;
 
     Ok(CrateFile {
+        decompressed_size,
         readme: Ok(markup.map(|(path, m)| readme_from_repo(m, &manifest.package.repository, &path))),
         manifest,
         files,
         lib_file,
+        language_stats: stats.finish(),
     })
+}
+
+fn is_source_code_file(path: &Path) -> Option<udedokei::Language> {
+    use std::os::unix::ffi::OsStrExt;
+
+    if path.starts_with("tests") || path.starts_with("benches") || path.starts_with("examples") {
+        return None;
+    }
+    if let Some(name) = path.file_name() {
+        if name.as_bytes().starts_with(b".") {
+            return None;
+        }
+    } else {
+        return None;
+    }
+    udedokei::Language::from_path(path)
 }

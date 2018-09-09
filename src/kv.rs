@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::sync::RwLock;
 use std::collections::HashMap;
 use serde::de::DeserializeOwned;
@@ -46,11 +47,11 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
     }
 
     #[inline]
-    pub fn set(&self, key: impl Into<String>, value: T) -> Result<(), Error> {
-        self.set_(key.into().into_boxed_str(), value)
+    pub fn set(&self, key: impl Into<String>, value: impl Borrow<T>) -> Result<(), Error> {
+        self.set_(key.into().into_boxed_str(), value.borrow())
     }
 
-    pub fn set_(&self, key: Box<str>, value: T) -> Result<(), Error> {
+    pub fn set_(&self, key: Box<str>, value: &T) -> Result<(), Error> {
 
         // sanity check
         let value = rmp_serde::to_vec(&value).map_err(|e| Error::from(e))
@@ -110,7 +111,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
             Ok(res) => {
                 let res = cb(res);
                 if let Some(ref res) = res {
-                    self.set(key, res.clone())?
+                    self.set(key, res)?
                 }
                 Ok(res)
             },

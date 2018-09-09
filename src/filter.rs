@@ -32,14 +32,16 @@ struct ImageOptimImageMeta {
 /// Filter through https://imageoptim.com/api
 pub struct ImageOptimAPIFilter {
     /// Get one from https://imageoptim.com/api/register
-    api_id: &'static str,
+    img_prefix: String,
+    meta_prefix: String,
     cache: TempCache<ImageOptimImageMeta>,
 }
 
 impl ImageOptimAPIFilter {
-    pub fn new(api_id: &'static str, cache_path: Into<PathBuf>) -> Result<Self, Error> {
+    pub fn new(api_id: &str, cache_path: impl Into<PathBuf>) -> Result<Self, Error> {
         Ok(Self {
-            api_id,
+            img_prefix: format!("https://img.gs/{}/full/", api_id),
+            meta_prefix: format!("https://img.gs/{}/meta,timeout=90/", api_id),
             cache: TempCache::new(cache_path)?,
         })
     }
@@ -47,13 +49,15 @@ impl ImageOptimAPIFilter {
 
 impl ImageFilter for ImageOptimAPIFilter {
     fn filter_url<'a>(&self, url: &'a str) -> Cow<'a, str> {
-        format!("https://img.gs/{}/full/{}", self.api_id, url).into()
+        format!("{}{}", self.img_prefix, url).into()
     }
 
-    fn image_size(&self, url: &str) -> Option<(u32, u32)> {
-        self.cache.get_json(url, url, |f| f)
+    fn image_size(&self, image_url: &str) -> Option<(u32, u32)> {
+        let image_url = image_url.trim_left_matches(&self.img_prefix);
+        let api_url = format!("{}{}", self.meta_prefix, image_url);
+        self.cache.get_json(image_url, api_url, |f| f)
             .map_err(|e| {
-                eprintln!("warning: image req to meta of {} failed: {}", url, e);
+                eprintln!("warning: image req to meta of {} failed: {}", image_url, e);
             })
             .ok()
             .and_then(|f| f)

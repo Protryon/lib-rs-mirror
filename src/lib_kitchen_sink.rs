@@ -303,6 +303,8 @@ impl KitchenSink {
 
     /// With warnings
     pub fn rich_crate_version_verbose(&self, krate: &Version, fetch_type: CrateData) -> CResult<(RichCrateVersion, Warnings)> {
+        if stopped() {Err(KitchenSinkErr::Stopped)?;}
+
         let key = (krate.name(), krate.version());
         let cached = if fetch_type != CrateData::FullNoDerived {
             match self.crate_derived_cache.get(key.0)? {
@@ -445,17 +447,21 @@ impl KitchenSink {
 
         warnings.extend(self.remove_redundant_links(&mut meta.manifest.package, maybe_repo.as_ref()));
 
-        if meta.manifest.package.homepage.is_none() && fetch_type != CrateData::Minimal {
-            if let Some(ref repo) = maybe_repo {
-                match repo.host() {
+        if fetch_type != CrateData::Minimal {
+            if let Some(ref crate_repo) = maybe_repo {
+                match crate_repo.host() {
                     RepoHost::GitHub(ref repo) => {
-                        if let Some(ghrepo) = self.gh.repo(repo, ver)? {
-                            if let Some(url) = ghrepo.github_page_url {
-                                meta.manifest.package.homepage = Some(url);
-                            } else if let Some(url) = ghrepo.homepage {
-                                meta.manifest.package.homepage = Some(url);
+                        let cachebust = self.cachebust_string_for_repo(crate_repo)?;
+                        if let Some(ghrepo) = self.gh.repo(repo, &cachebust)? {
+                            if meta.manifest.package.homepage.is_none() {
+                                if let Some(url) = ghrepo.github_page_url {
+                                    meta.manifest.package.homepage = Some(url);
+                                } else if let Some(url) = ghrepo.homepage {
+                                    meta.manifest.package.homepage = Some(url);
+                                }
+                                warnings.extend(self.remove_redundant_links(&mut meta.manifest.package, maybe_repo.as_ref()));
                             }
-                            warnings.extend(self.remove_redundant_links(&mut meta.manifest.package, maybe_repo.as_ref()));
+                            derived.github_description = ghrepo.description;
                         }
                     },
                     _ => {}, // TODO

@@ -3,6 +3,8 @@ use rusqlite;
 use serde;
 use serde_json;
 use rusqlite::Connection;
+use rusqlite::Error::SqliteFailure;
+use rusqlite::ErrorCode::DatabaseLocked;
 use std::path::Path;
 use thread_local::ThreadLocal;
 use error::Error;
@@ -70,6 +72,21 @@ impl SimpleCache {
     }
 
     pub fn get_cached(&self, key: (&str, &str), url: impl AsRef<str>) -> Result<Option<Vec<u8>>, Error> {
+        let url = url.as_ref();
+        let mut retries = 5;
+        loop {
+            match self.get_cached_inner(key, url) {
+                Err(Error::Db(SqliteFailure(ref e, _))) if retries > 0 && e.code == DatabaseLocked => {
+                    eprintln!("Retrying {}: {}", key.0, e);
+                    retries -= 1;
+                    thread::sleep(Duration::from_secs(1));
+                },
+                err => return err,
+            }
+        }
+    }
+
+    fn get_cached_inner(&self, key: (&str, &str), url: &str) -> Result<Option<Vec<u8>>, Error> {
         Ok(if let Some(data) = self.get(key)? {
             Some(data)
         } else {
@@ -77,7 +94,7 @@ impl SimpleCache {
                 None
             } else {
                 eprintln!("cache miss {}@{}", key.0, key.1);
-                let data = Self::fetch(url.as_ref())?;
+                let data = Self::fetch(url)?;
                 self.set(key, &data)?;
                 Some(data)
             }

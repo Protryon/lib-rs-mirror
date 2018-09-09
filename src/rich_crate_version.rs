@@ -108,6 +108,7 @@ impl RichCrateVersion {
             add_words(self.short_name());
             if let Some(s) = self.description() {add_words(s);}
             if let Some(s) = self.alternative_description() {add_words(s);}
+            if let Some(s) = &self.derived.github_name {add_words(s);}
             if let Some(s) = self.homepage() {add_words(s);}
             if let Some(s) = self.documentation() {add_words(s);}
             if let Some(r) = self.repository() {add_words(r.url.as_str());}
@@ -199,6 +200,11 @@ impl RichCrateVersion {
             if d.contains(". ") {d} // multiple sentences, leave them alone
             else {d.trim_right_matches('.')}
         })
+    }
+
+    /// Currently from github
+    pub fn alternative_description(&self) -> Option<&str> {
+        self.derived.github_description.as_ref().map(|s| s.as_str())
     }
 
     /// Only explicitly-specified authors
@@ -441,6 +447,8 @@ pub struct Derived {
     pub categories: Option<Vec<String>>,
     pub keywords: Option<Vec<String>>,
     pub github_keywords: Option<Vec<String>>,
+    pub github_name: Option<String>,
+    pub github_description: Option<String>,
     pub language_stats: udedokei::Stats,
     pub crate_compressed_size: usize,
     pub crate_decompressed_size: usize,

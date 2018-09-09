@@ -129,9 +129,17 @@ impl Index {
 
         let mut set: HashMap<DepName, (_, _, SemVer, HashSet<String>)> = HashMap::with_capacity(60);
         for d in ver.dependencies() {
-            if !wants.all_targets && d.target().is_some() {
+
+            // people forget to include winapi conditionally
+            let is_target_specific = d.name() == "winapi" || d.target().is_some();
+            if !wants.all_targets && is_target_specific {
                 continue; // FIXME: allow common targets?
             }
+            // hopefully nobody uses clippy at runtime, they just fail to make it dev dep
+            if !wants.dev && d.name() == "clippy" && d.is_optional() {
+                continue;
+            }
+
             match d.kind() {
                 Some("normal") | None => (),
                 Some("build") if wants.build => (),
@@ -247,8 +255,10 @@ impl Index {
 
     /// How likely it is that this exact crate will be installed in any project
     pub fn version_commonality(&self, crate_name: &str, version: &SemVer) -> f32 {
-        if "libc" == crate_name || "winapi" == crate_name { // bindings' SLoC looks heavier than actual overhead
-            return 0.92;
+        match crate_name {
+            // bindings' SLoC looks heavier than actual overhead of standard system libs
+            "libc" | "winapi" | "kernel32-sys" => return 0.91,
+            _ => {},
         }
 
         let stats = self.deps_stats();

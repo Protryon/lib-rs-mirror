@@ -6,6 +6,9 @@
   @if ver.is_yanked() {
     <span title="this version has been deleted" class="yanked">yanked</span>
   }
+  @if ver.is_proc_macro() {
+    <span title="compiler plug-in" class="derive">proc-macro</span>
+  }
   @if ver.is_sys() {
     <span title="system library" class="sys">sys</span>
   }

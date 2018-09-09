@@ -39,7 +39,7 @@
         @if !last {|}
       }
       @if let Some(parent) = c.parent_crate() {
-        › <span class="parent-crate"><a href="@url.krate(&parent)">@CratePage::capitalized(parent.short_name())</a></span>
+        › <span class="parent-crate"><a href="@url.krate(&parent)">@parent.capitalized_name()</a></span>
       }
       </span>
     }

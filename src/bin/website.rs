@@ -78,7 +78,7 @@ fn render_categories(cats: &CategoryMap, base: &Path, crates: &KitchenSink, done
             let allver = crates.rich_crate(origin).context("get crate all versions")?;
             let ver = crates.rich_crate_version(origin, CrateData::Full).context("get rich crate")?;
             let path = PathBuf::from(format!("public/crates/{}.html", ver.short_name()));
-            println!("{}", path.display());
+            println!("http://localhost:3000/crates/{}", ver.short_name());
             let mut outfile = BufWriter::new(File::create(&path)
                 .with_context(|_| format!("Can't create {}", path.display()))?);
             front_end::render_crate_page(&mut outfile, &allver, &ver, crates, markup).context("render crate page")?;

@@ -17,6 +17,7 @@ use rich_crate::Repo;
 use rich_crate::RichCrate;
 use rich_crate::RichCrateVersion;
 use rusqlite::*;
+use std::fs;
 use std::sync::Mutex;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -33,13 +34,26 @@ pub struct CrateDb {
     url: String,
     conn: ThreadLocal<std::result::Result<RefCell<Connection>, rusqlite::Error>>,
     exclusive_conn: Mutex<Option<Connection>>,
+    tag_synonyms: HashMap<Box<str>, (Box<str>, u8)>,
 }
 
 impl CrateDb {
     /// Path to sqlite db file to create/update
     pub fn new(path: impl AsRef<Path>) -> FResult<Self> {
         let path = path.as_ref();
+        let tag_synonyms = fs::read_to_string(path.with_file_name("tag-synonyms.csv"))?;
+        let tag_synonyms = tag_synonyms.lines()
+            .filter(|l| !l.starts_with('#'))
+            .map(|l| {
+                let mut cols = l.splitn(3, ',');
+                let score: u8 = cols.next().unwrap().parse().unwrap();
+                let find = cols.next().unwrap();
+                let replace = cols.next().unwrap();
+                (find.into(), (replace.into(), score))
+            })
+            .collect();
         Ok(Self {
+            tag_synonyms,
             url: format!("file:{}?cache=shared", path.display()),
             conn: ThreadLocal::new(),
             exclusive_conn: Mutex::new(None),
@@ -95,11 +109,21 @@ impl CrateDb {
             }
             insert_keyword.add(&k, w, true);
         }
+
         for (i, k) in c.short_name().split(|c: char| !c.is_alphanumeric()).enumerate() {
             print!("'{}, ", k);
             let mut w: f64 = 100./(8+i*2) as f64;
             insert_keyword.add(k, w, false);
         }
+
+        if let Some(l) = c.links() {
+            insert_keyword.add(l.trim_left_matches("lib"), 0.54, false);
+        }
+
+        // order is important. SO's synonyms are very keyword-specific and would
+        // add nonsense keywords if applied to freeform text
+        insert_keyword.add_synonyms(&self.tag_synonyms);
+
         if let Some((w2, d)) = Self::extract_text(&c) {
             let d: &str = &d;
             for (i, k) in d.split_whitespace()
@@ -113,9 +137,7 @@ impl CrateDb {
                 insert_keyword.add(&k, w, false);
             }
         }
-        if let Some(l) = c.links() {
-            insert_keyword.add(l.trim_left_matches("lib"), 0.54, false);
-        }
+
         for feat in c.features().keys() {
             if feat != "default" {
                 insert_keyword.add(&format!("feature:{}", feat), 0.55, false);
@@ -135,6 +157,7 @@ impl CrateDb {
             tmp.sort_by(|a,b| b.1.partial_cmp(a.1).unwrap());
             print!("#{} ", tmp.into_iter().map(|(k,_)| k.to_string()).collect::<Vec<_>>().join(" #"));
         }
+
 
         self.with_tx(|tx| {
             let mut insert_crate = tx.prepare_cached("INSERT OR IGNORE INTO crates (origin, recent_downloads) VALUES (?1, ?2)")?;
@@ -172,6 +195,7 @@ impl CrateDb {
                     insert_keyword.add(&slug, rel/3., false);
                 }
             }
+
             for (i, k) in c.authors().iter().filter_map(|a|a.email.as_ref().or(a.name.as_ref())).enumerate() {
                 print!("by:{}, ", k);
                 let mut w: f64 = 50./(100+i) as f64;
@@ -699,6 +723,7 @@ pub enum RepoChange {
 }
 
 pub struct KeywordInsert {
+    /// k => (weight, explicit)
     keywords: HashMap<String, (f64, bool)>,
 }
 
@@ -724,6 +749,24 @@ impl KeywordInsert {
         let k = self.keywords.entry(word).or_insert((weight, visible));
         if k.0 < weight {k.0 = weight}
         if visible {k.1 = visible}
+    }
+
+    pub fn add_synonyms(&mut self, tag_synonyms: &HashMap<Box<str>, (Box<str>, u8)>) {
+        let to_add: Vec<_> = self.keywords.iter().filter_map(|(k, &(v, _))| {
+            tag_synonyms.get(k.as_str()).and_then(|&(ref synonym, votes)| {
+                let synonym: &str = &synonym;
+                if self.keywords.get(synonym).is_some() {
+                    None
+                } else {
+                    println!("SYNONYM{} {} -> {}", votes, k, synonym);
+                    let relevance = (votes as f64 / 5. + 0.1).min(0.8);
+                    Some((synonym.to_string(), v * relevance))
+                }
+            })
+        }).collect();
+        for (s, v) in to_add {
+            self.keywords.entry(s).or_insert((v, false));
+        }
     }
 
     pub fn commit(mut self, conn: &Connection, crate_id: u32) -> FResult<()> {

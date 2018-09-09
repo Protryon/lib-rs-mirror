@@ -255,15 +255,26 @@ impl RichCrateVersion {
     }
 
     pub fn has_lib(&self) -> bool {
-        self.lib_file.is_some() || self.manifest.lib.is_some()
+        !self.is_proc_macro() && (self.lib_file.is_some() || self.manifest.lib.is_some())
     }
 
     pub fn has_bin(&self) -> bool {
         !self.manifest.bin.is_empty()
     }
 
+    pub fn is_proc_macro(&self) -> bool {
+        self.manifest.lib.as_ref().map_or(false, |lib| {
+            lib.proc_macro.unwrap_or(false)
+        })
+    }
+
     pub fn is_app(&self) -> bool {
-        self.has_bin() && !self.has_lib()
+        self.has_bin() && !self.is_proc_macro() && !self.has_lib()
+    }
+
+    /// Does it use nightly-only features
+    pub fn is_nightly(&self) -> bool {
+        self.derived.is_nightly
     }
 
     pub fn is_no_std(&self) -> bool {
@@ -275,6 +286,7 @@ impl RichCrateVersion {
     pub fn is_sys(&self) -> bool {
         !self.has_bin() &&
         self.has_buildrs() &&
+        !self.is_proc_macro() &&
         (self.links().is_some() || (
             self.short_name().ends_with("-sys") ||
             self.short_name().ends_with("_sys") ||
@@ -452,4 +464,5 @@ pub struct Derived {
     pub language_stats: udedokei::Stats,
     pub crate_compressed_size: usize,
     pub crate_decompressed_size: usize,
+    pub is_nightly: bool,
 }

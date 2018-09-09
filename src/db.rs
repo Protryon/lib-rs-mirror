@@ -60,24 +60,15 @@ impl SimpleCache {
     }
 
     pub fn get(&self, key: (&str, &str)) -> Result<Option<Vec<u8>>, Error> {
-        self.with_connection(|conn| {
-            let mut q = conn.prepare_cached("SELECT data FROM cache2 WHERE key = ?1 AND ver = ?2")?;
-            let row: Result<Vec<u8>, _> = q.query_row(&[&key.0, &key.1], |r| r.get(0));
-            match row {
-                Ok(row) => Ok(Some(row)),
-                Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-                Err(err) => Err(err)?,
-            }
-        })
+        Self::with_retries(|| self.get_inner(key))
     }
 
-    pub fn get_cached(&self, key: (&str, &str), url: impl AsRef<str>) -> Result<Option<Vec<u8>>, Error> {
-        let url = url.as_ref();
+    fn with_retries<T>(mut cb: impl FnMut() -> Result<T, Error>) -> Result<T, Error> {
         let mut retries = 5;
         loop {
-            match self.get_cached_inner(key, url) {
+            match cb() {
                 Err(Error::Db(SqliteFailure(ref e, _))) if retries > 0 && e.code == DatabaseLocked => {
-                    eprintln!("Retrying {}: {}", key.0, e);
+                    eprintln!("Retrying: {}", e);
                     retries -= 1;
                     thread::sleep(Duration::from_secs(1));
                 },
@@ -86,7 +77,21 @@ impl SimpleCache {
         }
     }
 
-    fn get_cached_inner(&self, key: (&str, &str), url: &str) -> Result<Option<Vec<u8>>, Error> {
+    fn get_inner(&self, key: (&str, &str)) -> Result<Option<Vec<u8>>, Error> {
+        self.with_connection(|conn| {
+            let mut q = conn.prepare_cached("SELECT data FROM cache2 WHERE key = ?1 AND ver = ?2")?;
+            let row: Result<Vec<u8>, _> = q.query_row(&[&key.0, &key.1], |r| r.get(0));
+            match row {
+                Ok(row) => {
+                    Ok(Some(row))
+                },
+                Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+                Err(err) => Err(err)?,
+            }
+        })
+    }
+
+    pub fn get_cached(&self, key: (&str, &str), url: impl AsRef<str>) -> Result<Option<Vec<u8>>, Error> {
         Ok(if let Some(data) = self.get(key)? {
             Some(data)
         } else {
@@ -94,7 +99,7 @@ impl SimpleCache {
                 None
             } else {
                 eprintln!("cache miss {}@{}", key.0, key.1);
-                let data = Self::fetch(url)?;
+                let data = Self::fetch(url.as_ref())?;
                 self.set(key, &data)?;
                 Some(data)
             }
@@ -110,6 +115,10 @@ impl SimpleCache {
     }
 
     pub fn set(&self, key: (&str, &str), data: &[u8]) -> Result<(), Error> {
+        Self::with_retries(|| self.set_inner(key, data))
+    }
+
+    fn set_inner(&self, key: (&str, &str), data: &[u8]) -> Result<(), Error> {
         self.with_connection(|conn| {
             let mut q = conn.prepare_cached("INSERT OR REPLACE INTO cache2(key, ver, data) VALUES(?1, ?2, ?3)")?;
             q.execute(&[&key.0, &key.1, &data])?;

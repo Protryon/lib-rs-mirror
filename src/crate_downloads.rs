@@ -63,7 +63,7 @@ impl CrateDownloadsFile {
         for ver_day in ver_dl {
             let date = parse_date(&ver_day.date);
             let weeksago = -(latest_date - date).num_weeks(); // negate to sort by oldest first
-            *by_week.entry(weeksago).or_insert(HashMap::new())
+            *by_week.entry(weeksago).or_insert_with(HashMap::new)
                 .entry(Some(ver_day.version)).or_insert(0)
                  += ver_day.downloads;
         }
@@ -71,7 +71,7 @@ impl CrateDownloadsFile {
         for day in other_dl {
             let date = parse_date(&day.date);
             let weeksago = -(latest_date - date).num_weeks(); // negate to sort by oldest first
-            *by_week.entry(weeksago).or_insert(HashMap::new())
+            *by_week.entry(weeksago).or_insert_with(HashMap::new)
                 .entry(None)
                 .or_insert(0)
                 += day.downloads;

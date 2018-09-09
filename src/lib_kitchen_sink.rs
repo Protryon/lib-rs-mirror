@@ -79,6 +79,7 @@ use std::collections::hash_map::Entry::*;
 use std::collections::HashMap;
 use std::path::{PathBuf, Path};
 use std::env;
+use std::mem;
 use crate_db::{CrateDb, RepoChange};
 pub use semver::Version as SemVer;
 
@@ -110,8 +111,8 @@ pub enum KitchenSinkErr {
     CategoryQueryFailed,
     #[fail(display = "crate not found: {:?}", _0)]
     CrateNotFound(Origin),
-    #[fail(display = "data not found")]
-    DataNotFound,
+    #[fail(display = "data not found, wanted {}", _0)]
+    DataNotFound(String),
     #[fail(display = "crate has no versions")]
     NoVersions,
     #[fail(display = "Environment variable CRATES_DATA_DIR is not set.\nChoose a dir where it's OK to store lots of data, and export it like CRATES_DATA_DIR=/var/lib/crates.rs")]
@@ -284,7 +285,7 @@ impl KitchenSink {
         self.rich_crate_version_from_index( ver, fetch_type)
     }
 
-    pub fn rich_crate_version_from_index(&self, krate: &Version, fetch_type: CrateData) -> CResult<RichCrateVersion> {
+    fn rich_crate_version_from_index(&self, krate: &Version, fetch_type: CrateData) -> CResult<RichCrateVersion> {
         let cache_key = format!("{}-{}", krate.name(), krate.version()).into_boxed_str();
 
         if fetch_type != CrateData::FullNoDerived {
@@ -322,7 +323,7 @@ impl KitchenSink {
         };
 
         let (d, warn) = if let Some(res) = cached {res} else {
-            let (d, warn) = self.rich_crate_version_data(krate, fetch_type).context("get rich crate data")?;
+            let (d, warn) = self.rich_crate_version_data(krate, fetch_type).with_context(|_| format!("get rich crate data for {}", key.0))?;
             if fetch_type == CrateData::Full {
                 self.crate_derived_cache.set(key.0, (key.1.to_string(), d.clone(), warn.clone()))?;
             } else if fetch_type == CrateData::FullNoDerived {
@@ -339,28 +340,20 @@ impl KitchenSink {
         let ver = latest.version();
 
         let crate_tarball = self.crates_io.crate_data(name, ver).context("crate_file")?
-            .ok_or_else(|| KitchenSinkErr::DataNotFound)?;
+            .ok_or_else(|| KitchenSinkErr::DataNotFound(format!("{}-{}", name, ver)))?;
         let crate_compressed_size = crate_tarball.len();
         let mut meta = crate_files::read_archive(&crate_tarball[..], name, ver)?;
         drop(crate_tarball);
 
-        // Guess repo URL if none was specified
-        if meta.manifest.package.repository.is_none() {
-            warnings.insert(Warning::NoRepositoryProperty);
-            if meta.manifest.package.homepage.as_ref().map_or(false, |h| Repo::looks_like_repo_url(h)) {
-                meta.manifest.package.repository = meta.manifest.package.homepage.take();
-            }
-        }
+        let has_buildrs = meta.has("build.rs");
 
-        let maybe_repo = meta.manifest.package.repository.as_ref().and_then(|r| Repo::new(r).ok());
+        let mut derived = Derived::default();
+        mem::swap(&mut derived.language_stats, &mut meta.language_stats); // move
+        derived.crate_compressed_size = crate_compressed_size;
+        // sometimes uncompressed sources without junk are smaller than tarball with junk
+        derived.crate_decompressed_size = meta.decompressed_size.max(crate_compressed_size);
 
-        let has_readme = meta.readme.as_ref().ok().and_then(|opt| opt.as_ref()).is_some();
-        if !has_readme {
-            warnings.insert(Warning::NoReadmeProperty);
-            if fetch_type != CrateData::Minimal {
-                warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()));
-            }
-        }
+        let origin = Origin::from_crates_io_name(name);
 
         // Quick'n'dirty autobins substitute
         if meta.manifest.bin.is_empty() {
@@ -394,22 +387,41 @@ impl KitchenSink {
             });
         }
 
-        let has_buildrs = meta.has("build.rs");
+        let maybe_repo = meta.manifest.package.repository.as_ref().and_then(|r| Repo::new(r).ok());
 
-        let mut derived = Derived::default();
-        derived.language_stats = meta.language_stats;
-        derived.crate_compressed_size = crate_compressed_size;
-        // sometimes uncompressed sources without junk are smaller than tarball with junk
-        derived.crate_decompressed_size = meta.decompressed_size.max(crate_compressed_size);
+        let path_in_repo = match maybe_repo.as_ref() {
+            Some(repo) => if fetch_type != CrateData::Minimal {
+                self.crate_db.path_in_repo(repo, name)?
+            } else {
+                None
+            },
+            None => None,
+        };
 
-        let origin = Origin::from_crates_io_name(name);
+        ///// Fixing and faking the data /////
+
+        // Guess repo URL if none was specified
+        if meta.manifest.package.repository.is_none() {
+            warnings.insert(Warning::NoRepositoryProperty);
+            if meta.manifest.package.homepage.as_ref().map_or(false, |h| Repo::looks_like_repo_url(h)) {
+                meta.manifest.package.repository = meta.manifest.package.homepage.take();
+            }
+        }
+
+        let has_readme = meta.readme.as_ref().ok().and_then(|opt| opt.as_ref()).is_some();
+        if !has_readme {
+            warnings.insert(Warning::NoReadmeProperty);
+            if fetch_type != CrateData::Minimal {
+                warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()));
+            }
+        }
 
         // Guess keywords if none were specified
         // TODO: also ignore useless keywords that are unique db-wide
         if meta.manifest.package.keywords.is_empty() && fetch_type != CrateData::Minimal {
             let gh = match maybe_repo.as_ref() {
                 Some(repo) => if let RepoHost::GitHub(ref gh) = repo.host() {
-                    self.gh.topics(gh, &self.cachebust_string_for_repo(repo)?)?
+                    self.gh.topics(gh, &self.cachebust_string_for_repo(repo).context("fetch topics")?)?
                 } else {None},
                 _ => None,
             };
@@ -451,7 +463,7 @@ impl KitchenSink {
             if let Some(ref crate_repo) = maybe_repo {
                 match crate_repo.host() {
                     RepoHost::GitHub(ref repo) => {
-                        let cachebust = self.cachebust_string_for_repo(crate_repo)?;
+                        let cachebust = self.cachebust_string_for_repo(crate_repo).context("ghrepo")?;
                         if let Some(ghrepo) = self.gh.repo(repo, &cachebust)? {
                             if meta.manifest.package.homepage.is_none() {
                                 if let Some(url) = ghrepo.github_page_url {
@@ -462,6 +474,7 @@ impl KitchenSink {
                                 warnings.extend(self.remove_redundant_links(&mut meta.manifest.package, maybe_repo.as_ref()));
                             }
                             derived.github_description = ghrepo.description;
+                            derived.github_name = Some(ghrepo.name);
                         }
                     },
                     _ => {}, // TODO
@@ -473,15 +486,6 @@ impl KitchenSink {
         if !self.is_readme_short(meta.readme.as_ref().map(|r| r.as_ref()).map_err(|_|())) {
             meta.lib_file = None;
         }
-
-        let path_in_repo = match maybe_repo.as_ref() {
-            Some(repo) => if fetch_type != CrateData::Minimal {
-                self.crate_db.path_in_repo(repo, name)?
-            } else {
-                None
-            },
-            None => None,
-        };
 
         Ok((RichCrateVersionCacheData {
             derived,
@@ -781,14 +785,15 @@ impl KitchenSink {
     }
 
     pub fn cachebust_string_for_repo(&self, crate_repo: &Repo) -> CResult<String> {
-        Ok(match self.crate_db.first_crate_for_repo(crate_repo).context("repo cache_bust")? {
-            None => "*".to_string(),
-            Some(ref ver_name) => {
-                let k = self.index.crate_version_latest_unstable(&Origin::from_crates_io_name(ver_name))
-                    .context("repo crate cache buster")?;
-                k.version().to_string()
-            }
-        })
+        Ok(self.crate_db.crates_in_repo(crate_repo)
+            .context("db cache_bust")?
+            .into_iter()
+            .filter_map(|name| {
+                self.index.crate_version_latest_unstable(&Origin::from_crates_io_name(&name)).ok()
+            })
+            .map(|k| k.version().to_string())
+            .next()
+            .unwrap_or_else(|| "*".to_string()))
     }
 
     /// Merge authors, owners, contributors
@@ -799,7 +804,7 @@ impl KitchenSink {
                 RepoHost::GitHub(ref repo) => {
                     // multiple crates share a repo, which causes cache churn when version "changes"
                     // so pick one of them and track just that one version
-                    let cachebust = self.cachebust_string_for_repo(crate_repo)?;
+                    let cachebust = self.cachebust_string_for_repo(crate_repo).context("contrib")?;
                     let contributors = self.gh.contributors(repo, &cachebust).context("contributors")?.unwrap_or_default();
                     let mut by_login = HashMap::new();
                     for contr in contributors {

@@ -84,6 +84,58 @@ impl CrateDb {
 
     /// Add data of the latest version of a crate to the index
     pub fn index_latest(&self, c: &RichCrateVersion) -> FResult<()> {
+        let origin = c.origin().to_str();
+
+        let mut insert_keyword = KeywordInsert::new()?;
+        for (i, k) in c.keywords(Include::AuthoritativeOnly).map(|k| k.trim().to_lowercase()).enumerate() {
+            print!("#{}, ", k);
+            let mut w: f64 = 100./(6+i*2) as f64;
+            if STOPWORDS.get(k.as_str()).is_some() {
+                w *= 0.6;
+            }
+            insert_keyword.add(&k, w, true);
+        }
+        for (i, k) in c.short_name().split(|c: char| !c.is_alphanumeric()).enumerate() {
+            print!("'{}, ", k);
+            let mut w: f64 = 100./(8+i*2) as f64;
+            insert_keyword.add(k, w, false);
+        }
+        if let Some((w2, d)) = Self::extract_text(&c) {
+            let d: &str = &d;
+            for (i, k) in d.split_whitespace()
+                .map(|k| k.trim_right_matches("'s"))
+                .filter(|k| k.len() >= 2)
+                .map(|k| k.to_lowercase())
+                .filter(|k| STOPWORDS.get(k.as_str()).is_none())
+                .take(25)
+                .enumerate() {
+                let w: f64 = w2 * 150./(80+i) as f64;
+                insert_keyword.add(&k, w, false);
+            }
+        }
+        if let Some(l) = c.links() {
+            insert_keyword.add(l.trim_left_matches("lib"), 0.54, false);
+        }
+        for feat in c.features().keys() {
+            if feat != "default" {
+                insert_keyword.add(&format!("feature:{}", feat), 0.55, false);
+            }
+        }
+        if c.is_sys() {
+            insert_keyword.add("has:is_sys", 0.01, false);
+        }
+        if c.has_bin() {
+            insert_keyword.add("has:bin", 0.01, false);
+        }
+
+        print!("{}: ", origin);
+
+        {
+            let mut tmp = insert_keyword.keywords.iter().collect::<Vec<_>>();
+            tmp.sort_by(|a,b| b.1.partial_cmp(a.1).unwrap());
+            print!("#{} ", tmp.into_iter().map(|(k,_)| k.to_string()).collect::<Vec<_>>().join(" #"));
+        }
+
         self.with_tx(|tx| {
             let mut insert_crate = tx.prepare_cached("INSERT OR IGNORE INTO crates (origin, recent_downloads) VALUES (?1, ?2)")?;
             let mut insert_repo = tx.prepare_cached("INSERT OR REPLACE INTO crate_repos (crate_id, repo) VALUES (?1, ?2)")?;
@@ -91,8 +143,6 @@ impl CrateDb {
             let mut clear_categories = tx.prepare_cached("DELETE FROM categories WHERE crate_id = ?1")?;
             let mut insert_category = tx.prepare_cached("INSERT OR IGNORE INTO categories (crate_id, slug, rank_weight, relevance_weight) VALUES (?1, ?2, ?3, ?4)")?;
             let mut get_crate_id = tx.prepare_cached("SELECT id, recent_downloads FROM crates WHERE origin = ?1")?;
-
-            let origin = c.origin().to_str();
 
             insert_crate.execute(&[&origin, &0]).context("insert crate")?;
             let (crate_id, downloads): (u32, u32) = get_crate_id.query_row(&[&origin], |row| (row.get(0), row.get(1))).context("crate_id")?;
@@ -105,61 +155,12 @@ impl CrateDb {
                 delete_repo.execute(&[&crate_id]).context("del repo")?;
             }
 
-            print!("{} = {}: ", origin, crate_id);
             clear_categories.execute(&[&crate_id]).context("clear cat")?;
-
-            let mut insert_keyword = KeywordInsert::new(&tx, crate_id)?;
-            for (i, k) in c.keywords(Include::AuthoritativeOnly).map(|k| k.trim().to_lowercase()).enumerate() {
-                print!("#{}, ", k);
-                let mut w: f64 = 100./(6+i*2) as f64;
-                if STOPWORDS.get(k.as_str()).is_some() {
-                    w *= 0.6;
-                }
-                insert_keyword.add(&k, w, true);
-            }
-            for (i, k) in c.short_name().split(|c: char| !c.is_alphanumeric()).enumerate() {
-                print!("'{}, ", k);
-                let mut w: f64 = 100./(8+i*2) as f64;
-                insert_keyword.add(k, w, false);
-            }
-            if let Some((w2, d)) = Self::extract_text(&c) {
-                let d: &str = &d;
-                for (i, k) in d.split_whitespace()
-                    .map(|k| k.trim_right_matches("'s"))
-                    .filter(|k| k.len() >= 2)
-                    .map(|k| k.to_lowercase())
-                    .filter(|k| STOPWORDS.get(k.as_str()).is_none())
-                    .take(25)
-                    .enumerate() {
-                    let w: f64 = w2 * 150./(80+i) as f64;
-                    insert_keyword.add(&k, w, false);
-                }
-            }
-            if let Some(l) = c.links() {
-                insert_keyword.add(l.trim_left_matches("lib"), 0.54, false);
-            }
-            for feat in c.features().keys() {
-                if feat != "default" {
-                    insert_keyword.add(&format!("feature:{}", feat), 0.55, false);
-                }
-            }
-            if c.is_sys() {
-                insert_keyword.add("has:is_sys", 0.01, false);
-            }
-            if c.has_bin() {
-                insert_keyword.add("has:bin", 0.01, false);
-            }
 
             let (categories, had_explicit_categories) = {
                 let keywords = insert_keyword.keywords.iter().map(|(k,_)| k.to_string());
                 self.extract_crate_categories(&tx, c, keywords, is_important_ish)?
             };
-
-            {
-                let mut tmp = insert_keyword.keywords.iter().collect::<Vec<_>>();
-                tmp.sort_by(|a,b| b.1.partial_cmp(a.1).unwrap());
-                print!("#{} ", tmp.into_iter().map(|(k,_)| k.to_string()).collect::<Vec<_>>().join(" #"));
-            }
 
             if !had_explicit_categories {
                 print!(">??? ");
@@ -181,7 +182,7 @@ impl CrateDb {
                 let url = repo.canonical_git_url();
                 insert_keyword.add(&format!("repo:{}", url), 1., false); // crates in monorepo probably belong together
             }
-            insert_keyword.commit()?;
+            insert_keyword.commit(&tx, crate_id)?;
             println!();
             Ok(())
         })
@@ -696,26 +697,13 @@ pub enum RepoChange {
     Replaced {crate_name: String, replacement: String, weight: f64},
 }
 
-pub struct KeywordInsert<'a> {
-    crate_id: u32,
-    select_id: CachedStatement<'a>,
-    insert_name: CachedStatement<'a>,
-    insert_value: CachedStatement<'a>,
-    make_visible: CachedStatement<'a>,
-    clear_keywords: CachedStatement<'a>,
+pub struct KeywordInsert {
     keywords: HashMap<String, (f64, bool)>,
 }
 
-impl<'a> KeywordInsert<'a> {
-    pub fn new(conn: &'a Connection, crate_id: u32) -> FResult<Self> {
+impl KeywordInsert {
+    pub fn new() -> FResult<Self> {
         Ok(Self {
-            crate_id,
-            select_id: conn.prepare_cached("SELECT id, visible FROM keywords WHERE keyword = ?1")?,
-            insert_name: conn.prepare_cached("INSERT OR IGNORE INTO keywords (keyword, visible) VALUES (?1, ?2)")?,
-            insert_value: conn.prepare_cached("INSERT OR IGNORE INTO crate_keywords(keyword_id, crate_id, weight, explicit)
-                VALUES (?1, ?2, ?3, ?4)")?,
-            make_visible: conn.prepare_cached("UPDATE keywords SET visible = 1 WHERE id = ?1")?,
-            clear_keywords: conn.prepare_cached("DELETE FROM crate_keywords WHERE crate_id = ?1")?,
             keywords: HashMap::new(),
         })
     }
@@ -737,7 +725,14 @@ impl<'a> KeywordInsert<'a> {
         if visible {k.1 = visible}
     }
 
-    pub fn commit(mut self) -> FResult<()> {
+    pub fn commit(mut self, conn: &Connection, crate_id: u32) -> FResult<()> {
+        let mut select_id = conn.prepare_cached("SELECT id, visible FROM keywords WHERE keyword = ?1")?;
+        let mut insert_name = conn.prepare_cached("INSERT OR IGNORE INTO keywords (keyword, visible) VALUES (?1, ?2)")?;
+        let mut insert_value = conn.prepare_cached("INSERT OR IGNORE INTO crate_keywords(keyword_id, crate_id, weight, explicit)
+            VALUES (?1, ?2, ?3, ?4)")?;
+        let mut make_visible = conn.prepare_cached("UPDATE keywords SET visible = 1 WHERE id = ?1")?;
+        let mut clear_keywords = conn.prepare_cached("DELETE FROM crate_keywords WHERE crate_id = ?1")?;
+
         for (cond, stopwords) in COND_STOPWORDS.iter() {
             if self.keywords.get(*cond).is_some() {
                 match stopwords {
@@ -753,14 +748,14 @@ impl<'a> KeywordInsert<'a> {
             }
         }
 
-        self.clear_keywords.execute(&[&self.crate_id]).context("clear cat")?;
+        clear_keywords.execute(&[&crate_id]).context("clear cat")?;
         for (word, (weight, visible)) in self.keywords {
-            self.insert_name.execute(&[&word, if visible {&1} else {&0}])?;
-            let (keyword_id, old_vis): (u32, u32) = self.select_id.query_row(&[&word],|r| (r.get(0), r.get(1))).context("get keyword")?;
+            insert_name.execute(&[&word, if visible {&1} else {&0}])?;
+            let (keyword_id, old_vis): (u32, u32) = select_id.query_row(&[&word],|r| (r.get(0), r.get(1))).context("get keyword")?;
             if visible && old_vis == 0 {
-                self.make_visible.execute(&[&keyword_id]).context("keyword vis")?;
+                make_visible.execute(&[&keyword_id]).context("keyword vis")?;
             }
-            self.insert_value.execute(&[&keyword_id, &self.crate_id, &weight, if visible {&1} else {&0}]).context("keyword")?;
+            insert_value.execute(&[&keyword_id, &crate_id, &weight, if visible {&1} else {&0}]).context("keyword")?;
         }
         Ok(())
     }

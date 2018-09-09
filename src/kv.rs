@@ -54,8 +54,8 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
     pub fn set_(&self, key: Box<str>, value: &T) -> Result<(), Error> {
 
         // sanity check
-        let value = rmp_serde::to_vec(&value).map_err(|e| Error::from(e))
-            .and_then(|dat| rmp_serde::from_slice(&dat).map_err(|e| Error::from(e)))?;
+        let value = rmp_serde::to_vec(value).map_err(Error::from)
+            .and_then(|dat| rmp_serde::from_slice(&dat).map_err(Error::from))?;
 
         let mut w = self.data.write().map_err(|_| Error::KvPoison)?;
         w.writes += 1;

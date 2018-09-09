@@ -21,6 +21,7 @@ struct Inner<T> {
 pub struct TempCache<T: Serialize + DeserializeOwned + Clone + Send> {
     path: PathBuf,
     data: RwLock<Inner<HashMap<Box<str>, T>>>,
+    pub cache_only: bool,
 }
 
 impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
@@ -40,6 +41,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
                 writes: 0,
                 next_autosave: 10,
             }),
+            cache_only: false,
         })
     }
 
@@ -91,11 +93,16 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
     }
 
 
+    #[inline]
     pub fn get_json<B>(&self, key: &str, url: impl AsRef<str>, cb: impl FnOnce(B) -> Option<T>) -> Result<Option<T>, Error>
         where B: for<'a> Deserialize<'a>
     {
         if let Some(res) = self.get(key)? {
             return Ok(Some(res));
+        }
+
+        if self.cache_only {
+            return Ok(None)
         }
 
         let data = SimpleCache::fetch(url.as_ref())?;

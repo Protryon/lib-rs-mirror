@@ -202,7 +202,7 @@
                       @if total >= 1000 {
                         @if let Some((val, unit)) = Some(c.format_knumber(total)) {
                           <span title="@c.format_number(total)">
-                            if total > 20000 {
+                            @if total > 20000 {
                               <b>@val@unit</b>
                             } else {
                               @val@unit

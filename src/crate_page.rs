@@ -283,7 +283,7 @@ impl<'a> CratePage<'a> {
 
     pub fn up_to_date_class(&self, richdep: &RichDep) -> &str {
         let (matches_latest, pop) = richdep.dep.req().parse().ok()
-            .map(|req| self.kitchen_sink.version_popularity(&richdep.name, req))
+            .map(|req| self.kitchen_sink.version_popularity(&richdep.name, &req))
             .unwrap_or((false, 0.));
         match pop {
             x if x >= 0.5 && matches_latest => "top",
@@ -643,7 +643,7 @@ impl<'a> CratePage<'a> {
         let big_arc = len > total / 2;
         let end = coords(start + len, total, radius as f64);
         let start = coords(start, total, radius as f64);
-        format!("M {startx:.1} {starty:.1} A {radius} {radius} 0 {arcflag} 1 {endx:.1} {endy:.1} L {radius} {radius}",
+        format!("M {startx:.2} {starty:.2} A {radius} {radius} 0 {arcflag} 1 {endx:.2} {endy:.2} L {radius} {radius}",
             startx = start.0.round(),
             starty = start.1.round(),
             radius = radius,
@@ -811,6 +811,6 @@ fn parse() {
 
 #[test]
 fn pie() {
-    assert_eq!("M 10.0 5.0 A 5 5 0 0 1 5.0 10.0 L 5 5", CratePage::svg_path_for_slice(1, 1, 4, 10));
-    assert_eq!("M 28.0 0.0 A 28 28 0 1 1 28.0 0.0 L 28 28", CratePage::svg_path_for_slice(0, 10, 10, 56));
+    assert_eq!("M 10.00 5.00 A 5 5 0 0 1 5.00 10.00 L 5 5", CratePage::svg_path_for_slice(1, 1, 4, 10));
+    assert_eq!("M 28.00 0.00 A 28 28 0 1 1 28.00 0.00 L 28 28", CratePage::svg_path_for_slice(0, 10, 10, 56));
 }

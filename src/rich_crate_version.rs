@@ -86,6 +86,19 @@ impl RichCrateVersion {
         self.manifest.package.license.as_ref().map(|s| s.as_str())
     }
 
+    pub fn license_name(&self) -> Option<&str> {
+        self.manifest.package.license.as_ref().map(|s| {
+            match s.as_str() {
+                "" => "(unspecified)",
+                "MIT OR Apache-2.0" | "MIT/Apache-2.0" | "MIT / Apache-2.0" => "MIT/Apache",
+                "Apache-2.0/ISC/MIT" => "MIT/Apache/ISC",
+                "BSD-3-Clause AND Zlib" => "BSD+Zlib",
+                "CC0-1.0" => "CC0",
+                s => s,
+            }
+        })
+    }
+
     pub fn license_file(&self) -> Option<&str> {
         self.manifest.package.license_file.as_ref().map(|s| s.as_str())
     }

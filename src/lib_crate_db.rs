@@ -7,6 +7,7 @@ extern crate thread_local;
 #[macro_use]
 extern crate lazy_static;
 extern crate rich_crate;
+use std::borrow::Cow;
 use chrono::prelude::*;
 use failure::ResultExt;
 use rich_crate::Include;
@@ -121,7 +122,8 @@ impl CrateDb {
                 let mut w: f64 = 100./(8+i*2) as f64;
                 insert_keyword.add(k, w, false);
             }
-            if let Some((w2,d)) = Self::extract_text(&c) {
+            if let Some((w2, d)) = Self::extract_text(&c) {
+                let d: &str = &d;
                 for (i, k) in d.split_whitespace()
                     .map(|k| k.trim_right_matches("'s"))
                     .filter(|k| k.len() >= 2)
@@ -399,7 +401,7 @@ impl CrateDb {
     }
 
     /// Assigned categories with their weights
-    pub fn crate_categories<'a>(&self, origin: &Origin) -> FResult<Vec<(f64, String)>> {
+    pub fn crate_categories(&self, origin: &Origin) -> FResult<Vec<(f64, String)>> {
         self.with_connection(|conn| {
             let mut query = conn.prepare_cached(r#"
                 SELECT c.relevance_weight, c.slug
@@ -670,17 +672,20 @@ impl CrateDb {
         })
     }
 
-    fn extract_text(c: &RichCrateVersion) -> Option<(f64, &str)> {
+    fn extract_text(c: &RichCrateVersion) -> Option<(f64, Cow<str>)> {
         if let Some(s) = c.description() {
-            return Some((1., s));
+            if let Some(more) = c.alternative_description() {
+                return Some((1., format!("{}{}", s, more).into()));
+            }
+            return Some((1., s.into()));
         }
         if let Ok(Some(r)) = c.readme() {
             let sub = match r.markup {
                 Markup::Markdown(ref s) | Markup::Rst(ref s) => s,
             };
             let end = sub.char_indices().skip(200).map(|(i,_)|i).next().unwrap_or(sub.len());
-            let sub = &sub[0..end].trim_right_matches(|c:char| c.is_alphanumeric());//half-word
-            return Some((0.5,sub));
+            let sub = sub[0..end].trim_right_matches(|c:char| c.is_alphanumeric());//half-word
+            return Some((0.5, sub.into()));
         }
         None
     }

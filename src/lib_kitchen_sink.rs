@@ -981,9 +981,13 @@ impl KitchenSink {
 
         // That's a guess
         if authors.len() == 1 && owners.len() == 1 && authors[0].github.is_none() {
-            let co = owners.remove(0);
-            authors[0].github = co.github;
-            authors[0].owner = co.owner;
+            let author_is_team = authors[0].likely_a_team();
+            let gh_is_team = owners[0].github.as_ref().map_or(false, |g| g.user_type != UserType::User);
+            if author_is_team == gh_is_team {
+                let co = owners.remove(0);
+                authors[0].github = co.github;
+                authors[0].owner = co.owner;
+            }
         }
 
         let owners_partial = authors.iter().any(|a| a.owner);

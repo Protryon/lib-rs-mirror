@@ -44,7 +44,7 @@ impl CrateDownloadsFile {
             .max_by_key(|a| &a.date)
             .map(|max| {
                 let date = parse_date(&max.date);
-                (Utc::today() - date).num_weeks() > 3
+                (Utc::today() - date).num_weeks() > 4
             })
             .unwrap_or(true)
     }

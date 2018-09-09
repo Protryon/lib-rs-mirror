@@ -269,17 +269,18 @@ impl CrateDb {
         })
     }
 
-    /// Multiple crates can share a repo. Consistently pick one of them (any one)
-    pub fn first_crate_for_repo(&self, repo: &Repo) -> FResult<Option<String>> {
+    pub fn crates_in_repo(&self, repo: &Repo) -> FResult<Vec<String>> {
         self.with_connection(|conn| {
             let mut q = conn.prepare_cached("
                 SELECT crate_name
                 FROM repo_crates
                 WHERE repo = ?1
-                AND EXISTS (SELECT 1 FROM crates c WHERE c.origin = 'crates.io:' || crate_name)
-                ORDER BY path, crate_name LIMIT 1
+                ORDER BY path, crate_name LIMIT 10
             ")?;
-            Ok(none_rows(q.query_row(&[&repo.canonical_git_url()], |r| r.get(0)))?)
+            let q = q.query_map(&[&repo.canonical_git_url()], |r| {
+                let n: String = r.get(0); n
+            })?.filter_map(|r| r.ok());
+            Ok(q.collect())
         })
     }
 

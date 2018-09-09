@@ -31,7 +31,7 @@ pub enum Origin {
 
 impl Origin {
     pub fn from_crates_io_name(name: &str) -> Self {
-        Origin::CratesIO(name.to_lowercase().into())
+        Origin::CratesIO(name.to_ascii_lowercase().into())
     }
 
     pub fn from_string(s: impl AsRef<str>) -> Self {

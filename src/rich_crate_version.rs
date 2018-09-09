@@ -8,10 +8,12 @@ use semver;
 use udedokei;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::collections::HashSet;
 use Author;
 use Origin;
 use Readme;
+use Markup;
 
 pub use parse_cfg::ErrorKind as CfgErr;
 pub use parse_cfg::{Cfg, Target};
@@ -65,6 +67,57 @@ impl RichCrateVersion {
 
     pub fn has_categories(&self) -> bool {
         !self.manifest.package.categories.is_empty() || self.derived.categories.as_ref().map_or(false, |c| !c.is_empty())
+    }
+
+    /// Finds preferred capitalization for the name
+    pub fn capitalized_name(&self) -> String {
+        let mut first_capital = String::new();
+        let mut ch = self.short_name().chars();
+        if let Some(f) = ch.next() {
+            first_capital.extend(f.to_uppercase());
+            first_capital.extend(ch);
+        }
+
+        let mut words = HashMap::new();
+        {
+            let name = self.short_name().to_lowercase();
+            let shouty = self.short_name().to_uppercase();
+            let mut add_words = |s: &str| {
+                for s in s.split(|c: char| !c.is_ascii_alphanumeric() && c != '-' && c != '_').filter(|&w| w != name && w.eq_ignore_ascii_case(&name)) {
+                    let mut points = 2;
+                    if name.len() > 2 {
+                        if s[1..] != name[1..] {
+                            points += 1;
+                        }
+                        if s != first_capital && s != shouty {
+                            points += 1;
+                        }
+                    }
+                    if let Some(count) = words.get_mut(s) {
+                        *count += points;
+                        continue;
+                    }
+                    words.insert(s.to_string(), points);
+                }
+            };
+            if let Ok(Some(r)) = self.readme() {
+                match r.markup {
+                    Markup::Markdown(ref s) | Markup::Rst(ref s) => add_words(s),
+                }
+            }
+            add_words(self.short_name());
+            if let Some(s) = self.description() {add_words(s);}
+            if let Some(s) = self.alternative_description() {add_words(s);}
+            if let Some(s) = self.homepage() {add_words(s);}
+            if let Some(s) = self.documentation() {add_words(s);}
+            if let Some(r) = self.repository() {add_words(r.url.as_str());}
+        }
+
+        if let Some((name, _)) = words.into_iter().max_by_key(|&(_, v)| v) {
+            name
+        } else {
+            first_capital
+        }
     }
 
     pub fn category_slugs(&self, include: Include) -> impl Iterator<Item = Cow<str>> {

@@ -3,12 +3,10 @@ extern crate serde;
 extern crate serde_json;
 #[macro_use] extern crate serde_derive;
 use std::path::Path;
-use simple_cache::SimpleCache;
 use simple_cache::TempCache;
 pub use simple_cache::Error;
 
 pub struct DocsRsClient {
-    cache_old: SimpleCache,
     cache: TempCache<Option<Vec<BuildStatus>>>,
 }
 
@@ -22,7 +20,6 @@ pub struct BuildStatus {
 impl DocsRsClient {
     pub fn new(cache_path: impl AsRef<Path>) -> Result<Self, Error> {
         Ok(Self {
-            cache_old: SimpleCache::new(cache_path.as_ref())?,
             cache: TempCache::new(cache_path.as_ref())?,
         })
     }
@@ -38,18 +35,13 @@ impl DocsRsClient {
             return Ok(cached)
         }
         let url = format!("https://docs.rs/crate/{}/{}/builds.json", crate_name, version);
-        let new = format!("docs.rs/{}", crate_name);
-        self.cache_old.get_json((&new, version), &url)
-        .and_then(|res| {
-            self.cache.set(key, res.clone())?;
-            Ok(res)
-        })
+        Ok(self.cache.get_json(&key, url, |t| t)?.and_then(|f| f))
     }
 }
 
 #[test]
 fn test_docsrsclient() {
-    let client = DocsRsClient::new("../data/cache.db").expect("new");
+    let client = DocsRsClient::new("../data/docsrs.db").expect("new");
 
     assert!(client.builds("libc", "0.2.40").expect("libc"));
     client.build_status("libc", "0.2.40").expect("libc");

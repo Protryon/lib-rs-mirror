@@ -28,7 +28,7 @@ impl UserDb {
     pub fn email_has_github(&self, email: &str) -> Result<bool> {
         let conn = self.conn.lock().unwrap();
         let mut get_email = conn.prepare_cached("SELECT 1 FROM github_emails WHERE email = ?1 LIMIT 1")?;
-        Ok(get_email.exists(&[&email.to_lowercase()])?)
+        Ok(get_email.exists(&[&email.to_ascii_lowercase()])?)
     }
 
     pub fn user_by_github_login(&self, login: &str) -> Result<Option<User>> {
@@ -79,7 +79,7 @@ impl UserDb {
             FROM github_emails e
             JOIN github_users u ON e.github_id = u.id
             WHERE email = ?1 LIMIT 1")?;
-        let mut res = get_user.query_map(&[&email.to_lowercase()], |row| {
+        let mut res = get_user.query_map(&[&email.to_ascii_lowercase()], |row| {
             User {
                 id: row.get(0),
                 login: row.get(1),
@@ -118,10 +118,10 @@ impl UserDb {
                 UserType::Org => "org",
                 UserType::Bot => "bot",
             };
-            insert_user.execute(&[&user.id, &user.login.to_lowercase(), &user.name, &user.avatar_url, &user.gravatar_id, &user.html_url, &t])?;
+            insert_user.execute(&[&user.id, &user.login.to_ascii_lowercase(), &user.name, &user.avatar_url, &user.gravatar_id, &user.html_url, &t])?;
 
             if let Some(e) = email {
-                insert_email.execute(&[&user.id, &e.to_lowercase(), &name])?;
+                insert_email.execute(&[&user.id, &e.to_ascii_lowercase(), &name])?;
             }
         }
         tx.commit()?;

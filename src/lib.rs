@@ -173,7 +173,7 @@ pub struct Stats {
     pub langs: HashMap<Language, Lines>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct Lines {
     pub comments: usize,
     pub code: usize,

@@ -133,7 +133,7 @@ impl Categories {
                 }
 
                 // bad syntax! Fix!
-                let slug = s.to_lowercase().split(':').filter(|s| !s.is_empty()).collect::<Vec<_>>().join("::");
+                let slug = s.to_ascii_lowercase().split(':').filter(|s| !s.is_empty()).collect::<Vec<_>>().join("::");
                 if s.is_empty() {
                     return None;
                 }

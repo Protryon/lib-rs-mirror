@@ -28,7 +28,7 @@
 
 [algorithms]
 name = "Algorithms"
-title = "algorithm in Rust"
+title = "Rust implementation"
 description = """
 Rust implementations of core algorithms such as hashing, sorting, \
 searching, and more.\
@@ -125,7 +125,7 @@ Implementing concurrent and parallel computation."""
 
 [cryptography]
 name = "Cryptography"
-title = "Rust cryptography library"
+title = "Rust crypto library"
 description = """
 Algorithms intended for securing data.\
 """

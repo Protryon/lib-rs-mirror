@@ -15,7 +15,7 @@ lazy_static! {
         (Cond::Any(&["winsdk", "winrt", "directx", "dll", "win32", "winutil", "msdos", "winapi"]),
             &[("os::windows-apis", 1.5, 0.1), ("parser-implementations", 0.9, 0.), ("text-processing", 0.9, 0.), ("no-std", 0.9, 0.)]),
         (Cond::All(&["windows", "ffi"]), &[("os::windows-apis", 1.1, 0.1)]),
-        (Cond::All(&["windows"]), &[("os::windows-apis", 1.1, 0.1)]),
+        (Cond::Any(&["windows"]), &[("os::windows-apis", 1.1, 0.1), ("text-processing", 0.8, 0.)]),
         (Cond::All(&["ffi", "winsdk"]), &[("os::windows-apis", 1.9, 0.5), ("no-std", 0.5, 0.), ("science::math", 0.9, 0.)]),
         (Cond::All(&["ffi", "windows"]), &[("os::windows-apis", 1.2, 0.2)]),
         (Cond::Any(&["winauth", "ntlm"]), &[("os::windows-apis", 1.25, 0.2), ("authentication", 1.3, 0.2)]),
@@ -617,6 +617,7 @@ lazy_static! {
         (Cond::Any(&["p2p", "digitalocean"]), &[("network-programming", 1.4, 0.2), ("command-line-utilities", 0.75, 0.), ("development-tools", 0.75, 0.), ("multimedia", 0.5, 0.)]),
 
         (Cond::All(&["graphics", "bindings"]), &[("rendering::graphics-api", 1.34, 0.2)]),
+        (Cond::Any(&["gfx-rs"]), &[("rendering::graphics-api", 1.15, 0.05)]),
         (Cond::All(&["graphics", "sdk"]), &[("rendering::graphics-api", 1.2, 0.1)]),
         (Cond::All(&["vr", "sdk"]), &[("rendering::graphics-api", 1.3, 0.2)]),
         (Cond::All(&["vr", "bindings"]), &[("rendering::graphics-api", 1.1, 0.1)]),

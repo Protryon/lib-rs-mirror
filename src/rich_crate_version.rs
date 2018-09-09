@@ -194,7 +194,11 @@ impl RichCrateVersion {
 
     /// Without trailing '.' to match website's style
     pub fn description(&self) -> Option<&str> {
-        self.manifest.package.description.as_ref().map(|d| d.as_str().trim_right_matches('.').trim())
+        self.manifest.package.description.as_ref().map(|d| {
+            let d = d.as_str().trim();
+            if d.contains(". ") {d} // multiple sentences, leave them alone
+            else {d.trim_right_matches('.')}
+        })
     }
 
     /// Only explicitly-specified authors

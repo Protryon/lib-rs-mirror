@@ -28,6 +28,7 @@ use locale::Numeric;
 use std::fmt::Display;
 use semver::Version as SemVer;
 use udedokei::{Language, Lines, Stats};
+use rayon::prelude::*;
 
 /// Data sources used in `crate_page.rs.html`
 pub struct CratePage<'a> {
@@ -650,19 +651,29 @@ impl<'a> CratePage<'a> {
         let mut main_crate_size = self.ver.crate_size();
         let mut deps_size = (0, 0, 0);
 
-        for (name, (depinf, semver)) in deps.into_iter() {
+        let tmp: Vec<_> = deps.into_par_iter().filter_map(|(name, (depinf, semver))| {
             if depinf.ty == DepTy::Dev {
-                continue;
+                return None;
             }
             if &*name == "clippy" && !depinf.default {
-                continue; // nobody will enable it
+                return None; // nobody will enable it
             }
+
+            let krate = match self.get_crate_of_dependency(&name, &semver) {
+                Ok(k) => k,
+                Err(e) => {
+                    eprintln!("bad dep not counted: {}", e);
+                    return None;
+                },
+            };
 
             // if optional, make it look less problematic (indirect - who knows, maybe platform-specific?)
             let weight = if depinf.default {1.} else if depinf.direct {0.25} else {0.15} *
                 // if it's common, it's more likelty to be installed anyway,
                 // so it's likely to be less costly to add it
                 (1. - self.kitchen_sink.index.version_commonality(&name, &semver)) *
+                // proc-macros are mostly build-time deps
+                if krate.is_proc_macro() {0.1} else {1.} *
                 // Build deps aren't a big deal [but still include some in case somebody did something awful]
                 if depinf.ty == DepTy::Runtime {1.} else {
                     match &*name {
@@ -671,14 +682,9 @@ impl<'a> CratePage<'a> {
                     }
                 };
 
-
-            let krate = match self.get_crate_of_dependency(&name, &semver) {
-                Ok(k) => k,
-                Err(e) => {
-                    eprintln!("bad dep not counted: {}", e);
-                    continue;
-                },
-            };
+            Some((depinf, krate, weight))
+        }).collect();
+        tmp.into_iter().for_each(|(depinf, krate, weight)| {
             let crate_size = krate.crate_size();
             let tarball_weighed = (crate_size.0 as f32 * weight) as usize;
             let uncompr_weighed = (crate_size.1 as f32 * weight) as usize;
@@ -699,18 +705,21 @@ impl<'a> CratePage<'a> {
                 let sloc = crate_stats.langs.iter().filter(|(l, _)| l.is_code()).map(|(_,v)| v.code).sum::<usize>();
                 deps_size.2 += (sloc as f32 * weight) as usize;
             }
-        }
+        });
 
         Ok((main_crate_size, deps_size, main_lang_stats))
     }
 
-    fn get_crate_of_dependency(&self, name: &str, semver: &SemVer) -> CResult<RichCrateVersion> {
-        let krate = self.kitchen_sink.index.crate_by_name(&Origin::from_crates_io_name(name))?;
-        let ver = krate.versions()
-            .iter().rev()
-            .find(|k| SemVer::parse(k.version()).ok().map_or(false, |v| &v == semver))
-            .unwrap_or_else(|| krate.latest_version());
-        self.kitchen_sink.rich_crate_version_from_index(ver, CrateData::Full)
+    fn get_crate_of_dependency(&self, name: &str, _semver: &SemVer) -> CResult<RichCrateVersion> {
+        // FIXME: caching doesn't hold multiple versions, so fetchnig of precise old versions is super expensive
+        return self.kitchen_sink.rich_crate_version(&Origin::from_crates_io_name(name), CrateData::Full)
+
+        // let krate = self.kitchen_sink.index.crate_by_name(&Origin::from_crates_io_name(name))?;
+        // let ver = krate.versions()
+        //     .iter().rev()
+        //     .find(|k| SemVer::parse(k.version()).ok().map_or(false, |v| &v == semver))
+        //     .unwrap_or_else(|| krate.latest_version());
+        // self.kitchen_sink.rich_crate_version_from_index(ver, CrateData::Full)
     }
 
     fn is_same_project(one: &RichCrateVersion, two: &RichCrateVersion) -> bool {

@@ -123,7 +123,7 @@ impl Index {
                     }
                 }
             } else {
-                to_enable.entry(feat.to_owned()).or_insert(HashSet::new());
+                to_enable.entry(feat.to_owned()).or_insert_with(HashSet::new);
             }
         }
 
@@ -219,7 +219,7 @@ impl Index {
     /// For crate being outdated. Returns (is_latest, popularity)
     /// 0 = not used *or deprecated*
     /// 1 = everyone uses it
-    pub fn version_popularity(&self, crate_name: &str, requirement: VersionReq) -> (bool, f32) {
+    pub fn version_popularity(&self, crate_name: &str, requirement: &VersionReq) -> (bool, f32) {
         if is_deprecated(crate_name) {
             return (false, 0.);
         }

@@ -603,7 +603,7 @@ impl KitchenSink {
     /// (latest, pop)
     /// 0 = not used
     /// 1 = everyone uses it
-    pub fn version_popularity(&self, crate_name: &str, requirement: VersionReq) -> (bool, f32) {
+    pub fn version_popularity(&self, crate_name: &str, requirement: &VersionReq) -> (bool, f32) {
         self.index.version_popularity(crate_name, requirement)
     }
 
@@ -809,7 +809,7 @@ impl KitchenSink {
                                     w.commits as f64 +
                                     ((w.added + w.deleted*2) as f64).sqrt()
                                 }).sum::<f64>();
-                            by_login.entry(author.login.to_lowercase())
+                            by_login.entry(author.login.to_ascii_lowercase())
                                 .or_insert((0., author)).0 += count;
                         }
                     }
@@ -835,7 +835,7 @@ impl KitchenSink {
                 };
                 if let Some(ref email) = author.email {
                     if let Ok(Some(github)) = self.user_db.user_by_email(email) {
-                        let login = github.login.to_lowercase();
+                        let login = github.login.to_ascii_lowercase();
                         ca.github = Some(github);
                         return (AuthorId::GitHub(login), ca);
                     }
@@ -850,7 +850,7 @@ impl KitchenSink {
                         return (AuthorId::GitHub(login), ca);
                     }
                 }
-                let key = author.email.as_ref().map(|e| AuthorId::Email(e.to_lowercase()))
+                let key = author.email.as_ref().map(|e| AuthorId::Email(e.to_ascii_lowercase()))
                     .or_else(|| author.name.clone().map(AuthorId::Name))
                     .unwrap_or(AuthorId::Meh(i));
                 (key, ca)
@@ -859,7 +859,7 @@ impl KitchenSink {
         if let Ok(owners) = self.crate_owners(krate) {
             for owner in owners {
                 if let Some(login) = owner.github_login() {
-                    match authors.entry(AuthorId::GitHub(login.to_lowercase())) {
+                    match authors.entry(AuthorId::GitHub(login.to_ascii_lowercase())) {
                         Occupied(mut e) => {
                             let e = e.get_mut();
                             e.owner = true;

@@ -129,7 +129,7 @@ impl Index {
         let mut counts = HashMap::with_capacity(total);
         for deps in crates {
             for (name, (depinf, semver)) in deps {
-                let n = counts.entry(name.clone()).or_insert(RevDependencies::default());
+                let n = counts.entry(name.clone()).or_insert_with(RevDependencies::default);
                 *n.versions.entry(semver).or_insert(0) += 1;
                 if depinf.direct {
                     n.direct += 1;

@@ -146,6 +146,9 @@ impl CrateDb {
         if c.is_sys() {
             insert_keyword.add("has:is_sys", 0.01, false);
         }
+        if c.is_proc_macro() {
+            insert_keyword.add("has:proc_macro", 0.1, false);
+        }
         if c.has_bin() {
             insert_keyword.add("has:bin", 0.01, false);
         }
@@ -242,7 +245,7 @@ impl CrateDb {
             categories::adjusted_relevance(candidates, keywords_collected, 0.01, 15)
         } else {
             let cat_w = 0.2 + 0.2 * c.keywords(Include::AuthoritativeOnly).count() as f64;
-            self.crate_categories_tx(conn, &c.origin(), keywords_collected, if is_important_ish {0.1} else {0.3})?.into_iter()
+            self.guess_crate_categories_tx(conn, &c.origin(), keywords_collected, if is_important_ish {0.1} else {0.3})?.into_iter()
             .map(|(w, slug)| {
                 ((w * cat_w).min(0.99), slug)
             }).collect()
@@ -421,13 +424,18 @@ impl CrateDb {
     ///
     /// Returns category slugs
     pub fn guess_crate_categories<'a>(&self, origin: &Origin, keywords: impl Iterator<Item = &'a str>) -> FResult<Vec<(f64, String)>> {
-        self.with_connection(|conn| {
-            self.crate_categories_tx(&conn, origin, keywords.map(|k| k.to_lowercase()).collect(), 0.1)
-        })
+        let assigned = self.crate_categories(origin)?;
+        if !assigned.is_empty() {
+            Ok(assigned)
+        } else {
+            self.with_connection(|conn| {
+                self.guess_crate_categories_tx(&conn, origin, keywords.map(|k| k.to_lowercase()).collect(), 0.1)
+            })
+        }
     }
 
     /// Assigned categories with their weights
-    pub fn crate_categories(&self, origin: &Origin) -> FResult<Vec<(f64, String)>> {
+    fn crate_categories(&self, origin: &Origin) -> FResult<Vec<(f64, String)>> {
         self.with_connection(|conn| {
             let mut query = conn.prepare_cached(r#"
                 SELECT c.relevance_weight, c.slug
@@ -441,7 +449,7 @@ impl CrateDb {
         })
     }
 
-    fn crate_categories_tx(&self, conn: &Connection, origin: &Origin, keywords: HashSet<String>, threshold: f64) -> FResult<Vec<(f64, String)>> {
+    fn guess_crate_categories_tx(&self, conn: &Connection, origin: &Origin, keywords: HashSet<String>, threshold: f64) -> FResult<Vec<(f64, String)>> {
         let mut query = conn.prepare_cached(r#"
         select cc.slug, sum(cc.relevance_weight * ck.weight * relk.relevance)/(8+count(*)) as w
         from (

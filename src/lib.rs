@@ -205,6 +205,7 @@ impl Language {
             Language::EmacsDevEnv |
             Language::Fish |
             Language::Html |
+            Language::Hex |
             Language::Org |
             Language::Json |
             Language::Less |

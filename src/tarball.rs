@@ -27,6 +27,7 @@ pub fn read_archive(archive: impl Read, prefix: &Path) -> Result<CrateFile> {
     let mut lib_file = None;
     let mut stats = udedokei::Collect::new();
     let mut decompressed_size = 0;
+    let mut is_nightly = false;
 
     for file in a.entries()? {
         let mut file = file?;
@@ -73,6 +74,9 @@ pub fn read_archive(archive: impl Read, prefix: &Path) -> Result<CrateFile> {
         match path_match {
             ReadAs::Lib => {
                 stats.add_to_stats(udedokei::Language::from_path("lib.rs").unwrap(), &data);
+                if check_if_uses_nightly_features(&data) {
+                    is_nightly = true;
+                }
                 lib_file = Some(data.to_string());
             },
             ReadAs::Toml => {
@@ -101,7 +105,16 @@ pub fn read_archive(archive: impl Read, prefix: &Path) -> Result<CrateFile> {
         files,
         lib_file,
         language_stats: stats.finish(),
+        is_nightly,
     })
+}
+
+fn check_if_uses_nightly_features(lib_source: &str) -> bool {
+    lib_source.lines()
+        .take(1000)
+        .map(|line| line.find('"').map(|pos| &line[0..pos]).unwrap_or(line)) // half-assed effort to ignore feature in strings
+        .map(|line| line.find("//").map(|pos| &line[0..pos]).unwrap_or(line)) // half-assed effort to remove comments
+        .any(|line| line.contains("#![feature("))
 }
 
 fn is_source_code_file(path: &Path) -> Option<udedokei::Language> {

@@ -36,6 +36,7 @@ pub struct CrateFile {
     pub readme: Result<Option<Readme>>,
     pub language_stats: udedokei::Stats,
     pub decompressed_size: usize,
+    pub is_nightly: bool,
 }
 
 impl CrateFile {

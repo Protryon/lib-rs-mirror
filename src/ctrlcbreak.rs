@@ -19,7 +19,7 @@ pub fn stopped() -> bool {
             }
         }).expect("Error setting Ctrl-C handler");
     });
-    STOPPED.load(Ordering::SeqCst) > 0
+    STOPPED.load(Ordering::Relaxed) > 0
 }
 
 #[inline]

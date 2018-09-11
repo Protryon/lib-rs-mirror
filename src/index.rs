@@ -282,7 +282,7 @@ impl fmt::Debug for Dep {
 /// Note: the repo URL in the crate is outdated, and it may be a redirect to the deprecated
 fn is_deprecated(name: &str) -> bool {
     match name {
-        "rustc-serialize" | "gcc" | "rustc-benchmarks" | "time" | "tempdir" => true,
+        "rustc-serialize" | "gcc" | "rustc-benchmarks" | "time" => true,
         _ => false,
     }
 }

@@ -352,6 +352,7 @@ impl KitchenSink {
         derived.crate_compressed_size = crate_compressed_size;
         // sometimes uncompressed sources without junk are smaller than tarball with junk
         derived.crate_decompressed_size = meta.decompressed_size.max(crate_compressed_size);
+        derived.is_nightly = meta.is_nightly;
 
         let origin = Origin::from_crates_io_name(name);
 
@@ -451,7 +452,7 @@ impl KitchenSink {
 
         // Delete the original docs.rs link, because we have our own
         // TODO: what if the link was to another crate or a subpage?
-        if meta.manifest.package.documentation.as_ref().map_or(false, |d| d.starts_with("https://docs.rs/") || d.starts_with("https://crates.fyi/")) {
+        if meta.manifest.package.documentation.as_ref().map_or(false, |s| Self::is_docs_rs_link(s)) {
             if self.has_docs_rs(name, ver) {
                 meta.manifest.package.documentation = None; // docs.rs is not proper docs
             }
@@ -556,7 +557,7 @@ impl KitchenSink {
             package.documentation = None;
         }
 
-        if package.homepage.as_ref().map_or(false, |d| d.starts_with("https://docs.rs/") || d.starts_with("https://crates.fyi/") || d.starts_with("https://crates.rs/") || d.starts_with("https://crates.io/")) {
+        if package.homepage.as_ref().map_or(false, |d| Self::is_docs_rs_link(d) || d.starts_with("https://crates.rs/") || d.starts_with("https://crates.io/")) {
             package.homepage = None;
         }
 
@@ -578,6 +579,11 @@ impl KitchenSink {
             res.status().is_success()
         })
         .unwrap_or(false)
+    }
+
+    fn is_docs_rs_link(d: &str) -> bool {
+        d.starts_with("https://docs.rs/") || d.starts_with("http://docs.rs/") ||
+        d.starts_with("http://crates.fyi/") || d.starts_with("https://crates.fyi/")
     }
 
     pub fn has_docs_rs(&self, name: &str, ver: &str) -> bool {
@@ -722,8 +728,9 @@ impl KitchenSink {
             }
         }
 
-        let mut changes = Vec::new();
+        if stopped() {Err(KitchenSinkErr::Stopped)?;}
 
+        let mut changes = Vec::new();
         crate_git_checkout::find_dependency_changes(&checkout, |added, removed, age| {
             if removed.is_empty() {
                 if added.len() > 1 {

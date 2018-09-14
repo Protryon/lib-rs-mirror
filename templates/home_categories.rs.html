@@ -1,5 +1,6 @@
 @use home_page::HomeCategory;
 @use Urler;
+@use iter::*;
 
 @(cats: &[HomeCategory], url: &Urler, toplevel: bool)
 
@@ -17,7 +18,8 @@
             <ul class=crates>
             @for t in &cat.top {
                 <li>
-                    <a href="@url.krate(t)" title="@t.description().unwrap_or("")">@t.short_name()</a></li>
+                    <a href="@url.krate(t)" title="@t.description().unwrap_or("")"
+                    >@for (last, part) in t.short_name().split('_').identify_last() {@part@if !last {_<wbr>}}</a></li>
             }
             @if cat.pop.saturating_sub(cat.top.len()) > 2 {
                 <li>and <a class="more" href="@url.category(&cat.cat)">@(cat.pop - cat.top.len()) more…</a></li>

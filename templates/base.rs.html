@@ -9,8 +9,13 @@
     <title>@props.title // Crates.rs</title>
     <meta name="twitter:title" content="@props.title">
 
+    <link rel=preload as=style href="/index.css" crossorigin="anonymous">
+    <link rel=preload as=font href="/fira/va9B4kDNxMZdWfMOD5VnLK3eRhf6Xl7Glw.woff2" crossorigin="anonymous">
+    <link rel=preload as=font href="/fira/va9B4kDNxMZdWfMOD5VnPKreRhf6Xl7Glw.woff2" crossorigin="anonymous">
+    <link rel=preload as=font href="/fira/va9E4kDNxMZdWfMOD5Vvl4jLazX3dA.woff2" crossorigin="anonymous">
+
     <style>@props.critical_css()</style>
-    <link rel=stylesheet href="/index.css?N">
+    <link rel=stylesheet href="/index.css" crossorigin="anonymous">
 
     @if props.noindex {
       <meta name="robots" content="noindex, follow">
@@ -47,6 +52,7 @@
     <meta name="og:image:url" content="https://www.rust-lang.org/logos/rust-logo-256x256-blk.png">
     <meta name="twitter:image" content="https://www.rust-lang.org/logos/rust-logo-256x256-blk.png">
     <link rel=icon href="/favicon.png">
+    <link rel=preconnect href="//img.gs" crossorigin="anonymous">
   <body vocab="http://schema.org/">
     @:content()
   </body>

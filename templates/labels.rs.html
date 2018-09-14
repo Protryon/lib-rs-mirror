@@ -6,6 +6,9 @@
   @if ver.is_yanked() {
     <span title="this version has been deleted" class="yanked">yanked</span>
   }
+  @if ver.is_nightly() {
+    <span title="uses unstable features" class="nightly">nightly</span>
+  }
   @if ver.is_proc_macro() {
     <span title="proc-macro, compiler plug-in" class="derive">macro</span>
   }
@@ -25,11 +28,12 @@
         <span title="dev tool" class="dev">dev</span>
       }
       @if ver.has_bin() {
-        <span title="contains executables" class="bin">bin</span>
+        @if ver.has_lib() {
+          <span title="both a program and a library" class="bin lib">bin+lib</span>
+        } else {
+          <span title="contains executables" class="bin">bin</span>
+        }
       }
     }
-  }
-  @if ver.is_nightly() {
-    <span title="uses unstable features" class="nightly">nightly</span>
   }
 </span>

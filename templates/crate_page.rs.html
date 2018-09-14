@@ -14,7 +14,7 @@
 
 @:base(&c.page(url), {
   <div typeof="SoftwareApplication">
-  <header id="package">
+  <header id="package" @if c.ver.is_yanked() {class="yanked"} else {@if c.ver.is_nightly() {class="nightly"}}>
     <div class="inner-col">
     <div class="breadcrumbs" typeof="BreadcrumbList">
     <h1>

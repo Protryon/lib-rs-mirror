@@ -189,12 +189,12 @@
                 }
               </section>
 
-              @if let Some(((tarball, raw), _)) = c.sizes {
+              @if let Some(((tarball, uncompressed), _, _)) = c.sizes {
                 <p>
-                  <span title="@c.format_kbytes(tarball) as tarball">@if tarball > 1000000 || raw > 10000000 {
-                    <b>@c.format_kbytes(tarball.max(raw))</b>
+                  <span title="@c.format_kbytes(tarball) as tarball">@if tarball > 1000000 || uncompressed > 10000000 {
+                    <b>@c.format_kbytes(tarball.max(uncompressed))</b>
                   } else {
-                    @c.format_kbytes(tarball.max(raw))
+                    @c.format_kbytes(tarball.max(uncompressed))
                   }</span>
                   @if let Some((total, _)) = c.lang_stats {
                     @if total >= 50 {
@@ -266,17 +266,17 @@
             } else {
               <h4>No runtime deps</h4>
             }
-            @if let Some(((main_tarball, _), (deps_tarball, deps_raw, deps_sloc))) = c.sizes {
-              @if deps_tarball > 1000000 || deps_tarball > main_tarball.div(2) {
+            @if let Some(((main_tarball, _), _, deps)) = c.sizes {
+              @if deps.tarball > 1000000 || deps.tarball > main_tarball.div(2) {
                 <p>
-                  <span title="amortized size; approx. @c.format_kbytes(deps_tarball) compressed">@if deps_tarball > 8000000 || deps_raw > 50000000 {
-                    ~<b>@c.format_kbytes(deps_tarball.max(deps_raw))</b>
+                  <span title="amortized size; approx. @c.format_kbytes(deps.tarball) compressed">@if deps.tarball > 8000000 || deps.uncompressed > 50000000 {
+                    ~<b>@c.format_kbytes(deps.tarball.max(deps.uncompressed))</b>
                   } else {
-                    ~@c.format_kbytes(deps_tarball.max(deps_raw))
+                    ~@c.format_kbytes(deps.tarball.max(deps.uncompressed))
                   }</span>
                   <br>
-                  @if deps_sloc >= 10000 {
-                    @if let Some((val, unit)) = Some(c.format_knumber(deps_sloc)) {
+                  @if deps.lines >= 10000 {
+                    @if let Some((val, unit)) = Some(c.format_knumber(deps.lines)) {
                       <span title="estimated">~@val@unit</span> <abbr title="approx. additional lines of code">SLoC</abbr>
                     }
                   }

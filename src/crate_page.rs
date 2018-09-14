@@ -39,7 +39,7 @@ pub struct CratePage<'a> {
     pub top_keyword: Option<(u32, String)>,
     pub all_contributors: (Vec<CrateAuthor<'a>>, Vec<CrateAuthor<'a>>, bool, usize),
     /// own, deps (tarball, uncompressed source); last one is sloc
-    pub sizes: Option<((usize, usize), (usize, usize, usize))>,
+    pub sizes: Option<((usize, usize), DepsSize, DepsSize)>,
     pub lang_stats: Option<(usize, Stats)>,
 }
 
@@ -90,8 +90,8 @@ impl<'a> CratePage<'a> {
             sizes: None,
             lang_stats: None,
         };
-        let (own_size, dep_size, lang_stats) = page.crate_size()?;
-        page.sizes = Some((own_size, dep_size));
+        let (own_size, deps_size_minimal, deps_size_typical, lang_stats) = page.crate_size()?;
+        page.sizes = Some((own_size, deps_size_minimal, deps_size_typical));
 
         let total = lang_stats.langs.iter()
             .filter(|(lang, _)| lang.is_code())
@@ -644,12 +644,8 @@ impl<'a> CratePage<'a> {
         )
     }
 
-    fn crate_size(&self) -> CResult<((usize, usize), (usize, usize, usize), Stats)> {
+    fn crate_size(&self) -> CResult<((usize, usize), DepsSize, DepsSize, Stats)> {
         let deps = self.kitchen_sink.all_dependencies_flattened(self.ver.origin())?;
-
-        let mut main_lang_stats = self.ver.language_stats().clone();
-        let mut main_crate_size = self.ver.crate_size();
-        let mut deps_size = (0, 0, 0);
 
         let tmp: Vec<_> = deps.into_par_iter().filter_map(|(name, (depinf, semver))| {
             if depinf.ty == DepTy::Dev {
@@ -667,27 +663,43 @@ impl<'a> CratePage<'a> {
                 },
             };
 
+            let commonality = self.kitchen_sink.index.version_commonality(&name, &semver);
+            let is_heavy_build_dep = match &*name {
+                "bindgen" | "clang-sys" | "cmake" | "cc" if depinf.default => true, // you deserve full weight of it
+                _ => false,
+            };
+
             // if optional, make it look less problematic (indirect - who knows, maybe platform-specific?)
             let weight = if depinf.default {1.} else if depinf.direct {0.25} else {0.15} *
                 // if it's common, it's more likelty to be installed anyway,
                 // so it's likely to be less costly to add it
-                (1. - self.kitchen_sink.index.version_commonality(&name, &semver)) *
+                (1. - commonality) *
                 // proc-macros are mostly build-time deps
                 if krate.is_proc_macro() {0.1} else {1.} *
                 // Build deps aren't a big deal [but still include some in case somebody did something awful]
-                if depinf.ty == DepTy::Runtime {1.} else {
-                    match &*name {
-                        "bindgen" | "clang-sys" | "cmake" | "cc" if depinf.default => 1., // you deserve full weight of it
-                        _ => 0.1,
-                    }
-                };
+                if depinf.ty == DepTy::Runtime || is_heavy_build_dep {1.} else {0.1};
 
-            Some((depinf, krate, weight))
+            // count only default ones
+            let weight_minimal = if depinf.default {1.} else {0.} *
+                // overestimate commonality
+                (1. - commonality).powi(2) *
+                if krate.is_proc_macro() {0.} else {1.} *
+                if depinf.ty == DepTy::Runtime {1.} else {0.};
+
+            Some((depinf, krate, weight, weight_minimal))
         }).collect();
-        tmp.into_iter().for_each(|(depinf, krate, weight)| {
+
+        let mut main_lang_stats = self.ver.language_stats().clone();
+        let mut main_crate_size = self.ver.crate_size();
+        let mut deps_size_typical = DepsSize::default();
+        let mut deps_size_minimal = DepsSize::default();
+
+        tmp.into_iter().for_each(|(depinf, krate, weight, weight_minimal)| {
             let crate_size = krate.crate_size();
             let tarball_weighed = (crate_size.0 as f32 * weight) as usize;
             let uncompr_weighed = (crate_size.1 as f32 * weight) as usize;
+            let tarball_weighed_minimal = (crate_size.0 as f32 * weight_minimal) as usize;
+            let uncompr_weighed_minimal = (crate_size.1 as f32 * weight_minimal) as usize;
             let crate_stats = krate.language_stats();
 
             if depinf.direct && Self::is_same_project(&self.ver, &krate) {
@@ -700,14 +712,18 @@ impl<'a> CratePage<'a> {
                     e.comments += (val.comments as f32 * weight) as usize;
                 }
             } else {
-                deps_size.0 += tarball_weighed;
-                deps_size.1 += uncompr_weighed;
                 let sloc = crate_stats.langs.iter().filter(|(l, _)| l.is_code()).map(|(_,v)| v.code).sum::<usize>();
-                deps_size.2 += (sloc as f32 * weight) as usize;
+
+                deps_size_typical.tarball += tarball_weighed;
+                deps_size_typical.uncompressed += uncompr_weighed;
+                deps_size_typical.lines += (sloc as f32 * weight) as usize;
+                deps_size_minimal.tarball += tarball_weighed_minimal;
+                deps_size_minimal.uncompressed += uncompr_weighed_minimal;
+                deps_size_minimal.lines += (sloc as f32 * weight_minimal) as usize;
             }
         });
 
-        Ok((main_crate_size, deps_size, main_lang_stats))
+        Ok((main_crate_size, deps_size_minimal, deps_size_typical, main_lang_stats))
     }
 
     fn get_crate_of_dependency(&self, name: &str, _semver: &SemVer) -> CResult<RichCrateVersion> {
@@ -728,6 +744,13 @@ impl<'a> CratePage<'a> {
             _ => false,
         }
     }
+}
+
+#[derive(Debug, Copy, Clone, Default)]
+pub struct DepsSize {
+    pub tarball: usize,
+    pub uncompressed: usize,
+    pub lines: usize,
 }
 
 type LanguageStats = Vec<(Language, Lines, (usize, usize))>;

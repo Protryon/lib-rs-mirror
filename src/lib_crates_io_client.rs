@@ -90,7 +90,7 @@ impl CratesIoClient {
         let url = format!("{}/downloads", crate_name);
         let new_key = (url.as_str(), as_of_version);
         let data: CrateDownloadsFile = cioopt!(self.get_json(new_key, &url)?);
-        if data.is_stale() && rand::random::<u8>() > 252 {
+        if !self.cache.cache_only && data.is_stale() && rand::random::<u8>() > 252 {
             eprintln!("downloads expired");
             let _ = self.cache.delete(new_key.0);
             let fresh: CrateDownloadsFile = cioopt!(self.get_json(new_key, &url)?);
@@ -116,7 +116,7 @@ impl CratesIoClient {
         where B: for<'a> serde::Deserialize<'a> + Payloadable
     {
         if let Some((ver, res)) = self.cache.get(key.0)? {
-            if ver == key.1 {
+            if self.cache.cache_only || ver == key.1 {
                 return Ok(Some(B::from(res)));
             }
             eprintln!("Cache near miss {}@{} vs {}", key.0, ver, key.1);

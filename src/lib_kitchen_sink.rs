@@ -28,6 +28,7 @@ extern crate semver_parser;
 extern crate chrono;
 
 mod index;
+pub use github_info::UserOrg;
 pub use index::*;
 use rayon::prelude::*;
 mod deps_stats;
@@ -170,12 +171,12 @@ impl KitchenSink {
         let main_cache_dir = data_path.to_owned();
         let index_path = Self::assert_exists(data_path.join("index"))?;
 
-        let (crates_io, gh) = rayon::join(
-            || crates_io_client::CratesIoClient::new(data_path),
-            || github_info::GitHub::new(&data_path.join("github.db"), github_token));
-        let (index, crate_derived_cache) = rayon::join(
-            || Index::new(index_path),
-            || TempCache::new(&data_path.join("crate_derived.db")));
+        let ((crates_io, gh), (index, crate_derived_cache)) = rayon::join(|| rayon::join(
+                || crates_io_client::CratesIoClient::new(data_path),
+                || github_info::GitHub::new(&data_path.join("github.db"), github_token)),
+            || rayon::join(
+                || Index::new(index_path),
+                || TempCache::new(&data_path.join("crate_derived.db"))));
         Ok(Self {
             crates_io: crates_io?,
             index,
@@ -263,7 +264,7 @@ impl KitchenSink {
         self.rich_crate_from_index(self.index.crate_by_name(origin).context("rich_crate")?)
     }
 
-    fn rich_crate_from_index(&self, krate: &Crate) -> CResult<RichCrate> {
+    pub fn rich_crate_from_index(&self, krate: &Crate) -> CResult<RichCrate> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
         let name = krate.name();
         let cache_bust = krate.latest_version().version(); // most recently published version
@@ -801,6 +802,10 @@ impl KitchenSink {
             .map(|k| k.version().to_string())
             .next()
             .unwrap_or_else(|| "*".to_string()))
+    }
+
+    pub fn user_github_orgs(&self, github_login: &str) -> CResult<Option<Vec<UserOrg>>> {
+        Ok(self.gh.user_orgs(github_login)?)
     }
 
     /// Merge authors, owners, contributors

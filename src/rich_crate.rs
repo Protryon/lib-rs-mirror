@@ -1,3 +1,4 @@
+use crates_io_client::CrateOwner;
 use crates_io_client::CrateMetaVersion;
 use crates_io_client::CratesIoCrate;
 use crates_io_client::DailyVersionDownload;
@@ -28,6 +29,10 @@ impl RichCrate {
 
     pub fn origin(&self) -> &Origin {
         &self.origin
+    }
+
+    pub fn owners(&self) -> &[CrateOwner] {
+        &self.crates_io.owners
     }
 
     pub fn weekly_downloads(&self) -> Vec<DownloadWeek> {

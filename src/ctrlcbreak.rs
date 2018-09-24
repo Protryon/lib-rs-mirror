@@ -1,5 +1,5 @@
 use ctrlc;
-use KitchenSinkErr;
+use crate::KitchenSinkErr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Once, ONCE_INIT};
 use std::process;

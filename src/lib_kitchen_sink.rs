@@ -1,41 +1,41 @@
 #[macro_use] extern crate failure;
-extern crate cargo_toml;
-extern crate categories;
-extern crate crate_db;
-extern crate crate_files;
-extern crate crates_index;
-extern crate crates_io_client;
-extern crate crate_git_checkout;
-extern crate docs_rs_client;
-extern crate ctrlc;
-extern crate github_info;
-extern crate lazyonce;
-extern crate regex;
-extern crate repo_url;
-extern crate rich_crate;
-extern crate serde;
-extern crate serde_json;
+
+
+
+use crate_files;
+use crates_index;
+use crates_io_client;
+use crate_git_checkout;
+use docs_rs_client;
+use ctrlc;
+use github_info;
+
+
+
+
+
+
 #[macro_use] extern crate serde_derive;
-extern crate toml;
-extern crate url;
-extern crate user_db;
-extern crate reqwest;
-extern crate simple_cache;
-extern crate itertools;
-extern crate rayon;
-extern crate semver;
-extern crate semver_parser;
-extern crate chrono;
+
+
+use user_db;
+use reqwest;
+
+
+use rayon;
+
+
+
 
 mod index;
 pub use github_info::UserOrg;
-pub use index::*;
+pub use crate::index::*;
 use rayon::prelude::*;
 mod deps_stats;
-pub use deps_stats::*;
+pub use crate::deps_stats::*;
 
 mod ctrlcbreak;
-pub use ctrlcbreak::*;
+pub use crate::ctrlcbreak::*;
 
 pub use crates_index::Crate;
 use crates_index::Version;
@@ -841,7 +841,7 @@ impl KitchenSink {
 
         let hit_max_contributor_count = contributors.len() == 100;
 
-        let mut authors: HashMap<AuthorId, CrateAuthor> = krate.authors()
+        let mut authors: HashMap<AuthorId, CrateAuthor<'_>> = krate.authors()
             .iter().enumerate().map(|(i,author)| {
                 let mut ca = CrateAuthor {
                     nth_author: Some(i),
@@ -921,7 +921,7 @@ impl KitchenSink {
             }).contribution += contribution;
         }
 
-        let mut authors_by_name = HashMap::<String, CrateAuthor>::new();
+        let mut authors_by_name = HashMap::<String, CrateAuthor<'_>>::new();
         for (_, a) in authors {
             match authors_by_name.entry(a.name().to_owned()) {
                 Occupied(mut e) => {
@@ -982,7 +982,7 @@ impl KitchenSink {
         }
 
         authors.sort_by(|a,b| {
-            fn score(a: &CrateAuthor) -> f64 {
+            fn score(a: &CrateAuthor<'_>) -> f64 {
                 let o = if a.owner {200.} else {1.};
                 o * (a.contribution + 10.) /
                 (1+a.nth_author.unwrap_or(99)) as f64

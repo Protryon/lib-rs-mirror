@@ -8,12 +8,12 @@ use crates_index::Crate;
 use crates_index::Version;
 use std::sync::{Arc, Mutex};
 use std::iter;
-use KitchenSinkErr;
-use KitchenSink;
+use crate::KitchenSinkErr;
+use crate::KitchenSink;
 use semver::VersionReq;
 use semver::Version as SemVer;
 use std::sync::RwLock;
-use deps_stats::DepsStats;
+use crate::deps_stats::DepsStats;
 
 pub struct Index {
     crates: HashMap<Origin, Crate>,
@@ -273,7 +273,7 @@ impl Index {
 
 use std::fmt;
 impl fmt::Debug for Dep {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Dep {{ {}, runtime: x{}, build: x{} }}", self.semver, self.runtime.lock().unwrap().len(), self.build.lock().unwrap().len())
     }
 }

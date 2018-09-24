@@ -1,10 +1,10 @@
-use KitchenSinkErr;
+use crate::KitchenSinkErr;
 use crates_index::Crate;
 use std::sync::Mutex;
 use std::sync::Arc;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use index::*;
+use crate::index::*;
 use rayon::prelude::*;
 use semver::Version as SemVer;
 

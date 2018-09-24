@@ -77,6 +77,11 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
         Ok(())
     }
 
+    pub fn get_all<F: FnOnce(&HashMap<Box<str>, T>)>(&self, cb: F) -> Result<(), Error> {
+        cb(&self.data.read().map_err(|_| Error::KvPoison)?.data);
+        Ok(())
+    }
+
     pub fn get(&self, key: &str) -> Result<Option<T>, Error> {
         Ok(self.data.read().map_err(|_| Error::KvPoison)?.data.get(key).cloned())
     }

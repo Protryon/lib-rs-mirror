@@ -75,7 +75,13 @@ fn render_categories(cats: &CategoryMap, base: &Path, crates: &KitchenSink, done
                 }
                 s.insert(origin.clone());
             }
-            let allver = crates.rich_crate(origin).context("get crate all versions")?;
+            let allver = match crates.rich_crate(origin) {
+                Ok(a) => a,
+                Err(e) => {
+                    eprintln!("Crate in category fail: {:?}", e);
+                    return Ok(()); // skip it
+                },
+            };
             let ver = crates.rich_crate_version(origin, CrateData::Full).context("get rich crate")?;
             let path = PathBuf::from(format!("public/crates/{}.html", ver.short_name()));
             println!("http://localhost:3000/crates/{}", ver.short_name());

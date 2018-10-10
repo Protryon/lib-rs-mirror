@@ -28,7 +28,7 @@ impl<'de> Deserialize<'de> for UserType {
             }
 
             fn visit_str<E: de::Error>(self, v: &str) -> Result<Self::Value, E> {
-                match v.to_lowercase().as_str() {
+                match v.to_ascii_lowercase().as_str() {
                     "org" | "organization" => Ok(UserType::Org),
                     "user" => Ok(UserType::User),
                     "bot" => Ok(UserType::Bot),
@@ -147,4 +147,15 @@ pub struct GitHubRepo {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Topics {
     pub names: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserOrg {
+    pub login: String, // "github",
+    //id: String, // 1,
+    // node_id: String, // "MDEyOk9yZ2FuaXphdGlvbjE=",
+    pub url: String, // "https://api.github.com/orgs/github",
+    // public_members_url: String, // "https://api.github.com/orgs/github/public_members{/member}",
+    // avatar_url: String, // "https://github.com/images/error/octocat_happy.gif",
+    pub description: Option<String>, // "A great organization"
 }

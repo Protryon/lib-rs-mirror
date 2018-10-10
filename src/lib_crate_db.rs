@@ -766,7 +766,6 @@ impl KeywordInsert {
                 if self.keywords.get(synonym).is_some() {
                     None
                 } else {
-                    println!("SYNONYM{} {} -> {}", votes, k, synonym);
                     let relevance = (votes as f64 / 5. + 0.1).min(0.8);
                     Some((synonym.to_string(), v * relevance))
                 }

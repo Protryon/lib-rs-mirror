@@ -84,7 +84,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
     pub fn save(&self) -> Result<(), Error> {
         let ser = {
             let d = self.data.read().map_err(|_| Error::KvPoison)?;
-            rmp_serde::to_vec(&d.data)?
+            rmp_serde::to_vec_named(&d.data)?
         };
         let tmp_path = NamedTempFile::new_in(self.path.parent().unwrap())?;
         fs::write(&tmp_path, &ser)?;

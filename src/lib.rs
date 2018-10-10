@@ -171,6 +171,7 @@ pub enum Language {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Stats {
     pub langs: HashMap<Language, Lines>,
+    pub has_old_try: bool,
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
@@ -716,6 +717,9 @@ impl Collect {
     }
 
     pub fn add_to_stats(&mut self, lang: Language, file_content: &str) {
+        if lang == Language::Rust {
+            self.rust_code_stats(file_content);
+        }
         match lang.tokei_lang().parse_from_str(self.dummy_dir_entry.clone(), file_content) {
             Ok(res) => {
                 let stats = self.stats.langs.entry(lang).or_insert(Lines {comments:0, code:0});
@@ -725,6 +729,17 @@ impl Collect {
             Err(err) => {
                 eprintln!("warning: {} ", err);
             },
+        }
+    }
+
+    fn rust_code_stats(&mut self, file_content: &str) {
+        for line in file_content.lines().take(10000) {
+             // half-assed effort to remove comments
+            let line = line.find("//").map(|pos| &line[0..pos]).unwrap_or(line);
+
+            if !self.stats.has_old_try {
+                self.stats.has_old_try = line.contains("try!(");
+            }
         }
     }
 }

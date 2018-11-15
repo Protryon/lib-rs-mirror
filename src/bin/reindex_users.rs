@@ -22,7 +22,7 @@ fn main() {
     let crates2 = crates.clone();
     let (tx, rx) = mpsc::sync_channel(64);
 
-    thread::spawn(move || {
+    let t = thread::spawn(move || {
         let tx1 = tx.clone();
         let all_crates = crates.all_crates();
         let crates = Arc::clone(&crates);
@@ -71,4 +71,6 @@ fn main() {
             eprintln!("•• {}: {}", email, err);
         }
     }
+
+    t.join().unwrap();
 }

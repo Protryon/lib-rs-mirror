@@ -1,10 +1,8 @@
 use std::path::Path;
 use std::collections::HashMap;
 
-extern crate tokei;
-extern crate ignore;
-extern crate serde;
-#[macro_use] extern crate serde_derive;
+use tokei;
+use serde_derive::*;
 
 use tokei::LanguageType as LT;
 

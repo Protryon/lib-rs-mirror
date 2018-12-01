@@ -1,9 +1,9 @@
-extern crate cargo_toml;
-extern crate libflate;
-extern crate render_readme;
-extern crate repo_url;
-extern crate tar;
-extern crate udedokei;
+use cargo_toml;
+
+use render_readme;
+
+
+use udedokei;
 
 #[macro_use] extern crate quick_error;
 
@@ -19,7 +19,7 @@ use std::path::PathBuf;
 mod error;
 mod tarball;
 
-pub use error::*;
+pub use crate::error::*;
 pub type Result<T> = std::result::Result<T, UnarchiverError>;
 
 /// Read tarball and get Cargo.toml, etc. out of it.

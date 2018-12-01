@@ -1,4 +1,5 @@
 [package]
+edition = "2018"
 name = "crate_files"
 version = "0.2.2"
 authors = ["Kornel <kornel@geekhood.net>"]
@@ -6,7 +7,7 @@ authors = ["Kornel <kornel@geekhood.net>"]
 [dependencies]
 tar = "0.4.15"
 libflate = "0.1.14"
-cargo_toml = "0.3.1"
+cargo_toml = "0.4.0"
 render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git" }
 repo_url = { git = "https://gitlab.com/crates.rs/repo_url.git" }
 udedokei = { git = "https://gitlab.com/crates.rs/udedokei.git" }

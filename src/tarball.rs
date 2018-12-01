@@ -4,9 +4,9 @@ use render_readme::Markup;
 use std::io::Read;
 use std::path::Path;
 use tar::Archive;
-use readme_from_repo;
-use is_readme_filename;
-use {Result, UnarchiverError, CrateFile};
+use crate::readme_from_repo;
+use crate::is_readme_filename;
+use crate::{Result, UnarchiverError, CrateFile};
 use udedokei;
 
 enum ReadAs {

@@ -1,4 +1,4 @@
-use CATEGORIES;
+use crate::CATEGORIES;
 use std::collections::HashMap;
 use std::collections::HashSet;
 

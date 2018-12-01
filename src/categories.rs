@@ -1,5 +1,5 @@
-extern crate toml;
-extern crate serde;
+use toml;
+
 #[macro_use] extern crate serde_derive;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate quick_error;
@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 use std::borrow::Cow;
 
 mod tuning;
-pub use tuning::*;
+pub use crate::tuning::*;
 
 const CATEGORIES_TOML: &[u8] = include_bytes!("categories.toml");
 
@@ -108,7 +108,7 @@ impl Categories {
         }).collect()
     }
 
-    pub fn fixed_category_slugs(cats: &[String]) -> Vec<Cow<str>> {
+    pub fn fixed_category_slugs(cats: &[String]) -> Vec<Cow<'_, str>> {
         let mut cats = cats.iter().enumerate().filter_map(|(idx, s)| {
             if s.len() < 2 {
                 return None;

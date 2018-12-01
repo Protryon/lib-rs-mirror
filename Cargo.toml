@@ -1,4 +1,5 @@
 [package]
+edition = "2018"
 name = "categories"
 version = "0.1.1"
 authors = ["Kornel <kornel@geekhood.net>"]

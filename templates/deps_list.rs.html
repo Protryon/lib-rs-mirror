@@ -1,8 +1,8 @@
-@use templates::target_cfg;
+@use crate::templates::target_cfg;
 @use rich_crate::RichDep;
 @use kitchen_sink::Target;
-@use Urler;
-@use CratePage;
+@use crate::Urler;
+@use crate::CratePage;
 @(c: &CratePage, url: &Urler, set: &[RichDep], label: &str)
 
 @for d in set.iter() {

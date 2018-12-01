@@ -29,14 +29,14 @@ mod urler;
 use kitchen_sink::{stopped, KitchenSinkErr};
 use failure::ResultExt;
 use categories::Category;
-use crate_page::*;
+use crate::crate_page::*;
 use kitchen_sink::KitchenSink;
 use render_readme::Renderer;
 use rich_crate::RichCrate;
 use rich_crate::RichCrateVersion;
 use std::fs::read_to_string;
 use std::io::Write;
-use urler::Urler;
+use crate::urler::Urler;
 
 include!(concat!(env!("OUT_DIR"), "/templates.rs"));
 

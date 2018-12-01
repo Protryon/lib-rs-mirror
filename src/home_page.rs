@@ -10,7 +10,7 @@ use rich_crate::RichCrateVersion;
 use categories::CATEGORIES;
 use kitchen_sink::{KitchenSink, CrateData};
 use failure;
-use Page;
+use crate::Page;
 use rayon::prelude::*;
 
 /// The list on the homepage looks flat, but it's actually a tree.

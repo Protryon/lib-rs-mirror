@@ -1,9 +1,9 @@
-@use templates::base;
-@use templates::labels;
-@use cat_page::CatPage;
+@use crate::templates::base;
+@use crate::templates::labels;
+@use crate::cat_page::CatPage;
 @use rich_crate::Include;
-@use Urler;
-@use iter::*;
+@use crate::Urler;
+@use crate::iter::*;
 
 @(p: &CatPage, url: &Urler)
 

@@ -1,4 +1,4 @@
-extern crate ructe;
+
 
 use ructe::compile_templates;
 use std::env;

@@ -4,9 +4,9 @@ use kitchen_sink::{KitchenSink, CrateData};
 use categories::CATEGORIES;
 use categories::Category;
 use failure::Error;
-use templates;
+use crate::templates;
 use std::collections::HashSet;
-use Page;
+use crate::Page;
 use rayon::prelude::*;
 
 /// Data for category page template

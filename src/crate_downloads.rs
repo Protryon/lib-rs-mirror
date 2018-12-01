@@ -1,4 +1,4 @@
-use parse_date;
+use crate::parse_date;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use chrono::Duration;
@@ -44,7 +44,7 @@ impl CrateDownloadsFile {
             .max_by_key(|a| &a.date)
             .map(|max| {
                 let date = parse_date(&max.date);
-                (Utc::today() - date).num_weeks() > 4
+                (Utc::today() - date).num_weeks() > 3
             })
             .unwrap_or(true)
     }

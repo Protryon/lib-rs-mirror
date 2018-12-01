@@ -1,7 +1,7 @@
-extern crate serde;
-extern crate rand;
-extern crate simple_cache;
-extern crate chrono;
+use serde;
+use rand;
+
+
 #[macro_use] extern crate serde_derive;
 use chrono::TimeZone;
 use chrono::Utc;
@@ -13,10 +13,10 @@ mod crate_meta;
 mod crate_deps;
 mod crate_owners;
 mod crate_downloads;
-pub use crate_meta::*;
-pub use crate_deps::*;
-pub use crate_owners::*;
-pub use crate_downloads::*;
+pub use crate::crate_meta::*;
+pub use crate::crate_deps::*;
+pub use crate::crate_owners::*;
+pub use crate::crate_downloads::*;
 pub use simple_cache::Error;
 use simple_cache::SimpleCache;
 use simple_cache::TempCache;
@@ -90,7 +90,7 @@ impl CratesIoClient {
         let url = format!("{}/downloads", crate_name);
         let new_key = (url.as_str(), as_of_version);
         let data: CrateDownloadsFile = cioopt!(self.get_json(new_key, &url)?);
-        if !self.cache.cache_only && data.is_stale() && rand::random::<u8>() > 252 {
+        if !self.cache.cache_only && data.is_stale() && rand::random::<u8>() > 100 {
             eprintln!("downloads expired");
             let _ = self.cache.delete(new_key.0);
             let fresh: CrateDownloadsFile = cioopt!(self.get_json(new_key, &url)?);
@@ -171,7 +171,7 @@ pub struct DailyVersionDownload<'a> {
 }
 
 impl CratesIoCrate {
-    pub fn daily_downloads(&self) -> Vec<DailyVersionDownload> {
+    pub fn daily_downloads(&self) -> Vec<DailyVersionDownload<'_>> {
         let versions: HashMap<_,_> = self.meta.versions.iter().map(|v| (v.id, v)).collect();
         self.downloads.version_downloads.iter().map(|d| {
             DailyVersionDownload {

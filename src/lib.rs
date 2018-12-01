@@ -1,22 +1,22 @@
-extern crate cargo_author;
-extern crate cargo_toml;
-extern crate categories;
-extern crate crates_index;
-extern crate crates_io_client;
-extern crate parse_cfg;
-extern crate render_readme;
-extern crate repo_url;
-extern crate udedokei;
-extern crate semver;
-extern crate serde;
+
+
+
+
+
+
+
+
+use udedokei;
+use semver;
+
 #[macro_use]
 extern crate serde_derive;
 
 pub use cargo_author::*;
 mod rich_crate;
-pub use rich_crate::*;
+pub use crate::rich_crate::*;
 mod rich_crate_version;
-pub use rich_crate_version::*;
+pub use crate::rich_crate_version::*;
 
 pub use render_readme::Markup;
 pub use render_readme::Readme;

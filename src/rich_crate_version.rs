@@ -10,10 +10,10 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use Author;
-use Origin;
-use Readme;
-use Markup;
+use crate::Author;
+use crate::Origin;
+use crate::Readme;
+use crate::Markup;
 
 pub use parse_cfg::ErrorKind as CfgErr;
 pub use parse_cfg::{Cfg, Target};
@@ -121,7 +121,7 @@ impl RichCrateVersion {
         }
     }
 
-    pub fn category_slugs(&self, include: Include) -> impl Iterator<Item = Cow<str>> {
+    pub fn category_slugs(&self, include: Include) -> impl Iterator<Item = Cow<'_, str>> {
         match include {
             Include::Cleaned => Categories::fixed_category_slugs(if let Some(ref assigned_categories) = self.derived.categories {
                 &assigned_categories
@@ -217,7 +217,7 @@ impl RichCrateVersion {
         self.repo.as_ref()
     }
 
-    pub fn repository_http_url(&self) -> Option<(&Repo, Cow<str>)> {
+    pub fn repository_http_url(&self) -> Option<(&Repo, Cow<'_, str>)> {
         self.repository().map(|repo| {
             let relpath = self.path_in_repo.as_ref().map(|s| s.as_str()).unwrap_or("");
             (repo, repo.canonical_http_url(relpath))

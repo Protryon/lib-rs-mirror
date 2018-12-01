@@ -3,7 +3,7 @@ use crates_io_client::CrateMetaVersion;
 use crates_io_client::CratesIoCrate;
 use crates_io_client::DailyVersionDownload;
 pub use crates_io_client::DownloadWeek;
-use Origin;
+use crate::Origin;
 
 /// Struct representing all versions of the crate
 /// (metadata that is version-independent or for all versions).
@@ -39,7 +39,7 @@ impl RichCrate {
         self.crates_io.downloads.weekly_downloads()
     }
 
-    pub fn daily_downloads(&self) -> Vec<DailyVersionDownload> {
+    pub fn daily_downloads(&self) -> Vec<DailyVersionDownload<'_>> {
         self.crates_io.daily_downloads()
     }
 

@@ -1,4 +1,4 @@
-extern crate url;
+use url;
 use url::Url;
 use std::borrow::Cow;
 
@@ -36,7 +36,7 @@ impl std::error::Error for GitError {
 }
 
 impl std::fmt::Display for GitError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
             GitError::IncompleteUrl => f.write_str("Incomplete URL"),
             GitError::InvalidUrl(e) => e.fmt(f),
@@ -96,7 +96,7 @@ impl Repo {
     }
 
     /// URL to view who contributed to the repository
-    pub fn contributors_http_url(&self) -> Cow<str> {
+    pub fn contributors_http_url(&self) -> Cow<'_, str> {
         match self.host {
             RepoHost::GitHub(SimpleRepo {ref owner, ref repo}) => {
                 format!("https://github.com/{}/{}/graphs/contributors", owner, repo).into()
@@ -159,7 +159,7 @@ impl Repo {
     }
 
     /// URL for browsing the repository via web browser
-    pub fn canonical_http_url(&self, base_dir_in_repo: &str) -> Cow<str> {
+    pub fn canonical_http_url(&self, base_dir_in_repo: &str) -> Cow<'_, str> {
         assert!(!base_dir_in_repo.starts_with('/'));
         let slash = if base_dir_in_repo != "" {"/tree/master/"} else {""};
         match self.host {
@@ -177,7 +177,7 @@ impl Repo {
     }
 
     /// URL for cloning the repository via git
-    pub fn canonical_git_url(&self) -> Cow<str> {
+    pub fn canonical_git_url(&self) -> Cow<'_, str> {
         match self.host {
             RepoHost::GitHub(SimpleRepo {ref owner, ref repo}) => {
                 format!("https://github.com/{}/{}.git", owner, repo).into()

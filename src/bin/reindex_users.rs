@@ -1,9 +1,9 @@
-extern crate failure;
-extern crate github_info;
-extern crate kitchen_sink;
-extern crate rayon;
-extern crate repo_url;
-extern crate user_db;
+
+
+
+use rayon;
+
+
 use kitchen_sink::stopped;
 use std::sync::Arc;
 use std::sync::mpsc;

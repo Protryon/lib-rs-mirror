@@ -1,9 +1,9 @@
-extern crate crate_db;
-extern crate kitchen_sink;
-extern crate failure;
-extern crate rayon;
-extern crate either;
-extern crate rand;
+
+use kitchen_sink;
+use failure;
+use rayon;
+
+
 use rand::Rng;
 use rand::thread_rng;
 use kitchen_sink::{KitchenSink, CrateData};
@@ -37,11 +37,13 @@ fn main() {
         };
         for (i, k) in c.into_iter().enumerate() {
             if stopped() {
-                eprintln!("STOPPING");
                 return;
             }
             let crates = Arc::clone(&crates);
             s1.spawn(move |s2| {
+                if stopped() {
+                    return;
+                }
                 print!("{} ", i);
                 match index_crate(&crates, &k) {
                     Ok(v) => if repos {

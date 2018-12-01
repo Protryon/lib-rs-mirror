@@ -1,6 +1,6 @@
-extern crate rusqlite;
-extern crate failure;
-extern crate github_info;
+
+use failure;
+
 use github_info::User;
 use github_info::UserType;
 use rusqlite::*;

@@ -1,5 +1,5 @@
 use rusqlite::*;
-use CrateDb;
+use crate::CrateDb;
 
 impl CrateDb {
     pub(crate) fn db(url: &str) -> Result<Connection> {

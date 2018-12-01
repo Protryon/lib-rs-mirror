@@ -1,12 +1,12 @@
-extern crate categories;
-extern crate chrono;
-extern crate rusqlite;
+use categories;
+
+use rusqlite;
 #[macro_use]
 extern crate failure;
-extern crate thread_local;
+
 #[macro_use]
 extern crate lazy_static;
-extern crate rich_crate;
+
 use std::borrow::Cow;
 use chrono::prelude::*;
 use failure::ResultExt;
@@ -28,7 +28,7 @@ type FResult<T> = std::result::Result<T, failure::Error>;
 
 mod schema;
 mod stopwords;
-use stopwords::{COND_STOPWORDS, STOPWORDS};
+use crate::stopwords::{COND_STOPWORDS, STOPWORDS};
 
 pub struct CrateDb {
     url: String,
@@ -112,7 +112,7 @@ impl CrateDb {
 
         for (i, k) in c.short_name().split(|c: char| !c.is_alphanumeric()).enumerate() {
             print!("'{}, ", k);
-            let mut w: f64 = 100./(8+i*2) as f64;
+            let w: f64 = 100./(8+i*2) as f64;
             insert_keyword.add(k, w, false);
         }
 
@@ -201,7 +201,7 @@ impl CrateDb {
 
             for (i, k) in c.authors().iter().filter_map(|a|a.email.as_ref().or(a.name.as_ref())).enumerate() {
                 print!("by:{}, ", k);
-                let mut w: f64 = 50./(100+i) as f64;
+                let w: f64 = 50./(100+i) as f64;
                 insert_keyword.add(&k, w, false);
             }
 
@@ -706,7 +706,7 @@ impl CrateDb {
         })
     }
 
-    fn extract_text(c: &RichCrateVersion) -> Option<(f64, Cow<str>)> {
+    fn extract_text(c: &RichCrateVersion) -> Option<(f64, Cow<'_, str>)> {
         if let Some(s) = c.description() {
             if let Some(more) = c.alternative_description() {
                 return Some((1., format!("{}{}", s, more).into()));

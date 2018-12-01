@@ -18,7 +18,7 @@ use std::path::Path;
 
 use git2::{build::RepoBuilder, Blob, ObjectType, Reference, Repository, Tree};
 mod iter;
-use iter::HistoryIter;
+use crate::iter::HistoryIter;
 
 #[derive(Debug, Clone)]
 pub struct ParseError(pub String);

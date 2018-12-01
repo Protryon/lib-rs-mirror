@@ -2,7 +2,7 @@ use std::borrow::Borrow;
 use std::sync::RwLock;
 use std::collections::HashMap;
 use serde::de::DeserializeOwned;
-use error::Error;
+use crate::error::Error;
 use serde::*;
 use serde_json;
 use std::path::PathBuf;
@@ -11,7 +11,7 @@ use std::fs;
 use tempfile::NamedTempFile;
 use rmp_serde;
 use std::io::BufReader;
-use SimpleCache;
+use crate::SimpleCache;
 
 struct Inner<T> {
     data: T,

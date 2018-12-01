@@ -7,7 +7,7 @@ use rusqlite::Error::SqliteFailure;
 use rusqlite::ErrorCode::DatabaseLocked;
 use std::path::Path;
 use thread_local::ThreadLocal;
-use error::Error;
+use crate::error::Error;
 use std::thread;
 use std::time::Duration;
 
@@ -98,7 +98,6 @@ impl SimpleCache {
             if self.cache_only {
                 None
             } else {
-                eprintln!("cache miss {}@{}", key.0, key.1);
                 let data = Self::fetch(url.as_ref())?;
                 self.set(key, &data)?;
                 Some(data)

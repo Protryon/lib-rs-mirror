@@ -1,18 +1,18 @@
-extern crate reqwest;
-extern crate rusqlite;
-extern crate serde;
-extern crate serde_json;
-extern crate rmp_serde;
-extern crate tempfile;
-extern crate thread_local;
+use reqwest;
+use rusqlite;
+use serde;
+use serde_json;
+use rmp_serde;
+
+
 #[macro_use]
 extern crate quick_error;
 
 mod error;
-pub use error::Error;
+pub use crate::error::Error;
 
 mod db;
-pub use db::*;
+pub use crate::db::*;
 
 mod kv;
-pub use kv::*;
+pub use crate::kv::*;

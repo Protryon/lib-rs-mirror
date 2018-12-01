@@ -23,7 +23,7 @@ impl<'de> Deserialize<'de> for UserType {
         impl<'a> Visitor<'a> for UserTypeVisitor {
             type Value = UserType;
 
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 formatter.write_str("user/org/bot")
             }
 

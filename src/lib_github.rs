@@ -1,12 +1,12 @@
-extern crate github_rs;
-extern crate hyper;
-extern crate file;
-extern crate serde;
-extern crate urlencoding;
+use github_rs;
+
+
+use serde;
+
 #[macro_use] extern crate serde_derive;
-extern crate serde_json;
-extern crate repo_url;
-extern crate simple_cache;
+use serde_json;
+
+use simple_cache;
 #[macro_use] extern crate quick_error;
 
 use std::path::Path;
@@ -24,7 +24,7 @@ use github_rs::headers::{rate_limit_remaining, rate_limit_reset};
 use hyper::header::{Accept, qitem};
 
 mod model;
-pub use model::*;
+pub use crate::model::*;
 
 pub type CResult<T> = Result<T, Error>;
 

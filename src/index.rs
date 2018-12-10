@@ -47,9 +47,10 @@ impl Index {
     }
 
     pub fn deps_stats(&self) -> &DepsStats {
-        self.deps_stats.get(|| {
+        let (_, res) = rayon::join(||{}, || self.deps_stats.get(|| {
             self.get_deps_stats()
-        })
+        }));
+        res
     }
 
     pub fn crate_by_name(&self, name: &Origin) -> Result<&Crate, KitchenSinkErr> {

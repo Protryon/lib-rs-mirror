@@ -606,6 +606,10 @@ impl KitchenSink {
         self.index.all_dependencies_flattened(self.index.crate_by_name(origin)?)
     }
 
+    pub fn prewarm(&self) {
+        self.index.deps_stats();
+    }
+
     pub fn dependents_stats_of(&self, krate: &RichCrateVersion) -> Option<RevDependencies> {
         let deps = self.index.deps_stats();
         deps.counts.get(krate.short_name()).cloned()

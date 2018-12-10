@@ -1,7 +1,6 @@
 use serde;
 use rand;
 
-
 #[macro_use] extern crate serde_derive;
 use chrono::TimeZone;
 use chrono::Utc;
@@ -91,7 +90,7 @@ impl CratesIoClient {
         let new_key = (url.as_str(), as_of_version);
         let data: CrateDownloadsFile = cioopt!(self.get_json(new_key, &url)?);
         if !self.cache.cache_only && data.is_stale() && rand::random::<u8>() > 100 {
-            eprintln!("downloads expired");
+            eprintln!("downloads expired {}@{}", crate_name, as_of_version);
             let _ = self.cache.delete(new_key.0);
             let fresh: CrateDownloadsFile = cioopt!(self.get_json(new_key, &url)?);
             assert!(!fresh.is_stale());
@@ -119,7 +118,12 @@ impl CratesIoClient {
             if self.cache.cache_only || ver == key.1 {
                 return Ok(Some(B::from(res)));
             }
-            eprintln!("Cache near miss {}@{} vs {}", key.0, ver, key.1);
+            let wants = semver::Version::parse(key.1);
+            let has = semver::Version::parse(&ver);
+            if wants.and_then(|wants| has.map(|has| (wants,has)))
+                .ok().map_or(false, |(wants,has)| has > wants) {
+                eprintln!("Cache regression: {}@{} vs {}" , key.0, ver, key.1);
+            }
         }
 
         let url = format!("https://crates.io/api/v1/crates/{}", path.as_ref());

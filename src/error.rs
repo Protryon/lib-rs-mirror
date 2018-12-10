@@ -28,9 +28,8 @@ quick_error! {
             display("KV cache enc: {}", err)
             cause(err)
         }
-        RmpDec(err:  rmp_serde::decode::Error) {
+        RmpDec(err: rmp_serde::decode::Error) {
             from()
-            display("KV cache dec: {}", err)
             cause(err)
         }
         KvPoison {}

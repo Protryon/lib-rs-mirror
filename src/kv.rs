@@ -30,7 +30,10 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
         let path = path.into().with_extension("rmp");
         let data = if path.exists() {
             let mut f = BufReader::new(File::open(&path)?);
-            rmp_serde::from_read(&mut f)?
+            rmp_serde::from_read(&mut f).map_err(|e| {
+                eprintln!("File {} is broken: {}", path.display(), e);
+                e
+            })?
         } else {
             HashMap::new()
         };
@@ -55,7 +58,10 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
 
         // sanity check
         let value = rmp_serde::to_vec(value).map_err(Error::from)
-            .and_then(|dat| rmp_serde::from_slice(&dat).map_err(Error::from))?;
+            .and_then(|dat| rmp_serde::from_slice(&dat).map_err(|e| {
+                eprintln!("Setter for {} {} failed to serialize: {}", self.path.display(), key, e);
+                Error::from(e)
+            }))?;
 
         let mut w = self.data.write().map_err(|_| Error::KvPoison)?;
         w.writes += 1;
@@ -93,7 +99,10 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
         };
         let tmp_path = NamedTempFile::new_in(self.path.parent().unwrap())?;
         fs::write(&tmp_path, &ser)?;
-        let _: HashMap<String, T> = rmp_serde::from_slice(&ser)?;
+        let _: HashMap<String, T> = rmp_serde::from_slice(&ser).map_err(|e| {
+            eprintln!("{} can't be saved, because {}", self.path.display(), e);
+            e
+        })?;
         tmp_path.persist(&self.path).map_err(|e| e.error)?;
         Ok(())
     }

@@ -70,7 +70,7 @@ impl Repo {
     fn repo_from_path<'a>(mut path: impl Iterator<Item = &'a str>) -> GResult<SimpleRepo> {
         Ok(SimpleRepo {
             owner: path.next().ok_or(GitError::IncompleteUrl)?.to_lowercase().to_string(),
-            repo: path.next().ok_or(GitError::IncompleteUrl)?.to_lowercase().trim_right_matches(".git").to_string(),
+            repo: path.next().ok_or(GitError::IncompleteUrl)?.to_lowercase().trim_end_matches(".git").to_string(),
         })
     }
 

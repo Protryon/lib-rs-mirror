@@ -1,14 +1,3 @@
-
-
-
-
-
-
-
-
-use udedokei;
-use semver;
-
 #[macro_use]
 extern crate serde_derive;
 

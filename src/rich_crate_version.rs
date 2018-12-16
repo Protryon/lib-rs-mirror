@@ -198,7 +198,7 @@ impl RichCrateVersion {
         self.manifest.package.description.as_ref().map(|d| {
             let d = d.as_str().trim();
             if d.contains(". ") {d} // multiple sentences, leave them alone
-            else {d.trim_right_matches('.')}
+            else {d.trim_end_matches('.')}
         })
     }
 

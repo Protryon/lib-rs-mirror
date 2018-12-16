@@ -1,6 +1,6 @@
-use std::path::PathBuf;
+use simple_cache::{Error, TempCache};
 use std::borrow::Cow;
-use simple_cache::{TempCache, Error};
+use std::path::PathBuf;
 
 /// Callbacks for every image URL in the document
 pub trait ImageFilter: Send + Sync + 'static {
@@ -21,7 +21,6 @@ impl ImageFilter for () {
         None
     }
 }
-
 
 #[derive(Clone, Copy, Deserialize, Serialize, Debug)]
 struct ImageOptimImageMeta {
@@ -53,7 +52,7 @@ impl ImageFilter for ImageOptimAPIFilter {
     }
 
     fn image_size(&self, image_url: &str) -> Option<(u32, u32)> {
-        let image_url = image_url.trim_left_matches(&self.img_prefix);
+        let image_url = image_url.trim_start_matches(&self.img_prefix);
         let api_url = format!("{}{}", self.meta_prefix, image_url);
         self.cache.get_json(image_url, api_url, |f| f)
             .map_err(|e| {

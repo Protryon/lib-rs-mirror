@@ -64,7 +64,7 @@ impl<'a> CatPage<'a> {
     }
 
     pub fn description(&self) -> &str {
-        self.cat.description.trim_right_matches('.')
+        self.cat.description.trim_end_matches('.')
     }
 
     /// "See also" feature

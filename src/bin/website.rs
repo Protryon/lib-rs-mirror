@@ -68,6 +68,7 @@ fn render_categories(cats: &CategoryMap, base: &Path, crates: &KitchenSink, done
             render_categories(&cat.sub, &new_base, crates, done_pages, markup)?;
         }
         let render_crate = |origin: &Origin| {
+            running()?;
             {
                 let mut s = done_pages.lock().unwrap();
                 if s.get(origin).is_some() {
@@ -83,6 +84,7 @@ fn render_categories(cats: &CategoryMap, base: &Path, crates: &KitchenSink, done
                 },
             };
             let ver = crates.rich_crate_version(origin, CrateData::Full).context("get rich crate")?;
+            running()?;
             let path = PathBuf::from(format!("public/crates/{}.html", ver.short_name()));
             println!("http://localhost:3000/crates/{}", ver.short_name());
             let mut outfile = BufWriter::new(File::create(&path)
@@ -100,6 +102,8 @@ fn render_categories(cats: &CategoryMap, base: &Path, crates: &KitchenSink, done
             render_crate(c).context(msg)
         })
         .collect::<Result<(), _>>()?;
+
+        running()?;
 
         crates.recently_updated_crates_in_category(&cat.slug)
             .context("recently updated crates")?

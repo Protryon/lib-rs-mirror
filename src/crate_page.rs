@@ -478,7 +478,7 @@ impl<'a> CratePage<'a> {
                 } else if host.ends_with(".githubusercontent.com") {
                     None
                 } else {
-                    Some(host.trim_left_matches("www.").to_string().into())
+                    Some(host.trim_start_matches("www.").to_string().into())
                 }
             })
         })
@@ -802,7 +802,7 @@ fn extract_doc_comments(code: &str) -> String {
     let mut out = String::with_capacity(code.len()/2);
     let mut is_in_block_mode = false;
     for l in code.lines() {
-        let l = l.trim_left();
+        let l = l.trim_start();
         if is_in_block_mode {
             if let Some(offset) = l.find("*/") {
                 is_in_block_mode = false;

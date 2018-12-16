@@ -1,3 +1,5 @@
+use rusqlite::types::ToSql;
+use rusqlite::NO_PARAMS;
 use categories;
 
 use rusqlite;
@@ -92,7 +94,8 @@ impl CrateDb {
 
     pub fn latest_crate_update_timestamp(&self) -> FResult<Option<u32>> {
         self.with_connection(|conn| {
-            Ok(none_rows(conn.query_row("SELECT max(created) FROM crate_versions", &[], |row| row.get(0)))?)
+            let nope: [u8; 0] = [];
+            Ok(none_rows(conn.query_row("SELECT max(created) FROM crate_versions", nope.iter(), |row| row.get(0)))?)
         })
     }
 
@@ -117,7 +120,7 @@ impl CrateDb {
         }
 
         if let Some(l) = c.links() {
-            insert_keyword.add(l.trim_left_matches("lib"), 0.54, false);
+            insert_keyword.add(l.trim_start_matches("lib"), 0.54, false);
         }
 
         // order is important. SO's synonyms are very keyword-specific and would
@@ -127,7 +130,7 @@ impl CrateDb {
         if let Some((w2, d)) = Self::extract_text(&c) {
             let d: &str = &d;
             for (i, k) in d.split_whitespace()
-                .map(|k| k.trim_right_matches("'s"))
+                .map(|k| k.trim_end_matches("'s"))
                 .filter(|k| k.len() >= 2)
                 .map(|k| k.to_lowercase())
                 .filter(|k| STOPWORDS.get(k.as_str()).is_none())
@@ -170,13 +173,15 @@ impl CrateDb {
             let mut insert_category = tx.prepare_cached("INSERT OR IGNORE INTO categories (crate_id, slug, rank_weight, relevance_weight) VALUES (?1, ?2, ?3, ?4)")?;
             let mut get_crate_id = tx.prepare_cached("SELECT id, recent_downloads FROM crates WHERE origin = ?1")?;
 
-            insert_crate.execute(&[&origin, &0]).context("insert crate")?;
+            let args: &[&dyn ToSql] = &[&origin, &0];
+            insert_crate.execute(args).context("insert crate")?;
             let (crate_id, downloads): (u32, u32) = get_crate_id.query_row(&[&origin], |row| (row.get(0), row.get(1))).context("crate_id")?;
             let is_important_ish = downloads > 2000;
 
             if let Some(repo) = c.repository() {
                 let url = repo.canonical_git_url();
-                insert_repo.execute(&[&crate_id, &url.as_ref()]).context("insert repo")?;
+                let args: &[&dyn ToSql] = &[&crate_id, &url.as_ref()];
+                insert_repo.execute(args).context("insert repo")?;
             } else {
                 delete_repo.execute(&[&crate_id]).context("del repo")?;
             }
@@ -193,7 +198,8 @@ impl CrateDb {
             }
             for (rank, rel, slug) in categories {
                 print!(">{}, ", slug);
-                insert_category.execute(&[&crate_id, &slug, &rank, &rel]).context("insert cat")?;
+                let args: &[&dyn ToSql] = &[&crate_id, &slug, &rank, &rel];
+                insert_category.execute(args).context("insert cat")?;
                 if had_explicit_categories {
                     insert_keyword.add(&slug, rel/3., false);
                 }
@@ -370,10 +376,12 @@ impl CrateDb {
             for change in changes {
                 match *change {
                     RepoChange::Replaced {ref crate_name, ref replacement, weight} => {
-                        insert_change.execute(&[&repo, &crate_name.as_str(), &Some(replacement.as_str()), &weight])
+                        let args: &[&dyn ToSql] = &[&repo, &crate_name.as_str(), &Some(replacement.as_str()), &weight];
+                        insert_change.execute(args)
                     },
                     RepoChange::Removed {ref crate_name, weight} => {
-                        insert_change.execute(&[&repo, &crate_name.as_str(), &(None as Option<&str>), &weight])
+                        let args: &[&dyn ToSql] = &[&repo, &crate_name.as_str(), &(None as Option<&str>), &weight];
+                        insert_change.execute(args)
                     },
                 }?;
             }
@@ -385,7 +393,8 @@ impl CrateDb {
         let repo = repo.canonical_git_url();
         self.with_connection(|conn| {
             let mut get_path = conn.prepare_cached("SELECT path FROM repo_crates WHERE repo = ?1 AND crate_name = ?2")?;
-            Ok(none_rows(get_path.query_row(&[&repo, &crate_name], |row| row.get(0))).context("path_in_repo")?)
+            let args: &[&dyn ToSql] = &[&repo, &crate_name];
+            Ok(none_rows(get_path.query_row(args, |row| row.get(0))).context("path_in_repo")?)
         })
     }
 
@@ -405,7 +414,8 @@ impl CrateDb {
 
             for ver in all.versions() {
                 let timestamp = DateTime::parse_from_rfc3339(&ver.created_at).context("version timestamp")?;
-                insert_version.execute(&[&crate_id, &ver.num, &timestamp.timestamp()]).context("insert ver")?;
+                let args: &[&dyn ToSql] = &[&crate_id, &ver.num, &timestamp.timestamp()];
+                insert_version.execute(args).context("insert ver")?;
             }
 
             for dl in all.daily_downloads() {
@@ -413,7 +423,8 @@ impl CrateDb {
                 if downloads > 0 {
                     let period = dl.date.and_hms(0,0,0).timestamp();
                     let ver = dl.version.map(|v| v.num.as_str()); // `NULL` means all versions together
-                    insert_dl.execute(&[&crate_id, &period, &ver, &downloads]).context("insert dl")?; // FIXME: ignore 0s?
+                    let args: &[&dyn ToSql] = &[&crate_id, &period, &ver, &downloads];
+                    insert_dl.execute(args).context("insert dl")?; // FIXME: ignore 0s?
                 }
             }
             Ok(())
@@ -637,7 +648,7 @@ impl CrateDb {
                 FROM repo_changes
                 WHERE replacement IS NULL
                 GROUP BY crate_name")?;
-            let q = query.query_map(&[], |row| {
+            let q = query.query_map(NO_PARAMS, |row| {
                 let s: String = row.get(0);
                 (Origin::from_crates_io_name(&s), row.get(1))
             })?;
@@ -659,8 +670,8 @@ impl CrateDb {
                 ORDER by w desc
                 LIMIT ?2"
             )?;
-
-            let q = query.query_map(&[&slug, &limit], |row| {
+            let args: &[&dyn ToSql] = &[&slug, &limit];
+            let q = query.query_map(args, |row| {
                 let s: String = row.get(0);
                 (Origin::from_string(s), row.get(1), row.get(2))
             })?;
@@ -699,7 +710,7 @@ impl CrateDb {
             let mut q = conn.prepare(r#"
                 select c.slug, count(*) as cnt from categories c group by c.slug
             "#)?;
-            let q = q.query_map(&[], |row| -> (String, u32) {
+            let q = q.query_map(NO_PARAMS, |row| -> (String, u32) {
                 (row.get(0), row.get(1))
             }).context("counts")?.filter_map(|r| r.ok());
             Ok(q.collect())
@@ -718,7 +729,7 @@ impl CrateDb {
                 Markup::Markdown(ref s) | Markup::Rst(ref s) => s,
             };
             let end = sub.char_indices().skip(200).map(|(i,_)|i).next().unwrap_or(sub.len());
-            let sub = sub[0..end].trim_right_matches(|c:char| c.is_alphanumeric());//half-word
+            let sub = sub[0..end].trim_end_matches(|c:char| c.is_alphanumeric());//half-word
             return Some((0.5, sub.into()));
         }
         None
@@ -745,8 +756,8 @@ impl KeywordInsert {
     pub fn add(&mut self, word: &str, weight: f64, visible: bool) {
         let word = word
             .trim_matches(|c: char| !c.is_alphanumeric())
-            .trim_right_matches("-rs")
-            .trim_left_matches("rust-");
+            .trim_end_matches("-rs")
+            .trim_start_matches("rust-");
         if word.is_empty() || weight <= 0.000001 {
             return;
         }
@@ -801,12 +812,14 @@ impl KeywordInsert {
 
         clear_keywords.execute(&[&crate_id]).context("clear cat")?;
         for (word, (weight, visible)) in self.keywords {
-            insert_name.execute(&[&word, if visible {&1} else {&0}])?;
+            let args: &[&dyn ToSql] = &[&word, if visible {&1} else {&0}];
+            insert_name.execute(args)?;
             let (keyword_id, old_vis): (u32, u32) = select_id.query_row(&[&word],|r| (r.get(0), r.get(1))).context("get keyword")?;
             if visible && old_vis == 0 {
                 make_visible.execute(&[&keyword_id]).context("keyword vis")?;
             }
-            insert_value.execute(&[&keyword_id, &crate_id, &weight, if visible {&1} else {&0}]).context("keyword")?;
+            let args: &[&dyn ToSql] = &[&keyword_id, &crate_id, &weight, if visible {&1} else {&0}];
+            insert_value.execute(args).context("keyword")?;
         }
         Ok(())
     }

@@ -1,5 +1,6 @@
 use cargo_toml::TomlDependency;
 pub use cargo_toml::TomlDepsSet;
+pub use cargo_toml::Edition;
 use cargo_toml::TomlManifest;
 use categories::Categories;
 use crates_index::Version;
@@ -63,6 +64,10 @@ impl RichCrateVersion {
 
     pub fn documentation(&self) -> Option<&str> {
         self.manifest.package.documentation.as_ref().map(|s| s.as_ref())
+    }
+
+    pub fn edition(&self) -> Edition {
+        self.manifest.package.edition
     }
 
     pub fn has_categories(&self) -> bool {

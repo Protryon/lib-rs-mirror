@@ -1,4 +1,5 @@
 
+use rusqlite::types::ToSql;
 use failure;
 
 use github_info::User;
@@ -118,10 +119,12 @@ impl UserDb {
                 UserType::Org => "org",
                 UserType::Bot => "bot",
             };
-            insert_user.execute(&[&user.id, &user.login.to_ascii_lowercase(), &user.name, &user.avatar_url, &user.gravatar_id, &user.html_url, &t])?;
+            let args: &[&dyn ToSql] = &[&user.id, &user.login.to_ascii_lowercase(), &user.name, &user.avatar_url, &user.gravatar_id, &user.html_url, &t];
+            insert_user.execute(args)?;
 
             if let Some(e) = email {
-                insert_email.execute(&[&user.id, &e.to_ascii_lowercase(), &name])?;
+                let args: &[&dyn ToSql] = &[&user.id, &e.to_ascii_lowercase(), &name];
+                insert_email.execute(args)?;
             }
         }
         tx.commit()?;

@@ -1,3 +1,5 @@
+use hyper::header::ACCEPT;
+use hyper::header::HeaderValue;
 use github_rs;
 
 
@@ -14,14 +16,13 @@ use std::path::Path;
 use urlencoding::encode;
 use repo_url::SimpleRepo;
 use github_rs::client;
-use github_rs::{Headers, StatusCode};
+use github_rs::{HeaderMap, StatusCode};
 use github_rs::client::Executor;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::time::Duration;
 use std::thread;
 use simple_cache::TempCache;
 use github_rs::headers::{rate_limit_remaining, rate_limit_reset};
-use hyper::header::{Accept, qitem};
 
 mod model;
 pub use crate::model::*;
@@ -145,7 +146,7 @@ impl GitHub {
         let path = format!("repos/{}/{}/topics", repo.owner, repo.repo);
         let t: Topics = match self.get_cached_old(&self.cache, (&key, as_of_version), |client| client.get()
                            .custom_endpoint(&path)
-                           .set_header(Accept(vec![qitem("application/vnd.github.mercy-preview+json".parse().unwrap())]))
+                           .set_header(ACCEPT, HeaderValue::from_static("application/vnd.github.mercy-preview+json"))
                            .execute())? {
             Some(data) => data,
             None => return Ok(None),
@@ -194,7 +195,7 @@ impl GitHub {
 
     fn get_cached<F, B>(&self, cache: &TempCache<(String, Option<B>)>, key: (&str, &str), cb: F) -> CResult<Option<B>>
         where B: for <'de> serde::Deserialize<'de> + serde::Serialize + Clone + Send + 'static,
-        F: FnOnce(&client::Github) -> Result<(Headers, StatusCode, Option<serde_json::Value>), github_rs::errors::Error>
+        F: FnOnce(&client::Github) -> Result<(HeaderMap, StatusCode, Option<serde_json::Value>), github_rs::errors::Error>
     {
         if let Some((ver, payload)) = cache.get(key.0)? {
             if ver == key.1 {
@@ -220,19 +221,19 @@ impl GitHub {
         }
 
         let non_parsable_body = match status {
-            StatusCode::Accepted |
-            StatusCode::Created => return Err(Error::TryAgainLater),
-            StatusCode::NoContent |
-            StatusCode::NotFound |
-            StatusCode::Gone |
-            StatusCode::MovedPermanently => true,
+            StatusCode::ACCEPTED |
+            StatusCode::CREATED => return Err(Error::TryAgainLater),
+            StatusCode::NO_CONTENT |
+            StatusCode::NOT_FOUND |
+            StatusCode::GONE |
+            StatusCode::MOVED_PERMANENTLY => true,
             _ => false,
         };
 
         let keep_cached = match status {
-            StatusCode::NotFound |
-            StatusCode::Gone |
-            StatusCode::MovedPermanently => true,
+            StatusCode::NOT_FOUND |
+            StatusCode::GONE |
+            StatusCode::MOVED_PERMANENTLY => true,
             _ => status.is_success(),
         };
 
@@ -256,7 +257,7 @@ impl GitHub {
 
     fn get_cached_old<F, B>(&self, cache: &TempCache<(String, Payload)>, key: (&str, &str), cb: F) -> CResult<Option<B>>
         where B: for<'de> serde::Deserialize<'de> + Payloadable,
-        F: FnOnce(&client::Github) -> Result<(Headers, StatusCode, Option<serde_json::Value>), github_rs::errors::Error>
+        F: FnOnce(&client::Github) -> Result<(HeaderMap, StatusCode, Option<serde_json::Value>), github_rs::errors::Error>
     {
         if let Some((ver, payload)) = cache.get(key.0)? {
             if ver == key.1 {
@@ -280,19 +281,19 @@ impl GitHub {
         }
 
         let non_parsable_body = match status {
-            StatusCode::Accepted |
-            StatusCode::Created => return Err(Error::TryAgainLater),
-            StatusCode::NoContent |
-            StatusCode::NotFound |
-            StatusCode::Gone |
-            StatusCode::MovedPermanently => true,
+            StatusCode::ACCEPTED |
+            StatusCode::CREATED => return Err(Error::TryAgainLater),
+            StatusCode::NO_CONTENT |
+            StatusCode::NOT_FOUND |
+            StatusCode::GONE |
+            StatusCode::MOVED_PERMANENTLY => true,
             _ => false,
         };
 
         let keep_cached = match status {
-            StatusCode::NotFound |
-            StatusCode::Gone |
-            StatusCode::MovedPermanently => true,
+            StatusCode::NOT_FOUND |
+            StatusCode::GONE |
+            StatusCode::MOVED_PERMANENTLY => true,
             _ => status.is_success(),
         };
 

@@ -1,3 +1,4 @@
+use rusqlite::types::ToSql;
 use reqwest;
 use rusqlite;
 use serde;
@@ -120,7 +121,8 @@ impl SimpleCache {
     fn set_inner(&self, key: (&str, &str), data: &[u8]) -> Result<(), Error> {
         self.with_connection(|conn| {
             let mut q = conn.prepare_cached("INSERT OR REPLACE INTO cache2(key, ver, data) VALUES(?1, ?2, ?3)")?;
-            q.execute(&[&key.0, &key.1, &data])?;
+            let arr: &[&dyn ToSql] = &[&key.0, &key.1, &data];
+            q.execute(arr)?;
             Ok(())
         })
     }
@@ -132,9 +134,9 @@ impl SimpleCache {
             thread::sleep(Duration::from_secs(1));
         }
         let mut res = client.get(url)
-            .header(reqwest::header::UserAgent::new("crates.rs/1.0"))
+            .header(reqwest::header::USER_AGENT, "crates.rs/1.0")
             .send()?;
-        if res.status() != reqwest::StatusCode::Ok {
+        if res.status() != reqwest::StatusCode::OK {
             Err(res.status())?;
         }
         let mut buf = Vec::new();

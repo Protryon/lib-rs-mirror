@@ -1,10 +1,7 @@
-
 use kitchen_sink;
 use failure;
 use rayon;
-
-
-use rand::Rng;
+use rand::seq::SliceRandom;
 use rand::thread_rng;
 use kitchen_sink::{KitchenSink, CrateData};
 use kitchen_sink::RichCrateVersion;
@@ -30,7 +27,7 @@ fn main() {
     rayon::scope(move |s1| {
         let c = if everything {
             let mut c: Vec<_> = crates.all_crates().keys().cloned().collect::<Vec<_>>();
-            thread_rng().shuffle(&mut c);
+            c.shuffle(&mut thread_rng());
             Either::Left(c)
         } else {
             Either::Right(crates.all_new_crates().unwrap().map(|c| c.origin().clone()))

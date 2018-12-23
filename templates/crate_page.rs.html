@@ -8,6 +8,7 @@
 @use crate::CratePage;
 @use crate::Contributors;
 @use rich_crate::Include;
+@use rich_crate::Edition;
 @use std::ops::Div;
 
 @(url: &Urler, c: &CratePage)
@@ -137,6 +138,9 @@
                     <span>@extra</span>
                   }
                 </h3>
+              }
+              @if c.ver.edition() == Edition::E2018 {
+                <p class="edition-2018">✓ Uses <a href="https://rust-lang-nursery.github.io/edition-guide/rust-2018/index.html">Rust 2018</a> edition</p>
               }
               <table>
                 @for (i,gr) in c.top_versions().enumerate() {

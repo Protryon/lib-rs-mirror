@@ -1,11 +1,11 @@
 //! Render the whole website - homepage, category pages, and crate pages linked there
 
-extern crate front_end;
-extern crate kitchen_sink;
-extern crate failure;
-extern crate rayon;
-extern crate render_readme;
-extern crate categories;
+use front_end;
+
+use failure;
+use rayon;
+
+use categories;
 
 use rayon::prelude::*;
 use std::path::Path;

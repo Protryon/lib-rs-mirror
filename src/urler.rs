@@ -59,7 +59,7 @@ impl Urler {
     /// Crate author's URL
     ///
     /// This will probably change to a listing page rather than arbitrary personal URL
-    pub fn author(&self, author: &CrateAuthor) -> Option<String> {
+    pub fn author(&self, author: &CrateAuthor<'_>) -> Option<String> {
         if let Some(ref gh) = author.github {
             Some(match gh.user_type {
                 UserType::User => format!("https://crates.io/users/{}", encode(&gh.login)),

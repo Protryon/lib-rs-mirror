@@ -5,20 +5,8 @@
 //! because the template engine Ructe doesn't support
 //! complex expressions in the templates.
 
-extern crate categories;
-extern crate chrono;
-extern crate failure;
-extern crate kitchen_sink;
-extern crate lab;
-extern crate rayon;
-extern crate render_readme;
-extern crate rich_crate;
-extern crate semver;
-extern crate semver_parser;
-extern crate urlencoding;
-extern crate locale;
-extern crate url;
-extern crate udedokei;
+use chrono;
+use failure;
 
 mod cat_page;
 mod crate_page;
@@ -67,7 +55,7 @@ impl Page {
 }
 
 /// See `cat_page.rs.html`
-pub fn render_category(out: &mut Write, cat: &Category, crates: &KitchenSink, markup: &Renderer) -> Result<(), failure::Error> {
+pub fn render_category(out: &mut dyn Write, cat: &Category, crates: &KitchenSink, markup: &Renderer) -> Result<(), failure::Error> {
     let urler = Urler::new();
     let page = cat_page::CatPage::new(cat, crates, markup).context("can't prepare rendering of category page")?;
     templates::cat_page(out, &page, &urler)?;
@@ -75,14 +63,14 @@ pub fn render_category(out: &mut Write, cat: &Category, crates: &KitchenSink, ma
 }
 
 /// See `homepage.rs.html`
-pub fn render_homepage(out: &mut Write, crates: &KitchenSink) -> Result<(), failure::Error> {
+pub fn render_homepage(out: &mut dyn Write, crates: &KitchenSink) -> Result<(), failure::Error> {
     let urler = Urler::new();
     templates::homepage(out, &home_page::HomePage::new(crates)?, &urler)?;
     Ok(())
 }
 
 /// See `crate_page.rs.html`
-pub fn render_crate_page(out: &mut Write, all: &RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, markup: &Renderer) -> Result<String, failure::Error> {
+pub fn render_crate_page(out: &mut dyn Write, all: &RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, markup: &Renderer) -> Result<String, failure::Error> {
     if stopped() {
         Err(KitchenSinkErr::Stopped)?;
     }

@@ -214,7 +214,7 @@ impl<'a> CratePage<'a> {
         self.all.downloads_recent() < 100
     }
 
-    pub(crate) fn all_contributors(&self) -> Contributors {
+    pub(crate) fn all_contributors(&self) -> Contributors<'_> {
         let (ref authors, ref owners, co_owned, contributors) = self.all_contributors;
         let period_after_authors = !owners.is_empty() && contributors == 0;
         let contributors_as_a_team = authors.last().map_or(false, |last| last.likely_a_team());
@@ -322,7 +322,7 @@ impl<'a> CratePage<'a> {
         top.into_iter()
     }
 
-    pub fn is_version_new(&self, ver: &Version, nth: usize) -> bool {
+    pub fn is_version_new(&self, ver: &Version<'_>, nth: usize) -> bool {
         nth == 0 /*latest*/ && ver.created_at.with_timezone(&Utc) > Utc::now() - Duration::weeks(1)
     }
 
@@ -485,7 +485,7 @@ impl<'a> CratePage<'a> {
     }
 
     /// `(url, label)`
-    pub fn homepage_link(&self) -> Option<(&str, Cow<str>)> {
+    pub fn homepage_link(&self) -> Option<(&str, Cow<'_, str>)> {
         self.ver.homepage()
         .map(|url| {
             let label = Self::url_domain(url)
@@ -506,7 +506,7 @@ impl<'a> CratePage<'a> {
     }
 
     /// `(url, label)`
-    pub fn documentation_link(&self) -> Option<(&str, Cow<str>)> {
+    pub fn documentation_link(&self) -> Option<(&str, Cow<'_, str>)> {
         self.ver.documentation()
         .map(|url| {
             let label = Self::url_domain(url)
@@ -523,7 +523,7 @@ impl<'a> CratePage<'a> {
     }
 
     /// `(url, label)`
-    pub fn repository_link(&self) -> Option<(Cow<str>, String)> {
+    pub fn repository_link(&self) -> Option<(Cow<'_, str>, String)> {
         self.ver.repository_http_url().map(|(repo, url)| {
             let label_prefix = repo.site_link_label();
             let label = match repo.host() {

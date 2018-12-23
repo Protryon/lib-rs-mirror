@@ -160,10 +160,9 @@ impl CrateDb {
 
         {
             let mut tmp = insert_keyword.keywords.iter().collect::<Vec<_>>();
-            tmp.sort_by(|a,b| b.1.partial_cmp(a.1).unwrap());
-            print!("#{} ", tmp.into_iter().map(|(k,_)| k.to_string()).collect::<Vec<_>>().join(" #"));
+            tmp.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
+            print!("#{} ", tmp.into_iter().map(|(k, _)| k.to_string()).collect::<Vec<_>>().join(" #"));
         }
-
 
         self.with_tx(|tx| {
             let mut insert_crate = tx.prepare_cached("INSERT OR IGNORE INTO crates (origin, recent_downloads) VALUES (?1, ?2)")?;
@@ -205,9 +204,9 @@ impl CrateDb {
                 }
             }
 
-            for (i, k) in c.authors().iter().filter_map(|a|a.email.as_ref().or(a.name.as_ref())).enumerate() {
+            for (i, k) in c.authors().iter().filter_map(|a| a.email.as_ref().or(a.name.as_ref())).enumerate() {
                 print!("by:{}, ", k);
-                let w: f64 = 50./(100+i) as f64;
+                let w: f64 = 50. / (100 + i) as f64;
                 insert_keyword.add(&k, w, false);
             }
 
@@ -336,11 +335,12 @@ impl CrateDb {
             let mut child_path = child_path.as_str();
 
             loop {
-                 child_path = child_path.rsplitn(1, '/').nth(1).unwrap_or("");
+                child_path = child_path.rsplitn(1, '/').nth(1).unwrap_or("");
                 if let Some(child) = paths.get(child_path) {
                     return Ok(Some(child.to_owned()));
                 }
-                if child_path.is_empty() { // in these paths "" is the root
+                if child_path.is_empty() {
+                    // in these paths "" is the root
                     break;
                 }
             }
@@ -350,7 +350,7 @@ impl CrateDb {
                     return &s[5..];
                 }
                 if s.ends_with("-rs") || s.ends_with("_rs") {
-                    return &s[..s.len()-3];
+                    return &s[..s.len() - 3];
                 }
                 if s.starts_with("rust") {
                     return &s[4..];
@@ -360,8 +360,7 @@ impl CrateDb {
 
             Ok(if let Some(child) = repo.repo_name().and_then(|n| paths.get(n).or_else(|| paths.get(unprefix(n)))) {
                 Some(child.to_owned())
-            }
-            else if let Some(child) = repo.owner_name().and_then(|n| paths.get(n).or_else(|| paths.get(unprefix(n)))) {
+            } else if let Some(child) = repo.owner_name().and_then(|n| paths.get(n).or_else(|| paths.get(unprefix(n)))) {
                 Some(child.to_owned())
             } else {
                 None
@@ -375,11 +374,11 @@ impl CrateDb {
             let mut insert_change = tx.prepare_cached("INSERT OR IGNORE INTO repo_changes (repo, crate_name, replacement, weight) VALUES (?1, ?2, ?3, ?4)")?;
             for change in changes {
                 match *change {
-                    RepoChange::Replaced {ref crate_name, ref replacement, weight} => {
+                    RepoChange::Replaced { ref crate_name, ref replacement, weight } => {
                         let args: &[&dyn ToSql] = &[&repo, &crate_name.as_str(), &Some(replacement.as_str()), &weight];
                         insert_change.execute(args)
                     },
-                    RepoChange::Removed {ref crate_name, weight} => {
+                    RepoChange::Removed { ref crate_name, weight } => {
                         let args: &[&dyn ToSql] = &[&repo, &crate_name.as_str(), &(None as Option<&str>), &weight];
                         insert_change.execute(args)
                     },
@@ -421,7 +420,7 @@ impl CrateDb {
             for dl in all.daily_downloads() {
                 let downloads = dl.downloads as u32;
                 if downloads > 0 {
-                    let period = dl.date.and_hms(0,0,0).timestamp();
+                    let period = dl.date.and_hms(0, 0, 0).timestamp();
                     let ver = dl.version.map(|v| v.num.as_str()); // `NULL` means all versions together
                     let args: &[&dyn ToSql] = &[&crate_id, &period, &ver, &downloads];
                     insert_dl.execute(args).context("insert dl")?; // FIXME: ignore 0s?
@@ -737,8 +736,8 @@ impl CrateDb {
 }
 
 pub enum RepoChange {
-    Removed {crate_name: String, weight: f64},
-    Replaced {crate_name: String, replacement: String, weight: f64},
+    Removed { crate_name: String, weight: f64 },
+    Replaced { crate_name: String, replacement: String, weight: f64 },
 }
 
 pub struct KeywordInsert {
@@ -812,13 +811,13 @@ impl KeywordInsert {
 
         clear_keywords.execute(&[&crate_id]).context("clear cat")?;
         for (word, (weight, visible)) in self.keywords {
-            let args: &[&dyn ToSql] = &[&word, if visible {&1} else {&0}];
+            let args: &[&dyn ToSql] = &[&word, if visible { &1 } else { &0 }];
             insert_name.execute(args)?;
-            let (keyword_id, old_vis): (u32, u32) = select_id.query_row(&[&word],|r| (r.get(0), r.get(1))).context("get keyword")?;
+            let (keyword_id, old_vis): (u32, u32) = select_id.query_row(&[&word], |r| (r.get(0), r.get(1))).context("get keyword")?;
             if visible && old_vis == 0 {
                 make_visible.execute(&[&keyword_id]).context("keyword vis")?;
             }
-            let args: &[&dyn ToSql] = &[&keyword_id, &crate_id, &weight, if visible {&1} else {&0}];
+            let args: &[&dyn ToSql] = &[&keyword_id, &crate_id, &weight, if visible { &1 } else { &0 }];
             insert_value.execute(args).context("keyword")?;
         }
         Ok(())

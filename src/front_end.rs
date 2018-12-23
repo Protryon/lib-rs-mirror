@@ -14,17 +14,17 @@ mod download_graph;
 mod home_page;
 mod iter;
 mod urler;
-use kitchen_sink::{stopped, KitchenSinkErr};
-use failure::ResultExt;
-use categories::Category;
 use crate::crate_page::*;
+use crate::urler::Urler;
+use categories::Category;
+use failure::ResultExt;
 use kitchen_sink::KitchenSink;
+use kitchen_sink::{stopped, KitchenSinkErr};
 use render_readme::Renderer;
 use rich_crate::RichCrate;
 use rich_crate::RichCrateVersion;
 use std::fs::read_to_string;
 use std::io::Write;
-use crate::urler::Urler;
 
 include!(concat!(env!("OUT_DIR"), "/templates.rs"));
 
@@ -80,7 +80,6 @@ pub fn render_crate_page(out: &mut dyn Write, all: &RichCrate, ver: &RichCrateVe
     templates::crate_page(out, &urler, &c).context("crate page io")?;
     Ok(c.page_title())
 }
-
 
 /// Ructe doesn't like complex expressions…
 trait MyAsStr {

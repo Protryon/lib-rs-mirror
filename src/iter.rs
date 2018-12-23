@@ -29,7 +29,7 @@ impl<It> Iterator for Iter<It> where It: Iterator {
                 Some(f) => {
                     self.buffer = Some(f);
                     Some((false, e))
-                }
+                },
             },
         }
     }

@@ -1,13 +1,13 @@
-use rich_crate::RichCrateVersion;
-use render_readme::Renderer;
-use kitchen_sink::{KitchenSink, CrateData};
-use categories::CATEGORIES;
-use categories::Category;
-use failure::Error;
 use crate::templates;
-use std::collections::HashSet;
 use crate::Page;
+use categories::Category;
+use categories::CATEGORIES;
+use failure::Error;
+use kitchen_sink::{CrateData, KitchenSink};
 use rayon::prelude::*;
+use render_readme::Renderer;
+use rich_crate::RichCrateVersion;
+use std::collections::HashSet;
 
 /// Data for category page template
 pub struct CatPage<'a> {
@@ -85,11 +85,11 @@ impl<'a> CatPage<'a> {
     pub fn downloads(&self, num: u32) -> (String, &str) {
         match num {
             a @ 0..=99 => (format!("{}", a), ""),
-            a @ 0..=500 => (format!("{}", a/10*10), ""),
-            a @ 0..=999 => (format!("{}", a/50*50), ""),
-            a @ 0..=9999 => (format!("{}.{}", a/1000, a%1000/100), "K"),
-            a @ 0..=999_999 => (format!("{}", a/1000), "K"),
-            a => (format!("{}.{}", a/1_000_000, a%1_000_000/100_000), "M"),
+            a @ 0..=500 => (format!("{}", a / 10 * 10), ""),
+            a @ 0..=999 => (format!("{}", a / 50 * 50), ""),
+            a @ 0..=9999 => (format!("{}.{}", a / 1000, a % 1000 / 100), "K"),
+            a @ 0..=999_999 => (format!("{}", a / 1000), "K"),
+            a => (format!("{}.{}", a / 1_000_000, a % 1_000_000 / 100_000), "M"),
         }
     }
 

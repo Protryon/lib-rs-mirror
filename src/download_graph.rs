@@ -1,5 +1,5 @@
-use rich_crate::DownloadWeek;
 use lab::Lab;
+use rich_crate::DownloadWeek;
 
 /// Data for SVG on the crate page showing weekly download counts
 ///
@@ -42,14 +42,14 @@ impl DownloadsGraph {
                 ]
             },
             x => {
-                let num_ticks = (x-1) as usize;
+                let num_ticks = (x - 1) as usize;
                 let thick = 8. / (7. + num_ticks as f32);
                 (0..num_ticks).map(|n| {
                     (chart_y as f32 + ((chart_height * (n+1)) as f32 / (num_ticks+1) as f32),
                         if num_ticks > 8 && (n+100 - num_ticks/2) %4==0 {1.5} else {thick}
                     )
                 }).collect()
-            }
+            },
         }
     }
 
@@ -58,10 +58,10 @@ impl DownloadsGraph {
     /// Binaries are allowed to have fewer downloads, because they're
     /// infrequent installations and not mere uses/cargo update.
     fn color_for_downloads(&self, value: usize) -> Lab {
-        let low = Lab::from_rgb(&[255,0,0]);
-        let hi = Lab::from_rgb(&[40,220,50]);
-        let mid = Lab::from_rgb(&[20,125,250]);
-        let max_expected = if self.is_bin {3.1} else {4.0}; // apps have it harder to get consistent stream of downloads
+        let low = Lab::from_rgb(&[255, 0, 0]);
+        let hi = Lab::from_rgb(&[40, 220, 50]);
+        let mid = Lab::from_rgb(&[20, 125, 250]);
+        let max_expected = if self.is_bin { 3.1 } else { 4.0 }; // apps have it harder to get consistent stream of downloads
         let grad = (((value as f32).log10() - 1.0) / max_expected).max(0.).min(1.);
 
         if grad > 0.5 {
@@ -81,7 +81,7 @@ impl DownloadsGraph {
 
     /// returns (x,y,width,height,color,label)
     /// TODO: make it a struct
-    pub fn graph_data(&self) -> Vec<(usize,usize,usize,usize,String,String)> {
+    pub fn graph_data(&self) -> Vec<(usize, usize, usize, usize, String, String)> {
         let chart_x = 0;
         let chart_y = 0;
         let chart_width = self.width;
@@ -90,13 +90,13 @@ impl DownloadsGraph {
         let scale = self.scale;
         // max half year (but we have only 14 weeks of data anyway)
         let max_time_span = 26;
-        let max_item_width = chart_width as f32  / max_time_span as f32  * 4.;
+        let max_item_width = chart_width as f32 / max_time_span as f32 * 4.;
 
         let time_window = &self.data[self.data.len().saturating_sub(max_time_span)..];
         if time_window.is_empty() {
             return Vec::new();
         }
-        let avg_value = time_window.iter().map(|d|d.total).sum::<usize>() / time_window.len();
+        let avg_value = time_window.iter().map(|d| d.total).sum::<usize>() / time_window.len();
 
         // bad rounding error
         let item_width = (chart_width as f32 / time_window.len() as f32).min(max_item_width);
@@ -128,7 +128,7 @@ impl DownloadsGraph {
 
     fn downloads_scale(data: &[DownloadWeek]) -> (u32, usize) {
         // + 100 keeps small values lower on all scales
-        nice_round_number(data.iter().map(|d|d.total).max().unwrap_or(0) + 100)
+        nice_round_number(data.iter().map(|d| d.total).max().unwrap_or(0) + 100)
     }
 }
 
@@ -140,7 +140,7 @@ fn nice_round_number(n: usize) -> (u32, usize) {
         }
     }
     let exp = (n as f64).log2().ceil() as u32;
-    let max = (1<<exp) as usize;
+    let max = (1 << exp) as usize;
     let rounded = if max >= 1_000_000 {
         max / 1_000_000 * 1_000_000
     } else if max >= 100_000 {
@@ -151,9 +151,9 @@ fn nice_round_number(n: usize) -> (u32, usize) {
         max
     };
     if rounded >= n {
-        (exp-5, rounded) // -5 to keep continuity with hardcoded defaults
+        (exp - 5, rounded) // -5 to keep continuity with hardcoded defaults
     } else {
-        (exp-5+1, rounded*2)
+        (exp - 5 + 1, rounded * 2)
     }
 }
 

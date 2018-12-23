@@ -1,34 +1,34 @@
-use kitchen_sink::CResult;
-use semver_parser;
+use crate::download_graph::DownloadsGraph;
+use crate::templates;
+use crate::urler::Urler;
+use crate::Page;
+use categories::Category;
+use categories::CATEGORIES;
 use chrono::prelude::*;
 use chrono::Duration;
-use kitchen_sink::{KitchenSink, Origin, DepTy, CrateData};
-use categories::Category;
-use render_readme::Renderer;
+use kitchen_sink::CResult;
+use kitchen_sink::CrateAuthor;
+use kitchen_sink::{CrateData, DepTy, KitchenSink, Origin};
+use locale::Numeric;
+use rayon::prelude::*;
 use render_readme::Markup;
-use crate::templates;
-use rich_crate::RichDep;
+use render_readme::Renderer;
+use rich_crate::Include;
 use rich_crate::Readme;
+use rich_crate::RepoHost;
 use rich_crate::RichCrate;
 use rich_crate::RichCrateVersion;
-use rich_crate::Include;
-use rich_crate::RepoHost;
-use crate::download_graph::DownloadsGraph;
-use kitchen_sink::CrateAuthor;
-use categories::CATEGORIES;
+use rich_crate::RichDep;
+use semver::Version as SemVer;
+use semver_parser;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::hash::Hash;
 use std::f64::consts::PI;
-use crate::urler::Urler;
-use url::Url;
-use crate::Page;
-use locale::Numeric;
 use std::fmt::Display;
-use semver::Version as SemVer;
+use std::hash::Hash;
 use udedokei::{Language, Lines, Stats};
-use rayon::prelude::*;
+use url::Url;
 
 /// Data sources used in `crate_page.rs.html`
 pub struct CratePage<'a> {
@@ -80,7 +80,6 @@ pub(crate) struct Contributors<'a> {
     pub contributors_as_a_team: bool,
 }
 
-
 impl<'a> CratePage<'a> {
     pub fn new(all: &'a RichCrate, ver: &'a RichCrateVersion, kitchen_sink: &'a KitchenSink, markup: &'a Renderer) -> CResult<Self> {
         let mut page = Self {
@@ -104,7 +103,7 @@ impl<'a> CratePage<'a> {
         let keywords = self.ver.keywords(Include::Cleaned).collect::<Vec<_>>().join(", ");
         Page {
             title: self.page_title(),
-            keywords: if keywords != "" {Some(keywords)} else {None},
+            keywords: if keywords != "" { Some(keywords) } else { None },
             created: Some(self.date_created()),
             description: self.ver.description().map(|d| format!("{} | Rust package at Crates.rs", d)),
             item_name: Some(self.ver.short_name().to_string()),
@@ -115,6 +114,7 @@ impl<'a> CratePage<'a> {
             alt_critical_css: None,
         }
     }
+
     pub fn page_title(&self) -> String {
         let slugs: Vec<_> = self.ver.category_slugs(Include::Cleaned).collect();
         let kind = if self.ver.has_bin() {
@@ -189,7 +189,7 @@ impl<'a> CratePage<'a> {
             let out = extract_doc_comments(lib);
             if !out.trim().is_empty() {
                 let docs_url = self.ver.docs_rs_url();
-                let base = docs_url.as_ref().map(|u| (u.as_str(),u.as_str()));
+                let base = docs_url.as_ref().map(|u| (u.as_str(), u.as_str()));
                 return Some(templates::Html(self.markup.page(&Markup::Markdown(out), base, self.nofollow())));
             }
         }
@@ -202,8 +202,8 @@ impl<'a> CratePage<'a> {
 
     pub fn render_readme(&self, readme: &Readme) -> templates::Html<String> {
         let urls = match (readme.base_url.as_ref(), readme.base_image_url.as_ref()) {
-            (Some(l), Some(i)) => Some((l.as_str(),i.as_str())),
-            (Some(l), None) => Some((l.as_str(),l.as_str())),
+            (Some(l), Some(i)) => Some((l.as_str(), i.as_str())),
+            (Some(l), None) => Some((l.as_str(), l.as_str())),
             _ => None,
         };
         templates::Html(self.markup.page(&readme.markup, urls, self.nofollow()))
@@ -233,20 +233,20 @@ impl<'a> CratePage<'a> {
 
     pub fn format_knumber(&self, num: usize) -> (String, &'static str) {
         let (num, unit) = match num {
-            0 ..= 899 => (num, ""),
-            0 ..= 8000 => return (format!("{}", ((num+250)/500) as f64 * 0.5), "K"), // 3.5K
-            0 ..= 899_999 => ((num+500)/1000, "K"),
-            0 ..= 9_999_999 => return (format!("{}", ((num+250_000)/500_000) as f64 * 0.5), "M"), // 3.5M
-            _ => ((num+500_000)/1_000_000, "M"), // 10M
+            0..=899 => (num, ""),
+            0..=8000 => return (format!("{}", ((num + 250) / 500) as f64 * 0.5), "K"), // 3.5K
+            0..=899_999 => ((num + 500) / 1000, "K"),
+            0..=9_999_999 => return (format!("{}", ((num + 250_000) / 500_000) as f64 * 0.5), "M"), // 3.5M
+            _ => ((num + 500_000) / 1_000_000, "M"),                                                // 10M
         };
         (Numeric::english().format_int(num), unit)
     }
 
     pub fn format_kbytes(&self, bytes: usize) -> String {
         let (num, unit) = match bytes {
-            0 ..= 800_000 => ((bytes+999)/1000, "KB"),
-            0 ..= 9_999_999 => return format!("{}MB", ((bytes+250_000)/500_000) as f64 * 0.5),
-            _ => ((bytes+500_000)/1_000_000, "MB"),
+            0..=800_000 => ((bytes + 999) / 1000, "KB"),
+            0..=9_999_999 => return format!("{}MB", ((bytes + 250_000) / 500_000) as f64 * 0.5),
+            _ => ((bytes + 500_000) / 1_000_000, "MB"),
         };
         format!("{}{}", Numeric::english().format_int(num), unit)
     }
@@ -303,9 +303,9 @@ impl<'a> CratePage<'a> {
                                 }
                             } else {
                                 format!("{}.{}", pred.major, pred.minor.unwrap_or(0))
-                            }
+                            };
                         },
-                        _ => {}
+                        _ => {},
                     }
                 }
             }
@@ -326,7 +326,7 @@ impl<'a> CratePage<'a> {
         nth == 0 /*latest*/ && ver.created_at.with_timezone(&Utc) > Utc::now() - Duration::weeks(1)
     }
 
-    pub fn has_runtime_deps(&self, ) -> bool {
+    pub fn has_runtime_deps(&self) -> bool {
         self.ver.links().is_some() || self.ver.has_runtime_deps()
     }
 
@@ -353,8 +353,8 @@ impl<'a> CratePage<'a> {
                 },
             };
         }
-        let mut grouped: Vec<_> = grouped.into_iter().map(|(_,v)| v).collect();
-        grouped.sort_by(|a,b| b.ver.semver.cmp(&a.ver.semver));
+        let mut grouped: Vec<_> = grouped.into_iter().map(|(_, v)| v).collect();
+        grouped.sort_by(|a, b| b.ver.semver.cmp(&a.ver.semver));
         grouped
     }
 
@@ -410,10 +410,9 @@ impl<'a> CratePage<'a> {
         let mut cnt = ReleaseCounts::default();
         let mut prev: Option<Version<'a>> = None;
         let mut all: Vec<_> = self.all_versions().collect();
-        all.sort_by(|a,b| a.semver.cmp(&b.semver));
+        all.sort_by(|a, b| a.semver.cmp(&b.semver));
         cnt.total = all.len();
-        let recent = *all.iter().map(|d| &d.created_at)
-            .max().expect("no versions") - Duration::weeks(40);
+        let recent = *all.iter().map(|d| &d.created_at).max().expect("no versions") - Duration::weeks(40);
         for v in all {
             if v.semver.major == 0 {
                 cnt.unstable += 1;
@@ -469,10 +468,8 @@ impl<'a> CratePage<'a> {
     }
 
     fn url_domain(url: &str) -> Option<Cow<'static, str>> {
-        Url::parse(url).ok()
-        .and_then(|url| {
-            url.host_str()
-            .and_then(|host| {
+        Url::parse(url).ok().and_then(|url| {
+            url.host_str().and_then(|host| {
                 if host.ends_with(".github.io") {
                     Some("github.io".into())
                 } else if host.ends_with(".githubusercontent.com") {
@@ -486,8 +483,7 @@ impl<'a> CratePage<'a> {
 
     /// `(url, label)`
     pub fn homepage_link(&self) -> Option<(&str, Cow<'_, str>)> {
-        self.ver.homepage()
-        .map(|url| {
+        self.ver.homepage().map(|url| {
             let label = Self::url_domain(url)
                 .map(|host| {
                     let docs_on_same_host = self.ver.documentation()
@@ -507,8 +503,7 @@ impl<'a> CratePage<'a> {
 
     /// `(url, label)`
     pub fn documentation_link(&self) -> Option<(&str, Cow<'_, str>)> {
-        self.ver.documentation()
-        .map(|url| {
+        self.ver.documentation().map(|url| {
             let label = Self::url_domain(url)
                 .map(|host| {
                     if host == "docs.rs" {
@@ -540,7 +535,6 @@ impl<'a> CratePage<'a> {
         })
     }
 
-
     /// Most relevant keyword for this crate and rank in listing for that keyword
     pub fn top_keyword(&self) -> Option<(u32, String)> {
         self.top_keyword.clone()
@@ -568,7 +562,7 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn most_recent_version(&self) -> Version<'a> {
-        self.all_versions().max_by(|a,b| a.created_at.cmp(&b.created_at)).expect("no versions?")
+        self.all_versions().max_by(|a, b| a.created_at.cmp(&b.created_at)).expect("no versions?")
     }
 
     pub fn all_versions(&self) -> impl Iterator<Item = Version<'a>> {
@@ -634,11 +628,12 @@ impl<'a> CratePage<'a> {
         let big_arc = len > total / 2;
         let end = coords(start + len, total, radius as f64);
         let start = coords(start, total, radius as f64);
-        format!("M {startx:.2} {starty:.2} A {radius} {radius} 0 {arcflag} 1 {endx:.2} {endy:.2} L {radius} {radius}",
+        format!(
+            "M {startx:.2} {starty:.2} A {radius} {radius} 0 {arcflag} 1 {endx:.2} {endy:.2} L {radius} {radius}",
             startx = start.0.round(),
             starty = start.1.round(),
             radius = radius,
-            arcflag = if big_arc {"1"} else {"0"},
+            arcflag = if big_arc { "1" } else { "0" },
             endx = end.0,
             endy = end.1,
         )
@@ -679,15 +674,16 @@ impl<'a> CratePage<'a> {
                 // Build deps aren't a big deal [but still include some in case somebody did something awful]
                 if depinf.ty == DepTy::Runtime || is_heavy_build_dep {1.} else {0.1};
 
-            // count only default ones
-            let weight_minimal = if depinf.default {1.} else {0.} *
+                // count only default ones
+                let weight_minimal = if depinf.default {1.} else {0.} *
                 // overestimate commonality
                 (1. - commonality).powi(2) *
                 if krate.is_proc_macro() {0.} else {1.} *
                 if depinf.ty == DepTy::Runtime {1.} else {0.};
 
-            Some((depinf, krate, weight, weight_minimal))
-        }).collect();
+                Some((depinf, krate, weight, weight_minimal))
+            })
+            .collect();
 
         let mut main_lang_stats = self.ver.language_stats().clone();
         let mut main_crate_size = self.ver.crate_size();
@@ -712,7 +708,7 @@ impl<'a> CratePage<'a> {
                     e.comments += (val.comments as f32 * weight) as usize;
                 }
             } else {
-                let sloc = crate_stats.langs.iter().filter(|(l, _)| l.is_code()).map(|(_,v)| v.code).sum::<usize>();
+                let sloc = crate_stats.langs.iter().filter(|(l, _)| l.is_code()).map(|(_, v)| v.code).sum::<usize>();
 
                 deps_size_typical.tarball += tarball_weighed;
                 deps_size_typical.uncompressed += uncompr_weighed;
@@ -728,7 +724,7 @@ impl<'a> CratePage<'a> {
 
     fn get_crate_of_dependency(&self, name: &str, _semver: &SemVer) -> CResult<RichCrateVersion> {
         // FIXME: caching doesn't hold multiple versions, so fetchnig of precise old versions is super expensive
-        return self.kitchen_sink.rich_crate_version(&Origin::from_crates_io_name(name), CrateData::Full)
+        return self.kitchen_sink.rich_crate_version(&Origin::from_crates_io_name(name), CrateData::Full);
 
         // let krate = self.kitchen_sink.index.crate_by_name(&Origin::from_crates_io_name(name))?;
         // let ver = krate.versions()
@@ -756,50 +752,43 @@ pub struct DepsSize {
 type LanguageStats = Vec<(Language, Lines, (usize, usize))>;
 
 impl ReleaseCounts {
-
     /// Judge how often the crate makes breaking or stable releases
     pub fn summary(&self) -> (String, Option<String>) {
         // TODO take yanked into account
         // show (n this year|n last year)
-        let (n,label,n2,label2,majorinfo) = if self.stable > 0 {
+        let (n, label, n2, label2, majorinfo) = if self.stable > 0 {
             let breaking = self.major_recent > 2 && self.major * 2 >= self.stable;
             if breaking {
                 (self.major, "major breaking", 0, "", false)
             } else {
-                (self.stable, "stable", self.major, "major", self.major > 2.max(self.stable/16))
+                (self.stable, "stable", self.major, "major", self.major > 2.max(self.stable / 16))
             }
         } else {
-            let very_breaking = self.unstable > 2 &&
-                (self.breaking_recent > 3 || self.breaking * 2 >= self.unstable);
+            let very_breaking = self.unstable > 2 && (self.breaking_recent > 3 || self.breaking * 2 >= self.unstable);
             if very_breaking {
                 (self.breaking, "breaking", 0, "", false)
             } else {
-                let bad = self.breaking_recent > 1.max(self.unstable/9) && self.breaking > 2.max(self.unstable/8);
+                let bad = self.breaking_recent > 1.max(self.unstable / 9) && self.breaking > 2.max(self.unstable / 8);
                 let good = self.patch * 2 >= self.total;
-                (self.unstable, if !bad && good {""} else {"unstable"}, self.breaking, "breaking", bad)
+                (self.unstable, if !bad && good { "" } else { "unstable" }, self.breaking, "breaking", bad)
             }
         };
         if n == self.total || (n > 7 && n * 10 >= self.total * 8) {
             if majorinfo {
-                (format!("{} {} release{}", n, label, if n==1 {""} else {"s"}),
-                 Some(format!("({} {})", n2, label2)))
+                (format!("{} {} release{}", n, label, if n == 1 { "" } else { "s" }), Some(format!("({} {})", n2, label2)))
             } else {
-                (format!("{} {} release{}", n, label, if n==1 {""} else {"s"}), None)
+                (format!("{} {} release{}", n, label, if n == 1 { "" } else { "s" }), None)
             }
-        }
-        else if n * 3 >= self.total * 2 {
-            (format!("{} release{}", self.total, if self.total==1 {""} else {"s"}),
-             Some(format!("({})", label)))
-        }
-        else {
-            (format!("{} release{}", self.total, if self.total==1 {""} else {"s"}),
-             Some(format!("({} {})", n, label)))
+        } else if n * 3 >= self.total * 2 {
+            (format!("{} release{}", self.total, if self.total == 1 { "" } else { "s" }), Some(format!("({})", label)))
+        } else {
+            (format!("{} release{}", self.total, if self.total == 1 { "" } else { "s" }), Some(format!("({} {})", n, label)))
         }
     }
 }
 
 fn extract_doc_comments(code: &str) -> String {
-    let mut out = String::with_capacity(code.len()/2);
+    let mut out = String::with_capacity(code.len() / 2);
     let mut is_in_block_mode = false;
     for l in code.lines() {
         let l = l.trim_start();

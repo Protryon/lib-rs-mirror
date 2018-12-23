@@ -1,17 +1,17 @@
 #![allow(unused_imports)]
-use kitchen_sink::stopped;
-use std::path::PathBuf;
+use crate::Page;
 use categories::Category;
 use categories::CategoryMap;
-use std::collections::HashMap;
-use std::collections::HashSet;
+use categories::CATEGORIES;
+use failure;
+use kitchen_sink::stopped;
+use kitchen_sink::{CrateData, KitchenSink};
+use rayon::prelude::*;
 use rich_crate::Origin;
 use rich_crate::RichCrateVersion;
-use categories::CATEGORIES;
-use kitchen_sink::{KitchenSink, CrateData};
-use failure;
-use crate::Page;
-use rayon::prelude::*;
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::path::PathBuf;
 
 /// The list on the homepage looks flat, but it's actually a tree.
 ///
@@ -38,7 +38,7 @@ impl<'a> HomePage<'a> {
 
     /// List of all categories, sorted, with their most popular and newest crates.
     pub fn all_categories(&self) -> Vec<HomeCategory> {
-        let seen =  &mut HashSet::with_capacity(5000);
+        let seen = &mut HashSet::with_capacity(5000);
         let mut all = self.make_all_categories(&CATEGORIES.root, seen);
         self.add_updated_to_all_categories(&mut all, seen);
         all
@@ -117,7 +117,7 @@ impl<'a> HomePage<'a> {
             cat.dl = dl.max(cat.dl);
         }
 
-        c.sort_by(|a,b| (b.dl * b.pop).cmp(&(a.dl * a.pop)));
+        c.sort_by(|a, b| (b.dl * b.pop).cmp(&(a.dl * a.pop)));
         c
     }
 

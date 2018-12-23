@@ -7,20 +7,20 @@ use rayon;
 
 use categories;
 
+use categories::CategoryMap;
+use failure::ResultExt;
+use kitchen_sink::running;
+use kitchen_sink::{CrateData, KitchenSink, Origin};
 use rayon::prelude::*;
+use render_readme::ImageOptimAPIFilter;
+use render_readme::{Highlighter, Renderer};
+use std::collections::HashSet;
+use std::fs;
+use std::fs::File;
+use std::io::BufWriter;
 use std::path::Path;
 use std::path::PathBuf;
-use kitchen_sink::running;
-use kitchen_sink::{KitchenSink, CrateData, Origin};
-use render_readme::ImageOptimAPIFilter;
-use render_readme::{Renderer, Highlighter};
-use categories::CategoryMap;
-use std::fs;
-use std::io::BufWriter;
-use std::fs::File;
 use std::sync::{Arc, Mutex};
-use std::collections::HashSet;
-use failure::ResultExt;
 
 ///
 /// See home_page.rs for interesting bits

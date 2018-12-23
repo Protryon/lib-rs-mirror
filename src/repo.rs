@@ -194,22 +194,18 @@ impl Repo {
 
     pub fn owner_name(&self) -> Option<&str> {
         match self.host {
-            RepoHost::GitHub(SimpleRepo {ref owner, ..}) |
-            RepoHost::BitBucket(SimpleRepo {ref owner, ..}) |
-            RepoHost::GitLab(SimpleRepo {ref owner, ..}) => {
-                return Some(owner)
-            },
+            RepoHost::GitHub(SimpleRepo { ref owner, .. }) |
+            RepoHost::BitBucket(SimpleRepo { ref owner, .. }) |
+            RepoHost::GitLab(SimpleRepo { ref owner, .. }) => return Some(owner),
             RepoHost::Other => None,
         }
     }
 
     pub fn repo_name(&self) -> Option<&str> {
         match self.host {
-            RepoHost::GitHub(SimpleRepo {ref repo, ..}) |
-            RepoHost::BitBucket(SimpleRepo {ref repo, ..}) |
-            RepoHost::GitLab(SimpleRepo {ref repo, ..}) => {
-                return Some(repo)
-            },
+            RepoHost::GitHub(SimpleRepo { ref repo, .. }) |
+            RepoHost::BitBucket(SimpleRepo { ref repo, .. }) |
+            RepoHost::GitLab(SimpleRepo { ref repo, .. }) => return Some(repo),
             RepoHost::Other => None,
         }
     }

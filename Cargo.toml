@@ -1,7 +1,7 @@
 [package]
+version = "0.3.0"
 edition = "2018"
 name = "reindex"
-version = "0.2.0"
 authors = ["Kornel <kornel@geekhood.net>"]
 
 [dependencies]
@@ -13,4 +13,5 @@ user_db = { git = "https://gitlab.com/crates.rs/user_db.git", version = "0.3" }
 failure = "0.1.1"
 rayon = "1.0.3"
 rand = "0.6"
+search_index = { path = "../search_index" }
 either = "1.5.0"

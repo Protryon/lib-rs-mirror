@@ -691,10 +691,9 @@ pub fn adjusted_relevance(mut candidates: HashMap<String, f64>, keywords: HashSe
         .take(max_num_categories)
         .map(|(k, v)| (v, k))
         .collect();
-    res.sort_by(|a,b| b.0.partial_cmp(&a.0).unwrap());
+    res.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
     res
 }
-
 
 #[derive(Debug, Copy, Clone)]
 pub(crate) enum Cond {

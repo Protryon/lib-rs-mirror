@@ -22,9 +22,9 @@ pub struct Categories {
 pub struct Category {
     pub name: String,
     pub description: String,
-    #[serde(rename="short-description")]
+    #[serde(rename = "short-description")]
     pub short_description: String,
-    #[serde(rename="standalone-name")]
+    #[serde(rename = "standalone-name")]
     pub standalone_name: Option<String>,
     pub title: String,
     pub slug: String,
@@ -46,11 +46,8 @@ quick_error! {
     }
 }
 
-
-lazy_static!{
-    pub static ref CATEGORIES: Categories = {
-        Categories::new().expect("built-in categories")
-    };
+lazy_static! {
+    pub static ref CATEGORIES: Categories = { Categories::new().expect("built-in categories") };
 }
 
 impl Categories {
@@ -145,11 +142,9 @@ impl Categories {
         }).collect::<Vec<_>>();
 
         // depth, then original order
-        cats.sort_by(|a, b| {
-            b.0.cmp(&a.0).then(a.1.cmp(&b.1))
-        });
+        cats.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
 
-        cats.into_iter().map(|(_,_,c)| c).collect()
+        cats.into_iter().map(|(_, _, c)| c).collect()
     }
 }
 
@@ -161,9 +156,7 @@ impl Category {
 
 #[test]
 fn cat() {
-    Categories::new().expect("categories")
-        .root
-        .get("parsing").expect("parsing");
+    Categories::new().expect("categories").root.get("parsing").expect("parsing");
 
     CATEGORIES.root.get("development-tools").expect("development-tools").sub.get("build-utils").expect("build-utils");
 }

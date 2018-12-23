@@ -192,7 +192,7 @@ impl KitchenSink {
     pub(crate) fn data_path() -> Result<PathBuf, KitchenSinkErr> {
         match env::var("CRATES_DATA_DIR") {
             Ok(d) => {
-                if !Path::new(&d).join("crates.db").exists() {
+                if !Path::new(&d).join("crate_data.db").exists() {
                     return Err(KitchenSinkErr::CacheDbMissing(d));
                 }
                 Ok(d.into())
@@ -200,7 +200,7 @@ impl KitchenSink {
             Err(_) => {
                 for path in &["../data", "./data", "/var/lib/crates.rs/data", "/www/crates.rs/data"] {
                     let path = Path::new(path);
-                    if path.exists() && path.join("crates.db").exists() {
+                    if path.exists() && path.join("crate_data.db").exists() {
                         return Ok(path.to_owned());
                     }
                 }

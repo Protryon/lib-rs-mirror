@@ -1,31 +1,17 @@
 #[macro_use] extern crate failure;
 
-
-
 use crate_files;
 use crates_index;
 use crates_io_client;
 use crate_git_checkout;
 use docs_rs_client;
-use ctrlc;
 use github_info;
-
-
-
-
-
 
 #[macro_use] extern crate serde_derive;
 
-
 use user_db;
 use reqwest;
-
-
 use rayon;
-
-
-
 
 mod index;
 pub use github_info::UserOrg;
@@ -575,7 +561,8 @@ impl KitchenSink {
     }
 
     pub fn check_url_is_valid(&self, url: &str) -> bool {
-        reqwest::get(url)
+        reqwest::Client::builder().build()
+        .and_then(|res| res.get(url).send())
         .map(|res| {
             res.status().is_success()
         })
@@ -593,7 +580,7 @@ impl KitchenSink {
 
     fn is_same_url<A: AsRef<str> + std::fmt::Debug>(a: Option<A>, b: Option<&String>) -> bool {
         fn trim_suffix(s: &str) -> &str {
-            s.split('#').next().unwrap().trim_right_matches("/index.html").trim_right_matches('/')
+            s.split('#').next().unwrap().trim_end_matches("/index.html").trim_end_matches('/')
         }
 
         match (a, b) {

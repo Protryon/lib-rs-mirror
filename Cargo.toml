@@ -15,27 +15,28 @@ crates_io_client = { git = "https://gitlab.com/crates.rs/crates_io_client.git", 
 docs_rs_client = { git = "https://gitlab.com/crates.rs/docs_rs_client.git", version = "0.4.0" }
 github_info = { git = "https://gitlab.com/crates.rs/github_info.git", version = "0.7.0" }
 crate_git_checkout = { git = "https://gitlab.com/crates.rs/crate_git_checkout.git", version = "0.3.0" }
-crate_files = { git = "https://gitlab.com/crates.rs/crate_files.git" }
-user_db = { git = "https://gitlab.com/crates.rs/user_db.git" }
+crate_files = { git = "https://gitlab.com/crates.rs/crate_files.git", version = "0.2" }
+user_db = { git = "https://gitlab.com/crates.rs/user_db.git", version = "0.3" }
 crate_db = { git = "https://gitlab.com/crates.rs/crate_db.git", version = "0.2.2" }
 categories = { git = "https://gitlab.com/crates.rs/categories.git" }
 rich_crate = { git = "https://gitlab.com/crates.rs/rich_crate.git", version = "0.3.2" }
 simple_cache = { git = "https://gitlab.com/crates.rs/simple_cache.git", version = "0.6.0" }
-lazyonce = "0.2.0"
+lazyonce = "0.3.0"
 repo_url = { git = "https://gitlab.com/crates.rs/repo_url.git", version = "0.3.0" }
 cargo_toml = "0.4.0"
 serde = "1.0.43"
 serde_derive = "1.0.70"
-serde_json = "1.0.24"
-toml = "0.4.6"
+serde_json = "1.0.33"
+toml = "0.4.10"
 lazy_static = "1.0.0"
 regex = "1.0.0"
 url = "1.7.0"
 failure = "0.1.2"
-lazycell = "0.6.0"
-rayon = "1.0.1"
-reqwest = "0.8.6"
-itertools = "0.7.8"
+lazycell = "1.2.1"
+rayon = "1.0.3"
+reqwest = "0.9"
+tokio = "=0.1.11"
+itertools = "0.8"
 semver-parser = "0.9.0"
 chrono = "0.4.5"
 semver = "0.9.0"

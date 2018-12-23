@@ -4,7 +4,13 @@ website: caches data/index/1 styles
 	cd front_end && cargo run --release --bin website
 	cd style && npm start
 
-caches: data/cache.db data/crates.db data/github.db data/crate_data.db data/users.db
+caches: data/crate_data.db
+
+data/crate_data.db:
+	if [ ! -d data/data.tar.xz -a -f data.tar.xz ]; then mv data.tar.xz data/; fi
+	if [ ! -f data/data.tar.xz ]; then curl --fail --output data/data.tar.xz https://crates.rs/data/data.tar.xz; fi
+
+	cd data; unxz < data.tar.xz | tar xv
 
 styles: style/public/index.css
 
@@ -18,16 +24,7 @@ style/node_modules/.bin/gulp:
 
 data/index/1:
 	@echo Getting crates index
-	git submodule update
-
-%.db: %.db.xz
-	@echo Uncompressing $@
-	-rm -f $@
-	unxz -vk $<
-
-data/cache.db.xz data/github.db.xz data/crate_data.db.xz data/users.db.xz data/crates.db:
-	@echo Downloading $@
-	curl --fail --output $@ https://crates.rs/$@
+	git submodule update --init
 
 .PHONY: all caches styles clean
 

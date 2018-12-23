@@ -14,7 +14,7 @@ enum ReadAs {
     ReadmeMarkdown(String),
     ReadmeRst(String),
     Lib,
-    GetStatsOfFile(udedokei::Language)
+    GetStatsOfFile(udedokei::Language),
 }
 
 pub fn read_archive(archive: impl Read, prefix: &Path) -> Result<CrateFile> {

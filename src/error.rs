@@ -1,5 +1,5 @@
-use std::io;
 use cargo_toml;
+use std::io;
 
 quick_error! {
     #[derive(Debug, Clone)]

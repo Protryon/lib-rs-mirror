@@ -1,20 +1,13 @@
 use cargo_toml;
-
 use render_readme;
-
-
 use udedokei;
-
-#[macro_use] extern crate quick_error;
-
-use cargo_toml::TomlPackage;
-use cargo_toml::TomlManifest;
-use render_readme::Markup;
-use render_readme::Readme;
+#[macro_use]
+extern crate quick_error;
+use cargo_toml::{Manifest, Package};
+use render_readme::{Markup, Readme};
 use repo_url::Repo;
 use std::io::Read;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 mod error;
 mod tarball;

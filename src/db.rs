@@ -1,4 +1,5 @@
 use rusqlite::types::ToSql;
+use crate::error::Error;
 use reqwest;
 use rusqlite;
 use serde;
@@ -8,7 +9,6 @@ use rusqlite::Error::SqliteFailure;
 use rusqlite::ErrorCode::DatabaseLocked;
 use std::path::Path;
 use thread_local::ThreadLocal;
-use crate::error::Error;
 use std::thread;
 use std::time::Duration;
 

@@ -1,9 +1,9 @@
 #![allow(renamed_and_removed_lints)]
 use reqwest;
+use rmp_serde;
 use rusqlite;
 use serde_json;
 use std::io;
-use rmp_serde;
 
 quick_error! {
     #[derive(Debug)]

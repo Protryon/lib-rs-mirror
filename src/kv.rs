@@ -4,12 +4,12 @@ use std::collections::HashMap;
 use serde::de::DeserializeOwned;
 use crate::error::Error;
 use serde::*;
+use rmp_serde;
 use serde_json;
 use std::path::PathBuf;
 use std::fs::File;
 use std::fs;
 use tempfile::NamedTempFile;
-use rmp_serde;
 use std::io::BufReader;
 use crate::SimpleCache;
 
@@ -117,7 +117,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
         }
 
         if self.cache_only {
-            return Ok(None)
+            return Ok(None);
         }
 
         let data = SimpleCache::fetch(url.as_ref())?;
@@ -133,7 +133,6 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
         }
     }
 }
-
 
 impl<T: Serialize + DeserializeOwned + Clone + Send> Drop for TempCache<T> {
     fn drop(&mut self) {

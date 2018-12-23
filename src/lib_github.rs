@@ -1,7 +1,5 @@
-use hyper::header::ACCEPT;
-use hyper::header::HeaderValue;
 use github_rs;
-
+use hyper::header::{HeaderValue, ACCEPT};
 
 use serde;
 
@@ -104,7 +102,7 @@ impl GitHub {
     pub fn user_by_email(&self, email: &str) -> CResult<Option<User>> {
         let std_suffix = "@users.noreply.github.com";
         if email.ends_with(std_suffix) {
-            let login = email[0..email.len()-std_suffix.len()].split('+').last().unwrap();
+            let login = email[0..email.len() - std_suffix.len()].split('+').last().unwrap();
             if let Some(user) = self.user_by_login(login)? {
                 return Ok(Some(user));
             }

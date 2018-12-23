@@ -1,15 +1,11 @@
-
-
-
 use rayon;
 
-
-use kitchen_sink::stopped;
-use std::sync::Arc;
-use std::sync::mpsc;
-use std::thread;
-use std::collections::HashSet;
-use kitchen_sink::{KitchenSink, CrateData};
+use kitchen_sink::{stopped, CrateData, KitchenSink};
+use std::{
+    collections::HashSet,
+    sync::{mpsc, Arc},
+    thread,
+};
 
 fn main() {
     let crates = Arc::new(match KitchenSink::new_default() {

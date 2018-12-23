@@ -1,15 +1,12 @@
-use kitchen_sink;
-use failure;
-use rayon;
-use rand::seq::SliceRandom;
-use rand::thread_rng;
-use kitchen_sink::{KitchenSink, CrateData};
-use kitchen_sink::RichCrateVersion;
-use kitchen_sink::Origin;
-use kitchen_sink::stopped;
-use std::sync::{Arc, Mutex};
-use std::collections::HashSet;
 use either::*;
+use failure;
+use kitchen_sink::{self, stopped, CrateData, KitchenSink, Origin, RichCrateVersion};
+use rand::{seq::SliceRandom, thread_rng};
+use rayon;
+use std::{
+    collections::HashSet,
+    sync::{Arc, Mutex},
+};
 
 fn main() {
     let crates = Arc::new(match kitchen_sink::KitchenSink::new_default() {
@@ -43,21 +40,23 @@ fn main() {
                 }
                 print!("{} ", i);
                 match index_crate(&crates, &k) {
-                    Ok(v) => if repos {
-                        s2.spawn(move |_| {
-                            if let Some(ref repo) = v.repository() {
-                                {
-                                    let mut s = seen_repos.lock().unwrap();
-                                    let url = repo.canonical_git_url().to_string();
-                                    if s.contains(&url) {
-                                        return;
+                    Ok(v) => {
+                        if repos {
+                            s2.spawn(move |_| {
+                                if let Some(ref repo) = v.repository() {
+                                    {
+                                        let mut s = seen_repos.lock().unwrap();
+                                        let url = repo.canonical_git_url().to_string();
+                                        if s.contains(&url) {
+                                            return;
+                                        }
+                                        println!("Indexing {}", url);
+                                        s.insert(url);
                                     }
-                                    println!("Indexing {}", url);
-                                    s.insert(url);
+                                    print_res(crates.index_repo(repo, v.version()));
                                 }
-                                print_res(crates.index_repo(repo, v.version()));
-                            }
-                        })
+                            })
+                        }
                     },
                     err => print_res(err),
                 }

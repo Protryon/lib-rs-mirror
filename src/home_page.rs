@@ -31,9 +31,7 @@ pub struct HomePage<'a> {
 
 impl<'a> HomePage<'a> {
     pub fn new(crates: &'a KitchenSink) -> Result<Self, failure::Error> {
-        Ok(Self {
-            crates,
-        })
+        Ok(Self { crates })
     }
 
     /// List of all categories, sorted, with their most popular and newest crates.
@@ -51,19 +49,9 @@ impl<'a> HomePage<'a> {
             // depth first
             self.add_updated_to_all_categories(&mut cat.sub, seen);
 
-            let new: Vec<_> = self.crates.recently_updated_crates_in_category(&cat.cat.slug).unwrap()
-                .into_iter()
-                .filter(|c| {
-                    seen.get(&c).is_none()
-                })
-                .take(3)
-                .collect();
-            let new: Vec<_> = new.into_par_iter()
-                .with_max_len(1)
-                .filter_map(|c| {
-                    self.crates.rich_crate_version(&c, CrateData::Full).ok()
-                })
-                .collect();
+            let new: Vec<_> =
+                self.crates.recently_updated_crates_in_category(&cat.cat.slug).unwrap().into_iter().filter(|c| seen.get(&c).is_none()).take(3).collect();
+            let new: Vec<_> = new.into_par_iter().with_max_len(1).filter_map(|c| self.crates.rich_crate_version(&c, CrateData::Full).ok()).collect();
             for c in &new {
                 seen.insert(c.origin().to_owned());
             }
@@ -74,31 +62,36 @@ impl<'a> HomePage<'a> {
     /// A crate can be in multiple categories, so `seen` ensures every crate is shown only once
     /// across all categories.
     fn make_all_categories(&self, root: &'static CategoryMap, seen: &mut HashSet<Origin>) -> Vec<HomeCategory> {
-        let mut c: Vec<_> = root.iter().take_while(|_| !stopped()).map(|(_, cat)| {
-            // depth first - important!
-            let sub = self.make_all_categories(&cat.sub, seen);
-            let own_pop = self.crates.category_crate_count(&cat.slug).unwrap_or(0) as usize;
+        let mut c: Vec<_> = root
+            .iter()
+            .take_while(|_| !stopped())
+            .map(|(_, cat)| {
+                // depth first - important!
+                let sub = self.make_all_categories(&cat.sub, seen);
+                let own_pop = self.crates.category_crate_count(&cat.slug).unwrap_or(0) as usize;
 
-            HomeCategory {
-                // make container as popular as its best child (already sorted), because homepage sorts by top-level only
-                pop: sub.get(0).map(|c| c.pop).unwrap_or(0).max(own_pop),
-                dl: sub.get(0).map(|c| c.dl).unwrap_or(0),
-                top: Vec::with_capacity(5),
-                sub,
-                cat,
-            }
-        }).collect();
-        c.sort_by(|a,b| b.pop.cmp(&a.pop));
+                HomeCategory {
+                    // make container as popular as its best child (already sorted), because homepage sorts by top-level only
+                    pop: sub.get(0).map(|c| c.pop).unwrap_or(0).max(own_pop),
+                    dl: sub.get(0).map(|c| c.dl).unwrap_or(0),
+                    top: Vec::with_capacity(5),
+                    sub,
+                    cat,
+                }
+            })
+            .collect();
+        c.sort_by(|a, b| b.pop.cmp(&a.pop));
 
         // mark seen from least popular (assuming they're more specific)
         for cat in c.iter_mut().rev() {
             let mut dl = 0;
-            let top: Vec<_> = self.crates.top_crates_in_category(&cat.cat.slug).unwrap()
+            let top: Vec<_> = self
+                .crates
+                .top_crates_in_category(&cat.cat.slug)
+                .unwrap()
                 .iter()
                 .take(35)
-                .filter(|(c,_)| {
-                    seen.get(c).is_none()
-                })
+                .filter(|(c, _)| seen.get(c).is_none())
                 .take(7)
                 .cloned()
                 .map(|(c, d)| {
@@ -106,11 +99,7 @@ impl<'a> HomePage<'a> {
                     c
                 })
                 .collect();
-            cat.top.par_extend(top.into_par_iter()
-                .with_max_len(1)
-                .filter_map(|c| {
-                    self.crates.rich_crate_version(&c, CrateData::Full).ok()
-                }));
+            cat.top.par_extend(top.into_par_iter().with_max_len(1).filter_map(|c| self.crates.rich_crate_version(&c, CrateData::Full).ok()));
             for c in &cat.top {
                 seen.insert(c.origin().to_owned());
             }

@@ -25,7 +25,9 @@ impl<'a> CatPage<'a> {
             count: crates.category_crate_count(&cat.slug)? as usize,
             keywords: crates.top_keywords_in_category(&cat.slug)?,
             related: crates.related_categories(&cat.slug)?,
-            crates: crates.top_crates_in_category(&cat.slug)?.par_iter()
+            crates: crates
+                .top_crates_in_category(&cat.slug)?
+                .par_iter()
                 .with_max_len(1)
                 .filter_map(|&(ref c, d)| {
                     let c = match crates.rich_crate_version(&c, CrateData::Full) {
@@ -36,8 +38,10 @@ impl<'a> CatPage<'a> {
                         return None;
                     }
                     Some(Ok((c, d)))
-                }).collect::<Result<Vec<_>, Error>>()?,
-            cat, markup,
+                })
+                .collect::<Result<Vec<_>, Error>>()?,
+            cat,
+            markup,
         })
     }
 
@@ -54,12 +58,12 @@ impl<'a> CatPage<'a> {
     pub fn version_class(&self, c: &RichCrateVersion) -> &str {
         let v = c.version_semver().unwrap();
         match (v.major, v.minor, v.patch, v.is_prerelease()) {
-            (1..=15, _, _, false) => {"stable"},
-            (0, m, p, false) if m >= 2 && p >= 3 => {"stable"},
-            (m, _, _, _) if m >= 1 => {"okay"},
-            (0, 1, p, _) if p >= 10 => {"okay"},
-            (0, 3..=10, p, _) if p > 0 => {"okay"},
-            _ =>  {"unstable"},
+            (1..=15, _, _, false) => "stable",
+            (0, m, p, false) if m >= 2 && p >= 3 => "stable",
+            (m, ..) if m >= 1 => "okay",
+            (0, 1, p, _) if p >= 10 => "okay",
+            (0, 3..=10, p, _) if p > 0 => "okay",
+            _ => "unstable",
         }
     }
 
@@ -70,13 +74,7 @@ impl<'a> CatPage<'a> {
     /// "See also" feature
     pub fn related_categories(&self) -> Vec<Vec<&Category>> {
         let mut seen = HashSet::with_capacity(self.related.len());
-        self.related.iter().map(|slug| {
-            CATEGORIES.from_slug(slug)
-                .filter(|c| seen.insert(&c.slug))
-                .collect()
-        })
-        .filter(|v: &Vec<_>| !v.is_empty())
-        .collect()
+        self.related.iter().map(|slug| CATEGORIES.from_slug(slug).filter(|c| seen.insert(&c.slug)).collect()).filter(|v: &Vec<_>| !v.is_empty()).collect()
     }
 
     /// Nicely rounded number of downloads

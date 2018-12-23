@@ -3,22 +3,25 @@ pub trait IdentifyLast: Iterator + Sized {
     fn identify_last(self) -> Iter<Self>;
 }
 
-impl<It> IdentifyLast for It where It: Iterator {
+impl<It> IdentifyLast for It
+where It: Iterator
+{
     fn identify_last(mut self) -> Iter<Self> {
         let e = self.next();
-        Iter {
-            iter: self,
-            buffer: e,
-        }
+        Iter { iter: self, buffer: e }
     }
 }
 
-pub struct Iter<It> where It: Iterator {
+pub struct Iter<It>
+where It: Iterator
+{
     iter: It,
     buffer: Option<It::Item>,
 }
 
-impl<It> Iterator for Iter<It> where It: Iterator {
+impl<It> Iterator for Iter<It>
+where It: Iterator
+{
     type Item = (bool, It::Item);
 
     fn next(&mut self) -> Option<Self::Item> {

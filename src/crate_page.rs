@@ -85,16 +85,17 @@ impl<'a> CratePage<'a> {
         let mut page = Self {
             top_keyword: kitchen_sink.top_keyword(all)?,
             all_contributors: kitchen_sink.all_contributors(ver)?,
-            all, ver, kitchen_sink, markup,
+            all,
+            ver,
+            kitchen_sink,
+            markup,
             sizes: None,
             lang_stats: None,
         };
         let (own_size, deps_size_minimal, deps_size_typical, lang_stats) = page.crate_size()?;
         page.sizes = Some((own_size, deps_size_minimal, deps_size_typical));
 
-        let total = lang_stats.langs.iter()
-            .filter(|(lang, _)| lang.is_code())
-            .map(|(_, lines)| lines.code).sum::<usize>();
+        let total = lang_stats.langs.iter().filter(|(lang, _)| lang.is_code()).map(|(_, lines)| lines.code).sum::<usize>();
         page.lang_stats = Some((total, lang_stats));
         Ok(page)
     }
@@ -150,7 +151,8 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn is_build_or_dev(&self) -> (bool, bool) {
-        self.kitchen_sink.dependents_stats_of(self.ver)
+        self.kitchen_sink
+            .dependents_stats_of(self.ver)
             .map(|d| {
                 let is_build = d.build.0 > (d.runtime.0 + d.runtime.1 + 5) * 2;
                 let is_dev = !is_build && d.dev > (d.runtime.0 * 2 + d.runtime.1 + d.build.0 * 2 + d.build.1 + 5);
@@ -160,20 +162,17 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn dependents_stats(&self) -> Option<(usize, usize)> {
-        self.kitchen_sink.dependents_stats_of(self.ver)
-        .map(|d| {
-            (d.runtime.0 + d.runtime.1 + d.build.0 + d.build.1 + d.dev,
-             d.direct)
-        })
-        .filter(|d| {
-            d.0 > 0
-        })
+        self.kitchen_sink.dependents_stats_of(self.ver).map(|d| (d.runtime.0 + d.runtime.1 + d.build.0 + d.build.1 + d.dev, d.direct)).filter(|d| d.0 > 0)
     }
 
     /// If true, there are many other crates with this keyword. Populated first.
     pub fn keywords_populated(&self) -> Option<Vec<(String, bool)>> {
         let k = self.kitchen_sink.keywords_populated(self.ver);
-        if k.is_empty() {None} else {Some(k)}
+        if k.is_empty() {
+            None
+        } else {
+            Some(k)
+        }
     }
 
     pub fn parent_crate(&self) -> Option<RichCrateVersion> {
@@ -218,13 +217,7 @@ impl<'a> CratePage<'a> {
         let (ref authors, ref owners, co_owned, contributors) = self.all_contributors;
         let period_after_authors = !owners.is_empty() && contributors == 0;
         let contributors_as_a_team = authors.last().map_or(false, |last| last.likely_a_team());
-        Contributors {
-            authors: authors.clone(),
-            owners: owners.clone(),
-            co_owned, contributors,
-            contributors_as_a_team,
-            period_after_authors,
-        }
+        Contributors { authors: authors.clone(), owners: owners.clone(), co_owned, contributors, contributors_as_a_team, period_after_authors }
     }
 
     pub fn format_number(&self, num: impl Display) -> String {
@@ -273,9 +266,7 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn up_to_date_class(&self, richdep: &RichDep) -> &str {
-        let (matches_latest, pop) = richdep.dep.req().parse().ok()
-            .map(|req| self.kitchen_sink.version_popularity(&richdep.name, &req))
-            .unwrap_or((false, 0.));
+        let (matches_latest, pop) = richdep.dep.req().parse().ok().map(|req| self.kitchen_sink.version_popularity(&richdep.name, &req)).unwrap_or((false, 0.));
         match pop {
             x if x >= 0.5 && matches_latest => "top",
             x if x >= 0.75 || matches_latest => "common",
@@ -293,7 +284,8 @@ impl<'a> CratePage<'a> {
                     use semver_parser::range::Op::*;
                     use semver_parser::range::WildcardVersion;
                     match pred.op {
-                        Tilde | Compatible | Wildcard(_) => { // There's no `Wildcard(*)`
+                        Tilde | Compatible | Wildcard(_) => {
+                            // There's no `Wildcard(*)`
                             let detailed = pred.op == Tilde || pred.op == Wildcard(WildcardVersion::Patch);
                             return if detailed || pred.major == 0 {
                                 if detailed || pred.patch.map_or(false, |p| p > 0) {
@@ -331,7 +323,9 @@ impl<'a> CratePage<'a> {
     }
 
     fn group_versions<K, I>(keep_first_n: usize, all: I) -> Vec<VersionGroup<'a>>
-        where I: Iterator<Item = (K, VersionGroup<'a>)>, K: Eq + Hash
+    where
+        I: Iterator<Item = (K, VersionGroup<'a>)>,
+        K: Eq + Hash,
     {
         use std::collections::hash_map::Entry::*;
         let mut grouped = HashMap::<(K, bool), VersionGroup<'a>>::new();
@@ -342,9 +336,7 @@ impl<'a> CratePage<'a> {
                     let old = e.get_mut();
                     old.count += v.count;
                     old.downloads += v.downloads;
-                    if old.ver.semver < v.ver.semver &&
-                        (old.ver.yanked || !v.ver.yanked) &&
-                        (old.ver.semver.is_prerelease() || !v.ver.semver.is_prerelease()) {
+                    if old.ver.semver < v.ver.semver && (old.ver.yanked || !v.ver.yanked) && (old.ver.semver.is_prerelease() || !v.ver.semver.is_prerelease()) {
                         old.ver = v.ver;
                     }
                 },
@@ -359,42 +351,47 @@ impl<'a> CratePage<'a> {
     }
 
     fn make_top_versions<I>(&self, all: I) -> Vec<VersionGroup<'a>>
-        where I: Iterator<Item = Version<'a>>
-    {
-        let grouped1 = Self::group_versions(0, all.map(|ver| {
-            let key = (
-                ver.created_at.year(), ver.created_at.month(), ver.created_at.day(),
-
-                // semver exposes major bumps, specially for 0.x
-                if ver.semver.major == 0 {ver.semver.minor+1} else {0}, ver.semver.major,
-                // exposes minor changes
-                if ver.semver.major == 0 {ver.semver.patch+1} else {0}, ver.semver.minor,
-            );
-            (key, VersionGroup {
-                count: 1,
-                downloads: ver.downloads,
-                ver,
-            })
-        }));
+    where I: Iterator<Item = Version<'a>> {
+        let grouped1 = Self::group_versions(
+            0,
+            all.map(|ver| {
+                let key = (
+                    ver.created_at.year(),
+                    ver.created_at.month(),
+                    ver.created_at.day(),
+                    // semver exposes major bumps, specially for 0.x
+                    if ver.semver.major == 0 { ver.semver.minor + 1 } else { 0 },
+                    ver.semver.major,
+                    // exposes minor changes
+                    if ver.semver.major == 0 { ver.semver.patch + 1 } else { 0 },
+                    ver.semver.minor,
+                );
+                (key, VersionGroup { count: 1, downloads: ver.downloads, ver })
+            }),
+        );
 
         let grouped2 = if grouped1.len() > 5 {
-            Self::group_versions(1, grouped1.into_iter().map(|v| {
-                ((v.ver.created_at.year(), v.ver.created_at.month(),
-                  // semver exposes major bumps, specially for 0.x
-                  if v.ver.semver.major == 0 {v.ver.semver.minor+1} else {0}, v.ver.semver.major,
-                ), v)
-            }))
+            Self::group_versions(
+                1,
+                grouped1.into_iter().map(|v| {
+                    (
+                        (
+                            v.ver.created_at.year(),
+                            v.ver.created_at.month(),
+                            // semver exposes major bumps, specially for 0.x
+                            if v.ver.semver.major == 0 { v.ver.semver.minor + 1 } else { 0 },
+                            v.ver.semver.major,
+                        ),
+                        v,
+                    )
+                }),
+            )
         } else {
             grouped1
         };
 
         if grouped2.len() > 8 {
-            Self::group_versions(2, grouped2.into_iter().map(|v|{
-                ((v.ver.created_at.year(),
-                  v.ver.created_at.month()/4,
-                  v.ver.semver.major,
-                ), v)
-            }))
+            Self::group_versions(2, grouped2.into_iter().map(|v| ((v.ver.created_at.year(), v.ver.created_at.month() / 4, v.ver.semver.major), v)))
         } else {
             grouped2
         }
@@ -439,8 +436,9 @@ impl<'a> CratePage<'a> {
             }
             if let Some(ref prev) = prev {
                 if v.semver.major == prev.semver.major &&
-                   v.semver.minor == prev.semver.minor &&
-                   (v.semver.patch != prev.semver.patch || v.semver.pre != prev.semver.pre) {
+                    v.semver.minor == prev.semver.minor &&
+                    (v.semver.patch != prev.semver.patch || v.semver.pre != prev.semver.pre)
+                {
                     cnt.patch += 1;
                 }
             }
@@ -451,11 +449,7 @@ impl<'a> CratePage<'a> {
 
     /// Most relevant category for the crate and rank in that category
     pub fn top_category(&self) -> Option<(u32, &Category)> {
-        self.kitchen_sink.top_category(&self.ver).and_then(|(top, slug)|{
-            CATEGORIES.from_slug(slug).last().map(|c| {
-                (top, c)
-            })
-        })
+        self.kitchen_sink.top_category(&self.ver).and_then(|(top, slug)| CATEGORIES.from_slug(slug).last().map(|c| (top, c)))
     }
 
     /// docs.rs link, if available
@@ -486,9 +480,7 @@ impl<'a> CratePage<'a> {
         self.ver.homepage().map(|url| {
             let label = Self::url_domain(url)
                 .map(|host| {
-                    let docs_on_same_host = self.ver.documentation()
-                        .and_then(Self::url_domain)
-                        .map_or(false, |doc_host| doc_host == host);
+                    let docs_on_same_host = self.ver.documentation().and_then(Self::url_domain).map_or(false, |doc_host| doc_host == host);
 
                     if docs_on_same_host {
                         Cow::Borrowed("Home") // there will be verbose label on docs link, so repeating it would be noisy
@@ -505,13 +497,7 @@ impl<'a> CratePage<'a> {
     pub fn documentation_link(&self) -> Option<(&str, Cow<'_, str>)> {
         self.ver.documentation().map(|url| {
             let label = Self::url_domain(url)
-                .map(|host| {
-                    if host == "docs.rs" {
-                        "API Reference".into()
-                    } else {
-                        Cow::Owned(format!("Documentation ({})", host))
-                    }
-                })
+                .map(|host| if host == "docs.rs" { "API Reference".into() } else { Cow::Owned(format!("Documentation ({})", host)) })
                 .unwrap_or_else(|| "Documentation".into());
             (url, label)
         })
@@ -522,14 +508,8 @@ impl<'a> CratePage<'a> {
         self.ver.repository_http_url().map(|(repo, url)| {
             let label_prefix = repo.site_link_label();
             let label = match repo.host() {
-                RepoHost::GitHub(ref host) | RepoHost::GitLab(ref host)| RepoHost::BitBucket(ref host) => {
-                    format!("{} ({})", label_prefix, host.owner)
-                },
-                RepoHost::Other => {
-                    Self::url_domain(&url)
-                        .map(|host| format!("{} ({})", label_prefix, host))
-                        .unwrap_or_else(|| label_prefix.to_string())
-                }
+                RepoHost::GitHub(ref host) | RepoHost::GitLab(ref host) | RepoHost::BitBucket(ref host) => format!("{} ({})", label_prefix, host.owner),
+                RepoHost::Other => Self::url_domain(&url).map(|host| format!("{} ({})", label_prefix, host)).unwrap_or_else(|| label_prefix.to_string()),
             };
             (url, label)
         })
@@ -544,17 +524,22 @@ impl<'a> CratePage<'a> {
     /// so that they look neater in breadcrumbs
     pub fn category_slugs_unique(&self) -> Vec<Vec<&Category>> {
         let mut seen = HashSet::new();
-        self.ver.category_slugs(Include::Cleaned).map(|slug| {
-            CATEGORIES.from_slug(slug).filter(|c| {
-                if seen.get(&c.slug).is_some() {
-                    return false;
-                }
-                seen.insert(&c.slug);
-                true
-            }).collect()
-        })
-        .filter(|v: &Vec<_>| !v.is_empty())
-        .collect()
+        self.ver
+            .category_slugs(Include::Cleaned)
+            .map(|slug| {
+                CATEGORIES
+                    .from_slug(slug)
+                    .filter(|c| {
+                        if seen.get(&c.slug).is_some() {
+                            return false;
+                        }
+                        seen.insert(&c.slug);
+                        true
+                    })
+                    .collect()
+            })
+            .filter(|v: &Vec<_>| !v.is_empty())
+            .collect()
     }
 
     pub fn date_created(&self) -> String {
@@ -586,31 +571,31 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn related_crates(&self) -> Option<Vec<RichCrateVersion>> {
-        self.kitchen_sink.related_crates(&self.ver)
-        .map_err(|e| eprintln!("related crates fail: {}", e))
-        .ok()
+        self.kitchen_sink.related_crates(&self.ver).map_err(|e| eprintln!("related crates fail: {}", e)).ok()
     }
 
     /// data for piechart
     pub fn langs_chart(&self, stats: &Stats, width_px: usize) -> Option<LanguageStats> {
-        let mut res: Vec<_> = stats.langs.iter()
-            .filter(|(lang, lines)| lines.code > 0 && lang.is_code())
-            .map(|(a, b)| (a.clone(), b.clone()))
-            .collect();
+        let mut res: Vec<_> = stats.langs.iter().filter(|(lang, lines)| lines.code > 0 && lang.is_code()).map(|(a, b)| (a.clone(), b.clone())).collect();
         if !res.is_empty() {
             res.sort_by_key(|(_, lines)| lines.code);
             let biggest = res.last().cloned().unwrap();
             let total = res.iter().map(|(_, lines)| lines.code).sum::<usize>();
-            if biggest.0 != Language::Rust || biggest.1.code < total * 9/10 {
+            if biggest.0 != Language::Rust || biggest.1.code < total * 9 / 10 {
                 let mut remaining_px = width_px;
                 let mut remaining_lines = total;
-                Some(res.into_iter().map(|(lang, lines)| {
-                    let width = (lines.code * remaining_px / remaining_lines.max(1)).max(1);
-                    let xpos = width_px - remaining_px;
-                    remaining_px -= width;
-                    remaining_lines -= lines.code;
-                    (lang, lines, (xpos, width))
-                }).rev().collect())
+                Some(
+                    res.into_iter()
+                        .map(|(lang, lines)| {
+                            let width = (lines.code * remaining_px / remaining_lines.max(1)).max(1);
+                            let xpos = width_px - remaining_px;
+                            remaining_px -= width;
+                            remaining_lines -= lines.code;
+                            (lang, lines, (xpos, width))
+                        })
+                        .rev()
+                        .collect(),
+                )
             } else {
                 None // if crate is 90% Rust, don't bother with stats
             }
@@ -621,8 +606,7 @@ impl<'a> CratePage<'a> {
 
     pub fn svg_path_for_slice(start: usize, len: usize, total: usize, diameter: usize) -> String {
         fn coords(val: usize, total: usize, radius: f64) -> (f64, f64) {
-            ((2. * PI * val as f64 / total as f64).sin() * radius + radius,
-             (PI + 2. * PI * val as f64 / total as f64).cos() * radius + radius)
+            ((2. * PI * val as f64 / total as f64).sin() * radius + radius, (PI + 2. * PI * val as f64 / total as f64).cos() * radius + radius)
         }
         let radius = diameter / 2;
         let big_arc = len > total / 2;
@@ -642,30 +626,32 @@ impl<'a> CratePage<'a> {
     fn crate_size(&self) -> CResult<((usize, usize), DepsSize, DepsSize, Stats)> {
         let deps = self.kitchen_sink.all_dependencies_flattened(self.ver.origin())?;
 
-        let tmp: Vec<_> = deps.into_par_iter().filter_map(|(name, (depinf, semver))| {
-            if depinf.ty == DepTy::Dev {
-                return None;
-            }
-            if &*name == "clippy" && !depinf.default {
-                return None; // nobody will enable it
-            }
-
-            let krate = match self.get_crate_of_dependency(&name, &semver) {
-                Ok(k) => k,
-                Err(e) => {
-                    eprintln!("bad dep not counted: {}", e);
+        let tmp: Vec<_> = deps
+            .into_par_iter()
+            .filter_map(|(name, (depinf, semver))| {
+                if depinf.ty == DepTy::Dev {
                     return None;
-                },
-            };
+                }
+                if &*name == "clippy" && !depinf.default {
+                    return None; // nobody will enable it
+                }
 
-            let commonality = self.kitchen_sink.index.version_commonality(&name, &semver);
-            let is_heavy_build_dep = match &*name {
-                "bindgen" | "clang-sys" | "cmake" | "cc" if depinf.default => true, // you deserve full weight of it
-                _ => false,
-            };
+                let krate = match self.get_crate_of_dependency(&name, &semver) {
+                    Ok(k) => k,
+                    Err(e) => {
+                        eprintln!("bad dep not counted: {}", e);
+                        return None;
+                    },
+                };
 
-            // if optional, make it look less problematic (indirect - who knows, maybe platform-specific?)
-            let weight = if depinf.default {1.} else if depinf.direct {0.25} else {0.15} *
+                let commonality = self.kitchen_sink.index.version_commonality(&name, &semver);
+                let is_heavy_build_dep = match &*name {
+                    "bindgen" | "clang-sys" | "cmake" | "cc" if depinf.default => true, // you deserve full weight of it
+                    _ => false,
+                };
+
+                // if optional, make it look less problematic (indirect - who knows, maybe platform-specific?)
+                let weight = if depinf.default {1.} else if depinf.direct {0.25} else {0.15} *
                 // if it's common, it's more likelty to be installed anyway,
                 // so it's likely to be less costly to add it
                 (1. - commonality) *

@@ -48,8 +48,7 @@ impl Page {
     }
 
     pub fn critical_css(&self) -> templates::Html<String> {
-        let path = self.alt_critical_css.as_ref().map(|s| s.as_str())
-            .unwrap_or("../style/public/critical.css");
+        let path = self.alt_critical_css.as_ref().map(|s| s.as_str()).unwrap_or("../style/public/critical.css");
         templates::Html(read_to_string(path).expect(path))
     }
 }

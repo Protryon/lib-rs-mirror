@@ -24,9 +24,7 @@ impl DownloadsGraph {
     pub fn new(data: Vec<DownloadWeek>, is_bin: bool, width: usize, height: usize) -> Self {
         // scale from all data is fine, will demote crates that lost popularity
         let (exp, scale) = Self::downloads_scale(&data);
-        Self {
-            exp, scale, data, is_bin, width, height,
-        }
+        Self { exp, scale, data, is_bin, width, height }
     }
 
     /// Lines in the background of the chart
@@ -36,19 +34,20 @@ impl DownloadsGraph {
         match self.exp {
             0..=2 => {
                 // When values are very low it seems nice to reuse the tick line to show maximum
-                let max = self.data.iter().map(|d|d.total).max().unwrap_or(0);
-                vec![
-                    (chart_y as f32 + chart_height as f32 - (max * chart_height) as f32 / self.scale as f32 - 2., 0.5)
-                ]
+                let max = self.data.iter().map(|d| d.total).max().unwrap_or(0);
+                vec![(chart_y as f32 + chart_height as f32 - (max * chart_height) as f32 / self.scale as f32 - 2., 0.5)]
             },
             x => {
                 let num_ticks = (x - 1) as usize;
                 let thick = 8. / (7. + num_ticks as f32);
-                (0..num_ticks).map(|n| {
-                    (chart_y as f32 + ((chart_height * (n+1)) as f32 / (num_ticks+1) as f32),
-                        if num_ticks > 8 && (n+100 - num_ticks/2) %4==0 {1.5} else {thick}
-                    )
-                }).collect()
+                (0..num_ticks)
+                    .map(|n| {
+                        (
+                            chart_y as f32 + ((chart_height * (n + 1)) as f32 / (num_ticks + 1) as f32),
+                            if num_ticks > 8 && (n + 100 - num_ticks / 2) % 4 == 0 { 1.5 } else { thick },
+                        )
+                    })
+                    .collect()
             },
         }
     }
@@ -65,17 +64,9 @@ impl DownloadsGraph {
         let grad = (((value as f32).log10() - 1.0) / max_expected).max(0.).min(1.);
 
         if grad > 0.5 {
-            Lab {
-                l: 60.0 + grad * 10.0,
-                a: mid.a * (2. - grad*2.) + hi.a * (grad*2.-1.),
-                b: mid.b * (2. - grad*2.) + hi.b * (grad*2.-1.),
-            }
+            Lab { l: 60.0 + grad * 10.0, a: mid.a * (2. - grad * 2.) + hi.a * (grad * 2. - 1.), b: mid.b * (2. - grad * 2.) + hi.b * (grad * 2. - 1.) }
         } else {
-            Lab {
-                l: 60.0 + grad * 10.0,
-                a: low.a * (1. - grad*2.) + mid.a * grad*2.,
-                b: low.b * (1. - grad*2.) + mid.b * grad*2.,
-            }
+            Lab { l: 60.0 + grad * 10.0, a: low.a * (1. - grad * 2.) + mid.a * grad * 2., b: low.b * (1. - grad * 2.) + mid.b * grad * 2. }
         }
     }
 
@@ -101,29 +92,24 @@ impl DownloadsGraph {
         // bad rounding error
         let item_width = (chart_width as f32 / time_window.len() as f32).min(max_item_width);
         let left = chart_x + chart_width - (time_window.len() as f32 * item_width).floor() as usize;
-        time_window.iter().enumerate()
-        .filter(|(_,d)|d.total>0)
-        .map(|(i,d)|{
-            let blend = self.color_for_downloads((avg_value + d.total)/2);
-            let age = i as f32 / time_window.len() as f32;
-            let blend = Lab {
-                l: blend.l + (1.- age) * 8.,
-                a: blend.a * (0.5 + age/2.),
-                b: blend.b * (0.5 + age/2.),
-            };
-            let color = blend.to_rgb();
-                let color = format!("#{:02x}{:02x}{:02x}",
-                    color[0],
-                    color[1],
-                    color[2],
-                );
-            let label = format!("{}/week @ {}", d.total, d.date.format("%Y-%m-%d"));
-            let h = (d.total * chart_height + scale - 1) / scale;
-            let overdraw = 1; // mix with border for style
-            let left_tick = ((i as f32)*item_width).round() as usize;
-            let right_tick = (((i+1) as f32)*item_width).round() as usize;
-            (left + left_tick, chart_y + chart_height - h, right_tick - left_tick, h + overdraw, color.clone(), label)
-        }).collect()
+        time_window
+            .iter()
+            .enumerate()
+            .filter(|(_, d)| d.total > 0)
+            .map(|(i, d)| {
+                let blend = self.color_for_downloads((avg_value + d.total) / 2);
+                let age = i as f32 / time_window.len() as f32;
+                let blend = Lab { l: blend.l + (1. - age) * 8., a: blend.a * (0.5 + age / 2.), b: blend.b * (0.5 + age / 2.) };
+                let color = blend.to_rgb();
+                let color = format!("#{:02x}{:02x}{:02x}", color[0], color[1], color[2],);
+                let label = format!("{}/week @ {}", d.total, d.date.format("%Y-%m-%d"));
+                let h = (d.total * chart_height + scale - 1) / scale;
+                let overdraw = 1; // mix with border for style
+                let left_tick = ((i as f32) * item_width).round() as usize;
+                let right_tick = (((i + 1) as f32) * item_width).round() as usize;
+                (left + left_tick, chart_y + chart_height - h, right_tick - left_tick, h + overdraw, color.clone(), label)
+            })
+            .collect()
     }
 
     fn downloads_scale(data: &[DownloadWeek]) -> (u32, usize) {

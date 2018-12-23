@@ -1,19 +1,19 @@
-use std::collections::HashMap;
-use std::collections::HashSet;
-use lazyonce::LazyOnce;
-use rich_crate::Origin;
-use std::path::PathBuf;
+use crate::deps_stats::DepsStats;
+use crate::KitchenSink;
+use crate::KitchenSinkErr;
 use crates_index;
 use crates_index::Crate;
 use crates_index::Version;
-use std::sync::{Arc, Mutex};
-use std::iter;
-use crate::KitchenSinkErr;
-use crate::KitchenSink;
-use semver::VersionReq;
+use lazyonce::LazyOnce;
+use rich_crate::Origin;
 use semver::Version as SemVer;
+use semver::VersionReq;
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::iter;
+use std::path::PathBuf;
 use std::sync::RwLock;
-use crate::deps_stats::DepsStats;
+use std::sync::{Arc, Mutex};
 
 pub struct Index {
     crates: HashMap<Origin, Crate>,
@@ -76,11 +76,11 @@ impl Index {
             .unwrap_or_else(|| krate.latest_version()) // latest_version = most recently published version
     }
 
-    pub fn deps_of_crate(&self, krate: &Crate, DepQuery {default, all_optional, dev}: DepQuery) -> Result<Dep, KitchenSinkErr> {
+    pub fn deps_of_crate(&self, krate: &Crate, DepQuery { default, all_optional, dev }: DepQuery) -> Result<Dep, KitchenSinkErr> {
         let latest = Self::highest_version(krate, true);
-        let mut features = Vec::with_capacity(if all_optional {latest.features().len()} else {0});
+        let mut features = Vec::with_capacity(if all_optional { latest.features().len() } else { 0 });
         if all_optional {
-            features.extend(latest.features().iter().filter(|(_,v)| !v.is_empty()).map(|(c, _)| c.to_string().into_boxed_str()));
+            features.extend(latest.features().iter().filter(|(_, v)| !v.is_empty()).map(|(c, _)| c.to_string().into_boxed_str()));
         };
         Ok(Dep {
             semver: semver_parse(latest.version()),
@@ -130,7 +130,6 @@ impl Index {
 
         let mut set: HashMap<DepName, (_, _, SemVer, HashSet<String>)> = HashMap::with_capacity(60);
         for d in ver.dependencies() {
-
             // people forget to include winapi conditionally
             let is_target_specific = d.name() == "winapi" || d.target().is_some();
             if !wants.all_targets && is_target_specific {
@@ -153,8 +152,7 @@ impl Index {
                 continue;
             }
 
-            let req = VersionReq::parse(d.requirement())
-                .map_err(|_| KitchenSinkErr::SemverParsingError)?;
+            let req = VersionReq::parse(d.requirement()).map_err(|_| KitchenSinkErr::SemverParsingError)?;
             let name = d.name();
             let krate = match self.crate_by_name(&Origin::from_crates_io_name(name)) {
                 Ok(k) => k,
@@ -225,14 +223,11 @@ impl Index {
             return (false, 0.);
         }
 
-        let matches_latest = self.crate_by_name(&Origin::from_crates_io_name(crate_name))
-        .ok()
-        .and_then(|krate| {
-            Self::highest_version(krate, true).version().parse().ok()
-        })
-        .map_or(false, |latest| {
-            requirement.matches(&latest)
-        });
+        let matches_latest = self
+            .crate_by_name(&Origin::from_crates_io_name(crate_name))
+            .ok()
+            .and_then(|krate| Self::highest_version(krate, true).version().parse().ok())
+            .map_or(false, |latest| requirement.matches(&latest));
 
         let stats = self.deps_stats();
         let pop = stats.counts.get(crate_name)

@@ -1,21 +1,22 @@
 #[macro_use] extern crate failure;
 
 use crate_files;
+use crate_git_checkout;
 use crates_index;
 use crates_io_client;
-use crate_git_checkout;
 use docs_rs_client;
 use github_info;
 
-#[macro_use] extern crate serde_derive;
+#[macro_use]
+extern crate serde_derive;
 
-use user_db;
-use reqwest;
 use rayon;
+use reqwest;
+use user_db;
 
 mod index;
-pub use github_info::UserOrg;
 pub use crate::index::*;
+pub use github_info::UserOrg;
 use rayon::prelude::*;
 mod deps_stats;
 pub use crate::deps_stats::*;
@@ -25,30 +26,30 @@ pub use crate::ctrlcbreak::*;
 
 pub use crates_index::Crate;
 use crates_index::Version;
-use crates_io_client::CrateOwner;
-pub use crates_io_client::CrateDependency;
 pub use crates_io_client::CrateDepKind;
+pub use crates_io_client::CrateDependency;
 pub use crates_io_client::CrateMetaVersion;
+use crates_io_client::CrateOwner;
 pub use crates_io_client::CratesIoCrate;
 pub use github_info::User;
 pub use github_info::UserType;
-pub use rich_crate::{Cfg, Target};
-pub use rich_crate::RichCrate;
-pub use rich_crate::RichDep;
-pub use rich_crate::RichCrateVersion;
-pub use rich_crate::Origin;
 pub use rich_crate::Include;
 pub use rich_crate::Markup;
+pub use rich_crate::Origin;
+pub use rich_crate::RichCrate;
+pub use rich_crate::RichCrateVersion;
+pub use rich_crate::RichDep;
+pub use rich_crate::{Cfg, Target};
 
-use chrono::DateTime;
-use semver::VersionReq;
-use simple_cache::TempCache;
-use crate_files::CrateFile;
 use cargo_toml::TomlLibOrBin;
 use cargo_toml::TomlManifest;
 use cargo_toml::TomlPackage;
+use chrono::DateTime;
+use crate_db::{CrateDb, RepoChange};
+use crate_files::CrateFile;
 use failure::ResultExt;
 use github_info::GitCommitAuthor;
+use itertools::Itertools;
 use lazyonce::LazyOnce;
 use repo_url::Repo;
 use repo_url::RepoHost;
@@ -56,19 +57,19 @@ use repo_url::SimpleRepo;
 use rich_crate::Author;
 use rich_crate::Derived;
 use rich_crate::Readme;
-use itertools::Itertools;
-use std::collections::HashSet;
+pub use semver::Version as SemVer;
+use semver::VersionReq;
+use simple_cache::TempCache;
 use std::borrow::Cow;
-use std::sync::RwLock;
-use std::sync::Arc;
 use std::cmp::Ordering;
 use std::collections::hash_map::Entry::*;
 use std::collections::HashMap;
-use std::path::{PathBuf, Path};
+use std::collections::HashSet;
 use std::env;
 use std::mem;
-use crate_db::{CrateDb, RepoChange};
-pub use semver::Version as SemVer;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::sync::RwLock;
 
 pub type CError = failure::Error;
 pub type CResult<T> = Result<T, CError>;
@@ -417,7 +418,7 @@ impl KitchenSink {
                 topics.retain(|t| match t.as_str() {
                     "rust" | "rs" | "rustlang" | "rust-lang" | "crate" | "crates" | "library" => false,
                     t if t.starts_with("rust-") => false,
-                    _ => true
+                    _ => true,
                 });
                 if !topics.is_empty() {
                     derived.github_keywords = Some(topics);
@@ -471,7 +472,7 @@ impl KitchenSink {
         }
 
         // lib file takes majority of space in cache, so remove it if it won't be used
-        if !self.is_readme_short(meta.readme.as_ref().map(|r| r.as_ref()).map_err(|_|())) {
+        if !self.is_readme_short(meta.readme.as_ref().map(|r| r.as_ref()).map_err(|_| ())) {
             meta.lib_file = None;
         }
 
@@ -512,7 +513,7 @@ impl KitchenSink {
                 },
                 Err(err) => {
                     warnings.insert(Warning::ErrorCloning(repo.canonical_git_url().to_string()));
-                    eprintln!("Checkout of {} failed: {}", meta.manifest.package.name, err);
+                    eprintln!("Checkout of {} ({}) failed: {}", meta.manifest.package.name, repo.canonical_git_url(), err);
                 },
             }
         }
@@ -618,7 +619,8 @@ impl KitchenSink {
     pub fn related_crates(&self, krate: &RichCrateVersion) -> CResult<Vec<RichCrateVersion>> {
         let (replacements, related) = rayon::join(
             || self.crate_db.replacement_crates(krate.short_name()).context("related_crates1"),
-            || self.crate_db.related_crates(krate.origin()).context("related_crates2"));
+            || self.crate_db.related_crates(krate.origin()).context("related_crates2"),
+        );
 
         let replacements: Vec<_> = replacements?.into_iter()
             .map(|name| Origin::from_crates_io_name(&name))
@@ -660,7 +662,7 @@ impl KitchenSink {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
         if !self.user_db.email_has_github(&commit.email)? {
             println!("{} => {}", commit.email, user.login);
-            self.user_db.index_user(&user, Some(&commit.email), commit.name.as_ref().map(|s|s.as_str()))?;
+            self.user_db.index_user(&user, Some(&commit.email), commit.name.as_ref().map(|s| s.as_str()))?;
         }
         Ok(())
     }
@@ -707,7 +709,7 @@ impl KitchenSink {
         let manif = manif.into_iter().map(|(subpath, manifest)| (subpath, manifest.package.name));
         self.crate_db.index_repo_crates(repo, manif).context("index rev repo")?;
 
-        if let Repo{host:RepoHost::GitHub(ref repo), ..} = repo {
+        if let Repo { host: RepoHost::GitHub(ref repo), .. } = repo {
             if let Some(commits) = self.repo_commits(repo, as_of_version)? {
                 for c in commits {
                     if let Some(a) = c.author {
@@ -732,9 +734,11 @@ impl KitchenSink {
                     if weight > 0.002 {
                         for dep1 in added.iter().take(8) {
                             for dep2 in added.iter().take(5) {
-                                if dep1 == dep2 {continue;}
+                                if dep1 == dep2 {
+                                    continue;
+                                }
                                 // Not really a replacement, but a recommendation if A then B
-                                changes.push(RepoChange::Replaced{crate_name: dep1.to_string(), replacement: dep2.to_string(), weight})
+                                changes.push(RepoChange::Replaced { crate_name: dep1.to_string(), replacement: dep2.to_string(), weight })
                             }
                         }
                     }
@@ -746,12 +750,12 @@ impl KitchenSink {
                         // Removals don't decay with age (if we see great comebacks, maybe it should be split by semver-major).
                         let weight = 8.0 / (7.0 + added.len() as f64);
                         for replacement in &added {
-                            changes.push(RepoChange::Replaced{crate_name: crate_name.clone(), replacement: replacement.to_string(), weight})
+                            changes.push(RepoChange::Replaced { crate_name: crate_name.clone(), replacement: replacement.to_string(), weight })
                         }
-                        changes.push(RepoChange::Removed{crate_name, weight});
+                        changes.push(RepoChange::Removed { crate_name, weight });
                     } else {
                         // ??? maybe use sliiight recommendation score based on existing (i.e. newer) state of deps in the repo?
-                        changes.push(RepoChange::Removed{crate_name, weight: 0.95});
+                        changes.push(RepoChange::Removed { crate_name, weight: 0.95 });
                     }
                 }
             }
@@ -942,11 +946,12 @@ impl KitchenSink {
             }
         }
 
-        let max_author_contribution = authors_by_name.values()
-            .map(|a| if a.owner || a.nth_author.is_some() {a.contribution} else {0.})
-            .max_by(|a,b| a.partial_cmp(&b).unwrap_or(Ordering::Equal))
+        let max_author_contribution = authors_by_name
+            .values()
+            .map(|a| if a.owner || a.nth_author.is_some() { a.contribution } else { 0. })
+            .max_by(|a, b| a.partial_cmp(&b).unwrap_or(Ordering::Equal))
             .unwrap_or(0.);
-        let big_contribution = if max_author_contribution < 50. {200.} else {max_author_contribution/2.};
+        let big_contribution = if max_author_contribution < 50. { 200. } else { max_author_contribution / 2. };
 
         let mut contributors = 0;
         let (mut authors, mut owners): (Vec<_>, Vec<_>) = authors_by_name.into_iter().map(|(_,v)|v)
@@ -972,14 +977,12 @@ impl KitchenSink {
             }
         }
 
-        authors.sort_by(|a,b| {
+        authors.sort_by(|a, b| {
             fn score(a: &CrateAuthor<'_>) -> f64 {
-                let o = if a.owner {200.} else {1.};
-                o * (a.contribution + 10.) /
-                (1+a.nth_author.unwrap_or(99)) as f64
+                let o = if a.owner { 200. } else { 1. };
+                o * (a.contribution + 10.) / (1 + a.nth_author.unwrap_or(99)) as f64
             }
-            score(b).partial_cmp(&score(a))
-                .unwrap_or(Ordering::Equal)
+            score(b).partial_cmp(&score(a)).unwrap_or(Ordering::Equal)
         });
 
         // That's a guess
@@ -994,7 +997,7 @@ impl KitchenSink {
         }
 
         let owners_partial = authors.iter().any(|a| a.owner);
-        Ok((authors, owners, owners_partial, if hit_max_contributor_count {100} else {contributors}))
+        Ok((authors, owners, owners_partial, if hit_max_contributor_count { 100 } else { contributors }))
     }
 
     fn crate_owners(&self, krate: &RichCrateVersion) -> CResult<Vec<CrateOwner>> {
@@ -1019,12 +1022,12 @@ impl KitchenSink {
                 for c in &mut crates {
                     c.2 /= 300. + removals.get(&c.0).cloned().unwrap_or(2.);
                 }
-                crates.sort_by(|a,b| b.2.partial_cmp(&a.2).unwrap());
-                let crates: Vec<_> = crates.into_iter().map(|(o,r,_)| (o,r)).take(100).collect();
+                crates.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap());
+                let crates: Vec<_> = crates.into_iter().map(|(o, r, _)| (o, r)).take(100).collect();
                 let res = Arc::new(crates);
                 e.insert(Arc::clone(&res));
                 res
-            }
+            },
         })
     }
 
@@ -1049,24 +1052,22 @@ impl KitchenSink {
     }
 
     pub fn category_crate_count(&self, slug: &str) -> Result<u32, KitchenSinkErr> {
-        self.category_crate_counts.get(|| {
-            match self.crate_db.category_crate_counts() {
+        self.category_crate_counts
+            .get(|| match self.crate_db.category_crate_counts() {
                 Ok(res) => Some(res),
                 Err(err) => {
                     eprintln!("error: can't get category counts: {}", err);
                     None
                 },
-            }
-        })
-        .as_ref()
-        .ok_or(KitchenSinkErr::CategoryQueryFailed)
-        .and_then(|h| {
-            h.get(slug).map(|&c| c)
-            .ok_or_else(|| {
-                eprintln!("Known categories: {:?}", h);
-                KitchenSinkErr::CategoryNotFound(slug.to_string())
             })
-        })
+            .as_ref()
+            .ok_or(KitchenSinkErr::CategoryQueryFailed)
+            .and_then(|h| {
+                h.get(slug).map(|&c| c).ok_or_else(|| {
+                    eprintln!("Known categories: {:?}", h);
+                    KitchenSinkErr::CategoryNotFound(slug.to_string())
+                })
+            })
     }
 
     fn repo_commits(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Option<Vec<github_info::CommitMeta>>> {
@@ -1080,7 +1081,6 @@ pub enum CrateData {
     Full,
     FullNoDerived,
 }
-
 
 /// This is used to uniquely identify authors based on as little information as is available
 #[derive(Debug, Hash, Eq, PartialEq)]

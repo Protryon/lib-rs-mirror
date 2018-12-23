@@ -1,12 +1,12 @@
+use crate::index::*;
 use crate::KitchenSinkErr;
 use crates_index::Crate;
-use std::sync::Mutex;
-use std::sync::Arc;
-use std::collections::HashMap;
-use std::collections::HashSet;
-use crate::index::*;
 use rayon::prelude::*;
 use semver::Version as SemVer;
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::sync::Arc;
+use std::sync::Mutex;
 
 pub struct DepsStats {
     pub total: usize,
@@ -61,19 +61,19 @@ impl DepVisitor {
 
     #[inline]
     pub fn start(&mut self, dep: &Dep, depinf: DepInf, cb: impl FnMut(&mut DepVisitor, &ArcDepSet, DepInf)) {
-        self.recurse_inner(dep, DepInf {direct: true, ..depinf}, cb)
+        self.recurse_inner(dep, DepInf { direct: true, ..depinf }, cb)
     }
 
     #[inline]
     pub fn recurse(&mut self, dep: &Dep, depinf: DepInf, cb: impl FnMut(&mut DepVisitor, &ArcDepSet, DepInf)) {
-        self.recurse_inner(dep, DepInf {direct: false, ..depinf}, cb)
+        self.recurse_inner(dep, DepInf { direct: false, ..depinf }, cb)
     }
 
     #[inline]
     fn recurse_inner(&mut self, dep: &Dep, depinf: DepInf, mut cb: impl FnMut(&mut DepVisitor, &ArcDepSet, DepInf)) {
         cb(self, &dep.runtime, depinf);
-        let ty = if depinf.ty == DepTy::Dev {DepTy::Dev} else {DepTy::Build};
-        cb(self, &dep.build, DepInf {ty, ..depinf});
+        let ty = if depinf.ty == DepTy::Dev { DepTy::Dev } else { DepTy::Build };
+        cb(self, &dep.build, DepInf { ty, ..depinf });
     }
 }
 
@@ -151,15 +151,12 @@ impl Index {
                     },
                     DepTy::Dev => {
                         n.dev += 1;
-                    }
+                    },
                 }
             }
         }
 
-        DepsStats {
-            total,
-            counts,
-        }
+        DepsStats { total, counts }
     }
 }
 

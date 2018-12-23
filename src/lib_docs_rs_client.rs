@@ -1,10 +1,7 @@
-
-
-
 #[macro_use] extern crate serde_derive;
-use std::path::Path;
-use simple_cache::TempCache;
 pub use simple_cache::Error;
+use simple_cache::TempCache;
+use std::path::Path;
 
 pub struct DocsRsClient {
     cache: TempCache<Option<Vec<BuildStatus>>>,
@@ -32,7 +29,7 @@ impl DocsRsClient {
     pub fn build_status(&self, crate_name: &str, version: &str) -> Result<Option<Vec<BuildStatus>>, Error> {
         let key = format!("{}-{}", crate_name, version);
         if let Some(cached) = self.cache.get(&key)? {
-            return Ok(cached)
+            return Ok(cached);
         }
         let url = format!("https://docs.rs/crate/{}/{}/builds.json", crate_name, version);
         Ok(self.cache.get_json(&key, url, |t| t)?.and_then(|f| f))

@@ -1,6 +1,5 @@
-
-use rusqlite::types::ToSql;
 use failure;
+use rusqlite::types::ToSql;
 
 use github_info::User;
 use github_info::UserType;
@@ -131,5 +130,3 @@ impl UserDb {
         Ok(())
     }
 }
-
-

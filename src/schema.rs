@@ -1,6 +1,6 @@
+use crate::UserDb;
 use rusqlite::*;
 use std::path::Path;
-use crate::UserDb;
 
 impl UserDb {
     pub(crate) fn db(path: &Path) -> Result<Connection> {

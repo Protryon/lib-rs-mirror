@@ -12,8 +12,11 @@ mod cat_page;
 mod crate_page;
 mod download_graph;
 mod home_page;
+mod search_page;
 mod iter;
 mod urler;
+pub use crate::search_page::*;
+
 use crate::crate_page::*;
 use crate::urler::Urler;
 use categories::Category;

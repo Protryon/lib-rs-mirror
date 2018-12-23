@@ -1,0 +1,65 @@
+@use crate::templates::base;
+@use crate::Urler;
+@use crate::SearchPage;
+
+@(p: &SearchPage, url: &Urler)
+
+@:base(&p.page(), {
+
+<header id="serp">
+    <div class="inner-col">
+        <div class="breadcrumbs">
+            <h1><a href="/">Crates.rs</a></h1>
+            › Search (beta)
+        </div>
+    </div>
+    <div class="inner-col">
+        <form id=search method="get" action="/search">
+            <input placeholder="name, keywords, description" type=search value="@p.query" name=q><button type=submit>Search</button>
+        </form>
+        <nav>
+            <ul>
+                @if !p.good_results.is_empty() {
+                    <li class=active>Sorted by relevance</li>
+                }
+                <li><a href="@url.search_ddg(p.query)">I'm feeling ducky</a></li>
+            </ul>
+        </nav>
+    </div>
+</header>
+<main id="results">
+    <div class="inner-col">
+        @if p.good_results.is_empty() {
+            <p class=notfound>Nothing found :(</p>
+            <p class=tryalso>Try <a href="@url.search_ddg(p.query)">searching with duckduckgo</a> or <a href="@url.search_crates_io(p.query)">on crates.io</a>.</p>
+        } else {
+            <ol>
+            @for c in p.good_results {
+                <li>
+                    <a href="@url.krate_by_name(&c.crate_name)"><div class=h>
+                        <h4>@c.crate_name</h4>
+                        <p class=desc>@p.render_markdown_str(&c.description)</p>
+                    </div></a>
+                </li>
+            }
+            <p class=tryalso>Try <a href="@url.search_ddg(p.query)">searching with duckduckgo</a> or <a href="@url.search_crates_io(p.query)">on crates.io</a>.</p>
+            @for c in p.bad_results {
+                <li>
+                    <a href="@url.krate_by_name(&c.crate_name)"><div class=h>
+                        <h4>@c.crate_name</h4>
+                        <p class=desc>@p.render_markdown_str(&c.description)</p>
+                    </div></a>
+                </li>
+            }
+            </ol>
+        }
+    </div>
+</main>
+
+<footer>
+    <div class="inner-col">
+        <p>Search powered by <a href="https://crates.rs/crates/tantivy">tantivy</a>.</p>
+        <p>Browse <a href="/">all categories</a>.
+    </div>
+</footer>
+})

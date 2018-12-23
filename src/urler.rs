@@ -30,7 +30,11 @@ impl Urler {
 
     /// Link to crate individual page
     pub fn krate(&self, krate: &RichCrateVersion) -> String {
-        format!("/crates/{}", encode(krate.short_name()))
+        self.krate_by_name(krate.short_name())
+    }
+
+    pub fn krate_by_name(&self, crate_name: &str) -> String {
+        format!("/crates/{}", encode(crate_name))
     }
 
     pub fn keyword(&self, name: &str) -> String {
@@ -76,5 +80,13 @@ impl Urler {
         } else {
             None
         }
+    }
+
+    pub fn search_crates_io(&self, query: &str) -> String {
+        format!("https://crates.io/search?q={}", encode(query))
+    }
+
+    pub fn search_ddg(&self, query: &str) -> String {
+        format!("https://duckduckgo.com/?q=site%3Acrates.rs+{}", encode(query))
     }
 }

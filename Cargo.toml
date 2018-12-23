@@ -25,6 +25,12 @@ members = [
 [profile.dev]
 opt-level = 1
 
+[profile.release]
+codegen-units = 12
+debug = true
+incremental = true
+lto = false
+
 [patch.crates-io]
 cargo_toml = { path = "cargo_toml" }
 cargo_author = { path = "cargo_author" }

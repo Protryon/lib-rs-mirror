@@ -1,12 +1,10 @@
-use serde;
 use rand;
+use serde;
 
 #[macro_use] extern crate serde_derive;
-use chrono::TimeZone;
-use chrono::Utc;
-use chrono::Date;
 use std::collections::HashMap;
 use std::path::Path;
+use chrono::{Date, TimeZone, Utc};
 
 mod crate_meta;
 mod crate_deps;
@@ -31,7 +29,7 @@ macro_rules! cioopt {
             Some(ok) => ok,
             None => return Ok(None),
         }
-    }
+    };
 }
 
 #[derive(Debug)]
@@ -201,9 +199,8 @@ pub(crate) fn parse_date(date: &str) -> Date<Utc> {
     let y = date[0..4].parse().expect("dl date parse");
     let m = date[5..7].parse().expect("dl date parse");
     let d = date[8..10].parse().expect("dl date parse");
-    Utc.ymd(y,m,d)
+    Utc.ymd(y, m, d)
 }
-
 
 #[test]
 fn cratesioclient() {
@@ -212,7 +209,7 @@ fn cratesioclient() {
     client.crate_meta("capi", "0.0.1").expect("cargo-deb");
     let owners = client.crate_owners("cargo-deb", "1.10.0").expect("crate_owners").expect("found some");
     assert_eq!(2, owners.len(), "that will fail when metadata updates");
-    match CratesIoClient::new(Path::new("../data")).expect("new").cache_only(true).crate_data("fail404","999").unwrap() {
+    match CratesIoClient::new(Path::new("../data")).expect("new").cache_only(true).crate_data("fail404", "999").unwrap() {
         None => {},
         Some(e) => panic!("{:?}", e),
     }

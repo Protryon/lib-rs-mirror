@@ -20,19 +20,19 @@ impl CrateMetaFile {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateMetaBadge {
     pub badge_type: String,
-    pub attributes: CrateMetaBadgeAttr
+    pub attributes: CrateMetaBadgeAttr,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateMetaBadgeAttr {
     pub repository: Option<String>,
-    pub branch: Option<String>
+    pub branch: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateMeta {
-    pub id: String, // "cargo-deb",
-    pub name: String, // "cargo-deb",
+    pub id: String,         // "cargo-deb",
+    pub name: String,       // "cargo-deb",
     pub updated_at: String, // "2018-04-26T00:57:41.867975+00:00",
     #[serde(default)]
     pub versions: Vec<usize>, // [90309, 89288, 87534, 86387, 82743, 82697, 81712, 81233, 79188, 76393, 69921, 65169, 64103, 62665, 62074, 61494, 61440, 61393, 61273, 61237, 61236],
@@ -64,26 +64,26 @@ pub struct CrateMetaVersion {
     // pub readme_path: String, // "/api/v1/crates/cargo-deb/1.4.0/readme",
     pub updated_at: String, // "2018-01-29T23:10:11.539889+00:00",
     pub created_at: String, // "2018-01-29T23:10:11.539889+00:00",
-    pub downloads: usize, // 154,
-    pub features: HashMap<String,Vec<String>>,
-    pub yanked: bool, // false,
+    pub downloads: usize,   // 154,
+    pub features: HashMap<String, Vec<String>>,
+    pub yanked: bool,            // false,
     pub license: Option<String>, // "MIT",
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateMetaKeyword {
-    pub id: String, // "cargo",
-    pub keyword: String, // "cargo",
+    pub id: String,         // "cargo",
+    pub keyword: String,    // "cargo",
     pub created_at: String, // "2014-11-28T19:06:33.883165+00:00",
-    pub crates_cnt: usize, // 92
+    pub crates_cnt: usize,  // 92
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateMetaCategory {
-    pub id: String, // "development-tools::build-utils",
-    pub category: String, // "Development tools::Build Utils",
-    pub slug: String, // "development-tools::build-utils",
+    pub id: String,          // "development-tools::build-utils",
+    pub category: String,    // "Development tools::Build Utils",
+    pub slug: String,        // "development-tools::build-utils",
     pub description: String, // "Utilities for build scripts and other build time steps.",
-    pub created_at: String, // "2017-05-13T17:18:45.578208+00:00",
-    pub crates_cnt: usize, // 19
+    pub created_at: String,  // "2017-05-13T17:18:45.578208+00:00",
+    pub crates_cnt: usize,   // 19
 }

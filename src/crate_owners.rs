@@ -1,4 +1,3 @@
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateOwnersFile {
     pub users: Vec<CrateOwner>,
@@ -18,11 +17,11 @@ pub enum OwnerKind {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateOwner {
-    pub id: usize, // 362,
-    pub login: String, // "github:rust-bus:maintainers",
-    pub kind: OwnerKind, // "team" || "user"
-    pub url: String, // "https://github.com/rust-bus",
-    pub name: Option<String>, // "maintainers",
+    pub id: usize,              // 362,
+    pub login: String,          // "github:rust-bus:maintainers",
+    pub kind: OwnerKind,        // "team" || "user"
+    pub url: String,            // "https://github.com/rust-bus",
+    pub name: Option<String>,   // "maintainers",
     pub avatar: Option<String>, // "https://avatars1.githubusercontent.com/u/38887296?v=4"
 }
 
@@ -50,7 +49,7 @@ impl CrateOwner {
                     "github" => w.next(),
                     _ => None,
                 }
-            }
+            },
         }
     }
 }

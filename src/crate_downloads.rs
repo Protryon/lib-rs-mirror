@@ -30,7 +30,6 @@ pub struct CrateExtraDailyDownload {
     pub date: String,
 }
 
-
 #[derive(Debug, Clone)]
 pub struct DownloadWeek {
     pub date: Date<Utc>,

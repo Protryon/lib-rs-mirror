@@ -19,6 +19,7 @@ members = [
 "simple_cache",
 "user_db",
 "crate_git_checkout",
+"udedokei",
 ]
 
 [profile.dev]
@@ -76,3 +77,6 @@ simple_cache = { path = "simple_cache" }
 
 [patch.'https://gitlab.com/crates.rs/user_db.git']
 user_db = { path = "user_db" }
+
+[patch.'https://gitlab.com/crates.rs/udedokei.git']
+udedokei = { path = "udedokei" }

@@ -49,8 +49,8 @@ fn main() {
             .handler("/", fs::StaticFiles::new("../style/public").unwrap())
             .default_resource(|r| r.f(handle_404))
     })
-    .bind("127.0.0.1:8080")
-    .expect("Can not bind to 127.0.0.1:8080")
+    .bind("127.0.0.1:32531")
+    .expect("Can not bind to 127.0.0.1:32531")
     .shutdown_timeout(0) // <- Set shutdown timeout to 0 seconds (default 60s)
     .start();
 

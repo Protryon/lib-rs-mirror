@@ -1,0 +1,15 @@
+[package]
+edition = "2018"
+name = "search_index"
+version = "0.1.0"
+authors = ["Kornel <kornel@geekhood.net>"]
+
+[lib]
+name = "search_index"
+path = "src/lib_search_index.rs"
+
+[dependencies]
+tantivy = "0.7"
+kitchen_sink = { git = "https://gitlab.com/crates.rs/kitchen_sink.git", version = "0.5.1" }
+rayon = "1.0.3"
+rand = "0.6.1"

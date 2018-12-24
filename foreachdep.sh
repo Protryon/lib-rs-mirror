@@ -1,2 +1,2 @@
 #!/bin/bash
-for git in */.git; do ( echo "• "$(dirname "$git")":"; cd "$git/.." && "$@" ); done
+for git in */.git; do ( echo "• "$(dirname "$git")":"; cd "$(dirname "$git")" && "$@" ); done

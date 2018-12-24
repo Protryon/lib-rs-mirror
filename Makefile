@@ -4,7 +4,7 @@ website: caches data/index/1 styles
 	cd front_end && cargo run --release --bin website
 	cd style && npm start
 
-caches: data/crate_data.db
+caches: data/crate_data.db data/users.db
 
 data/crate_data.db:
 	if [ ! -d data/data.tar.xz -a -f data.tar.xz ]; then mv data.tar.xz data/; fi

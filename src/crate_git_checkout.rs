@@ -15,6 +15,7 @@ use std::process::Command;
 
 use repo_url::Repo;
 use std::path::Path;
+use std::fs;
 
 use git2::{build::RepoBuilder, Blob, ObjectType, Reference, Repository, Tree};
 mod iter;
@@ -79,10 +80,13 @@ fn get_repo(repo: &Repo, base_path: &Path) -> Result<Repository, git2::Error> {
 
     match Repository::open(&repo_path) {
         Ok(repo) => Ok(repo),
-        err => {
+        Err(err) => {
             if !url.starts_with("http://") && !url.starts_with("https://") && !url.starts_with("git@github.com:") {
                 eprintln!("Rejecting non-HTTP git URL: {}", url);
-                return err;
+                return Err(err);
+            }
+            if err.code() == git2::ErrorCode::Exists {
+                let _ = fs::remove_dir_all(&repo_path);
             }
             if shallow {
                 let ok = Command::new("git")

@@ -1,25 +1,20 @@
-extern crate cargo_toml;
-extern crate failure;
-extern crate git2;
-extern crate render_readme;
-extern crate repo_url;
-extern crate urlencoding;
-
-use cargo_toml::TomlManifest;
-use cargo_toml::TomlPackage;
-use render_readme::Markup;
-use render_readme::Readme;
+use crate::iter::HistoryIter;
+use cargo_toml::{TomlManifest, TomlPackage};
+use failure;
+use git2;
+use git2::build::RepoBuilder;
+use git2::{Blob, ObjectType, Reference, Repository, Tree};
+use render_readme;
+use render_readme::{Markup, Readme};
+use repo_url::Repo;
 use std::collections::hash_map::Entry::Vacant;
 use std::collections::{HashMap, HashSet};
-use std::process::Command;
-
-use repo_url::Repo;
-use std::path::Path;
 use std::fs;
+use std::path::Path;
+use std::process::Command;
+use urlencoding;
 
-use git2::{build::RepoBuilder, Blob, ObjectType, Reference, Repository, Tree};
 mod iter;
-use crate::iter::HistoryIter;
 
 #[derive(Debug, Clone)]
 pub struct ParseError(pub String);
@@ -37,15 +32,15 @@ pub fn checkout(repo: &Repo, base_path: &Path) -> Result<Repository, git2::Error
 }
 
 #[inline]
-pub fn iter_blobs<F>(repo: &Repository, tree: &Tree, mut cb: F) -> Result<(), failure::Error>
-    where F: FnMut(&str, &str, Blob) -> Result<(), failure::Error>
+pub fn iter_blobs<F>(repo: &Repository, tree: &Tree<'_>, mut cb: F) -> Result<(), failure::Error>
+    where F: FnMut(&str, &str, Blob<'_>) -> Result<(), failure::Error>
 {
     iter_blobs_recurse(repo, tree, &mut String::with_capacity(500), &mut cb)?;
     Ok(())
 }
 
-fn iter_blobs_recurse<F>(repo: &Repository, tree: &Tree, path: &mut String, cb: &mut F) -> Result<(), failure::Error>
-    where F: FnMut(&str, &str, Blob) -> Result<(), failure::Error>
+fn iter_blobs_recurse<F>(repo: &Repository, tree: &Tree<'_>, path: &mut String, cb: &mut F) -> Result<(), failure::Error>
+    where F: FnMut(&str, &str, Blob<'_>) -> Result<(), failure::Error>
 {
     for i in tree.iter() {
         let name = match i.name() {
@@ -117,7 +112,7 @@ pub fn find_manifests(repo: &Repository) -> Result<(Vec<(String, TomlManifest)>,
     find_manifests_in_tree(&repo, &tree)
 }
 
-fn find_manifests_in_tree(repo: &Repository, tree: &Tree) -> Result<(Vec<(String, TomlManifest)>, Vec<ParseError>), failure::Error> {
+fn find_manifests_in_tree(repo: &Repository, tree: &Tree<'_>) -> Result<(Vec<(String, TomlManifest)>, Vec<ParseError>), failure::Error> {
     let mut tomls = Vec::with_capacity(8);
     let mut warnings = Vec::new();
     iter_blobs(repo, tree, |inner_path, name, blob| {
@@ -134,7 +129,7 @@ fn find_manifests_in_tree(repo: &Repository, tree: &Tree) -> Result<(Vec<(String
     Ok((tomls, warnings))
 }
 
-fn path_in_repo(repo: &Repository, tree: &Tree, crate_name: &str) -> Result<Option<String>, failure::Error> {
+fn path_in_repo(repo: &Repository, tree: &Tree<'_>, crate_name: &str) -> Result<Option<String>, failure::Error> {
     Ok(find_manifests_in_tree(repo, tree)?.0
         .into_iter()
         .find(|(_, manifest)| manifest.package.name == crate_name)
@@ -163,10 +158,10 @@ pub fn find_dependency_changes(repo: &Repository, mut cb: impl FnMut(HashSet<Str
         // All deps in a repo, because we traverse history once per repo, not once per crate,
         // and because moving of deps between internal crates doesn't count.
         let mut older_deps = HashSet::with_capacity(100);
-        for (_, mut manifest) in find_manifests_in_tree(&repo, &commit.tree()?)?.0 {
-            older_deps.extend(manifest.dependencies.into_iter().map(|(k,_)| k));
-            older_deps.extend(manifest.dev_dependencies.into_iter().map(|(k,_)| k));
-            older_deps.extend(manifest.build_dependencies.into_iter().map(|(k,_)| k));
+        for (_, manifest) in find_manifests_in_tree(&repo, &commit.tree()?)?.0 {
+            older_deps.extend(manifest.dependencies.into_iter().map(|(k, _)| k));
+            older_deps.extend(manifest.dev_dependencies.into_iter().map(|(k, _)| k));
+            older_deps.extend(manifest.build_dependencies.into_iter().map(|(k, _)| k));
         }
 
         let mut added = HashSet::with_capacity(10);
@@ -184,16 +179,13 @@ pub fn find_dependency_changes(repo: &Repository, mut cb: impl FnMut(HashSet<Str
         }
 
         for dep in older_deps {
-            match newer_deps.entry(dep) {
-                Vacant(e) => {
-                    if age > 0 {
-                        removed.insert(e.key().clone());
-                        e.insert(State {since: None, until: Some(age)});
-                    } else {
-                        e.insert(State::default());
-                    }
-                },
-                _ => {},
+            if let Vacant(e) = newer_deps.entry(dep) {
+                if age > 0 {
+                    removed.insert(e.key().clone());
+                    e.insert(State {since: None, until: Some(age)});
+                } else {
+                    e.insert(State::default());
+                }
             }
         }
 

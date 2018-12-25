@@ -62,19 +62,18 @@ impl<'repo> Iterator for HistoryIter<'repo> {
 
 
 impl<'repo> PartialEq for Generation<'repo> {
-    fn eq(&self, other: &Generation) -> bool {
+    fn eq(&self, other: &Generation<'_>) -> bool {
         other.num == self.num && self.nth == other.nth
     }
 }
 impl<'repo> PartialOrd for Generation<'repo> {
-    fn partial_cmp(&self, other: &Generation) -> Option<Ordering> {
+    fn partial_cmp(&self, other: &Generation<'_>) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 impl<'repo> Eq for Generation<'repo> {}
 impl<'repo> Ord for Generation<'repo> {
-    fn cmp(&self, other: &Generation) -> Ordering {
-        other.num.cmp(&self.num)
-            .then(other.nth.cmp(&self.nth))
+    fn cmp(&self, other: &Generation<'_>) -> Ordering {
+        other.num.cmp(&self.num).then(other.nth.cmp(&self.nth))
     }
 }

@@ -1,4 +1,4 @@
-use cargo_toml::TomlManifest;
+use cargo_toml::Manifest;
 use libflate::gzip::Decoder;
 use render_readme::Markup;
 use std::io::Read;
@@ -21,7 +21,7 @@ pub fn read_archive(archive: impl Read, prefix: &Path) -> Result<CrateFile> {
     let decoder = Decoder::new(archive)?;
     let mut a = Archive::new(decoder);
 
-    let mut manifest: Option<TomlManifest> = None;
+    let mut manifest: Option<Manifest> = None;
     let mut markup = None;
     let mut files = Vec::new();
     let mut lib_file = None;
@@ -46,7 +46,7 @@ pub fn read_archive(archive: impl Read, prefix: &Path) -> Result<CrateFile> {
             match relpath {
                 p if p == Path::new("Cargo.toml") || p == Path::new("cargo.toml") => ReadAs::Toml,
                 p if p == Path::new("src/lib.rs") => ReadAs::Lib,
-                p if is_readme_filename(p, manifest.as_ref().map(|m| &m.package)) => {
+                p if is_readme_filename(p, manifest.as_ref().and_then(|m| m.package.as_ref())) => {
                     let path_prefix = p.parent().unwrap().display().to_string();
                     if p.extension().map_or(false, |e| e == "rst") {
                         ReadAs::ReadmeRst(path_prefix)
@@ -80,7 +80,7 @@ pub fn read_archive(archive: impl Read, prefix: &Path) -> Result<CrateFile> {
                 lib_file = Some(data.to_string());
             },
             ReadAs::Toml => {
-                manifest = Some(TomlManifest::from_slice(data.as_bytes())?);
+                manifest = Some(Manifest::from_slice(data.as_bytes())?);
             },
             ReadAs::ReadmeMarkdown(path_prefix) => {
                 markup = Some((path_prefix, Markup::Markdown(data.to_string())));
@@ -100,7 +100,7 @@ pub fn read_archive(archive: impl Read, prefix: &Path) -> Result<CrateFile> {
 
     Ok(CrateFile {
         decompressed_size,
-        readme: Ok(markup.map(|(path, m)| readme_from_repo(m, &manifest.package.repository, &path))),
+        readme: Ok(markup.map(|(path, m)| readme_from_repo(m, manifest.package.as_ref().and_then(|r| r.repository.as_ref()), &path))),
         manifest,
         files,
         lib_file,

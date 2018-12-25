@@ -23,7 +23,7 @@ pub fn read_archive(archive_tgz: impl Read, name: &str, ver: &str) -> Result<Cra
 
 #[derive(Debug, Clone)]
 pub struct CrateFile {
-    pub manifest: TomlManifest,
+    pub manifest: Manifest,
     pub lib_file: Option<String>,
     pub files: Vec<PathBuf>,
     pub readme: Result<Option<Readme>>,
@@ -46,8 +46,8 @@ impl CrateFile {
     }
 }
 
-fn readme_from_repo(markup: Markup, repo_url: &Option<String>, base_path: &str) -> Readme {
-    let repo = repo_url.as_ref().and_then(|url| Repo::new(url).ok());
+fn readme_from_repo(markup: Markup, repo_url: Option<&String>, base_path: &str) -> Readme {
+    let repo = repo_url.and_then(|url| Repo::new(url).ok());
     let base_url = repo.as_ref().map(|r| r.readme_base_url(base_path));
     let base_image_url = repo.map(|r| r.readme_base_image_url(base_path));
 
@@ -55,9 +55,9 @@ fn readme_from_repo(markup: Markup, repo_url: &Option<String>, base_path: &str) 
 }
 
 /// Check if given filename is a README. If `package` is missing, guess.
-fn is_readme_filename(path: &Path, package: Option<&TomlPackage>) -> bool {
+fn is_readme_filename(path: &Path, package: Option<&Package>) -> bool {
     path.to_str().map_or(false, |s| {
-        if let Some(&TomlPackage{readme: Some(ref r),..}) = package {
+        if let Some(&Package { readme: Some(ref r), .. }) = package {
             r == s
         } else {
             render_readme::is_readme_filename(path)

@@ -1,5 +1,5 @@
 use crate::iter::HistoryIter;
-use cargo_toml::{TomlManifest, TomlPackage};
+use cargo_toml::{Manifest, Package};
 use failure;
 use git2;
 use git2::build::RepoBuilder;
@@ -106,19 +106,23 @@ fn get_repo(repo: &Repo, base_path: &Path) -> Result<Repository, git2::Error> {
     }
 }
 
-pub fn find_manifests(repo: &Repository) -> Result<(Vec<(String, TomlManifest)>, Vec<ParseError>), failure::Error> {
+pub fn find_manifests(repo: &Repository) -> Result<(Vec<(String, Manifest)>, Vec<ParseError>), failure::Error> {
     let head = repo.head()?;
     let tree = head.peel_to_tree()?;
     find_manifests_in_tree(&repo, &tree)
 }
 
-fn find_manifests_in_tree(repo: &Repository, tree: &Tree<'_>) -> Result<(Vec<(String, TomlManifest)>, Vec<ParseError>), failure::Error> {
+fn find_manifests_in_tree(repo: &Repository, tree: &Tree<'_>) -> Result<(Vec<(String, Manifest)>, Vec<ParseError>), failure::Error> {
     let mut tomls = Vec::with_capacity(8);
     let mut warnings = Vec::new();
     iter_blobs(repo, tree, |inner_path, name, blob| {
         if name == "Cargo.toml" {
-            match TomlManifest::from_slice(blob.content()) {
-                Ok(toml) => tomls.push((inner_path.to_owned(), toml)),
+            match Manifest::from_slice(blob.content()) {
+                Ok(toml) => {
+                    if toml.package.is_some() {
+                        tomls.push((inner_path.to_owned(), toml))
+                    }
+                },
                 Err(err) => {
                     warnings.push(ParseError(format!("Can't parse {}/{}/{}: {}", repo.path().display(), inner_path, name, err)));
                 },
@@ -132,7 +136,7 @@ fn find_manifests_in_tree(repo: &Repository, tree: &Tree<'_>) -> Result<(Vec<(St
 fn path_in_repo(repo: &Repository, tree: &Tree<'_>, crate_name: &str) -> Result<Option<String>, failure::Error> {
     Ok(find_manifests_in_tree(repo, tree)?.0
         .into_iter()
-        .find(|(_, manifest)| manifest.package.name == crate_name)
+        .find(|(_, manifest)| manifest.package.as_ref().map_or(false, |p| p.name == crate_name))
         .map(|(path, _)| path))
 }
 
@@ -194,7 +198,7 @@ pub fn find_dependency_changes(repo: &Repository, mut cb: impl FnMut(HashSet<Str
     Ok(())
 }
 
-pub fn find_readme(repo: &Repository, package: &TomlPackage) -> Result<Option<Readme>, failure::Error> {
+pub fn find_readme(repo: &Repository, package: &Package) -> Result<Option<Readme>, failure::Error> {
     let head = repo.head()?;
     let tree = head.peel_to_tree()?;
     let mut readme = None;
@@ -228,9 +232,9 @@ fn readme_from_repo(markup: Markup, repo_url: &Option<String>, base_dir_in_repo:
 }
 
 /// Check if given filename is a README. If `package` is missing, guess.
-fn is_readme_filename(path: &Path, package: Option<&TomlPackage>) -> bool {
+fn is_readme_filename(path: &Path, package: Option<&Package>) -> bool {
     path.to_str().map_or(false, |s| {
-        if let Some(&TomlPackage{readme: Some(ref r),..}) = package {
+        if let Some(&Package{readme: Some(ref r),..}) = package {
             r == s
         } else {
             render_readme::is_readme_filename(path)

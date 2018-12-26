@@ -1,7 +1,5 @@
-use cargo_toml::TomlDependency;
-pub use cargo_toml::TomlDepsSet;
-pub use cargo_toml::Edition;
-use cargo_toml::TomlManifest;
+pub use cargo_toml::{Edition, FeatureSet, TargetDepsSet, DepsSet};
+use cargo_toml::{Dependency, Package, Product, Manifest};
 use categories::Categories;
 use crates_index::Version;
 use repo_url::Repo;
@@ -23,7 +21,6 @@ pub use parse_cfg::{Cfg, Target};
 pub struct RichCrateVersion {
     origin: Origin,
     index: Version,
-    manifest: TomlManifest,
     derived: Derived,
     authors: Vec<Author>,
     readme: Result<Option<Readme>, ()>,
@@ -31,6 +28,16 @@ pub struct RichCrateVersion {
     repo: Option<Repo>,
     path_in_repo: Option<String>,
     has_buildrs: bool,
+
+    // Manifest content
+    package: Package,
+    lib: Option<Product>,
+    bin: Vec<Product>,
+    features: FeatureSet,
+    target: TargetDepsSet,
+    dependencies: DepsSet,
+    build_dependencies: DepsSet,
+    dev_dependencies: DepsSet,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -44,34 +51,48 @@ pub enum Include {
 ///
 /// Crates.rs uses this only for the latest version of a crate.
 impl RichCrateVersion {
-    pub fn new(index: Version, mut manifest: TomlManifest, derived: Derived, readme: Result<Option<Readme>, ()>, lib_file: Option<String>, path_in_repo: Option<String>, has_buildrs: bool) -> Self {
-        Self::fake_categories(&mut manifest);
-        Self {
+    pub fn new(index: Version, mut manifest: Manifest, derived: Derived, readme: Result<Option<Readme>, ()>,
+        lib_file: Option<String>, path_in_repo: Option<String>, has_buildrs: bool) -> Self
+    {
+        let package = manifest.package.take().unwrap();
+        let mut s = Self {
             origin: Origin::from_crates_io_name(index.name()),
-            repo: manifest.package.repository.as_ref().and_then(|r| Repo::new(r).ok()),
-            authors: manifest.package.authors.iter().map(|a| Author::new(a)).collect(),
-            index, manifest, readme, has_buildrs,
+            repo: package.repository.as_ref().and_then(|r| Repo::new(r).ok()),
+            authors: package.authors.iter().map(|a| Author::new(a)).collect(),
+            index,
+            package,
+            readme,
+            has_buildrs,
             derived,
             path_in_repo,
             lib_file,
-        }
+            lib: manifest.lib,
+            bin: manifest.bin,
+            features: manifest.features,
+            target: manifest.target,
+            dependencies: manifest.dependencies,
+            build_dependencies: manifest.build_dependencies,
+            dev_dependencies: manifest.dev_dependencies,
+        };
+        s.fake_categories();
+        s
     }
 
     #[inline]
     pub fn homepage(&self) -> Option<&str> {
-        self.manifest.package.homepage.as_ref().map(|s| s.as_ref())
+        self.package.homepage.as_ref().map(|s| s.as_ref())
     }
 
     pub fn documentation(&self) -> Option<&str> {
-        self.manifest.package.documentation.as_ref().map(|s| s.as_ref())
+        self.package.documentation.as_ref().map(|s| s.as_ref())
     }
 
     pub fn edition(&self) -> Edition {
-        self.manifest.package.edition
+        self.package.edition
     }
 
     pub fn has_categories(&self) -> bool {
-        !self.manifest.package.categories.is_empty() || self.derived.categories.as_ref().map_or(false, |c| !c.is_empty())
+        !self.package.categories.is_empty() || self.derived.categories.as_ref().map_or(false, |c| !c.is_empty())
     }
 
     /// Finds preferred capitalization for the name
@@ -131,49 +152,43 @@ impl RichCrateVersion {
             Include::Cleaned => Categories::fixed_category_slugs(if let Some(ref assigned_categories) = self.derived.categories {
                 &assigned_categories
             } else {
-                &self.manifest.package.categories
+                &self.package.categories
             }),
-            Include::AuthoritativeOnly => Categories::fixed_category_slugs(&self.manifest.package.categories),
+            Include::AuthoritativeOnly => Categories::fixed_category_slugs(&self.package.categories),
             Include::RawCargoTomlOnly => {
-                let tmp: Vec<_> = self.manifest.package.categories.iter().map(From::from).collect();
+                let tmp: Vec<_> = self.package.categories.iter().map(From::from).collect();
                 tmp
             }
         }.into_iter()
     }
 
     pub fn license(&self) -> Option<&str> {
-        self.manifest.package.license.as_ref().map(|s| s.as_str())
+        self.package.license.as_ref().map(|s| s.as_str())
     }
 
     pub fn license_name(&self) -> Option<&str> {
-        self.manifest.package.license.as_ref().map(|s| {
-            match s.as_str() {
-                "" => "(unspecified)",
-                "MIT OR Apache-2.0" | "MIT/Apache-2.0" | "MIT / Apache-2.0" => "MIT/Apache",
-                "Apache-2.0/ISC/MIT" => "MIT/Apache/ISC",
-                "BSD-3-Clause AND Zlib" => "BSD+Zlib",
-                "CC0-1.0" => "CC0",
-                s => s,
-            }
+        self.package.license.as_ref().map(|s| match s.as_str() {
+            "" => "(unspecified)",
+            "MIT OR Apache-2.0" | "MIT/Apache-2.0" | "MIT / Apache-2.0" => "MIT/Apache",
+            "Apache-2.0/ISC/MIT" => "MIT/Apache/ISC",
+            "BSD-3-Clause AND Zlib" => "BSD+Zlib",
+            "CC0-1.0" => "CC0",
+            s => s,
         })
     }
 
     pub fn license_file(&self) -> Option<&str> {
-        self.manifest.package.license_file.as_ref().map(|s| s.as_str())
+        self.package.license_file.as_ref().map(|s| s.as_str())
     }
 
     /// Either original keywords or guessed ones
     pub fn keywords(&self, include: Include) -> impl Iterator<Item = &str> {
         match include {
-            Include::RawCargoTomlOnly => &self.manifest.package.keywords,
+            Include::RawCargoTomlOnly => &self.package.keywords,
             Include::AuthoritativeOnly => {
-                if self.manifest.package.keywords.is_empty() {
-                    self.derived.github_keywords.as_ref()
-                } else {
-                    None
-                }.unwrap_or(&self.manifest.package.keywords)
+                if self.package.keywords.is_empty() { self.derived.github_keywords.as_ref() } else { None }.unwrap_or(&self.package.keywords)
             },
-            Include::Cleaned => self.derived.keywords.as_ref().unwrap_or(&self.manifest.package.keywords),
+            Include::Cleaned => self.derived.keywords.as_ref().unwrap_or(&self.package.keywords),
         }
         .iter().map(|s| s.as_str())
     }
@@ -200,7 +215,7 @@ impl RichCrateVersion {
 
     /// Without trailing '.' to match website's style
     pub fn description(&self) -> Option<&str> {
-        self.manifest.package.description.as_ref().map(|d| {
+        self.package.description.as_ref().map(|d| {
             let d = d.as_str().trim();
             if d.contains(". ") {d} // multiple sentences, leave them alone
             else {d.trim_end_matches('.')}
@@ -239,11 +254,11 @@ impl RichCrateVersion {
     }
 
     pub fn has_buildrs(&self) -> bool {
-        self.has_buildrs || self.manifest.package.build.is_some()
+        self.has_buildrs || self.package.build.is_some()
     }
 
     pub fn links(&self) -> Option<&str> {
-        self.manifest.package.links.as_ref().map(|s| s.as_str())
+        self.package.links.as_ref().map(|s| s.as_str())
     }
 
     #[inline]
@@ -260,17 +275,15 @@ impl RichCrateVersion {
     }
 
     pub fn has_lib(&self) -> bool {
-        !self.is_proc_macro() && (self.lib_file.is_some() || self.manifest.lib.is_some())
+        !self.is_proc_macro() && (self.lib_file.is_some() || self.lib.is_some())
     }
 
     pub fn has_bin(&self) -> bool {
-        !self.manifest.bin.is_empty()
+        !self.bin.is_empty()
     }
 
     pub fn is_proc_macro(&self) -> bool {
-        self.manifest.lib.as_ref().map_or(false, |lib| {
-            lib.proc_macro.unwrap_or(false)
-        })
+        self.lib.as_ref().map_or(false, |lib| lib.proc_macro)
     }
 
     pub fn is_app(&self) -> bool {
@@ -301,17 +314,16 @@ impl RichCrateVersion {
     }
 
     pub fn has_runtime_deps(&self) -> bool {
-        !self.manifest.dependencies.is_empty()
-        || self.manifest.target.values().any(|target| !target.dependencies.is_empty())
+        !self.dependencies.is_empty() || self.target.values().any(|target| !target.dependencies.is_empty())
     }
 
     pub fn features(&self) -> &BTreeMap<String, Vec<String>> {
-        &self.manifest.features
+        &self.features
     }
 
     /// Runtime, dev, build
     pub fn dependencies(&self) -> Result<(Vec<RichDep>, Vec<RichDep>, Vec<RichDep>), CfgErr> {
-        fn to_dep((name, dep): (&String, &TomlDependency)) -> (String, RichDep) {
+        fn to_dep((name, dep): (&String, &Dependency)) -> (String, RichDep) {
             (name.to_owned(), RichDep {
                 name: name.to_owned(),
                 dep: dep.clone(),
@@ -320,11 +332,11 @@ impl RichCrateVersion {
                 with_features: Vec::new(),
             })
         }
-        let mut normal: BTreeMap<String, RichDep> = self.manifest.dependencies.iter().map(to_dep).collect();
-        let mut build: BTreeMap<String, RichDep> = self.manifest.build_dependencies.iter().map(to_dep).collect();
-        let mut dev: BTreeMap<String, RichDep> = self.manifest.dev_dependencies.iter().map(to_dep).collect();
+        let mut normal: BTreeMap<String, RichDep> = self.dependencies.iter().map(to_dep).collect();
+        let mut build: BTreeMap<String, RichDep> = self.build_dependencies.iter().map(to_dep).collect();
+        let mut dev: BTreeMap<String, RichDep> = self.dev_dependencies.iter().map(to_dep).collect();
 
-        fn add_targets(dest: &mut BTreeMap<String, RichDep>, src: &TomlDepsSet, target: &str) -> Result<(), CfgErr> {
+        fn add_targets(dest: &mut BTreeMap<String, RichDep>, src: &DepsSet, target: &str) -> Result<(), CfgErr> {
             for (k, v) in src {
                 use std::collections::btree_map::Entry::*;
                 match dest.entry(k.to_string()) {
@@ -342,7 +354,7 @@ impl RichCrateVersion {
             }
             Ok(())
         }
-        for (ref target, ref plat) in &self.manifest.target {
+        for (ref target, ref plat) in &self.target {
             add_targets(&mut normal, &plat.dependencies, target)?;
             add_targets(&mut build, &plat.build_dependencies, target)?;
             add_targets(&mut dev, &plat.dev_dependencies, target)?;
@@ -395,27 +407,31 @@ impl RichCrateVersion {
         Ok((convsort(normal), convsort(dev), convsort(build)))
     }
 
-    fn fake_categories(manifest: &mut TomlManifest) {
-        for cat in &mut manifest.package.categories {
+    fn fake_categories(&mut self) {
+        for cat in &mut self.package.categories {
             if cat == "parsers" {
-                if manifest.dependencies.keys().any(|k| k == "nom") {
+                if self.dependencies.keys().any(|k| k == "nom") {
                     *cat = "parser-implementations".into();
                 }
             }
             if cat == "cryptography" {
-                if manifest.package.keywords.iter().any(|k| k == "bitcoin" || k == "ethereum" || k == "exonum" || k == "blockchain") {
+                if self.package.keywords.iter().any(|k| k == "bitcoin" || k == "ethereum" || k == "exonum" || k == "blockchain") {
                     *cat = "cryptography::cryptocurrencies".into();
                 }
             }
             if cat == "games" {
-                if manifest.package.keywords.iter().any(|k| k == "game-dev" || k == "game-development" || k == "gamedev" || k == "framework" || k == "utilities" || k == "parser" || k == "api") {
+                if self.package.keywords.iter().any(|k| {
+                    k == "game-dev" || k == "game-development" || k == "gamedev" || k == "framework" || k == "utilities" || k == "parser" || k == "api"
+                }) {
                     *cat = "game-engines".into();
                 }
             }
             if cat == "science" {
-                if manifest.package.keywords.iter().any(|k| k == "neural-network" || k == "machine-learning" || k == "deep-learning") {
+                if self.package.keywords.iter().any(|k| k == "neural-network" || k == "machine-learning" || k == "deep-learning") {
                     *cat = "science::ml".into();
-                } else if manifest.package.keywords.iter().any(|k| k == "math" ||  k == "calculus" || k == "algebra" || k == "linear-algebra" || k == "mathematics" || k == "maths" || k == "number-theory") {
+                } else if self.package.keywords.iter().any(|k| {
+                    k == "math" || k == "calculus" || k == "algebra" || k == "linear-algebra" || k == "mathematics" || k == "maths" || k == "number-theory"
+                }) {
                     *cat = "science::math".into();
                 }
             }
@@ -434,7 +450,7 @@ impl RichCrateVersion {
 
 pub struct RichDep {
     pub name: String,
-    pub dep: TomlDependency,
+    pub dep: Dependency,
     /// it's optional, used only for a platform
     pub only_for_targets: Vec<Target>,
     /// it's optional, used only if parent crate's feature is enabled

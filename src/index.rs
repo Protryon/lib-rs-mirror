@@ -157,7 +157,7 @@ impl Index {
             let krate = match self.crate_by_name(&Origin::from_crates_io_name(name)) {
                 Ok(k) => k,
                 Err(e) => {
-                    eprintln!("{} depends on missing crate {}: {}", ver.name(), name, e);
+                    eprintln!("{}@{} depends on missing crate {} (@{}): {}", ver.name(), ver.version(), name, req, e);
                     continue;
                 },
             };

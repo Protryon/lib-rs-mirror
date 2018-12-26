@@ -41,9 +41,8 @@ pub use rich_crate::RichCrateVersion;
 pub use rich_crate::RichDep;
 pub use rich_crate::{Cfg, Target};
 
-use cargo_toml::TomlLibOrBin;
-use cargo_toml::TomlManifest;
-use cargo_toml::TomlPackage;
+use cargo_toml::Manifest;
+use cargo_toml::Package;
 use chrono::DateTime;
 use crate_db::{CrateDb, RepoChange};
 use crate_files::CrateFile;
@@ -79,6 +78,8 @@ pub type Warnings = HashSet<Warning>;
 pub enum Warning {
     #[fail(display = "`Cargo.toml` doesn't have `repository` property")]
     NoRepositoryProperty,
+    #[fail(display = "`Cargo.toml` doesn't have `[package]` section")]
+    NotAPackage,
     #[fail(display = "`Cargo.toml` doesn't have `readme` property")]
     NoReadmeProperty,
     #[fail(display = "Can't find README in repository: {}", _0)]
@@ -99,6 +100,8 @@ pub enum KitchenSinkErr {
     CategoryQueryFailed,
     #[fail(display = "crate not found: {:?}", _0)]
     CrateNotFound(Origin),
+    #[fail(display = "crate is not a package: {:?}", _0)]
+    NotAPackage(Origin),
     #[fail(display = "data not found, wanted {}", _0)]
     DataNotFound(String),
     #[fail(display = "crate has no versions")]
@@ -133,7 +136,7 @@ pub struct KitchenSink {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct RichCrateVersionCacheData {
     derived: Derived,
-    manifest: TomlManifest,
+    manifest: Manifest,
     readme: Result<Option<Readme>, ()>,
     lib_file: Option<String>,
     path_in_repo: Option<String>,
@@ -324,6 +327,7 @@ impl KitchenSink {
 
     fn rich_crate_version_data(&self, latest: &crates_index::Version, fetch_type: CrateData) -> CResult<(RichCrateVersionCacheData, Warnings)> {
         let mut warnings = HashSet::new();
+
         let name = latest.name();
         let ver = latest.version();
 
@@ -344,39 +348,9 @@ impl KitchenSink {
 
         let origin = Origin::from_crates_io_name(name);
 
-        // Quick'n'dirty autobins substitute
-        if meta.manifest.bin.is_empty() {
-            if let Some(path) = meta.find(|p| p.starts_with("src/bin/") || p.starts_with("src/main.rs")).map(|t| t.display().to_string()) {
-                meta.manifest.bin.push(TomlLibOrBin {
-                    path: Some(path),
-                    name: Some(meta.manifest.package.name.clone()),
-                    bench: None,
-                    doc: None,
-                    plugin: None,
-                    proc_macro: None,
-                    test: None,
-                    doctest: None,
-                    harness: None,
-                });
-            }
-        }
+        let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
 
-        // quick and dirty autolibs substitute
-        if meta.manifest.lib.is_none() && (meta.lib_file.is_some() || meta.has("src/lib.rs")) {
-            meta.manifest.lib = Some(TomlLibOrBin {
-                path: Some("src/lib.rs".to_owned()),
-                name: Some(meta.manifest.package.name.clone()),
-                bench: None,
-                doc: None,
-                plugin: None,
-                proc_macro: None,
-                test: None,
-                doctest: None,
-                harness: None,
-            });
-        }
-
-        let maybe_repo = meta.manifest.package.repository.as_ref().and_then(|r| Repo::new(r).ok());
+        let maybe_repo = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
 
         let path_in_repo = match maybe_repo.as_ref() {
             Some(repo) => if fetch_type != CrateData::Minimal {
@@ -390,10 +364,10 @@ impl KitchenSink {
         ///// Fixing and faking the data /////
 
         // Guess repo URL if none was specified
-        if meta.manifest.package.repository.is_none() {
+        if package.repository.is_none() {
             warnings.insert(Warning::NoRepositoryProperty);
-            if meta.manifest.package.homepage.as_ref().map_or(false, |h| Repo::looks_like_repo_url(h)) {
-                meta.manifest.package.repository = meta.manifest.package.homepage.take();
+            if package.homepage.as_ref().map_or(false, |h| Repo::looks_like_repo_url(h)) {
+                package.repository = package.homepage.take();
             }
         }
 
@@ -405,9 +379,11 @@ impl KitchenSink {
             }
         }
 
+        let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
+
         // Guess keywords if none were specified
         // TODO: also ignore useless keywords that are unique db-wide
-        if meta.manifest.package.keywords.is_empty() && fetch_type != CrateData::Minimal {
+        if package.keywords.is_empty() && fetch_type != CrateData::Minimal {
             let gh = match maybe_repo.as_ref() {
                 Some(repo) => if let RepoHost::GitHub(ref gh) = repo.host() {
                     self.gh.topics(gh, &self.cachebust_string_for_repo(repo).context("fetch topics")?)?
@@ -430,9 +406,9 @@ impl KitchenSink {
         }
 
         // Guess categories if none were specified
-        if meta.manifest.package.categories.is_empty() && fetch_type == CrateData::Full {
+        if package.categories.is_empty() && fetch_type == CrateData::Full {
             derived.categories = Some({
-                let keywords_iter = meta.manifest.package.keywords.iter().map(|s| s.as_str());
+                let keywords_iter = package.keywords.iter().map(|s| s.as_str());
                 self.crate_db.guess_crate_categories(&origin, keywords_iter).context("catdb")?
                 .into_iter().map(|(_, c)| c).collect()
             });
@@ -440,13 +416,13 @@ impl KitchenSink {
 
         // Delete the original docs.rs link, because we have our own
         // TODO: what if the link was to another crate or a subpage?
-        if meta.manifest.package.documentation.as_ref().map_or(false, |s| Self::is_docs_rs_link(s)) {
+        if package.documentation.as_ref().map_or(false, |s| Self::is_docs_rs_link(s)) {
             if self.has_docs_rs(name, ver) {
-                meta.manifest.package.documentation = None; // docs.rs is not proper docs
+                package.documentation = None; // docs.rs is not proper docs
             }
         }
 
-        warnings.extend(self.remove_redundant_links(&mut meta.manifest.package, maybe_repo.as_ref()));
+        warnings.extend(self.remove_redundant_links(package, maybe_repo.as_ref()));
 
         if fetch_type != CrateData::Minimal {
             if let Some(ref crate_repo) = maybe_repo {
@@ -454,13 +430,13 @@ impl KitchenSink {
                     RepoHost::GitHub(ref repo) => {
                         let cachebust = self.cachebust_string_for_repo(crate_repo).context("ghrepo")?;
                         if let Some(ghrepo) = self.gh.repo(repo, &cachebust)? {
-                            if meta.manifest.package.homepage.is_none() {
+                            if package.homepage.is_none() {
                                 if let Some(url) = ghrepo.github_page_url {
-                                    meta.manifest.package.homepage = Some(url);
+                                    package.homepage = Some(url);
                                 } else if let Some(url) = ghrepo.homepage {
-                                    meta.manifest.package.homepage = Some(url);
+                                    package.homepage = Some(url);
                                 }
-                                warnings.extend(self.remove_redundant_links(&mut meta.manifest.package, maybe_repo.as_ref()));
+                                warnings.extend(self.remove_redundant_links(package, maybe_repo.as_ref()));
                             }
                             derived.github_description = ghrepo.description;
                             derived.github_name = Some(ghrepo.name);
@@ -498,11 +474,18 @@ impl KitchenSink {
 
     fn add_readme_from_repo(&self, meta: &mut CrateFile, maybe_repo: Option<&Repo>) -> Warnings {
         let mut warnings = HashSet::new();
+        let package = match meta.manifest.package.as_ref() {
+            Some(p) => p,
+            None => {
+                warnings.insert(Warning::NotAPackage);
+                return warnings;
+            }
+        };
         if let Some(repo) = maybe_repo {
             let res = crate_git_checkout::checkout(repo, &self.git_checkout_path)
             .map_err(From::from)
             .and_then(|checkout| {
-                crate_git_checkout::find_readme(&checkout, &meta.manifest.package)
+                crate_git_checkout::find_readme(&checkout, package)
             });
             match res {
                 Ok(Some(readme)) => {
@@ -513,14 +496,14 @@ impl KitchenSink {
                 },
                 Err(err) => {
                     warnings.insert(Warning::ErrorCloning(repo.canonical_git_url().to_string()));
-                    eprintln!("Checkout of {} ({}) failed: {}", meta.manifest.package.name, repo.canonical_git_url(), err);
+                    eprintln!("Checkout of {} ({}) failed: {}", package.name, repo.canonical_git_url(), err);
                 },
             }
         }
         warnings
     }
 
-    fn remove_redundant_links(&self, package: &mut TomlPackage, maybe_repo: Option<&Repo>) -> Warnings {
+    fn remove_redundant_links(&self, package: &mut Package, maybe_repo: Option<&Repo>) -> Warnings {
         let mut warnings = HashSet::new();
 
         // We show github link prominently, so if homepage = github, that's nothing new
@@ -706,7 +689,9 @@ impl KitchenSink {
         for warn in warnings {
             eprintln!("warning: {}", warn.0);
         }
-        let manif = manif.into_iter().map(|(subpath, manifest)| (subpath, manifest.package.name));
+        let manif = manif.into_iter().filter_map(|(subpath, manifest)| {
+            manifest.package.map(|p| (subpath, p.name))
+        });
         self.crate_db.index_repo_crates(repo, manif).context("index rev repo")?;
 
         if let Repo { host: RepoHost::GitHub(ref repo), .. } = repo {

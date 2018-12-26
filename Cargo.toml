@@ -1,8 +1,9 @@
 [package]
-name = "server"
-version = "0.1.0"
+name = "crates-server"
+version = "0.1.1"
 authors = ["Kornel <kornel@geekhood.net>"]
 edition = "2018"
+description = "Crates.rs web server"
 
 [dependencies]
 actix-web = "0.7.16"

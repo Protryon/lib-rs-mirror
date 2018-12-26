@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::borrow::Cow;
 use actix_web::{http::*, *};
 use env_logger;
@@ -5,6 +6,7 @@ use futures::future::{self, Future};
 use futures_cpupool::CpuPool;
 use log::*;
 use std::sync::Arc;
+use std::env;
 use front_end;
 use search_index::CrateSearchIndex;
 use render_readme::{Highlighter, ImageFilter, Renderer};
@@ -34,7 +36,13 @@ fn main() {
 
     let markup = Renderer::new_filter(Highlighter::new(), Arc::new(NopFilter {}));
 
-    let index = CrateSearchIndex::new("../data").unwrap();
+    let public_dir: PathBuf = env::var_os("DOCUMENT_ROOT").map(From::from).unwrap_or_else(|| "../style/public".into());
+    let data_dir: PathBuf = env::var_os("CRATE_DATA_DIR").map(From::from).unwrap_or_else(|| "../data".into());
+
+    assert!(public_dir.exists(), "DOCUMENT_ROOT {} does not exist", public_dir.display());
+    assert!(data_dir.exists(), "CRATE_DATA_DIR {} does not exist", data_dir.display());
+
+    let index = CrateSearchIndex::new(data_dir).expect("data directory");
 
     let state = Arc::new(ServerState {
         pool: CpuPool::new_num_cpus(),
@@ -46,7 +54,7 @@ fn main() {
         App::with_state(state.clone())
             .middleware(middleware::Logger::default())
             .resource("/search", |r| r.method(Method::GET).f(handle_search))
-            .handler("/", fs::StaticFiles::new("../style/public").unwrap())
+            .handler("/", fs::StaticFiles::new(&public_dir).expect("public directory"))
             .default_resource(|r| r.f(handle_404))
     })
     .bind("127.0.0.1:32531")

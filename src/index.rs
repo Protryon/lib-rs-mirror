@@ -278,7 +278,10 @@ impl fmt::Debug for Dep {
 /// Note: the repo URL in the crate is outdated, and it may be a redirect to the deprecated
 fn is_deprecated(name: &str) -> bool {
     match name {
-        "rustc-serialize" | "gcc" | "rustc-benchmarks" | "time" | "flate2-crc" => true,
+        "rustc-serialize" | "gcc" | "rustc-benchmarks" | "time" |
+        "flate2-crc" | "complex" | "simple_stats" | "concurrent" | "feed" |
+        "isatty" | "thread-scoped" | "target_build_utils" | "chan" | "chan-signal" |
+        "glsl-to-spirv" => true,
         _ => false,
     }
 }

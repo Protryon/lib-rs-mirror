@@ -118,7 +118,7 @@ fn index(indexer: &mut Indexer, all: &RichCrate, k: &RichCrateVersion) -> Result
 
     println!("{:0.3} {}: {}", score, k.short_name(), k.description().unwrap_or(""));
 
-    indexer.add(k.short_name(), version, k.description().unwrap_or(""), &keywords.join(" "), readme, downloads as u64, score);
+    indexer.add(k.short_name(), version, k.description().unwrap_or(""), &keywords, readme, downloads as u64, score);
     Ok(())
 }
 

@@ -41,6 +41,7 @@ impl SearchPage<'_> {
             alternate: None,
             canonical: None,
             noindex: true,
+            search_meta: true,
             critical_css_data: Some(include_str!("../../style/public/search.css")),
         }
     }

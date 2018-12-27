@@ -53,6 +53,9 @@
     <meta name="twitter:image" content="https://www.rust-lang.org/logos/rust-logo-256x256-blk.png">
     <link rel=icon href="/favicon.png">
     <link rel=preconnect href="//img.gs" crossorigin="anonymous">
+    @if props.search_meta {
+      <link title="Crates.rs" type="application/opensearchdescription+xml" rel="search" href="/opensearch.xml">
+    }
   <body vocab="http://schema.org/">
     @:content()
   </body>

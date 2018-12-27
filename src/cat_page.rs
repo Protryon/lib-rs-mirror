@@ -103,6 +103,7 @@ impl<'a> CatPage<'a> {
             alternate: None,
             canonical: None,
             noindex: false,
+            search_meta: true,
             critical_css_data: None,
         }
     }

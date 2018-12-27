@@ -41,6 +41,7 @@ pub struct Page {
     alternate: Option<String>,
     canonical: Option<String>,
     noindex: bool,
+    search_meta: bool,
     critical_css_data: Option<&'static str>,
 }
 

@@ -60,7 +60,7 @@ Async program flow using techniques like futures, promises, waiting, or eventing
 
 [authentication]
 name = "Authentication"
-title = "Rust authentication library"
+title = "Rust auth library"
 description = """
 Crates to help with the process of confirming identities.\
 """
@@ -79,7 +79,7 @@ Store the results of previous computations."""
 
 [command-line-interface]
 name = "Command-line interface"
-title = "command-line interface for Rust"
+title = "CLI for Rust"
 description = """
 Crates to help create command line interfaces, such as argument \
 parsers, line-editing, or output coloring and formatting.\
@@ -89,7 +89,7 @@ Argument parsers, line-editing, or output coloring and formatting."""
 
 [command-line-utilities]
 name = "Command line utilities"
-title = "Rust command line utility"
+title = "Rust command line util"
 description = """
 Applications to run at the command line.\
 """
@@ -107,7 +107,7 @@ Algorithms for making data smaller."""
 
 [config]
 name = "Configuration"
-title = "Rust configuration library"
+title = "Rust config library"
 description = """
 Crates to facilitate configuration management for applications.\
 """
@@ -143,7 +143,7 @@ short-description = "Coins, blockchains and wallets."
 
 [database]
 name = "Database interfaces"
-title = "database interface for Rust"
+title = "db interface for Rust"
 description = """
 Crates to interface with database management systems.\
 """
@@ -152,7 +152,7 @@ Interface with database management systems."""
 
 [database-implementations]
 name = "Database implementations"
-title = "Rust database implementation"
+title = "Rust database"
 description = """
 Databases allow clients to store and query large amounts of data in an \
 efficient manner. This category is for database management systems \
@@ -173,7 +173,7 @@ Rust implementations of data structures for specific purposes."""
 
 [date-and-time]
 name = "Date and time"
-title = "Rust date and time library"
+title = "Rust date/time library"
 description = """
 Crates to manage the inherent complexity of dealing with the fourth \
 dimension.\
@@ -183,7 +183,7 @@ Dealing with the fourth dimension."""
 
 [development-tools]
 name = "Development tools"
-title = "Rust development tool"
+title = "Rust dev tool"
 description = """
 Crates that provide developer-facing features such as testing, debugging, \
 linting, performance profiling, autocompletion, formatting, and more.\
@@ -193,7 +193,7 @@ Testing, debugging, linting, performance profiling, autocompletion, formatting, 
 
 [development-tools.categories.build-utils]
 name = "Build Utils"
-title = "Rust build utility"
+title = "Rust build util"
 description = """
 Utilities for build scripts and other build time steps.\
 """
@@ -211,7 +211,7 @@ Subcommands that extend the capabilities of Cargo."""
 
 [development-tools.categories.debugging]
 name = "Debugging"
-title = "library for debugging in Rust"
+title = "for debugging in Rust"
 description = """
 Crates to help you figure out what is going on with your code such as \
 logging, tracing, or assertions.\
@@ -231,7 +231,7 @@ Interface with other languages. Includes binding generators and helpful language
 
 [development-tools.categories.procedural-macro-helpers]
 name = "Procedural macro helpers"
-title = "Rust procedural macro helper"
+title = "Rust proc macro helper"
 description = """
 Crates to help you write procedural macros in Rust.
 """
@@ -268,7 +268,7 @@ Sending, receiving, formatting, and parsing email."""
 
 [embedded]
 name = "Embedded development"
-title = "embedded development in Rust"
+title = "embedded dev in Rust"
 description = """
 Crates that are primarily useful on embedded devices or \
 without an operating system.
@@ -351,7 +351,7 @@ Create a graphical user interface."""
 
 [hardware-support]
 name = "Hardware support"
-title = "Rust hardware support library"
+title = "Rust HW library"
 description = """
 Crates to interface with specific CPU or other hardware features.\
 """
@@ -370,7 +370,7 @@ Develop software capable of adapting to various languages and regions."""
 
 [localization]
 name = "Localization (L10n)"
-title = "Rust localization library"
+title = "Rust localization"
 description = """
 Crates to help adapting internationalized software to specific \
 languages and regions.\
@@ -441,7 +441,7 @@ Encode or decode binary data in multimedia formats.
 
 [network-programming]
 name = "Network programming"
-title = "Rust network programming library"
+title = "Rust network library"
 description = """
 Crates dealing with higher-level network protocols such as FTP, HTTP, \
 or SSH, or lower-level network protocols such as TCP or UDP.\
@@ -461,7 +461,7 @@ Libraries that function without the Rust standard library.
 
 [os]
 name = "Operating systems"
-title = "Rust system-specific library"
+title = "Rust OS-specific library"
 description = """
 Bindings to operating system-specific APIs.\
 """
@@ -535,7 +535,7 @@ High-level solutions for rendering on the screen."""
 
 [rendering.categories.graphics-api]
 name = "Graphics APIs"
-title = "Rust graphics library"
+title = "Rust gfx library"
 description = """
 Crates that provide direct access to the hardware's or the operating \
 system's rendering capabilities.\
@@ -566,7 +566,7 @@ Shared solutions for particular situations specific to programming in Rust."""
 
 [science]
 name = "Science"
-title = "Rust scientific library"
+title = "Rust library"
 description = """
 Crates related to solving problems involving math, physics, chemistry, \
 biology, machine learning, geoscience, and other scientific fields.\
@@ -634,7 +634,7 @@ Deal with the complexities of human language when expressed in textual form."""
 
 [value-formatting]
 name = "Value formatting"
-title = "Rust value formatting library"
+title = "Rust formatting library"
 description = """
 Crates to allow an application to format values for display to a user, \
 potentially adapting the display to various languages and regions.\
@@ -644,7 +644,7 @@ Format values for display to a user, potentially adapting the display to various
 
 [visualization]
 name = "Visualization"
-title = "Rust visualization library"
+title = "Rust data vis library"
 description = """
 Ways to view data, such as plotting or graphing.\
 """

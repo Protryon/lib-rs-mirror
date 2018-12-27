@@ -19,7 +19,7 @@ crate_files = { git = "https://gitlab.com/crates.rs/crate_files.git", version = 
 user_db = { git = "https://gitlab.com/crates.rs/user_db.git", version = "0.3" }
 crate_db = { git = "https://gitlab.com/crates.rs/crate_db.git", version = "0.2.2" }
 categories = { git = "https://gitlab.com/crates.rs/categories.git" }
-rich_crate = { git = "https://gitlab.com/crates.rs/rich_crate.git", version = "0.3.2" }
+rich_crate = { git = "https://gitlab.com/crates.rs/rich_crate.git", version = "0.3.3" }
 simple_cache = { git = "https://gitlab.com/crates.rs/simple_cache.git", version = "0.6.0" }
 lazyonce = "0.3.0"
 repo_url = { git = "https://gitlab.com/crates.rs/repo_url.git", version = "0.3.0" }

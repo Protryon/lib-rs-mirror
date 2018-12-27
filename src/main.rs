@@ -53,6 +53,7 @@ fn main() {
         App::with_state(state.clone())
             .middleware(middleware::Logger::default())
             .resource("/search", |r| r.method(Method::GET).f(handle_search))
+            .resource("/keywords/{keyword}", |r| r.method(Method::GET).f(handle_keyword))
             .handler("/", fs::StaticFiles::new(&public_dir).expect("public directory"))
             .default_resource(|r| r.f(handle_404))
     })
@@ -67,6 +68,42 @@ fn main() {
 
 fn handle_404(_req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
     Ok(HttpResponse::NotFound().content_type("text/plain;charset=UTF-8").body("404\n"))
+}
+
+fn handle_keyword(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
+    let kw: Result<String, _> = req.match_info().query("keyword");
+    match kw {
+        Ok(ref q) if !q.is_empty() && is_alnum(&q) => {
+            let query = q.to_owned();
+            let state = req.state();
+            let state2 = Arc::clone(state);
+            state.pool.spawn_fn(move || {
+                let mut page: Vec<u8> = Vec::with_capacity(50000);
+                let keyword_query = format!("keywords:{}", query);
+                let results = state2.index.search(&keyword_query, 100).unwrap();
+                front_end::render_keyword_page(&mut page, &query, &results, &state2.markup).unwrap();
+                Ok::<_,()>(page)
+            })
+            .map_err(|_| unreachable!())
+            .and_then(|page| {
+                future::ok(HttpResponse::Ok()
+                    .content_type("text/html;charset=UTF-8")
+                    .content_length(page.len() as u64)
+                    .body(page))
+            })
+            .responder()
+        },
+        _ => {
+            future::ok(HttpResponse::TemporaryRedirect()
+                .header("Location", "/")
+                .finish())
+                .responder()
+        },
+    }
+}
+
+fn is_alnum(q: &str) -> bool {
+    q.chars().all(|c| c.is_ascii_alphanumeric())
 }
 
 fn handle_search(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {

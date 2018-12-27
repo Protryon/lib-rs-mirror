@@ -34,22 +34,22 @@
             <p class=tryalso>Try <a href="@url.search_ddg(p.query)">searching with duckduckgo</a> or <a href="@url.search_crates_io(p.query)">on crates.io</a>.</p>
         } else {
             <ol>
-            @for c in p.good_results {
+            @for (i, c) in p.good_results.iter().chain(p.bad_results).enumerate() {
                 <li>
                     <a href="@url.krate_by_name(&c.crate_name)"><div class=h>
                         <h4>@c.crate_name</h4>
                         <p class=desc>@p.render_markdown_str(&c.description)</p>
+                    </div>
+                    <div class=meta>
+                        <span class="version @p.version_class(&c.version)"><span>v</span>@c.version</span>
+                        @if c.monthly_downloads >= 100 {
+                            <span class=downloads title="c.monthly_downloads recent downloads">@if let Some((num,unit)) = Some(p.downloads(c.monthly_downloads)) {@num<b>@unit</b>}</span>
+                        }
                     </div></a>
                 </li>
-            }
-            <p class=tryalso>Try <a href="@url.search_ddg(p.query)">searching with duckduckgo</a> or <a href="@url.search_crates_io(p.query)">on crates.io</a>.</p>
-            @for c in p.bad_results {
-                <li>
-                    <a href="@url.krate_by_name(&c.crate_name)"><div class=h>
-                        <h4>@c.crate_name</h4>
-                        <p class=desc>@p.render_markdown_str(&c.description)</p>
-                    </div></a>
-                </li>
+                @if i == p.good_results.len() {
+                    <p class=tryalso>Try <a href="@url.search_ddg(p.query)">searching with duckduckgo</a> or <a href="@url.search_crates_io(p.query)">on crates.io</a>.</p>
+                }
             }
             </ol>
         }

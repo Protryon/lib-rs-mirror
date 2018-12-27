@@ -6,6 +6,9 @@ pub struct CrateSearchIndex {
     keywords_field: Field,
     description_field: Field,
     readme_field: Field,
+    monthly_downloads: Field,
+    crate_version: Field,
+
     tantivy_index: Index,
 }
 
@@ -14,6 +17,8 @@ pub struct CrateFound {
     pub crate_name: String,
     pub description: String,
     pub score: f32,
+    pub version: String,
+    pub monthly_downloads: u64,
 }
 
 pub struct Indexer {
@@ -32,10 +37,12 @@ impl CrateSearchIndex {
 
         Ok(Self {
             tantivy_index,
-            crate_name_field: schema.get_field("crate_name").unwrap(),
-            keywords_field: schema.get_field("keywords").unwrap(),
-            description_field: schema.get_field("description").unwrap(),
-            readme_field: schema.get_field("readme").unwrap(),
+            crate_name_field: schema.get_field("crate_name").expect("schema"),
+            keywords_field: schema.get_field("keywords").expect("schema"),
+            description_field: schema.get_field("description").expect("schema"),
+            readme_field: schema.get_field("readme").expect("schema"),
+            monthly_downloads: schema.get_field("monthly_downloads").expect("schema"),
+            crate_version: schema.get_field("crate_version").expect("schema"),
         })
     }
 
@@ -50,18 +57,21 @@ impl CrateSearchIndex {
         let text_field_indexing = TextFieldIndexing::default().set_tokenizer("en_stem").set_index_option(IndexRecordOption::WithFreqs);
         let text_options = TextOptions::default().set_indexing_options(text_field_indexing);
         let readme_field = schema_builder.add_text_field("readme", text_options);
+        let crate_version = schema_builder.add_text_field("crate_version", STRING | STORED);
+        let monthly_downloads = schema_builder.add_u64_field("monthly_downloads", INT_STORED);
 
         let schema = schema_builder.build();
         let tantivy_index = Index::create_in_dir(index_dir, schema)?;
         tantivy_index.load_searchers()?;
 
-        Ok(Self { tantivy_index, crate_name_field, keywords_field, description_field, readme_field })
+        Ok(Self { tantivy_index, crate_name_field, keywords_field, description_field, readme_field, monthly_downloads, crate_version })
     }
 
     pub fn search(&self, query_text: &str, limit: usize) -> tantivy::Result<Vec<CrateFound>> {
         let query_text = query_text.trim();
-        let mut query_parser =
-            QueryParser::for_index(&self.tantivy_index, vec![self.crate_name_field, self.keywords_field, self.description_field, self.readme_field]);
+        let mut query_parser = QueryParser::for_index(&self.tantivy_index, vec![
+            self.crate_name_field, self.keywords_field, self.description_field, self.readme_field,
+        ]);
         query_parser.set_conjunction_by_default();
 
         let mut top_collector = TopCollector::with_limit(limit);
@@ -83,6 +93,8 @@ impl CrateSearchIndex {
                 score,
                 crate_name: take_string(doc.remove("crate_name")),
                 description: take_string(doc.remove("description")),
+                version: take_string(doc.remove("crate_version")),
+                monthly_downloads: take_int(doc.get("monthly_downloads")),
             })
         })
         .collect()
@@ -92,7 +104,18 @@ impl CrateSearchIndex {
 fn take_string(val: Option<Vec<Value>>) -> String {
     match val {
         Some(mut val) => match val.remove(0) {
-            Value::Str(s) => return s,
+            Value::Str(s) => s,
+            _ => panic!("invalid value type"),
+        },
+        _ => panic!("missing value"),
+    }
+}
+
+fn take_int(val: Option<&Vec<Value>>) -> u64 {
+    match val {
+        Some(val) => match val.get(0) {
+            Some(Value::U64(s)) => *s,
+            Some(Value::I64(s)) => *s as u64,
             _ => panic!("invalid value type"),
         },
         _ => panic!("missing value"),
@@ -104,7 +127,7 @@ impl Indexer {
         Ok(Self { writer: index.tantivy_index.writer(250_000_000)?, index })
     }
 
-    pub fn add(&mut self, crate_name: &str, keywords: &str, description: &str, readme: Option<&str>) {
+    pub fn add(&mut self, crate_name: &str, version: &str, keywords: &str, description: &str, readme: Option<&str>, monthly_downloads: u64) {
         // delete old doc if any
         let crate_name_term = Term::from_field_text(self.index.crate_name_field, crate_name);
         self.writer.delete_term(crate_name_term);
@@ -117,6 +140,8 @@ impl Indexer {
         if let Some(readme) = readme {
             doc.add_text(self.index.readme_field, readme);
         }
+        doc.add_text(self.index.crate_version, version);
+        doc.add_u64(self.index.monthly_downloads, monthly_downloads);
         self.writer.add_document(doc);
     }
 

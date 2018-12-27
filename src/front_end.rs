@@ -26,7 +26,6 @@ use kitchen_sink::{stopped, KitchenSinkErr};
 use render_readme::Renderer;
 use rich_crate::RichCrate;
 use rich_crate::RichCrateVersion;
-use std::fs::read_to_string;
 use std::io::Write;
 
 include!(concat!(env!("OUT_DIR"), "/templates.rs"));
@@ -42,7 +41,7 @@ pub struct Page {
     alternate: Option<String>,
     canonical: Option<String>,
     noindex: bool,
-    alt_critical_css: Option<String>,
+    critical_css_data: Option<&'static str>,
 }
 
 impl Page {
@@ -50,9 +49,9 @@ impl Page {
         "@CratesRS"
     }
 
-    pub fn critical_css(&self) -> templates::Html<String> {
-        let path = self.alt_critical_css.as_ref().map(|s| s.as_str()).unwrap_or("../style/public/critical.css");
-        templates::Html(read_to_string(path).expect(path))
+    pub fn critical_css(&self) -> templates::Html<&'static str> {
+        let data = self.critical_css_data.unwrap_or(include_str!("../../style/public/critical.css"));
+        templates::Html(data)
     }
 }
 

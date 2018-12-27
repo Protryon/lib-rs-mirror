@@ -112,7 +112,7 @@ impl<'a> CratePage<'a> {
             alternate: self.ver.crates_io_url(),
             canonical: Some(url.krate(&self.ver)),
             noindex: self.ver.is_yanked(),
-            alt_critical_css: None,
+            critical_css_data: None,
         }
     }
 

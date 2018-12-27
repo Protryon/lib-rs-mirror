@@ -121,7 +121,7 @@ impl<'a> HomePage<'a> {
             alternate: None,
             canonical: None,
             noindex: false,
-            alt_critical_css: Some("../style/public/home.css".to_owned()),
+            critical_css_data: Some(include_str!("../../style/public/home.css")),
         }
     }
 }

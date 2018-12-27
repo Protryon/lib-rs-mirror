@@ -149,7 +149,7 @@ impl Indexer {
     }
 
     /// score is float 0..=1 range
-    pub fn add(&mut self, crate_name: &str, version: &str, keywords: &str, description: &str, readme: Option<&str>, monthly_downloads: u64, score: f64) {
+    pub fn add(&mut self, crate_name: &str, version: &str, description: &str, keywords: &[&str], readme: Option<&str>, monthly_downloads: u64, score: f64) {
         // delete old doc if any
         let crate_name_term = Term::from_field_text(self.index.crate_name_field, crate_name);
         self.writer.delete_term(crate_name_term);
@@ -157,7 +157,7 @@ impl Indexer {
         // index new one
         let mut doc = Document::default();
         doc.add_text(self.index.crate_name_field, crate_name);
-        doc.add_text(self.index.keywords_field, keywords);
+        doc.add_text(self.index.keywords_field, &keywords.join(", "));
         doc.add_text(self.index.description_field, description);
         if let Some(readme) = readme {
             doc.add_text(self.index.readme_field, readme);

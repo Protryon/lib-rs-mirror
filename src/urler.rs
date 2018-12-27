@@ -86,6 +86,10 @@ impl Urler {
         format!("https://crates.io/search?q={}", encode(query))
     }
 
+    pub fn search_crates_rs(&self, query: &str) -> String {
+        format!("https://crates.rs/search?q={}", encode(query))
+    }
+
     pub fn search_ddg(&self, query: &str) -> String {
         format!("https://duckduckgo.com/?q=site%3Acrates.rs+{}", encode(query))
     }

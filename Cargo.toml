@@ -11,7 +11,7 @@ path = "src/lib_crate_db.rs"
 
 [dependencies]
 rusqlite = "0.16"
-rich_crate = { git = "https://gitlab.com/crates.rs/rich_crate.git", version = "0.3.2" }
+rich_crate = { git = "https://gitlab.com/crates.rs/rich_crate.git", version = "0.3.3" }
 categories = { git = "https://gitlab.com/crates.rs/categories.git" }
 failure = "0.1.3"
 rayon = "1.0.1"

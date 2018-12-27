@@ -769,7 +769,7 @@ impl KitchenSink {
         let repo = child.repository()?;
         let name = self.crate_db.parent_crate(repo, child.short_name()).ok().and_then(|v| v)?;
         self.rich_crate_version(&Origin::from_crates_io_name(&name), CrateData::Minimal)
-            .map_err(|e| eprintln!("parent crate: {}", e)).ok()
+            .map_err(|e| eprintln!("parent crate: {} {}", e, name)).ok()
     }
 
     pub fn cachebust_string_for_repo(&self, crate_repo: &Repo) -> CResult<String> {

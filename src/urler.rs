@@ -38,7 +38,7 @@ impl Urler {
     }
 
     pub fn keyword(&self, name: &str) -> String {
-        format!("https://crates.io/keywords/{}", encode(name))
+        format!("/keywords/{}", encode(name))
     }
 
     /// First page of category listing

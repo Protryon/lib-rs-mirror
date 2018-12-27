@@ -4,7 +4,6 @@ use actix_web::{http::*, *};
 use env_logger;
 use futures::future::{self, Future};
 use futures_cpupool::CpuPool;
-use log::*;
 use std::sync::Arc;
 use std::env;
 use front_end;
@@ -62,7 +61,7 @@ fn main() {
     .shutdown_timeout(0) // <- Set shutdown timeout to 0 seconds (default 60s)
     .start();
 
-    info!("Starting http server");
+    println!("Starting HTTP server on 127.0.0.1:32531");
     let _ = sys.run();
 }
 

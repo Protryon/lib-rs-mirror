@@ -103,7 +103,7 @@ fn handle_keyword(req: &HttpRequest<AServerState>) -> FutureResponse<HttpRespons
 }
 
 fn is_alnum(q: &str) -> bool {
-    q.chars().all(|c| c.is_ascii_alphanumeric())
+    q.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
 
 fn handle_search(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {

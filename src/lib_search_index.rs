@@ -1,13 +1,22 @@
 use std::{fs, path::Path};
-use tantivy::{self, collector::TopCollector, query::QueryParser, schema::*, Index, IndexWriter};
+use std::cmp::Ordering;
+use tantivy::{self, collector::TopDocs, query::QueryParser, schema::*, Index, IndexWriter};
+
+const CRATE_SCORE_MAX: f64 = 1000000.0;
 
 pub struct CrateSearchIndex {
+    /// as-is
     crate_name_field: Field,
+    /// space-separated
     keywords_field: Field,
     description_field: Field,
     readme_field: Field,
+    /// raw number
     monthly_downloads: Field,
+    /// semver string
     crate_version: Field,
+    /// number in range 0..=SCORE_MAX denoting desirability of the crate
+    crate_score: Field,
 
     tantivy_index: Index,
 }
@@ -43,6 +52,7 @@ impl CrateSearchIndex {
             readme_field: schema.get_field("readme").expect("schema"),
             monthly_downloads: schema.get_field("monthly_downloads").expect("schema"),
             crate_version: schema.get_field("crate_version").expect("schema"),
+            crate_score: schema.get_field("crate_score").expect("schema"),
         })
     }
 
@@ -59,12 +69,13 @@ impl CrateSearchIndex {
         let readme_field = schema_builder.add_text_field("readme", text_options);
         let crate_version = schema_builder.add_text_field("crate_version", STRING | STORED);
         let monthly_downloads = schema_builder.add_u64_field("monthly_downloads", INT_STORED);
+        let crate_score = schema_builder.add_u64_field("crate_score", INT_STORED);
 
         let schema = schema_builder.build();
         let tantivy_index = Index::create_in_dir(index_dir, schema)?;
         tantivy_index.load_searchers()?;
 
-        Ok(Self { tantivy_index, crate_name_field, keywords_field, description_field, readme_field, monthly_downloads, crate_version })
+        Ok(Self { tantivy_index, crate_name_field, keywords_field, description_field, readme_field, monthly_downloads, crate_version, crate_score })
     }
 
     pub fn search(&self, query_text: &str, limit: usize) -> tantivy::Result<Vec<CrateFound>> {
@@ -74,7 +85,6 @@ impl CrateSearchIndex {
         ]);
         query_parser.set_conjunction_by_default();
 
-        let mut top_collector = TopCollector::with_limit(limit);
         let query = query_parser.parse_query(query_text)
             .or_else(|_| {
                 let mangled_query: String = query_text.chars().map(|ch| {
@@ -84,20 +94,31 @@ impl CrateSearchIndex {
             })?;
 
         let searcher = self.tantivy_index.searcher();
-        searcher.search(&*query, &mut top_collector)?;
+        let top_docs = searcher.search(&*query, &TopDocs::with_limit(limit))?;
 
-        top_collector.top_docs().into_iter().map(|(score, doc_address)| {
+        let mut docs = top_docs.into_iter().enumerate().map(|(i, (score, doc_address))| {
             let retrieved_doc = searcher.doc(doc_address)?;
             let mut doc = self.tantivy_index.schema().to_named_doc(&retrieved_doc).0;
+            let mut base_score = take_int(doc.get("crate_score")) as f64;
+            let position_bonus = CRATE_SCORE_MAX / ((i+1) as f64) / 4.; // first few crates can be ordered by tantivy's relevance
+            let crate_name = take_string(doc.remove("crate_name"));
+            // bonus for exact match
+            if crate_name == query_text {
+                base_score += CRATE_SCORE_MAX/10.;
+            }
             Ok(CrateFound {
-                score,
-                crate_name: take_string(doc.remove("crate_name")),
+                score: (score as f64 * (base_score + position_bonus)) as f32,
+                crate_name,
                 description: take_string(doc.remove("description")),
                 version: take_string(doc.remove("crate_version")),
                 monthly_downloads: take_int(doc.get("monthly_downloads")),
             })
         })
-        .collect()
+        .collect::<tantivy::Result<Vec<_>>>()?;
+
+        // re-sort using our base score
+        docs.sort_by(|a,b| b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal));
+        Ok(docs)
     }
 }
 
@@ -127,7 +148,8 @@ impl Indexer {
         Ok(Self { writer: index.tantivy_index.writer(250_000_000)?, index })
     }
 
-    pub fn add(&mut self, crate_name: &str, version: &str, keywords: &str, description: &str, readme: Option<&str>, monthly_downloads: u64) {
+    /// score is float 0..=1 range
+    pub fn add(&mut self, crate_name: &str, version: &str, keywords: &str, description: &str, readme: Option<&str>, monthly_downloads: u64, score: f64) {
         // delete old doc if any
         let crate_name_term = Term::from_field_text(self.index.crate_name_field, crate_name);
         self.writer.delete_term(crate_name_term);
@@ -142,6 +164,7 @@ impl Indexer {
         }
         doc.add_text(self.index.crate_version, version);
         doc.add_u64(self.index.monthly_downloads, monthly_downloads);
+        doc.add_u64(self.index.crate_score, (score * CRATE_SCORE_MAX).ceil() as u64);
         self.writer.add_document(doc);
     }
 

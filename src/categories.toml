@@ -116,7 +116,7 @@ Configuration management for applications."""
 
 [concurrency]
 name = "Concurrency"
-title = "Rust library for concurrency"
+title = "Rust concurrency library"
 description = """
 Crates for implementing concurrent and parallel computation.\
 """

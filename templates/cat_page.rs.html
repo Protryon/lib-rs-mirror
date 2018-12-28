@@ -11,7 +11,7 @@
     <header id="category">
         <div class="inner-col">
             <div class="breadcrumbs" typeof="BreadcrumbList">
-            <h1>
+            <h1 role="banner">
               <span property="itemListElement" typeof="ListItem">
                 <a property="item" typeof="WebPage" href="/"><span property="name">Crates</span>.rs</a>
                 <meta property="position" content="1">
@@ -60,7 +60,7 @@
 
     <main>
         @if !p.cat.sub.is_empty() {
-          <nav id="category-subcategories">
+          <nav id="category-subcategories" role="navigation">
             <div class="inner-col">
               <ul>
                 @for subcat in p.cat.sub.values() {
@@ -110,7 +110,7 @@
       @if let Some(related) = Some(p.related_categories()) {
       @if !related.is_empty() {
         <div class=seealso>
-        <div class="inner-col">
+        <div class="inner-col" role="navigaton" aria-label="See also">
           See also:
             @for (last, cat) in related.iter().identify_last() {
             @for (last, subcat) in cat.iter().identify_last() {

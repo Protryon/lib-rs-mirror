@@ -9,7 +9,7 @@ license = "Apache-2.0 OR MIT"
 [dependencies]
 crates-index = "0.12.0"
 crates_io_client = { git = "https://gitlab.com/crates.rs/crates_io_client.git", version = "0.4.0" }
-render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git", version = "0.4.0" }
+render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git", version = "0.5.0" }
 categories = { git = "https://gitlab.com/crates.rs/categories.git" }
 udedokei = { git = "https://gitlab.com/crates.rs/udedokei.git" }
 cargo_author = "1.0.0"

@@ -168,11 +168,11 @@ lazy_static! {
             &[("cryptography", 1.4, 0.3), ("algorithms", 0.9, 0.), ("no-std", 0.95, 0.), ("command-line-utilities", 0.75, 0.), ("development-tools::testing", 0.8, 0.)]),
         (Cond::Any(&["ethereum", "ethcore", "bitcoin", "monero", "coinbase", "litecoin", "bitfinex", "nanocurrency"]),
             &[("cryptography::cryptocurrencies", 1.7, 0.8), ("science::math", 0.8, 0.), ("data-structures", 0.7, 0.), ("cryptography", 0.8, 0.), ("database-implementations", 0.7, 0.),
-            ("database", 0.6, 0.), ("email", 0.6, 0.), ("value-formatting", 0.7, 0.), ("algorithms", 0.9, 0.), ("embedded", 0.8, 0.), ("no-std", 0.4, 0.), ("development-tools::cargo-plugins", 0.7, 0.),
+            ("database", 0.3, 0.), ("email", 0.6, 0.), ("value-formatting", 0.7, 0.), ("algorithms", 0.9, 0.), ("embedded", 0.8, 0.), ("no-std", 0.4, 0.), ("development-tools::cargo-plugins", 0.7, 0.),
             ("command-line-utilities", 0.8, 0.), ("development-tools::testing", 0.7, 0.), ("development-tools", 0.6, 0.), ("date-and-time", 0.4, 0.)]),
         (Cond::Any(&["cryptocurrency", "altcoin", "cryptocurrencies", "blockchain", "exonum"]),
             &[("cryptography::cryptocurrencies", 1.7, 0.8), ("science::math", 0.8, 0.), ("data-structures", 0.7, 0.), ("cryptography", 0.8, 0.), ("database-implementations", 0.7, 0.),
-            ("database", 0.6, 0.), ("email", 0.6, 0.), ("value-formatting", 0.7, 0.), ("algorithms", 0.9, 0.), ("embedded", 0.8, 0.), ("no-std", 0.4, 0.), ("development-tools::cargo-plugins", 0.7, 0.),
+            ("database", 0.3, 0.), ("email", 0.6, 0.), ("value-formatting", 0.7, 0.), ("algorithms", 0.9, 0.), ("embedded", 0.8, 0.), ("no-std", 0.4, 0.), ("development-tools::cargo-plugins", 0.7, 0.),
             ("command-line-utilities", 0.8, 0.), ("development-tools::testing", 0.7, 0.), ("development-tools", 0.6, 0.), ("date-and-time", 0.4, 0.)]),
         (Cond::Any(&["parity", "stellar", "coin", "wallet", "bitstamp"]), &[("cryptography::cryptocurrencies", 1.3, 0.1), ("science::math", 0.8, 0.)]),
 

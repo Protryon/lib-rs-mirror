@@ -190,7 +190,11 @@ impl<'a> CratePage<'a> {
             if !out.trim().is_empty() {
                 let docs_url = self.ver.docs_rs_url();
                 let base = docs_url.as_ref().map(|u| (u.as_str(), u.as_str()));
-                return Some(templates::Html(self.markup.page(&Markup::Markdown(out), base, self.nofollow())));
+                let (html, warnings) = self.markup.page(&Markup::Markdown(out), base, self.nofollow());
+                if !warnings.is_empty() {
+                    eprintln!("{} lib: {:?}", self.ver.short_name(), warnings);
+                }
+                return Some(templates::Html(html));
             }
         }
         None
@@ -206,7 +210,11 @@ impl<'a> CratePage<'a> {
             (Some(l), None) => Some((l.as_str(), l.as_str())),
             _ => None,
         };
-        templates::Html(self.markup.page(&readme.markup, urls, self.nofollow()))
+        let (html, warnings) = self.markup.page(&readme.markup, urls, self.nofollow());
+        if !warnings.is_empty() {
+            eprintln!("{} readme: {:?}", self.ver.short_name(), warnings);
+        }
+        templates::Html(html)
     }
 
     pub fn nofollow(&self) -> bool {

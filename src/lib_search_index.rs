@@ -94,13 +94,13 @@ impl CrateSearchIndex {
             })?;
 
         let searcher = self.tantivy_index.searcher();
-        let top_docs = searcher.search(&*query, &TopDocs::with_limit(limit))?;
+        let top_docs = searcher.search(&*query, &TopDocs::with_limit(limit+limit/3))?;
 
         let mut docs = top_docs.into_iter().enumerate().map(|(i, (score, doc_address))| {
             let retrieved_doc = searcher.doc(doc_address)?;
             let mut doc = self.tantivy_index.schema().to_named_doc(&retrieved_doc).0;
             let mut base_score = take_int(doc.get("crate_score")) as f64;
-            let position_bonus = CRATE_SCORE_MAX / ((i+1) as f64) / 4.; // first few crates can be ordered by tantivy's relevance
+            let position_bonus = CRATE_SCORE_MAX / ((i+1).pow(2) as f64) / 5.; // first few crates can be ordered by tantivy's relevance
             let crate_name = take_string(doc.remove("crate_name"));
             // bonus for exact match
             if crate_name == query_text {
@@ -118,6 +118,7 @@ impl CrateSearchIndex {
 
         // re-sort using our base score
         docs.sort_by(|a,b| b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal));
+        docs.truncate(limit); // search picked a few more results to cut out chaff using crate_score
         Ok(docs)
     }
 }

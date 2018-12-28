@@ -6,6 +6,12 @@ edition = "2018"
 description = "Crates.rs web server"
 readme = "README.md"
 
+[package.metadata.deb]
+assets = [
+    ["target/release/crates-server", "usr/bin/", "755"],
+    ["../data/tantivy/*", "var/lib/crates-server/tantivy/", "755"],
+]
+
 [dependencies]
 actix-web = "0.7.16"
 env_logger = "0.6.0"
@@ -15,9 +21,4 @@ futures = "0.1.25"
 render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git", version = "0.4.0" }
 search_index = { git = "https://gitlab.com/crates.rs/search_index.git" }
 front_end = { git = "https://gitlab.com/crates.rs/front_end.git" }
-
-[package.metadata.deb]
-assets = [
-    ["target/release/crates-server", "usr/bin/", "755"],
-    ["../data/tantivy/*", "var/lib/crates-server/tantivy/", "755"],
-]
+urlencoding = "1.0.0"

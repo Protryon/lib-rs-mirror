@@ -73,7 +73,13 @@ fn handle_404(_req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
 fn handle_keyword(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
     let kw: Result<String, _> = req.match_info().query("keyword");
     match kw {
-        Ok(ref q) if !q.is_empty() && is_alnum(&q) => {
+        Ok(ref q) if !q.is_empty() => {
+            if !is_alnum(q) {
+                return future::ok(HttpResponse::PermanentRedirect()
+                    .header("Location", format!("/search?q={}", urlencoding::encode(q)))
+                    .finish())
+                    .responder();
+            }
             let query = q.to_owned();
             let state = req.state();
             let state2 = Arc::clone(state);

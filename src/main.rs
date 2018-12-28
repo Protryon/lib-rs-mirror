@@ -74,28 +74,36 @@ fn handle_keyword(req: &HttpRequest<AServerState>) -> FutureResponse<HttpRespons
     let kw: Result<String, _> = req.match_info().query("keyword");
     match kw {
         Ok(ref q) if !q.is_empty() => {
-            if !is_alnum(q) {
-                return future::ok(HttpResponse::PermanentRedirect()
-                    .header("Location", format!("/search?q={}", urlencoding::encode(q)))
-                    .finish())
-                    .responder();
-            }
             let query = q.to_owned();
             let state = req.state();
             let state2 = Arc::clone(state);
             state.pool.spawn_fn(move || {
+                if !is_alnum(&query) {
+                    return Ok((query, None));
+                }
                 let mut page: Vec<u8> = Vec::with_capacity(50000);
                 let keyword_query = format!("keywords:{}", query);
                 let results = state2.index.search(&keyword_query, 100).unwrap();
-                front_end::render_keyword_page(&mut page, &query, &results, &state2.markup).unwrap();
-                Ok::<_,()>(page)
+                if !results.is_empty() {
+                    front_end::render_keyword_page(&mut page, &query, &results, &state2.markup).unwrap();
+                    Ok::<_,()>((query, Some(page)))
+                } else {
+                    Ok((query, None))
+                }
             })
             .map_err(|_| unreachable!())
-            .and_then(|page| {
-                future::ok(HttpResponse::Ok()
-                    .content_type("text/html;charset=UTF-8")
-                    .content_length(page.len() as u64)
-                    .body(page))
+            .and_then(|(query, page)| {
+                future::ok(if let Some(page) = page {
+                    HttpResponse::Ok()
+                        .content_type("text/html;charset=UTF-8")
+                        .content_length(page.len() as u64)
+                        .body(page)
+                } else {
+                    HttpResponse::TemporaryRedirect()
+                        .header("Location", format!("/search?q={}", urlencoding::encode(&query)))
+                        .finish()
+
+                }).responder()
             })
             .responder()
         },

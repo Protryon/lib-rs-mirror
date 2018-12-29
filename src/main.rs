@@ -14,6 +14,10 @@ use front_end;
 use search_index::CrateSearchIndex;
 use render_readme::{Highlighter, Renderer, ImageOptimAPIFilter};
 
+use std::alloc::System;
+#[global_allocator]
+static A: System = System;
+
 struct ServerState {
     pool: CpuPool,
     markup: Renderer,

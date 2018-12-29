@@ -25,6 +25,7 @@ pub struct CrateSearchIndex {
 pub struct CrateFound {
     pub crate_name: String,
     pub description: String,
+    pub keywords: String,
     pub score: f32,
     pub version: String,
     pub monthly_downloads: u64,
@@ -100,7 +101,8 @@ impl CrateSearchIndex {
             let retrieved_doc = searcher.doc(doc_address)?;
             let mut doc = self.tantivy_index.schema().to_named_doc(&retrieved_doc).0;
             let mut base_score = take_int(doc.get("crate_score")) as f64;
-            let position_bonus = CRATE_SCORE_MAX / ((i+1).pow(2) as f64) / 5.; // first few crates can be ordered by tantivy's relevance
+            // first few crates can be ordered by tantivy's relevance
+            let position_bonus = if i < 4 {CRATE_SCORE_MAX / 8.} else {0.};
             let crate_name = take_string(doc.remove("crate_name"));
             // bonus for exact match
             if crate_name == query_text {
@@ -110,6 +112,7 @@ impl CrateSearchIndex {
                 score: (score as f64 * (base_score + position_bonus)) as f32,
                 crate_name,
                 description: take_string(doc.remove("description")),
+                keywords: take_string(doc.remove("keywords")),
                 version: take_string(doc.remove("crate_version")),
                 monthly_downloads: take_int(doc.get("monthly_downloads")),
             })

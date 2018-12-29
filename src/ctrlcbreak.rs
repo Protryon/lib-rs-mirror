@@ -7,6 +7,10 @@ use std::sync::{Once, ONCE_INIT};
 static STOPPED: AtomicUsize = AtomicUsize::new(0);
 static INIT: Once = ONCE_INIT;
 
+pub fn dont_hijack_ctrlc() {
+    INIT.call_once(|| {});
+}
+
 pub fn stopped() -> bool {
     INIT.call_once(|| {
         ctrlc::set_handler(move || {

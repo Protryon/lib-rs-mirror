@@ -22,6 +22,7 @@ members = [
 "udedokei",
 "search_index",
 "server",
+"render_readme/dump",
 ]
 
 [profile.dev]

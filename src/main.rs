@@ -82,7 +82,7 @@ fn handle_keyword(req: &HttpRequest<AServerState>) -> FutureResponse<HttpRespons
                     return Ok((query, None));
                 }
                 let mut page: Vec<u8> = Vec::with_capacity(50000);
-                let keyword_query = format!("keywords:{}", query);
+                let keyword_query = format!("keywords:\"{}\"", query);
                 let results = state2.index.search(&keyword_query, 100).unwrap();
                 if !results.is_empty() {
                     front_end::render_keyword_page(&mut page, &query, &results, &state2.markup).unwrap();

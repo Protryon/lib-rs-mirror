@@ -14,6 +14,8 @@ use rayon;
 use reqwest;
 use user_db;
 
+mod comprstring;
+pub use crate::comprstring::*;
 mod index;
 pub use crate::index::*;
 pub use github_info::UserOrg;
@@ -137,8 +139,8 @@ pub struct KitchenSink {
 struct RichCrateVersionCacheData {
     derived: Derived,
     manifest: Manifest,
-    readme: Result<Option<Readme>, ()>,
-    lib_file: Option<String>,
+    readme: Result<Option<ComprReadme>, ()>,
+    lib_file: Option<ComprString>,
     path_in_repo: Option<String>,
     has_buildrs: bool,
 }
@@ -322,7 +324,17 @@ impl KitchenSink {
             }
             (d, warn)
         };
-        Ok((RichCrateVersion::new(krate.clone(), d.manifest, d.derived, d.readme, d.lib_file, d.path_in_repo, d.has_buildrs), warn))
+        let readme = d.readme.map(|o| o.map(|r| {
+            Readme {
+                base_url: r.base_url,
+                base_image_url: r.base_image_url,
+                markup: match r.markup {
+                    ComprMarkup::Markdown(s) => Markup::Markdown(s.to_string()),
+                    ComprMarkup::Rst(s) => Markup::Rst(s.to_string()),
+                },
+            }
+        }));
+        Ok((RichCrateVersion::new(krate.clone(), d.manifest, d.derived, readme, d.lib_file.map(|s| s.into()), d.path_in_repo, d.has_buildrs), warn))
     }
 
     fn rich_crate_version_data(&self, latest: &crates_index::Version, fetch_type: CrateData) -> CResult<(RichCrateVersionCacheData, Warnings)> {
@@ -341,9 +353,9 @@ impl KitchenSink {
 
         let mut derived = Derived::default();
         mem::swap(&mut derived.language_stats, &mut meta.language_stats); // move
-        derived.crate_compressed_size = crate_compressed_size;
+        derived.crate_compressed_size = crate_compressed_size as u32;
         // sometimes uncompressed sources without junk are smaller than tarball with junk
-        derived.crate_decompressed_size = meta.decompressed_size.max(crate_compressed_size);
+        derived.crate_decompressed_size = meta.decompressed_size.max(crate_compressed_size) as u32;
         derived.is_nightly = meta.is_nightly;
 
         let origin = Origin::from_crates_io_name(name);
@@ -456,8 +468,17 @@ impl KitchenSink {
             derived,
             has_buildrs,
             manifest: meta.manifest,
-            readme: meta.readme.map_err(|_|()),
-            lib_file: meta.lib_file,
+            readme: meta.readme.map_err(|_| ()).map(|o| o.map(|r| {
+                ComprReadme {
+                    base_url: r.base_url,
+                    base_image_url: r.base_image_url,
+                    markup: match r.markup {
+                        Markup::Markdown(s) => ComprMarkup::Markdown(s.into()),
+                        Markup::Rst(s) => ComprMarkup::Rst(s.into()),
+                    },
+                }
+            })),
+            lib_file: meta.lib_file.map(|s| s.into()),
             path_in_repo,
         }, warnings))
     }
@@ -1122,4 +1143,17 @@ impl<'a> CrateAuthor<'a> {
 #[test]
 fn crates() {
     KitchenSink::new_default().expect("Test if configured");
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+enum ComprMarkup {
+    Markdown(ComprString),
+    Rst(ComprString),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ComprReadme {
+    pub markup: ComprMarkup,
+    pub base_url: Option<String>,
+    pub base_image_url: Option<String>,
 }

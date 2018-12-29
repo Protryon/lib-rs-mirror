@@ -319,7 +319,7 @@
           <div class=seealso role="navigaton" aria-label="See also">
             See also:
             @for (last, cra) in crates.into_iter().identify_last() {
-              <a href="@url.krate(&cra)">@cra.short_name()</a>@if !last {,}
+              <a href="@url.krate_by_origin(&cra)">@cra.short_crate_name()</a>@if !last {,}
             }
           </div>
         }

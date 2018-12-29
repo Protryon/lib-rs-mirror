@@ -3,6 +3,7 @@ use kitchen_sink::CrateAuthor;
 use kitchen_sink::UserType;
 use rich_crate::RichCrateVersion;
 use rich_crate::RichDep;
+use rich_crate::Origin;
 use urlencoding::encode;
 
 /// One thing responsible for link URL scheme on the site.
@@ -31,6 +32,10 @@ impl Urler {
     /// Link to crate individual page
     pub fn krate(&self, krate: &RichCrateVersion) -> String {
         self.krate_by_name(krate.short_name())
+    }
+
+    pub fn krate_by_origin(&self, o: &Origin) -> String {
+        format!("/crates/{}", encode(o.short_crate_name()))
     }
 
     pub fn krate_by_name(&self, crate_name: &str) -> String {

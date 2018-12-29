@@ -649,7 +649,7 @@ impl<'a> CratePage<'a> {
                     return None; // nobody will enable it
                 }
 
-                let krate = match self.get_crate_of_dependency(&name, &semver) {
+                let krate = match self.get_crate_of_dependency(&name, ()) {
                     Ok(k) => k,
                     Err(e) => {
                         eprintln!("bad dep not counted: {}", e);
@@ -721,7 +721,7 @@ impl<'a> CratePage<'a> {
         Ok((main_crate_size, deps_size_minimal, deps_size_typical, main_lang_stats))
     }
 
-    fn get_crate_of_dependency(&self, name: &str, _semver: &SemVer) -> CResult<RichCrateVersion> {
+    fn get_crate_of_dependency(&self, name: &str, _semver: ()) -> CResult<RichCrateVersion> {
         // FIXME: caching doesn't hold multiple versions, so fetchnig of precise old versions is super expensive
         return self.kitchen_sink.rich_crate_version(&Origin::from_crates_io_name(name), CrateData::Full);
 

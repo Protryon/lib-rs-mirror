@@ -132,7 +132,7 @@ fn take_string(val: Option<Vec<Value>>) -> String {
             Value::Str(s) => s,
             _ => panic!("invalid value type"),
         },
-        _ => panic!("missing value"),
+        _ => String::new(),
     }
 }
 
@@ -143,7 +143,7 @@ fn take_int(val: Option<&Vec<Value>>) -> u64 {
             Some(Value::I64(s)) => *s as u64,
             _ => panic!("invalid value type"),
         },
-        _ => panic!("missing value"),
+        _ => 0,
     }
 }
 

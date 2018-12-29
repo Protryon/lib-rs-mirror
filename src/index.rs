@@ -76,7 +76,7 @@ impl Index {
             .unwrap_or_else(|| krate.latest_version()) // latest_version = most recently published version
     }
 
-    pub fn deps_of_crate(&self, krate: &Crate, DepQuery { default, all_optional, dev }: DepQuery) -> Result<Dep, KitchenSinkErr> {
+    pub(crate) fn deps_of_crate(&self, krate: &Crate, DepQuery { default, all_optional, dev }: DepQuery) -> Result<Dep, KitchenSinkErr> {
         let latest = Self::highest_version(krate, true);
         let mut features = Vec::with_capacity(if all_optional { latest.features().len() } else { 0 });
         if all_optional {
@@ -101,7 +101,7 @@ impl Index {
         })
     }
 
-    pub fn deps_of_ver(&self, ver: &Version, wants: Features) -> Result<ArcDepSet, KitchenSinkErr> {
+    pub(crate) fn deps_of_ver(&self, ver: &Version, wants: Features) -> Result<ArcDepSet, KitchenSinkErr> {
         let key = (format!("{}-{}", ver.name(), ver.version()).into(), wants.clone());
         if let Some(cached) = self.cache.read().unwrap().get(&key) {
             return Ok(cached.clone());
@@ -213,6 +213,10 @@ impl Index {
 
         *result.lock().unwrap() = set?;
         Ok(result)
+    }
+
+    pub fn clear_cache(&self) {
+        self.cache.write().unwrap().clear();
     }
 
     /// For crate being outdated. Returns (is_latest, popularity)

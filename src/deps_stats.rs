@@ -125,6 +125,8 @@ impl Index {
             .filter(|collected| !collected.is_empty())
         }).collect();
 
+        self.clear_cache();
+
         let total = crates.len();
         let mut counts = HashMap::with_capacity(total);
         for deps in crates {

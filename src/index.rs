@@ -1,3 +1,5 @@
+use string_interner::StringInterner;
+use string_interner::Sym;
 use crate::deps_stats::DepsStats;
 use crate::KitchenSink;
 use crate::KitchenSinkErr;
@@ -17,7 +19,8 @@ use std::sync::{Arc, Mutex};
 
 pub struct Index {
     crates: HashMap<Origin, Crate>,
-    cache: RwLock<HashMap<(Box<str>, Features), ArcDepSet>>,
+    pub(crate) inter: RwLock<StringInterner<Sym>>,
+    pub(crate) cache: RwLock<HashMap<(Box<str>, Features), ArcDepSet>>,
     deps_stats: LazyOnce<DepsStats>,
 }
 
@@ -33,6 +36,7 @@ impl Index {
                 .collect();
         Self {
             cache: RwLock::new(HashMap::with_capacity(5000)),
+            inter: RwLock::new(StringInterner::new()),
             deps_stats: LazyOnce::new(),
             crates,
         }
@@ -173,7 +177,11 @@ impl Index {
                     (ver, semver)
                 });
 
-            let key = (name.into(), matched.version().into());
+
+            let key = {
+                let mut inter = self.inter.write().unwrap();
+                (inter.get_or_intern(name), inter.get_or_intern(matched.version()))
+            };
 
             let (_, _, _, all_features) = set.entry(key)
                 .or_insert_with(|| (d, matched.clone(), semver, HashSet::new()));
@@ -217,6 +225,7 @@ impl Index {
 
     pub fn clear_cache(&self) {
         self.cache.write().unwrap().clear();
+        *self.inter.write().unwrap() = StringInterner::new();
     }
 
     /// For crate being outdated. Returns (is_latest, popularity)
@@ -304,7 +313,7 @@ pub struct Features {
     pub features: Box<[Box<str>]>,
 }
 
-pub type DepName = (Arc<str>, Box<str>);
+pub type DepName = (Sym, Sym);
 pub type DepSet = HashMap<DepName, Dep>;
 pub type ArcDepSet = Arc<Mutex<DepSet>>;
 

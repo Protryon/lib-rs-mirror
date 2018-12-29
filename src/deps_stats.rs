@@ -5,22 +5,22 @@ use rayon::prelude::*;
 use semver::Version as SemVer;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::sync::Arc;
 use std::sync::Mutex;
+use string_interner::Sym;
 
 pub struct DepsStats {
     pub total: usize,
-    pub counts: HashMap<Arc<str>, RevDependencies>,
+    pub counts: HashMap<Box<str>, RevDependencies>,
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct RevDependencies {
     /// Default, optional
-    pub runtime: (u32, u32),
-    pub build: (u32, u32),
-    pub dev: u32,
-    pub direct: u32,
-    pub versions: HashMap<SemVer, u32>,
+    pub runtime: (u16, u16),
+    pub build: (u16, u16),
+    pub dev: u16,
+    pub direct: u16,
+    pub versions: HashMap<SemVer, u16>,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -78,7 +78,7 @@ impl DepVisitor {
 }
 
 impl Index {
-    pub fn all_dependencies_flattened(&self, c: &Crate) -> Result<HashMap<Arc<str>, (DepInf, SemVer)>, KitchenSinkErr> {
+    pub fn all_dependencies_flattened(&self, c: &Crate) -> Result<HashMap<Box<str>, (DepInf, SemVer)>, KitchenSinkErr> {
         let mut collected = HashMap::with_capacity(120);
         let mut visitor = DepVisitor::new();
 
@@ -112,7 +112,17 @@ impl Index {
             ty: DepTy::Dev,
         }, &mut collected, &mut visitor);
 
-        Ok(collected)
+        if collected.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+
+        let inter = self.inter.read().unwrap();
+        let mut converted = HashMap::with_capacity(collected.len());
+        converted.extend(collected.into_iter().map(|(k, v)| {
+            (inter.resolve(k).unwrap().into(), v)
+        }));
+        Ok(converted)
     }
 
     pub(crate) fn get_deps_stats(&self) -> DepsStats {
@@ -162,11 +172,11 @@ impl Index {
     }
 }
 
-fn flatten(dep: &Dep, depinf: DepInf, collected: &mut HashMap<Arc<str>, (DepInf, SemVer)>, visitor: &mut DepVisitor) {
+fn flatten(dep: &Dep, depinf: DepInf, collected: &mut HashMap<Sym, (DepInf, SemVer)>, visitor: &mut DepVisitor) {
     visitor.start(dep, depinf, |vis, dep, depinf| flatten_set(dep, depinf, collected, vis));
 }
 
-fn flatten_set(depset: &ArcDepSet, depinf: DepInf, collected: &mut HashMap<Arc<str>, (DepInf, SemVer)>, visitor: &mut DepVisitor) {
+fn flatten_set(depset: &ArcDepSet, depinf: DepInf, collected: &mut HashMap<Sym, (DepInf, SemVer)>, visitor: &mut DepVisitor) {
     visitor.visit(depset, depinf, |vis, (name, _), dep| {
         collected.entry(name.clone())
             .and_modify(|(old, semver)| {

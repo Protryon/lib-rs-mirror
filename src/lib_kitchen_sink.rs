@@ -620,25 +620,19 @@ impl KitchenSink {
     }
 
     /// Recommendations
-    pub fn related_crates(&self, krate: &RichCrateVersion) -> CResult<Vec<RichCrateVersion>> {
+    pub fn related_crates(&self, krate: &RichCrateVersion) -> CResult<Vec<Origin>> {
         let (replacements, related) = rayon::join(
             || self.crate_db.replacement_crates(krate.short_name()).context("related_crates1"),
             || self.crate_db.related_crates(krate.origin()).context("related_crates2"),
         );
 
-        let replacements: Vec<_> = replacements?.into_iter()
+        Ok(replacements?.into_iter()
             .map(|name| Origin::from_crates_io_name(&name))
             .chain(related?)
             .unique()
             .take(10)
-            .collect();
-        Ok(replacements.into_par_iter()
-            .with_max_len(1)
-            .map(|origin| {
-                self.rich_crate_version(&origin, CrateData::Minimal)
-            })
-            .filter_map(|res| res.map_err(|e| eprintln!("related crate err: {}", e)).ok())
             .collect())
+
     }
 
     /// Returns (nth, slug)

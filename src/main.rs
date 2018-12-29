@@ -23,6 +23,7 @@ struct ServerState {
     markup: Renderer,
     index: CrateSearchIndex,
     crates: KitchenSink,
+    public_crates_dir: PathBuf,
 }
 
 type AServerState = Arc<ServerState>;
@@ -33,11 +34,13 @@ fn main() {
     let sys = actix::System::new("crates-server");
 
 
-    let public_dir: PathBuf = env::var_os("DOCUMENT_ROOT").map(From::from).unwrap_or_else(|| "../style/public".into());
+    let public_styles_dir: PathBuf = env::var_os("DOCUMENT_ROOT").map(From::from).unwrap_or_else(|| "../style/public".into());
+    let public_crates_dir: PathBuf = env::var_os("CRATE_HTML_ROOT").map(From::from).unwrap_or_else(|| "/www/crates.rs/public/crates".into());
     let data_dir: PathBuf = env::var_os("CRATE_DATA_DIR").map(From::from).unwrap_or_else(|| "../data".into());
     let github_token = env::var("GITHUB_TOKEN").expect("GITHUB_TOKEN missing");
 
-    assert!(public_dir.exists(), "DOCUMENT_ROOT {} does not exist", public_dir.display());
+    assert!(public_crates_dir.exists(), "CRATE_HTML_ROOT {} does not exist", public_crates_dir.display());
+    assert!(public_styles_dir.exists(), "DOCUMENT_ROOT {} does not exist", public_styles_dir.display());
     assert!(data_dir.exists(), "CRATE_DATA_DIR {} does not exist", data_dir.display());
 
     let crates = KitchenSink::new(&data_dir, &github_token).unwrap();
@@ -51,6 +54,7 @@ fn main() {
         markup,
         index,
         crates,
+        public_crates_dir,
     });
 
     let state2 = Arc::clone(&state);
@@ -65,7 +69,7 @@ fn main() {
             .resource("/search", |r| r.method(Method::GET).f(handle_search))
             .resource("/keywords/{keyword}", |r| r.method(Method::GET).f(handle_keyword))
             .resource("/crates/{crate}", |r| r.method(Method::GET).f(handle_crate))
-            .handler("/", fs::StaticFiles::new(&public_dir).expect("public directory"))
+            .handler("/", fs::StaticFiles::new(&public_styles_dir).expect("public directory"))
             .default_resource(|r| r.f(handle_404))
     })
     .bind("127.0.0.1:32531")
@@ -102,14 +106,16 @@ fn handle_home(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> 
 fn handle_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
     let kw: String = req.match_info().query("crate").unwrap();
     println!("rendering {:?}", kw);
-    let origin = Origin::from_crates_io_name(&kw);
     let state = req.state();
     let state2 = Arc::clone(state);
     state.pool.spawn_fn(move || {
-        let all = state2.crates.rich_crate(&origin).unwrap();
-        let ver = state2.crates.rich_crate_version(&origin, CrateData::Full).unwrap();
+        assert!(is_alnum(&kw));
+        let origin = Origin::from_crates_io_name(&kw);
+        let all = state2.crates.rich_crate(&origin).expect("get crate");
+        let ver = state2.crates.rich_crate_version(&origin, CrateData::Full).expect("get crate");
         let mut page: Vec<u8> = Vec::with_capacity(50000);
-        front_end::render_crate_page(&mut page, &all, &ver, &state2.crates, &state2.markup).unwrap();
+        front_end::render_crate_page(&mut page, &all, &ver, &state2.crates, &state2.markup).expect("page render");
+        std::fs::write(state2.public_crates_dir.join(format!("{}.html", kw)), &page).expect("save page");
         Ok::<_,()>(page)
     })
     .map_err(|_| unreachable!())

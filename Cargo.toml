@@ -20,5 +20,6 @@ futures-cpupool = "0.1.8"
 futures = "0.1.25"
 render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git", version = "0.5.0" }
 search_index = { git = "https://gitlab.com/crates.rs/search_index.git" }
+kitchen_sink = { git = "https://gitlab.com/crates.rs/kitchen_sink.git", version = "0.5.2" }
 front_end = { git = "https://gitlab.com/crates.rs/front_end.git", version = "0.3.1" }
 urlencoding = "1.0.0"

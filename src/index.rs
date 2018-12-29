@@ -17,6 +17,27 @@ use std::path::PathBuf;
 use std::sync::RwLock;
 use std::sync::{Arc, Mutex};
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct MiniVer {
+    pub major: u16,
+    pub minor: u16,
+    pub patch: u16,
+    pub build: u16,
+    pub pre: Box<[semver::Identifier]>,
+}
+
+impl MiniVer {
+    pub fn to_semver(&self) -> SemVer {
+        SemVer {
+            major: self.major.into(),
+            minor: self.minor.into(),
+            patch: self.patch.into(),
+            pre: self.pre.clone().into(),
+            build: if self.build > 0 {vec![semver::Identifier::Numeric(self.build.into())]} else {Vec::new()},
+        }
+    }
+}
+
 pub struct Index {
     crates: HashMap<Origin, Crate>,
     pub(crate) inter: RwLock<StringInterner<Sym>>,
@@ -87,7 +108,7 @@ impl Index {
             features.extend(latest.features().iter().filter(|(_, v)| !v.is_empty()).map(|(c, _)| c.to_string().into_boxed_str()));
         };
         Ok(Dep {
-            semver: semver_parse(latest.version()),
+            semver: semver_parse(latest.version()).into(),
             runtime: self.deps_of_ver(latest, Features {
                 all_targets: all_optional,
                 default,
@@ -213,7 +234,7 @@ impl Index {
                 features: all_features,
             })?;
             Ok((k, Dep {
-                semver,
+                semver: semver.into(),
                 runtime,
                 build,
             }))
@@ -248,7 +269,8 @@ impl Index {
             let mut matches = 0;
             let mut unmatches = 0;
             for (ver, count) in &stats.versions {
-                if requirement.matches(ver) {
+
+                if requirement.matches(&ver.to_semver()) {
                     matches += count; // TODO: this should be (slighly) weighed by crate's popularity?
                 } else {
                     unmatches += count;
@@ -263,7 +285,7 @@ impl Index {
     }
 
     /// How likely it is that this exact crate will be installed in any project
-    pub fn version_commonality(&self, crate_name: &str, version: &SemVer) -> f32 {
+    pub fn version_commonality(&self, crate_name: &str, version: &MiniVer) -> f32 {
         match crate_name {
             // bindings' SLoC looks heavier than actual overhead of standard system libs
             "libc" | "winapi" | "kernel32-sys" => return 0.91,
@@ -273,7 +295,7 @@ impl Index {
         let stats = self.deps_stats();
         stats.counts.get(crate_name)
         .and_then(|c| {
-            c.versions.get(version)
+            c.versions.get(&version)
             .map(|&ver| ver as f32 / stats.total as f32)
         })
         .unwrap_or(0.)
@@ -304,6 +326,24 @@ fn semver_parse(ver: &str) -> SemVer {
         .unwrap_or_else(|_| SemVer::parse("0.0.0").expect("must parse"))
 }
 
+impl From<SemVer> for MiniVer {
+    fn from(s: SemVer) -> Self {
+        Self {
+            major: s.major as u16,
+            minor: s.minor as u16,
+            patch: s.patch as u16,
+            pre: s.pre.into_boxed_slice(),
+            build: if let Some(semver::Identifier::Numeric(m)) = s.build.get(0) {*m as u16} else {0},
+        }
+    }
+}
+
+impl fmt::Display for MiniVer {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}.{}.{}-{}", self.major, self.minor, self.patch, self.build)
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Features {
     pub all_targets: bool,
@@ -318,7 +358,7 @@ pub type DepSet = HashMap<DepName, Dep>;
 pub type ArcDepSet = Arc<Mutex<DepSet>>;
 
 pub struct Dep {
-    pub semver: SemVer,
+    pub semver: MiniVer,
     pub runtime: ArcDepSet,
     pub build: ArcDepSet,
 }

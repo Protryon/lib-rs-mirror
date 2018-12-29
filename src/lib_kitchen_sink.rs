@@ -594,7 +594,7 @@ impl KitchenSink {
         }
     }
 
-    pub fn all_dependencies_flattened(&self, origin: &Origin) -> Result<HashMap<Box<str>, (DepInf, SemVer)>, KitchenSinkErr> {
+    pub fn all_dependencies_flattened(&self, origin: &Origin) -> Result<HashMap<Box<str>, (DepInf, MiniVer)>, KitchenSinkErr> {
         self.index.all_dependencies_flattened(self.index.crate_by_name(origin)?)
     }
 

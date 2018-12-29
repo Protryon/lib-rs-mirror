@@ -2,7 +2,6 @@ use crate::index::*;
 use crate::KitchenSinkErr;
 use crates_index::Crate;
 use rayon::prelude::*;
-use semver::Version as SemVer;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Mutex;
@@ -20,7 +19,7 @@ pub struct RevDependencies {
     pub build: (u16, u16),
     pub dev: u16,
     pub direct: u16,
-    pub versions: HashMap<SemVer, u16>,
+    pub versions: HashMap<MiniVer, u16>,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -78,7 +77,7 @@ impl DepVisitor {
 }
 
 impl Index {
-    pub fn all_dependencies_flattened(&self, c: &Crate) -> Result<HashMap<Box<str>, (DepInf, SemVer)>, KitchenSinkErr> {
+    pub fn all_dependencies_flattened(&self, c: &Crate) -> Result<HashMap<Box<str>, (DepInf, MiniVer)>, KitchenSinkErr> {
         let mut collected = HashMap::with_capacity(120);
         let mut visitor = DepVisitor::new();
 
@@ -172,11 +171,11 @@ impl Index {
     }
 }
 
-fn flatten(dep: &Dep, depinf: DepInf, collected: &mut HashMap<Sym, (DepInf, SemVer)>, visitor: &mut DepVisitor) {
+fn flatten(dep: &Dep, depinf: DepInf, collected: &mut HashMap<Sym, (DepInf, MiniVer)>, visitor: &mut DepVisitor) {
     visitor.start(dep, depinf, |vis, dep, depinf| flatten_set(dep, depinf, collected, vis));
 }
 
-fn flatten_set(depset: &ArcDepSet, depinf: DepInf, collected: &mut HashMap<Sym, (DepInf, SemVer)>, visitor: &mut DepVisitor) {
+fn flatten_set(depset: &ArcDepSet, depinf: DepInf, collected: &mut HashMap<Sym, (DepInf, MiniVer)>, visitor: &mut DepVisitor) {
     visitor.visit(depset, depinf, |vis, (name, _), dep| {
         collected.entry(name.clone())
             .and_modify(|(old, semver)| {

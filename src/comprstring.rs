@@ -6,24 +6,26 @@ use std::fmt;
 
 /// gzip-compressed string
 #[derive(Clone, Eq, PartialEq, serde_derive::Serialize, serde_derive::Deserialize)]
-pub struct ComprString(Box<[u8]>);
+pub struct ComprString {
+    d: Box<[u8]>
+}
 
 impl ComprString {
     pub fn new(s: &str) -> Self {
         let mut e = DeflateEncoder::new(Vec::with_capacity(s.len()/2), Compression::best());
         e.write_all(s.as_bytes()).unwrap();
-        ComprString(e.finish().unwrap().into_boxed_slice())
+        ComprString{ d: e.finish().unwrap().into_boxed_slice() }
     }
 
     pub fn to_string(&self) -> String {
-        let mut deflater = DeflateDecoder::new(&self.0[..]);
-        let mut s = String::with_capacity(self.0.len()*2);
+        let mut deflater = DeflateDecoder::new(&self.d[..]);
+        let mut s = String::with_capacity(self.d.len()*2);
         deflater.read_to_string(&mut s).unwrap();
         s
     }
 
     pub fn compressed_len(&self) -> usize {
-        self.0.len()
+        self.d.len()
     }
 }
 

@@ -35,6 +35,12 @@ impl Origin {
             Origin::CratesIO(ref s) => format!("crates.io:{}", s),
         }
     }
+
+    pub fn short_crate_name(&self) -> &str {
+        match *self {
+            Origin::CratesIO(ref s) => s,
+        }
+    }
 }
 
 #[test]
@@ -42,4 +48,5 @@ fn roundtrip() {
     let o1 = Origin::from_crates_io_name("hello");
     let o2 = Origin::from_string(o1.to_str());
     assert_eq!(o1, o2);
+    assert_eq!("hello", o2.short_crate_name());
 }

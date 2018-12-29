@@ -225,7 +225,7 @@
                     @if sloc.len() > 1 && *total > 1000 {
                       <svg viewBox="-1 -1 59 59" width="60" height="60">
                         @for (lang, lines, (x, w)) in sloc {
-                          <path d="@CratePage::svg_path_for_slice(x,if x+w < 359 {w+1} else {w},360,58)" fill="@lang.color()"><title>@lang.name() @if let Some((val,unit)) = Some(c.format_knumber(lines.code)) {@val@unit} SLoC @if lines.comments > 1 { // @c.format_fraction(lines.comments as f64 / (lines.code+lines.comments) as f64) comments }</title></path>
+                          <path d="@CratePage::svg_path_for_slice(x,if x+w < 359 {w+1} else {w},360,58)" fill="@lang.color()"><title>@lang.name() @if let Some((val,unit)) = Some(c.format_knumber(lines.code as usize)) {@val@unit} SLoC @if lines.comments > 1 { // @c.format_fraction(lines.comments as f64 / (lines.code+lines.comments) as f64) comments }</title></path>
                         }
                       </svg>
                     }

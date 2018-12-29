@@ -95,8 +95,8 @@ impl<'a> CratePage<'a> {
         let (own_size, deps_size_minimal, deps_size_typical, lang_stats) = page.crate_size()?;
         page.sizes = Some((own_size, deps_size_minimal, deps_size_typical));
 
-        let total = lang_stats.langs.iter().filter(|(lang, _)| lang.is_code()).map(|(_, lines)| lines.code).sum::<usize>();
-        page.lang_stats = Some((total, lang_stats));
+        let total = lang_stats.langs.iter().filter(|(lang, _)| lang.is_code()).map(|(_, lines)| lines.code).sum::<u32>();
+        page.lang_stats = Some((total as usize, lang_stats));
         Ok(page)
     }
 
@@ -162,7 +162,7 @@ impl<'a> CratePage<'a> {
             .unwrap_or((false, false))
     }
 
-    pub fn dependents_stats(&self) -> Option<(usize, usize)> {
+    pub fn dependents_stats(&self) -> Option<(u32, u32)> {
         self.kitchen_sink.dependents_stats_of(self.ver).map(|d| (d.runtime.0 + d.runtime.1 + d.build.0 + d.build.1 + d.dev, d.direct)).filter(|d| d.0 > 0)
     }
 
@@ -584,12 +584,12 @@ impl<'a> CratePage<'a> {
     }
 
     /// data for piechart
-    pub fn langs_chart(&self, stats: &Stats, width_px: usize) -> Option<LanguageStats> {
+    pub fn langs_chart(&self, stats: &Stats, width_px: u32) -> Option<LanguageStats> {
         let mut res: Vec<_> = stats.langs.iter().filter(|(lang, lines)| lines.code > 0 && lang.is_code()).map(|(a, b)| (a.clone(), b.clone())).collect();
         if !res.is_empty() {
             res.sort_by_key(|(_, lines)| lines.code);
             let biggest = res.last().cloned().unwrap();
-            let total = res.iter().map(|(_, lines)| lines.code).sum::<usize>();
+            let total = res.iter().map(|(_, lines)| lines.code).sum::<u32>();
             if biggest.0 != Language::Rust || biggest.1.code < total * 9 / 10 {
                 let mut remaining_px = width_px;
                 let mut remaining_lines = total;
@@ -613,8 +613,8 @@ impl<'a> CratePage<'a> {
         }
     }
 
-    pub fn svg_path_for_slice(start: usize, len: usize, total: usize, diameter: usize) -> String {
-        fn coords(val: usize, total: usize, radius: f64) -> (f64, f64) {
+    pub fn svg_path_for_slice(start: u32, len: u32, total: u32, diameter: u32) -> String {
+        fn coords(val: u32, total: u32, radius: f64) -> (f64, f64) {
             ((2. * PI * val as f64 / total as f64).sin() * radius + radius, (PI + 2. * PI * val as f64 / total as f64).cos() * radius + radius)
         }
         let radius = diameter / 2;
@@ -699,11 +699,11 @@ impl<'a> CratePage<'a> {
 
                 for (&lang, val) in &crate_stats.langs {
                     let e = main_lang_stats.langs.entry(lang).or_insert(Lines::default());
-                    e.code += (val.code as f32 * weight) as usize;
-                    e.comments += (val.comments as f32 * weight) as usize;
+                    e.code += (val.code as f32 * weight) as u32;
+                    e.comments += (val.comments as f32 * weight) as u32;
                 }
             } else {
-                let sloc = crate_stats.langs.iter().filter(|(l, _)| l.is_code()).map(|(_, v)| v.code).sum::<usize>();
+                let sloc = crate_stats.langs.iter().filter(|(l, _)| l.is_code()).map(|(_, v)| v.code).sum::<u32>();
 
                 deps_size_typical.tarball += tarball_weighed;
                 deps_size_typical.uncompressed += uncompr_weighed;
@@ -744,7 +744,7 @@ pub struct DepsSize {
     pub lines: usize,
 }
 
-type LanguageStats = Vec<(Language, Lines, (usize, usize))>;
+type LanguageStats = Vec<(Language, Lines, (u32, u32))>;
 
 impl ReleaseCounts {
     /// Judge how often the crate makes breaking or stable releases

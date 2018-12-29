@@ -16,10 +16,10 @@ pub struct DepsStats {
 #[derive(Debug, Clone, Default)]
 pub struct RevDependencies {
     /// Default, optional
-    pub runtime: (usize, usize),
-    pub build: (usize, usize),
-    pub dev: usize,
-    pub direct: usize,
+    pub runtime: (u32, u32),
+    pub build: (u32, u32),
+    pub dev: u32,
+    pub direct: u32,
     pub versions: HashMap<SemVer, u32>,
 }
 

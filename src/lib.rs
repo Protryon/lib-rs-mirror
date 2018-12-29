@@ -174,8 +174,8 @@ pub struct Stats {
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct Lines {
-    pub comments: usize,
-    pub code: usize,
+    pub comments: u32,
+    pub code: u32,
 }
 
 #[derive(Debug)]
@@ -721,8 +721,8 @@ impl Collect {
         match lang.tokei_lang().parse_from_str(self.dummy_dir_entry.clone(), file_content) {
             Ok(res) => {
                 let stats = self.stats.langs.entry(lang).or_insert(Lines {comments:0, code:0});
-                stats.comments += res.comments;
-                stats.code += res.code;
+                stats.comments += res.comments as u32;
+                stats.code += res.code as u32;
             },
             Err(err) => {
                 eprintln!("warning: {} ", err);

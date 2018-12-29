@@ -443,8 +443,9 @@ impl RichCrateVersion {
     }
 
     /// compressed (whole tarball) and decompressed (extracted files only)
+    #[inline]
     pub fn crate_size(&self) -> (usize, usize) {
-        (self.derived.crate_compressed_size, self.derived.crate_decompressed_size)
+        (self.derived.crate_compressed_size as usize, self.derived.crate_decompressed_size as usize)
     }
 }
 
@@ -483,7 +484,7 @@ pub struct Derived {
     pub github_name: Option<String>,
     pub github_description: Option<String>,
     pub language_stats: udedokei::Stats,
-    pub crate_compressed_size: usize,
-    pub crate_decompressed_size: usize,
+    pub crate_compressed_size: u32,
+    pub crate_decompressed_size: u32,
     pub is_nightly: bool,
 }

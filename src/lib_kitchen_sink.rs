@@ -866,7 +866,7 @@ impl KitchenSink {
                 if ca.github.is_none() && author.email.is_none() {
                     if let Some(ref name) = author.name {
                         if let Some((contribution, github)) = contributors.remove(&name.to_lowercase()) {
-                            let login = github.login.to_lowercase();
+                            let login = github.login.to_ascii_lowercase();
                             ca.github = Some(github);
                             ca.info = None; // was useless; just a login; TODO: only clear name once it's Option
                             ca.contribution = contribution;
@@ -918,7 +918,7 @@ impl KitchenSink {
         }
 
         for (login, (contribution, github)) in contributors {
-            authors.entry(AuthorId::GitHub(login))
+            authors.entry(AuthorId::GitHub(login.to_ascii_lowercase()))
             .or_insert(CrateAuthor {
                 nth_author: None,
                 contribution: 0.,

@@ -72,7 +72,7 @@ lazy_static! {
         (Cond::Any(&["pkg-config"]), &[("os::windows-apis", 0.5, 0.)]),
 
         (Cond::Any(&["web", "chrome", "electron"]), &[("os::macos-apis", 0.5, 0.), ("filesystem", 0.8, 0.), ("os::unix-apis", 0.5, 0.), ("os::windows-apis", 0.5, 0.)]),
-        (Cond::Any(&["wasm", "webasm", "webassembly"]), &[("wasm", 3., 0.7), ("embedded", 0.5, 0.), ("gui", 0.4, 0.), ("development-tools", 0.95, 0.), ("os::macos-apis", 0.5, 0.), ("os::unix-apis", 0.5, 0.), ("os::windows-apis", 0.5, 0.), ("command-line-utilities", 0.75, 0.)]),
+        (Cond::Any(&["wasm", "webasm", "webassembly"]), &[("wasm", 3., 0.7), ("embedded", 0.5, 0.), ("gui", 0.4, 0.), ("development-tools", 0.95, 0.), ("os::macos-apis", 0.5, 0.), ("os::unix-apis", 0.5, 0.), ("os::windows-apis", 0.5, 0.), ("command-line-interface", 0.6, 0.), ("command-line-utilities", 0.75, 0.)]),
         (Cond::Any(&["emscripten"]), &[("wasm", 1.1, 0.2), ("embedded", 0.3, 0.)]),
         (Cond::Any(&["parity", "mach-o", "intrusive", "cli"]), &[("wasm", 0.5, 0.), ("embedded", 0.8, 0.), ("development-tools::debugging", 0.8, 0.)]),
         (Cond::Any(&["native"]), &[("wasm", 0.5, 0.), ("web-programming", 0.5, 0.), ("multimedia::video", 0.8, 0.), ("multimedia", 0.8, 0.)]),
@@ -151,7 +151,7 @@ lazy_static! {
         (Cond::Any(&["read", "byte",  "ffi", "debuginfo", "debug", "api", "sys", "algorithms", "ieee754", "cast","macro", "ascii", "parser"]),
             &[("science::math", 0.6, 0.), ("science::ml", 0.8, 0.), ("science", 0.9, 0.), ("games", 0.8, 0.)]),
         (Cond::Any(&["openssl", "simd", "jit", "cipher", "sql", "collision", "data-structures", "plugin", "cargo",  "terminal", "game", "service", "piston", "system"]),
-            &[("science::math", 0.6, 0.), ("encoding", 0.6, 0.), ("science::ml", 0.8, 0.), ("science", 0.9, 0.)]),
+            &[("science::math", 0.6, 0.), ("encoding", 0.6, 0.), ("science::ml", 0.8, 0.), ("science", 0.9, 0.), ("wasm", 0.8, 0.)]),
         (Cond::Any(&["algorithms", "algorithm", "copy-on-write"]),
             &[("algorithms", 1.1, 0.1), ("science::math", 0.8, 0.), ("science::ml", 0.8, 0.), ("science", 0.8, 0.)]),
         (Cond::All(&["gaussian", "blur"]),
@@ -480,6 +480,7 @@ lazy_static! {
         (Cond::Any(&["commandline", "command-line", "cmdline"]),
             &[("command-line-utilities", 1.1, 0.1), ("command-line-interface", 1.1, 0.), ("development-tools::ffi", 0.7, 0.)]),
         (Cond::Any(&["has:bin"]), &[("command-line-utilities", 1.1, 0.), ("no-std", 0.8, 0.)]),
+        (Cond::Any(&["has:cargo-bin"]), &[("development-tools::cargo-plugins", 1.2, 0.1)]),
 
         (Cond::Any(&["numeral", "numerals", "formatter", "notation", "pretty", "pretty-print", "pretty-printing", "punycode", "money", "units"]),
             &[("value-formatting", 1.2, 0.2), ("simulation", 0.5, 0.), ("wasm", 0.7, 0.), ("no-std", 0.8, 0.)]),
@@ -521,10 +522,10 @@ lazy_static! {
 
         (Cond::Any(&["game", "utils", "json", "simulation", "turtle"]), &[("rendering::engine", 0.7, 0.)]),
         (Cond::Any(&["game", "games"]),
-            &[("games", 1.25, 0.2), ("science::math", 0.6, 0.), ("science::ml", 0.7, 0.), ("development-tools::cargo-plugins", 0.7, 0.), ("rendering::engine", 0.8, 0.), ("embedded", 0.75, 0.), ("filesystem", 0.5, 0.),
+            &[("games", 1.25, 0.2), ("science::math", 0.6, 0.), ("wasm", 0.8, 0.), ("science::ml", 0.7, 0.), ("development-tools::cargo-plugins", 0.7, 0.), ("rendering::engine", 0.8, 0.), ("embedded", 0.75, 0.), ("filesystem", 0.5, 0.),
             ("web-programming::http-client", 0.5, 0.), ("internationalization", 0.7, 0.), ("date-and-time", 0.3, 0.), ("development-tools::procedural-macro-helpers", 0.6, 0.)]),
         (Cond::Any(&["fun", "puzzle", "play", "steam", "conway", "starcraft", "roguelike", "minecraft", "sudoku"]),
-            &[("games", 1.25, 0.3), ("rendering::engine", 0.8, 0.), ("cryptography", 0.5, 0.), ("command-line-utilities", 0.75, 0.)]),
+            &[("games", 1.25, 0.3), ("rendering::engine", 0.8, 0.), ("wasm", 0.8, 0.), ("command-line-interface", 0.8, 0.), ("cryptography", 0.5, 0.), ("command-line-utilities", 0.75, 0.)]),
 
         (Cond::Any(&["vector", "openai", "client"]), &[("games", 0.7, 0.), ("emulators", 0.7, 0.)]),
         (Cond::All(&["gamedev", "engine"]), &[("game-engines", 1.5, 0.4), ("games", 0.1, 0.), ("multimedia::video", 0.5, 0.), ("rendering::data-formats", 0.8, 0.)]),

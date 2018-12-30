@@ -282,6 +282,12 @@ impl RichCrateVersion {
         !self.bin.is_empty()
     }
 
+    // has cargo-prefixed bin
+    pub fn has_cargo_bin(&self) -> bool {
+        // we get binaries normalized, so no need to check for package name
+        self.bin.iter().any(|b| b.name.as_ref().map_or(false, |n| n.starts_with("cargo-")))
+    }
+
     pub fn is_proc_macro(&self) -> bool {
         self.lib.as_ref().map_or(false, |lib| lib.proc_macro)
     }

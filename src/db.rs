@@ -129,10 +129,6 @@ impl SimpleCache {
 
     pub(crate) fn fetch(url: &str) -> Result<Vec<u8>, Error> {
         let client = reqwest::Client::builder().build()?;
-        if url.contains("crates.io") {
-            // Please don't remove this.
-            thread::sleep(Duration::from_secs(1));
-        }
         let mut res = client.get(url)
             .header(reqwest::header::USER_AGENT, "crates.rs/1.0")
             .send()?;

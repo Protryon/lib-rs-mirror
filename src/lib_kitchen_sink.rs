@@ -851,14 +851,27 @@ impl KitchenSink {
                         return (AuthorId::GitHub(login), ca);
                     }
                 }
+                if let Some(ref url) = author.url {
+                    let gh_url = "https://github.com/";
+                    if url.to_ascii_lowercase().starts_with(gh_url) {
+                        let login = url[gh_url.len()..].splitn(1, '/').next().unwrap();
+                        if let Ok(Some(gh)) = self.gh.user_by_login(login) {
+                            let login = gh.login.to_ascii_lowercase();
+                            ca.github = Some(gh);
+                            return (AuthorId::GitHub(login), ca);
+                        }
+                    }
+                }
                 // name only, no email
-                else if let Some(ref name) = author.name {
-                    if let Some((contribution, github)) = contributors.remove(&name.to_lowercase()) {
-                        let login = github.login.to_lowercase();
-                        ca.github = Some(github);
-                        ca.info = None; // was useless; just a login; TODO: only clear name once it's Option
-                        ca.contribution = contribution;
-                        return (AuthorId::GitHub(login), ca);
+                if ca.github.is_none() && author.email.is_none() {
+                    if let Some(ref name) = author.name {
+                        if let Some((contribution, github)) = contributors.remove(&name.to_lowercase()) {
+                            let login = github.login.to_lowercase();
+                            ca.github = Some(github);
+                            ca.info = None; // was useless; just a login; TODO: only clear name once it's Option
+                            ca.contribution = contribution;
+                            return (AuthorId::GitHub(login), ca);
+                        }
                     }
                 }
                 let key = author.email.as_ref().map(|e| AuthorId::Email(e.to_ascii_lowercase()))

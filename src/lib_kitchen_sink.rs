@@ -574,8 +574,8 @@ impl KitchenSink {
     }
 
     fn is_docs_rs_link(d: &str) -> bool {
-        d.starts_with("https://docs.rs/") || d.starts_with("http://docs.rs/") ||
-        d.starts_with("http://crates.fyi/") || d.starts_with("https://crates.fyi/")
+        let d = d.trim_start_matches("http://").trim_start_matches("https://");
+        d.starts_with("docs.rs/") || d.starts_with("crates.fyi/")
     }
 
     pub fn has_docs_rs(&self, name: &str, ver: &str) -> bool {
@@ -583,12 +583,13 @@ impl KitchenSink {
     }
 
     fn is_same_url<A: AsRef<str> + std::fmt::Debug>(a: Option<A>, b: Option<&String>) -> bool {
-        fn trim_suffix(s: &str) -> &str {
+        fn trim(s: &str) -> &str {
+            let s = s.trim_start_matches("http://").trim_start_matches("https://");
             s.split('#').next().unwrap().trim_end_matches("/index.html").trim_end_matches('/')
         }
 
         match (a, b) {
-            (Some(ref a), Some(ref b)) if trim_suffix(a.as_ref()).eq_ignore_ascii_case(trim_suffix(b)) => true,
+            (Some(ref a), Some(ref b)) if trim(a.as_ref()).eq_ignore_ascii_case(trim(b)) => true,
             _ => false,
         }
     }

@@ -150,10 +150,13 @@ impl CrateDb {
             insert_keyword.add("has:is_sys", 0.01, false);
         }
         if c.is_proc_macro() {
-            insert_keyword.add("has:proc_macro", 0.1, false);
+            insert_keyword.add("has:proc_macro", 0.2, false);
         }
         if c.has_bin() {
             insert_keyword.add("has:bin", 0.01, false);
+            if c.has_cargo_bin() {
+                insert_keyword.add("has:cargo-bin", 0.2, false);
+            }
         }
 
         print!("{}: ", origin);

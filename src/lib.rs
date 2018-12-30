@@ -56,9 +56,10 @@ fn readme_from_repo(markup: Markup, repo_url: Option<&String>, base_path: &str) 
 
 /// Check if given filename is a README. If `package` is missing, guess.
 fn is_readme_filename(path: &Path, package: Option<&Package>) -> bool {
-    path.to_str().map_or(false, |s| {
+    path.to_str().map_or(false, |pathstr| {
         if let Some(&Package { readme: Some(ref r), .. }) = package {
-            r == s
+            // packages put ./README which doesn't match README
+            r.trim_start_matches('.').trim_start_matches('/') == pathstr
         } else {
             render_readme::is_readme_filename(path)
         }

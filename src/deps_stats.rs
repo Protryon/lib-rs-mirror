@@ -141,27 +141,28 @@ impl Index {
         for deps in crates {
             for (name, (depinf, semver)) in deps {
                 let n = counts.entry(name.clone()).or_insert_with(RevDependencies::default);
-                n.versions.entry(semver).or_insert(0).checked_add(1).unwrap();
+                let t = n.versions.entry(semver).or_insert(0);
+                *t = t.checked_add(1).unwrap();
                 if depinf.direct {
-                    n.direct.checked_add(1).unwrap();
+                    n.direct = n.direct.checked_add(1).unwrap();
                 }
                 match depinf.ty {
                     DepTy::Runtime => {
                         if depinf.default {
-                            n.runtime.0.checked_add(1).unwrap();
+                            n.runtime.0 = n.runtime.0.checked_add(1).unwrap();
                         } else {
-                            n.runtime.1.checked_add(1).unwrap();
+                            n.runtime.1 = n.runtime.1.checked_add(1).unwrap();
                         }
                     },
                     DepTy::Build => {
                         if depinf.default {
-                            n.build.0.checked_add(1).unwrap();
+                            n.build.0 = n.build.0.checked_add(1).unwrap();
                         } else {
-                            n.build.1.checked_add(1).unwrap();
+                            n.build.1 = n.build.1.checked_add(1).unwrap();
                         }
                     },
                     DepTy::Dev => {
-                        n.dev.checked_add(1).unwrap();
+                        n.dev = n.dev.checked_add(1).unwrap();
                     },
                 }
             }

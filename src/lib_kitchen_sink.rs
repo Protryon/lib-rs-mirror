@@ -14,8 +14,7 @@ use rayon;
 use reqwest;
 use user_db;
 
-mod comprstring;
-pub use crate::comprstring::*;
+pub use compressed_string::*;
 mod index;
 pub use crate::index::*;
 pub use github_info::UserOrg;

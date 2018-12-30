@@ -43,7 +43,7 @@ impl Urler {
     }
 
     pub fn keyword(&self, name: &str) -> String {
-        format!("/keywords/{}", encode(name))
+        format!("/keywords/{}", encode(&name.to_lowercase()))
     }
 
     /// First page of category listing

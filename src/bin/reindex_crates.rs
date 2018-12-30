@@ -17,7 +17,7 @@ fn main() {
         },
     });
 
-    let everything = false;
+    let everything = std::env::args().nth(1).map_or(false, |a| a == "--all");
     let repos = !everything;
 
     let seen_repos = &Mutex::new(HashSet::new());

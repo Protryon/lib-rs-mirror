@@ -211,7 +211,7 @@ impl GitHub {
             let now = SystemTime::now().duration_since(UNIX_EPOCH)?;
             let wait = (end_timestamp.checked_sub(now)).and_then(|d| d.checked_div(rl + 2));
             if let Some(wait) = wait {
-                if wait.as_secs() > 0 {
+                if wait.as_secs() > 2 {
                     eprintln!("need to wait! {:?}", wait);
                     thread::sleep(wait);
                 }

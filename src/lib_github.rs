@@ -185,7 +185,13 @@ impl GitHub {
         match self.get_cached(&self.contribs, key, callback) {
             Err(Error::TryAgainLater) => {
                 thread::sleep(Duration::from_secs(1));
-                self.get_cached(&self.contribs, key, callback)
+                match self.get_cached(&self.contribs, key, callback) {
+                    Err(Error::TryAgainLater) => {
+                        thread::sleep(Duration::from_secs(4));
+                        self.get_cached(&self.contribs, key, callback)
+                    },
+                    res => res,
+                }
             },
             res => res,
         }

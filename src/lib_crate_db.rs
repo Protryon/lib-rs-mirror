@@ -100,7 +100,7 @@ impl CrateDb {
     }
 
     /// Add data of the latest version of a crate to the index
-    pub fn index_latest(&self, c: &RichCrateVersion) -> FResult<()> {
+    pub fn index_latest(&self, c: &RichCrateVersion, deps_stats: &[(&str, f32)]) -> FResult<()> {
         let origin = c.origin().to_str();
 
         let mut insert_keyword = KeywordInsert::new()?;
@@ -157,6 +157,10 @@ impl CrateDb {
             if c.has_cargo_bin() {
                 insert_keyword.add("has:cargo-bin", 0.2, false);
             }
+        }
+
+        for &(dep, weight) in deps_stats {
+            insert_keyword.add(&format!("dep:{}", dep), (weight / 2.0).into(), false);
         }
 
         print!("{}: ", origin);

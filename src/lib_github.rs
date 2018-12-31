@@ -64,6 +64,7 @@ pub struct GitHub {
     orgs: TempCache<(String, Option<Vec<UserOrg>>)>,
     users: TempCache<(String, Option<User>)>,
     commits: TempCache<(String, Option<Vec<CommitMeta>>)>,
+    releases: TempCache<(String, Option<Vec<GitHubRelease>>)>,
     contribs: TempCache<(String, Option<Vec<UserContrib>>)>,
 }
 
@@ -75,6 +76,7 @@ impl GitHub {
             orgs: TempCache::new(&cache_path.as_ref().with_file_name("github_orgs.bin"))?,
             users: TempCache::new(&cache_path.as_ref().with_file_name("github_users.bin"))?,
             commits: TempCache::new(&cache_path.as_ref().with_file_name("github_commits.bin"))?,
+            releases: TempCache::new(&cache_path.as_ref().with_file_name("github_releases.bin"))?,
             contribs: TempCache::new(&cache_path.as_ref().with_file_name("github_contribs.bin"))?,
         }.init())
     }
@@ -136,6 +138,14 @@ impl GitHub {
         self.get_cached(&self.commits, (&key, as_of_version), |client| client.get()
                            .repos().owner(&repo.owner).repo(&repo.repo)
                            .commits()
+                           .execute())
+    }
+
+    pub fn releases(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Option<Vec<GitHubRelease>>> {
+        let key = format!("release/{}/{}", repo.owner, repo.repo);
+        let path = format!("repos/{}/{}/releases", repo.owner, repo.repo);
+        self.get_cached(&self.releases, (&key, as_of_version), |client| client.get()
+                           .custom_endpoint(&path)
                            .execute())
     }
 
@@ -419,6 +429,18 @@ fn github_contrib() {
     };
     gh.contributors(&repo, "").unwrap();
     gh.commits(&repo, "").unwrap();
+}
+
+#[test]
+fn github_releases() {
+    let gh = GitHub::new(
+        "../data/github.db",
+        std::env::var("GITHUB_TOKEN").expect("GITHUB_TOKEN env var")).unwrap();
+    let repo = SimpleRepo{
+        owner:"kornelski".into(),
+        repo:"pngquant".into(),
+    };
+    assert!(gh.releases(&repo, "").unwrap().unwrap().len() > 2);
 }
 
 #[test]

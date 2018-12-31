@@ -145,6 +145,26 @@ pub struct GitHubRepo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitHubRelease {
+  // url: Option<String>, // "https://api.github.com/repos/octocat/Hello-World/releases/1",
+  // html_url: Option<String>, // "https://github.com/octocat/Hello-World/releases/v1.0.0",
+  // assets_url: Option<String>, // "https://api.github.com/repos/octocat/Hello-World/releases/1/assets",
+  // upload_url: Option<String>, // "https://uploads.github.com/repos/octocat/Hello-World/releases/1/assets{?name,label}",
+  // tarball_url: Option<String>, // "https://api.github.com/repos/octocat/Hello-World/tarball/v1.0.0",
+  // zipball_url: Option<String>, // "https://api.github.com/repos/octocat/Hello-World/zipball/v1.0.0",
+  // id: Option<String>, // 1,
+  // node_id: Option<String>, // "MDc6UmVsZWFzZTE=",
+  pub tag_name: Option<String>, // "v1.0.0",
+  // target_commitish: Option<String>, // "master",
+  // name: Option<String>, // "v1.0.0",
+  pub body: Option<String>, // "Description of the release",
+  pub draft: Option<bool>, // false,
+  pub prerelease: Option<bool>, // false,
+  pub created_at: Option<String>, // "2013-02-27T19:35:32Z",
+  pub published_at: Option<String>, // "2013-02-27T19:35:32Z",
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Topics {
     pub names: Vec<String>,
 }

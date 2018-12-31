@@ -45,15 +45,24 @@ quick_error! {
             display("{}", err)
             from(e: github_rs::errors::Error) -> (e.to_string()) // non-Sync
         }
-        Json(err: Box<serde_json::Error>) {
-            display("JSON decode error {}", err)
-            from(e: serde_json::Error) -> (Box::new(e))
+        Json(err: Box<serde_json::Error>, call: Option<&'static str>) {
+            display("JSON decode error {} in {}", err, call.unwrap_or("github_info"))
+            from(e: serde_json::Error) -> (Box::new(e), None)
             cause(err)
         }
         Time(err: std::time::SystemTimeError) {
             display("{}", err)
             from()
             cause(err)
+        }
+    }
+}
+
+impl Error {
+    pub fn context(self, ctx: &'static str) -> Self {
+        match self {
+            Error::Json(e, _) => Error::Json(e, Some(ctx)),
+            as_is => as_is,
         }
     }
 }
@@ -122,7 +131,7 @@ impl GitHub {
         let key = format!("user/{}", enc_login);
         self.get_cached(&self.users, (&key, ""), |client| client.get()
                        .users().username(login)
-                       .execute())
+                       .execute()).map_err(|e| e.context("user_by_login"))
     }
 
     pub fn user_orgs(&self, login: &str) -> CResult<Option<Vec<UserOrg>>> {
@@ -130,7 +139,7 @@ impl GitHub {
         let key = format!("user/{}", login);
         self.get_cached(&self.orgs, (&key, ""), |client| client.get()
                        .users().username(&login).orgs()
-                       .execute())
+                       .execute()).map_err(|e| e.context("user_orgs"))
     }
 
     pub fn commits(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Option<Vec<CommitMeta>>> {
@@ -138,7 +147,7 @@ impl GitHub {
         self.get_cached(&self.commits, (&key, as_of_version), |client| client.get()
                            .repos().owner(&repo.owner).repo(&repo.repo)
                            .commits()
-                           .execute())
+                           .execute()).map_err(|e| e.context("commits"))
     }
 
     pub fn releases(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Option<Vec<GitHubRelease>>> {
@@ -146,7 +155,7 @@ impl GitHub {
         let path = format!("repos/{}/{}/releases", repo.owner, repo.repo);
         self.get_cached(&self.releases, (&key, as_of_version), |client| client.get()
                            .custom_endpoint(&path)
-                           .execute())
+                           .execute()).map_err(|e| e.context("releases"))
     }
 
     pub fn topics(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Option<Vec<String>>> {
@@ -155,7 +164,7 @@ impl GitHub {
         let t: Topics = match self.get_cached_old(&self.cache, (&key, as_of_version), |client| client.get()
                            .custom_endpoint(&path)
                            .set_header(ACCEPT, HeaderValue::from_static("application/vnd.github.mercy-preview+json"))
-                           .execute())? {
+                           .execute()).map_err(|e| e.context("topics"))? {
             Some(data) => data,
             None => return Ok(None),
         };
@@ -166,7 +175,7 @@ impl GitHub {
         let key = format!("{}/{}/repo", repo.owner, repo.repo);
         let mut ghdata: GitHubRepo = match self.get_cached_old(&self.cache, (&key, as_of_version), |client| client.get()
                            .repos().owner(&repo.owner).repo(&repo.repo)
-                           .execute())? {
+                           .execute()).map_err(|e| e.context("repo"))? {
             Some(data) => data,
             None => return Ok(None),
         };
@@ -203,6 +212,7 @@ impl GitHub {
                     res => res,
                 }
             },
+            Err(e) => Err(e.context("contributors")),
             res => res,
         }
     }

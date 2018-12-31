@@ -133,10 +133,13 @@
           <section class="about-crate">
             <section id="versions">
               @if let Some(parts) = Some(c.version_stats_summary()) {
-                <h3>@parts.0
-                  @if let Some(extra) = parts.1 {
-                    <span>@extra</span>
+                <h3>
+                  @if let Some(url) = c.changelog_url() {
+                    <a href="@url">@parts.0</a>
+                  } else {
+                    @parts.0
                   }
+                  @if let Some(extra) = parts.1 {<span>@extra</span>}
                 </h3>
               }
               @if c.ver.edition() == Edition::E2018 {

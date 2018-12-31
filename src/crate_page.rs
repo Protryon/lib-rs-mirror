@@ -151,6 +151,10 @@ impl<'a> CratePage<'a> {
         }
     }
 
+    pub fn changelog_url(&self) -> Option<String> {
+        self.kitchen_sink.changelog_url(self.ver)
+    }
+
     pub fn is_build_or_dev(&self) -> (bool, bool) {
         self.kitchen_sink
             .dependents_stats_of(self.ver)

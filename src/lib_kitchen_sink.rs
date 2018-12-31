@@ -701,7 +701,25 @@ impl KitchenSink {
 
     pub fn index_crate_highest_version(&self, v: &RichCrateVersion) -> CResult<()> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
-        self.crate_db.index_latest(v)?;
+
+        // direct deps are used as extra keywords for similarity matching,
+        // but we're taking only niche deps to group similar niche crates together
+        let deps_stats = self.index.deps_stats();
+        let mut weighed_deps = Vec::<(&str, f32)>::new();
+        let all_deps = v.dependencies()?;
+        let all_deps = [(all_deps.0, 1.0), (all_deps.2, 0.33)];
+        // runtime and (lesser) build-time deps
+        for (deps, overall_weight) in all_deps.iter() {
+            for dep in deps {
+                if let Some(rev) = deps_stats.counts.get(dep.name.as_str()) {
+                    if rev.direct > 1 && rev.direct < 150 && rev.runtime.0 < 500 && rev.runtime.1 < 800 {
+                        let weight = overall_weight / (1 + rev.direct) as f32;
+                        weighed_deps.push((dep.name.as_str(), weight));
+                    }
+                }
+            }
+        }
+        self.crate_db.index_latest(v, &weighed_deps)?;
         Ok(())
     }
 

@@ -336,6 +336,17 @@ impl KitchenSink {
         Ok((RichCrateVersion::new(krate.clone(), d.manifest, d.derived, readme, d.lib_file.map(|s| s.into()), d.path_in_repo, d.has_buildrs), warn))
     }
 
+    pub fn changelog_url(&self, k: &RichCrateVersion) -> Option<String> {
+        let repo = k.repository()?;
+        if let RepoHost::GitHub(ref gh) = repo.host() {
+            let releases = self.gh.releases(gh, &self.cachebust_string_for_repo(repo).ok()?).ok()??;
+            if releases.iter().any(|rel| rel.body.as_ref().map_or(false, |b| b.len() > 10)) {
+                return Some(format!("https://github.com/{}/{}/releases", gh.owner, gh.repo));
+            }
+        }
+        None
+    }
+
     fn rich_crate_version_data(&self, latest: &crates_index::Version, fetch_type: CrateData) -> CResult<(RichCrateVersionCacheData, Warnings)> {
         let mut warnings = HashSet::new();
 

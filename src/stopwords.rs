@@ -57,6 +57,8 @@ lazy_static! {
         ("deep-learning", Some(&["math", "statistics"])),
         ("machine-learning", Some(&["math", "statistics"])),
         ("neural-networks", Some(&["math", "statistics"])),
+        ("database", Some(&["embedded"])),
+        ("thread", Some(&["storage"])),
         ("bitcoin", Some(&["http", "day", "database", "key-value", "network", "wasm"])),
         ("exonum", Some(&["http", "day", "database", "key-value", "network", "wasm"])),
         ("blockchain", Some(&["database", "key-value", "network", "wasm", "nosql", "orm", "driver"])),

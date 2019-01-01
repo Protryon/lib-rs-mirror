@@ -362,21 +362,22 @@ Interface with specific CPU or other hardware features."""
 name = "Internationalization (i18n)"
 title = "Rust i18n library"
 description = """
-Crates to help develop software capable of adapting to various \
-languages and regions.\
+Crates to develop software adapting to various \
+languages and regions. Including localization (L10n) software.\
 """
 short-description = """
-Develop software capable of adapting to various languages and regions."""
+and localization (l10n). Develop software for various languages and regions."""
 
-[localization]
-name = "Localization (L10n)"
-title = "Rust localization"
-description = """
-Crates to help adapting internationalized software to specific \
-languages and regions.\
-"""
-short-description = """
-Internationalizing software to specific languages and regions."""
+# merged into internationalization
+# [localization]
+# name = "Localization (L10n)"
+# title = "Rust localization"
+# description = """
+# Crates to help adapting internationalized software to specific \
+# languages and regions.\
+# """
+# short-description = """
+# Internationalizing software to specific languages and regions."""
 
 [memory-management]
 name = "Memory management"

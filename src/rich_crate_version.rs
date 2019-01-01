@@ -415,6 +415,10 @@ impl RichCrateVersion {
 
     fn fake_categories(&mut self) {
         for cat in &mut self.package.categories {
+            if cat == "localization" {
+                // nobody knows the difference
+                *cat = "internationalization".to_string();
+            }
             if cat == "parsers" {
                 if self.dependencies.keys().any(|k| k == "nom" || k == "peresil" || k == "combine") {
                     *cat = "parser-implementations".into();

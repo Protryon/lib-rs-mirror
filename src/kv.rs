@@ -143,3 +143,11 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> Drop for TempCache<T> {
         }
     }
 }
+
+#[test]
+fn kvtest() {
+    let tmp: TempCache<(String, String)> = TempCache::new("/tmp/rmptest.bin").unwrap();
+    tmp.set("hello", &("world".to_string(), "etc".to_string())).unwrap();
+    let res = tmp.get("hello").unwrap().unwrap();
+    assert_eq!(res, ("world".to_string(), "etc".to_string()));
+}

@@ -35,6 +35,8 @@ debug = true
 cargo_toml = { path = "cargo_toml" }
 cargo_author = { path = "cargo_author" }
 lazyonce = { path = "lazyonce" }
+rmp = { git = "https://github.com/kornelski/msgpack-rust", rev = "1a05988fb11d73d2e1a89b393105b8e5986a22a2" }
+rmp-serde = { git = "https://github.com/kornelski/msgpack-rust", rev = "1a05988fb11d73d2e1a89b393105b8e5986a22a2" }
 
 [patch.'https://gitlab.com/crates.rs/categories.git']
 categories = { path = "categories" }

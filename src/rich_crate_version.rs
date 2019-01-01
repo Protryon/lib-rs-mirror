@@ -97,14 +97,14 @@ impl RichCrateVersion {
 
     /// Finds preferred capitalization for the name
     pub fn capitalized_name(&self) -> String {
-        let mut first_capital = String::new();
+        let mut first_capital = String::with_capacity(self.short_name().len());
         let mut ch = self.short_name().chars();
         if let Some(f) = ch.next() {
             first_capital.extend(f.to_uppercase());
-            first_capital.extend(ch);
+            first_capital.extend(ch.map(|c| if c == '_' {' '} else {c}));
         }
 
-        let mut words = HashMap::new();
+        let mut words = HashMap::with_capacity(100);
         {
             let name = self.short_name().to_lowercase();
             let shouty = self.short_name().to_uppercase();

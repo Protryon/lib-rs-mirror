@@ -37,7 +37,7 @@ quick_error! {
             display("Accepted, but no data available yet")
         }
         Cache(err: Box<simple_cache::Error>) {
-            display("GH can't start cache: {}", err)
+            display("GH can't decode cache: {}", err)
             from(e: simple_cache::Error) -> (Box::new(e))
             cause(err)
         }
@@ -91,18 +91,6 @@ impl GitHub {
     }
 
     fn init(self) -> Self {
-        let mut to_delete = Vec::new();
-        self.cache.get_all(|data| {
-            for (k, (ver, payload)) in data {
-                if let Payload::Contrib(u) = payload {
-                    self.contribs.set(k.clone(), (ver.clone(), Some(u.clone()))).unwrap();
-                    to_delete.push(k.clone());
-                }
-            }
-        }).unwrap();
-        for d in &to_delete {
-            self.cache.delete(d).unwrap();
-        }
         self
     }
 

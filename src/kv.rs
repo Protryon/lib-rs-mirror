@@ -6,31 +6,33 @@ use crate::error::Error;
 use serde::*;
 use rmp_serde;
 use serde_json;
+use std::marker::PhantomData;
 use std::path::PathBuf;
 use std::fs::File;
-use std::fs;
 use tempfile::NamedTempFile;
+use std::io::BufWriter;
 use std::io::BufReader;
 use crate::SimpleCache;
 use flate2::Compression;
 use flate2::write::DeflateEncoder;
 use flate2::read::DeflateDecoder;
 
-struct Inner<T> {
-    data: T,
+struct Inner {
+    data: HashMap<Box<str>, Box<[u8]>>,
     writes: usize,
     next_autosave: usize,
 }
 
 pub struct TempCache<T: Serialize + DeserializeOwned + Clone + Send> {
     path: PathBuf,
-    data: RwLock<Inner<HashMap<Box<str>, T>>>,
+    data: RwLock<Inner>,
+    _ty: PhantomData<T>,
     pub cache_only: bool,
 }
 
 impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
     pub fn new(path: impl Into<PathBuf>) -> Result<Self, Error> {
-        let path = path.into().with_extension("rmp");
+        let path = path.into().with_extension("rmpz");
         let data = if path.exists() {
             let mut f = BufReader::new(File::open(&path)?);
             rmp_serde::from_read(&mut f).map_err(|e| {
@@ -45,9 +47,10 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
             path,
             data: RwLock::new(Inner {
                 data,
-                writes: 1,
+                writes: 0,
                 next_autosave: 10,
             }),
+            _ty: PhantomData,
             cache_only: false,
         })
     }
@@ -58,17 +61,15 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
     }
 
     pub fn set_(&self, key: Box<str>, value: &T) -> Result<(), Error> {
+        let mut e = DeflateEncoder::new(Vec::new(), Compression::best());
+        rmp_serde::encode::write_named(&mut e, value)?;
+        let compr = e.finish()?;
 
-        // sanity check
-        let value = rmp_serde::to_vec(value).map_err(Error::from)
-            .and_then(|dat| rmp_serde::from_slice(&dat).map_err(|e| {
-                eprintln!("Setter for {} {} failed to serialize: {}", self.path.display(), key, e);
-                Error::from(e)
-            }))?;
+        let _ =Self::ungz(&compr)?; // sanity check
 
         let mut w = self.data.write().map_err(|_| Error::KvPoison)?;
         w.writes += 1;
-        w.data.insert(key, value);
+        w.data.insert(key, compr.into_boxed_slice());
         if w.writes >= w.next_autosave {
             w.writes = 0;
             w.next_autosave *= 2;
@@ -86,13 +87,20 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
         Ok(())
     }
 
-    pub fn get_all<F: FnOnce(&HashMap<Box<str>, T>)>(&self, cb: F) -> Result<(), Error> {
-        cb(&self.data.read().map_err(|_| Error::KvPoison)?.data);
-        Ok(())
-    }
+    // pub fn get_all<F: FnOnce(&HashMap<Box<str>, T>)>(&self, cb: F) -> Result<(), Error> {
+    //     cb(&self.data.read().map_err(|_| Error::KvPoison)?.data);
+    //     Ok(())
+    // }
 
     pub fn get(&self, key: &str) -> Result<Option<T>, Error> {
-        Ok(self.data.read().map_err(|_| Error::KvPoison)?.data.get(key).cloned())
+        let kw = self.data.read().map_err(|_| Error::KvPoison)?;
+        Ok(match kw.data.get(key) {
+            Some(gz) => Some(Self::ungz(gz).map_err(|e| {
+                eprintln!("ungz of {} failed", key);
+                e
+            })?),
+            None => None,
+        })
     }
 
     fn ungz(data: &[u8]) -> Result<T, Error> {
@@ -101,32 +109,12 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
     }
 
     pub fn save(&self) -> Result<(), Error> {
-        let ser = {
-            let d = self.data.read().map_err(|_| Error::KvPoison)?;
-            rmp_serde::to_vec_named(&d.data)?
-        };
         let tmp_path = NamedTempFile::new_in(self.path.parent().unwrap())?;
-        fs::write(&tmp_path, &ser)?;
-        let _: HashMap<String, T> = rmp_serde::from_slice(&ser).map_err(|e| {
-            eprintln!("{} can't be saved as uncompressed, because {}", self.path.display(), e);
-            e
-        })?;
-        tmp_path.persist(&self.path).map_err(|e| e.error)?;
-
-        let new_path = self.path.with_extension("rmpz");
-        let tmp_path2 = NamedTempFile::new_in(new_path.parent().unwrap())?;
-        let mut file = File::create(&tmp_path2)?;
-
+        let mut file = BufWriter::new(File::create(&tmp_path)?);
         let d = self.data.read().map_err(|_| Error::KvPoison)?;
-        let new_data = d.data.iter().map(|(k, v)| {
-            let mut e = DeflateEncoder::new(Vec::new(), Compression::best());
-            rmp_serde::encode::write_named(&mut e, v)?;
-            let compr = e.finish()?;
-            Self::ungz(&compr).expect("ser sanity check");
-            Ok((k.clone(), compr.into_boxed_slice()))
-        }).collect::<Result<HashMap<_,_>, Error>>()?;
-        rmp_serde::encode::write(&mut file, &new_data)?;
-        tmp_path2.persist(new_path).map_err(|e| e.error)?;
+        rmp_serde::encode::write(&mut file, &d.data)?;
+        drop(d);
+        tmp_path.persist(&self.path).map_err(|e| e.error)?;
         Ok(())
     }
 
@@ -172,5 +160,10 @@ fn kvtest() {
     let tmp: TempCache<(String, String)> = TempCache::new("/tmp/rmptest.bin").unwrap();
     tmp.set("hello", &("world".to_string(), "etc".to_string())).unwrap();
     let res = tmp.get("hello").unwrap().unwrap();
+    drop(tmp);
     assert_eq!(res, ("world".to_string(), "etc".to_string()));
+
+    let tmp2: TempCache<(String, String)> = TempCache::new("/tmp/rmptest.bin").unwrap();
+    let res2 = tmp2.get("hello").unwrap().unwrap();
+    assert_eq!(res2, ("world".to_string(), "etc".to_string()));
 }

@@ -14,7 +14,7 @@ use crate::Origin;
 use crate::Readme;
 use crate::Markup;
 
-pub use parse_cfg::ErrorKind as CfgErr;
+pub use parse_cfg::ParseError as CfgErr;
 pub use parse_cfg::{Cfg, Target};
 
 #[derive(Debug, Clone)]

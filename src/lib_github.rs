@@ -75,23 +75,21 @@ pub struct GitHub {
     commits: TempCache<(String, Option<Vec<CommitMeta>>)>,
     releases: TempCache<(String, Option<Vec<GitHubRelease>>)>,
     contribs: TempCache<(String, Option<Vec<UserContrib>>)>,
+    topics: TempCache<(String, Option<Vec<String>>)>,
 }
 
 impl GitHub {
     pub fn new(cache_path: impl AsRef<Path>, token: impl Into<String>) -> CResult<Self> {
         Ok(Self {
             token: token.into(),
-            cache: TempCache::new(&cache_path.as_ref().with_extension("bin"))?,
+            cache: TempCache::new(&cache_path.as_ref())?,
             orgs: TempCache::new(&cache_path.as_ref().with_file_name("github_orgs.bin"))?,
             users: TempCache::new(&cache_path.as_ref().with_file_name("github_users.bin"))?,
             commits: TempCache::new(&cache_path.as_ref().with_file_name("github_commits.bin"))?,
             releases: TempCache::new(&cache_path.as_ref().with_file_name("github_releases.bin"))?,
             contribs: TempCache::new(&cache_path.as_ref().with_file_name("github_contribs.bin"))?,
-        }.init())
-    }
-
-    fn init(self) -> Self {
-        self
+            topics: TempCache::new(&cache_path.as_ref().with_file_name("github_topics.bin"))?,
+        })
     }
 
     fn client(&self) -> CResult<client::Github> {
@@ -119,7 +117,7 @@ impl GitHub {
         let key = format!("user/{}", enc_login);
         self.get_cached(&self.users, (&key, ""), |client| client.get()
                        .users().username(login)
-                       .execute()).map_err(|e| e.context("user_by_login"))
+                       .execute(), id).map_err(|e| e.context("user_by_login"))
     }
 
     pub fn user_orgs(&self, login: &str) -> CResult<Option<Vec<UserOrg>>> {
@@ -127,7 +125,7 @@ impl GitHub {
         let key = format!("user/{}", login);
         self.get_cached(&self.orgs, (&key, ""), |client| client.get()
                        .users().username(&login).orgs()
-                       .execute()).map_err(|e| e.context("user_orgs"))
+                       .execute(), id).map_err(|e| e.context("user_orgs"))
     }
 
     pub fn commits(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Option<Vec<CommitMeta>>> {
@@ -135,7 +133,7 @@ impl GitHub {
         self.get_cached(&self.commits, (&key, as_of_version), |client| client.get()
                            .repos().owner(&repo.owner).repo(&repo.repo)
                            .commits()
-                           .execute()).map_err(|e| e.context("commits"))
+                           .execute(), id).map_err(|e| e.context("commits"))
     }
 
     pub fn releases(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Option<Vec<GitHubRelease>>> {
@@ -143,20 +141,16 @@ impl GitHub {
         let path = format!("repos/{}/{}/releases", repo.owner, repo.repo);
         self.get_cached(&self.releases, (&key, as_of_version), |client| client.get()
                            .custom_endpoint(&path)
-                           .execute()).map_err(|e| e.context("releases"))
+                           .execute(), id).map_err(|e| e.context("releases"))
     }
 
     pub fn topics(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Option<Vec<String>>> {
-        let key = format!("{}/{}/topcs", repo.owner, repo.repo);
+        let key = format!("{}/{}", repo.owner, repo.repo);
         let path = format!("repos/{}/{}/topics", repo.owner, repo.repo);
-        let t: Topics = match self.get_cached_old(&self.cache, (&key, as_of_version), |client| client.get()
+        self.get_cached(&self.topics, (&key, as_of_version), |client| client.get()
                            .custom_endpoint(&path)
                            .set_header(ACCEPT, HeaderValue::from_static("application/vnd.github.mercy-preview+json"))
-                           .execute()).map_err(|e| e.context("topics"))? {
-            Some(data) => data,
-            None => return Ok(None),
-        };
-        Ok(Some(t.names))
+                           .execute(), |t: Topics| t.names).map_err(|e| e.context("topics"))
     }
 
     pub fn repo(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Option<GitHubRepo>> {
@@ -189,13 +183,13 @@ impl GitHub {
         let callback = |client: &client::Github| {
             client.get().custom_endpoint(&path).execute()
         };
-        match self.get_cached(&self.contribs, key, callback) {
+        match self.get_cached(&self.contribs, key, callback, id) {
             Err(Error::TryAgainLater) => {
                 thread::sleep(Duration::from_secs(1));
-                match self.get_cached(&self.contribs, key, callback) {
+                match self.get_cached(&self.contribs, key, callback, id) {
                     Err(Error::TryAgainLater) => {
                         thread::sleep(Duration::from_secs(4));
-                        self.get_cached(&self.contribs, key, callback)
+                        self.get_cached(&self.contribs, key, callback, id)
                     },
                     res => res,
                 }
@@ -205,9 +199,11 @@ impl GitHub {
         }
     }
 
-    fn get_cached<F, B>(&self, cache: &TempCache<(String, Option<B>)>, key: (&str, &str), cb: F) -> CResult<Option<B>>
-        where B: for <'de> serde::Deserialize<'de> + serde::Serialize + Clone + Send + 'static,
-        F: FnOnce(&client::Github) -> Result<(HeaderMap, StatusCode, Option<serde_json::Value>), github_rs::errors::Error>
+    fn get_cached<F, P, B, R>(&self, cache: &TempCache<(String, Option<R>)>, key: (&str, &str), cb: F, postproc: P) -> CResult<Option<R>>
+        where P: FnOnce(B) -> R,
+        F: FnOnce(&client::Github) -> Result<(HeaderMap, StatusCode, Option<serde_json::Value>), github_rs::errors::Error>,
+        B: for <'de> serde::Deserialize<'de> + serde::Serialize + Clone + Send + 'static,
+        R: for <'de> serde::Deserialize<'de> + serde::Serialize + Clone + Send + 'static
     {
         if let Some((ver, payload)) = cache.get(key.0)? {
             if ver == key.1 {
@@ -249,9 +245,9 @@ impl GitHub {
             _ => status.is_success(),
         };
 
-        match body.ok_or(Error::NoBody).and_then(|stats| Ok(serde_json::from_value(stats)?)) {
+        match body.ok_or(Error::NoBody).and_then(|stats| Ok(postproc(serde_json::from_value(stats)?))) {
             Ok(val) => {
-                let res = (key.1.to_string(), val);
+                let res = (key.1.to_string(), Some(val));
                 if keep_cached {
                     cache.set(key.0, &res)?;
                 }
@@ -326,6 +322,10 @@ impl GitHub {
             Err(err) => Err(err)?
         }
     }
+}
+
+fn id<T>(v: T) -> T {
+    v
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

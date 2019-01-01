@@ -8,3 +8,4 @@ data/tantivy
 data/staging
 *.db-journal
 *.rmp
+*.rmpz

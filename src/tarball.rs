@@ -1,8 +1,11 @@
 use cargo_toml::Manifest;
 use libflate::gzip::Decoder;
 use render_readme::Markup;
+use std::io;
 use std::io::Read;
 use std::path::Path;
+use std::path::PathBuf;
+use std::collections::HashSet;
 use tar::Archive;
 use crate::readme_from_repo;
 use crate::is_readme_filename;
@@ -94,9 +97,11 @@ pub fn read_archive(archive: impl Read, prefix: &Path) -> Result<CrateFile> {
         }
     }
 
-    let manifest = manifest.ok_or_else(|| UnarchiverError::TomlNotFound(
+    let mut manifest = manifest.ok_or_else(|| UnarchiverError::TomlNotFound(
         files.iter().map(|p| p.display().to_string()).collect::<Vec<_>>().join(", "),
     ))?;
+
+    manifest.complete_from_abstract_filesystem(FilesFs(&files))?;
 
     Ok(CrateFile {
         decompressed_size,
@@ -107,6 +112,19 @@ pub fn read_archive(archive: impl Read, prefix: &Path) -> Result<CrateFile> {
         language_stats: stats.finish(),
         is_nightly,
     })
+}
+
+struct FilesFs<'a>(&'a [PathBuf]);
+
+impl cargo_toml::AbstractFilesystem for FilesFs<'_> {
+    fn file_names_in(&self, dir: &str) -> io::Result<HashSet<Box<str>>> {
+        Ok(self.0.iter().filter_map(|p| {
+            p.strip_prefix(dir).ok()
+        })
+        .filter_map(|p| p.to_str())
+        .map(From::from)
+        .collect())
+    }
 }
 
 fn check_if_uses_nightly_features(lib_source: &str) -> bool {

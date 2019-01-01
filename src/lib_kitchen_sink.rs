@@ -14,7 +14,6 @@ use rayon;
 use reqwest;
 use user_db;
 
-pub use compressed_string::*;
 mod index;
 pub use crate::index::*;
 pub use github_info::UserOrg;
@@ -138,8 +137,8 @@ pub struct KitchenSink {
 struct RichCrateVersionCacheData {
     derived: Derived,
     manifest: Manifest,
-    readme: Result<Option<ComprReadme>, ()>,
-    lib_file: Option<ComprString>,
+    readme: Result<Option<Readme>, ()>,
+    lib_file: Option<String>,
     path_in_repo: Option<String>,
     has_buildrs: bool,
 }
@@ -323,17 +322,7 @@ impl KitchenSink {
             }
             (d, warn)
         };
-        let readme = d.readme.map(|o| o.map(|r| {
-            Readme {
-                base_url: r.base_url,
-                base_image_url: r.base_image_url,
-                markup: match r.markup {
-                    ComprMarkup::Markdown(s) => Markup::Markdown(s.to_string()),
-                    ComprMarkup::Rst(s) => Markup::Rst(s.to_string()),
-                },
-            }
-        }));
-        Ok((RichCrateVersion::new(krate.clone(), d.manifest, d.derived, readme, d.lib_file.map(|s| s.into()), d.path_in_repo, d.has_buildrs), warn))
+        Ok((RichCrateVersion::new(krate.clone(), d.manifest, d.derived, d.readme, d.lib_file.map(|s| s.into()), d.path_in_repo, d.has_buildrs), warn))
     }
 
     pub fn changelog_url(&self, k: &RichCrateVersion) -> Option<String> {
@@ -478,16 +467,7 @@ impl KitchenSink {
             derived,
             has_buildrs,
             manifest: meta.manifest,
-            readme: meta.readme.map_err(|_| ()).map(|o| o.map(|r| {
-                ComprReadme {
-                    base_url: r.base_url,
-                    base_image_url: r.base_image_url,
-                    markup: match r.markup {
-                        Markup::Markdown(s) => ComprMarkup::Markdown(s.into()),
-                        Markup::Rst(s) => ComprMarkup::Rst(s.into()),
-                    },
-                }
-            })),
+            readme: meta.readme.map_err(|_| ()),
             lib_file: meta.lib_file.map(|s| s.into()),
             path_in_repo,
         }, warnings))
@@ -1179,17 +1159,4 @@ impl<'a> CrateAuthor<'a> {
 #[test]
 fn crates() {
     KitchenSink::new_default().expect("Test if configured");
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-enum ComprMarkup {
-    Markdown(ComprString),
-    Rst(ComprString),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct ComprReadme {
-    pub markup: ComprMarkup,
-    pub base_url: Option<String>,
-    pub base_image_url: Option<String>,
 }

@@ -10,6 +10,7 @@ use repo_url::Repo;
 use std::collections::hash_map::Entry::Vacant;
 use std::collections::{HashMap, HashSet};
 use std::fs;
+use std::io;
 use std::path::Path;
 use std::process::Command;
 use urlencoding;
@@ -112,13 +113,51 @@ pub fn find_manifests(repo: &Repository) -> Result<(Vec<(String, Manifest)>, Vec
     find_manifests_in_tree(&repo, &tree)
 }
 
+struct GitFS<'a, 'b> {
+    repo: &'b Repository,
+    tree: &'b Tree<'a>,
+}
+
+impl cargo_toml::AbstractFilesystem for GitFS<'_,'_> {
+    fn file_names_in(&self, dir_path: &str) -> Result<HashSet<Box<str>>, io::Error> {
+        self.file_names_in_tree(&self.tree, Some(dir_path))
+    }
+}
+
+impl GitFS<'_,'_> {
+    fn file_names_in_tree(&self, curr_dir: &Tree<'_>, dir_path: Option<&str>) -> Result<HashSet<Box<str>>, io::Error> {
+        if let Some(dir_path) = dir_path {
+            let mut parts = dir_path.splitn(1, '/');
+            let subdir_name = parts.next().unwrap();
+            let rest = parts.next();
+            for item in curr_dir.iter() {
+                if item.name() == Some(subdir_name) {
+                    if let Ok(tree) = self.repo.find_tree(item.id()) {
+                        return self.file_names_in_tree(&tree, rest);
+                    }
+                }
+            }
+            Err(io::Error::new(io::ErrorKind::NotFound, subdir_name))
+        } else {
+            let mut res = HashSet::new();
+            for item in curr_dir.iter() {
+                if let Some(n) = item.name() {
+                    res.insert(n.into());
+                }
+            }
+            Ok(res)
+        }
+    }
+}
+
 fn find_manifests_in_tree(repo: &Repository, tree: &Tree<'_>) -> Result<(Vec<(String, Manifest)>, Vec<ParseError>), failure::Error> {
     let mut tomls = Vec::with_capacity(8);
     let mut warnings = Vec::new();
     iter_blobs(repo, tree, |inner_path, name, blob| {
         if name == "Cargo.toml" {
             match Manifest::from_slice(blob.content()) {
-                Ok(toml) => {
+                Ok(mut toml) => {
+                    toml.complete_from_abstract_filesystem(GitFS {repo, tree})?;
                     if toml.package.is_some() {
                         tomls.push((inner_path.to_owned(), toml))
                     }
@@ -242,4 +281,17 @@ fn is_readme_filename(path: &Path, package: Option<&Package>) -> bool {
     })
 }
 
+#[test]
+fn git_fs() {
+    let repo = Repository::open(".git").expect("own git repo");
+    let (m, w) = find_manifests(&repo).expect("has manifests");
+    assert_eq!(1, m.len());
+    assert_eq!(0, w.len());
+    assert_eq!("", &m[0].0);
+    let manif = &m[0].1;
+    let pkg = manif.package.as_ref().expect("package");
+    assert_eq!("crate_git_checkout", &pkg.name);
+    assert!(manif.lib.is_some());
+    assert_eq!(0, manif.bin.len());
+}
 

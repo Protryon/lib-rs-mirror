@@ -68,7 +68,8 @@ lazy_static! {
         ("arm", Some(&["no-std", "no_std", "feature:no_std"])),
         ("float", Some(&["math"])),
         ("emulator", Some(&["6502"])),
-        ("terminal", Some(&["math"])),
+        ("terminal", Some(&["math", "emulator"])),
+        ("editor", Some(&["terminal"])),
         ("build", Some(&["logic"])), // confuses categorization
         ("messaging", Some(&["matrix"])), // confuses categorization
         ("chat", Some(&["matrix"])), // confuses categorization
@@ -83,6 +84,12 @@ lazy_static! {
         ("cargo", Some(&["plugin"])),
         ("git", Some(&["terminal"])),
         ("wide", Some(&["windows", "win32"])),
+        ("i18n", Some(&["text", "format", "message", "json", "ffi"])),
+        ("l10n", Some(&["text", "format", "message", "json", "ffi"])),
+        ("unicode", Some(&["text"])),
+        ("font", Some(&["text", "bitmap"])),
+        ("freetype", Some(&["text", "bitmap"])),
+        ("tex", Some(&["font"])),
         ("regex", Some(&["text", "linear", "time", "search"])),
         ("language", Some(&["server"])),
         ("medical", Some(&["image"])),
@@ -100,6 +107,7 @@ lazy_static! {
         ("parser", Some(&["no-std", "no_std", "game"])), // it's a nice feature, but not defining one
         ("cryptography", Some(&["no-std", "no_std"])), // it's a nice feature, but not defining one
         ("websocket", Some(&["http", "cli", "tokio", "client", "io", "network", "servo", "web"])), // there's a separate category for it
+        ("rest", Some(&["api"])),
 
         ("google", None), // there's a ton of auto-generated crates
         ("ethereum", None), // there's a ton of auto-generated crates

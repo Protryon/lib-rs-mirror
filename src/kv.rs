@@ -12,6 +12,9 @@ use std::fs;
 use tempfile::NamedTempFile;
 use std::io::BufReader;
 use crate::SimpleCache;
+use flate2::Compression;
+use flate2::write::DeflateEncoder;
+use flate2::read::DeflateDecoder;
 
 struct Inner<T> {
     data: T,
@@ -42,7 +45,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
             path,
             data: RwLock::new(Inner {
                 data,
-                writes: 0,
+                writes: 1,
                 next_autosave: 10,
             }),
             cache_only: false,
@@ -92,6 +95,11 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
         Ok(self.data.read().map_err(|_| Error::KvPoison)?.data.get(key).cloned())
     }
 
+    fn ungz(data: &[u8]) -> Result<T, Error> {
+        let ungz = DeflateDecoder::new(data);
+        Ok(rmp_serde::decode::from_read(ungz)?)
+    }
+
     pub fn save(&self) -> Result<(), Error> {
         let ser = {
             let d = self.data.read().map_err(|_| Error::KvPoison)?;
@@ -100,10 +108,25 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
         let tmp_path = NamedTempFile::new_in(self.path.parent().unwrap())?;
         fs::write(&tmp_path, &ser)?;
         let _: HashMap<String, T> = rmp_serde::from_slice(&ser).map_err(|e| {
-            eprintln!("{} can't be saved, because {}", self.path.display(), e);
+            eprintln!("{} can't be saved as uncompressed, because {}", self.path.display(), e);
             e
         })?;
         tmp_path.persist(&self.path).map_err(|e| e.error)?;
+
+        let new_path = self.path.with_extension("rmpz");
+        let tmp_path2 = NamedTempFile::new_in(new_path.parent().unwrap())?;
+        let mut file = File::create(&tmp_path2)?;
+
+        let d = self.data.read().map_err(|_| Error::KvPoison)?;
+        let new_data = d.data.iter().map(|(k, v)| {
+            let mut e = DeflateEncoder::new(Vec::new(), Compression::best());
+            rmp_serde::encode::write_named(&mut e, v)?;
+            let compr = e.finish()?;
+            Self::ungz(&compr).expect("ser sanity check");
+            Ok((k.clone(), compr.into_boxed_slice()))
+        }).collect::<Result<HashMap<_,_>, Error>>()?;
+        rmp_serde::encode::write(&mut file, &new_data)?;
+        tmp_path2.persist(new_path).map_err(|e| e.error)?;
         Ok(())
     }
 

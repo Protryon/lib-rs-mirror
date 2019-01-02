@@ -149,6 +149,7 @@ Crates to interface with database management systems.\
 """
 short-description = """
 Interface with database management systems."""
+siblings = ["database-implementations"]
 
 [database-implementations]
 name = "Database implementations"
@@ -160,6 +161,7 @@ implemented in Rust.\
 """
 short-description = """
 Database management systems implemented in Rust."""
+siblings = ["database"]
 
 [data-structures]
 name = "Data structures"
@@ -276,6 +278,7 @@ without an operating system.
 short-description = """
 For embedded devices or devices without an operating system.
 """
+siblings = ["hardware-support", "no-std"]
 
 [emulators]
 name = "Emulators"
@@ -357,6 +360,7 @@ Crates to interface with specific CPU or other hardware features.\
 """
 short-description = """
 Interface with specific CPU or other hardware features."""
+siblings = ["embedded"]
 
 [internationalization]
 name = "Internationalization (i18n)"
@@ -449,6 +453,7 @@ or SSH, or lower-level network protocols such as TCP or UDP.\
 """
 short-description = """
 Network protocols such as FTP, HTTP, or SSH, or lower-level TCP or UDP."""
+siblings = ["authentication", "email"]
 
 [no-std]
 name = "No standard library"
@@ -459,6 +464,7 @@ Crates that are able to function without the Rust standard library.
 short-description = """
 Libraries that function without the Rust standard library.
 """
+siblings = ["embedded"]
 
 [os]
 name = "Operating systems"
@@ -504,6 +510,7 @@ Parsers implemented for particular formats or languages.\
 """
 short-description = """
 Parse data formats or languages."""
+siblings = ["parsing"]
 
 [parsing]
 name = "Parsing tools"
@@ -514,6 +521,7 @@ Format-specific parsers belong in other, more specific categories.
 """
 short-description = """
 Parsing tools and parser generators."""
+siblings = ["parser-implementations"]
 
 [rendering]
 name = "Rendering"
@@ -669,6 +677,7 @@ Crates to create applications for the web.\
 """
 short-description = """
 Create applications for the Web."""
+siblings = ["wasm"]
 
 [web-programming.categories.http-client]
 name = "HTTP client"

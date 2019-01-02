@@ -29,6 +29,7 @@ pub struct Category {
     pub title: String,
     pub slug: String,
     pub sub: CategoryMap,
+    pub siblings: Vec<String>,
 }
 
 pub type CategoryMap = BTreeMap<String, Category>;
@@ -80,6 +81,7 @@ impl Categories {
             let short_description = details.remove("short-description").ok_or(CatError::MissingField)?.try_into()?;
             let title = details.remove("title").ok_or(CatError::MissingField)?.try_into()?;
             let standalone_name = details.remove("standalone-name").and_then(|v| v.try_into().ok());
+            let siblings = details.remove("siblings").and_then(|v| v.try_into().ok()).unwrap_or_default();
 
             let mut full_slug = String::with_capacity(full_slug_start.len()+2+slug.len());
             if full_slug_start != "" {
@@ -101,6 +103,7 @@ impl Categories {
                 description,
                 slug: full_slug,
                 sub,
+                siblings,
             }))
         }).collect()
     }

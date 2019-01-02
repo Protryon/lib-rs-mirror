@@ -241,12 +241,23 @@ pub fn find_readme(repo: &Repository, package: &Package) -> Result<Option<Readme
     let head = repo.head()?;
     let tree = head.peel_to_tree()?;
     let mut readme = None;
+    let mut found_best = false; // it'll find many readmes, including fallbacks
 
     let prefix = path_in_repo(&repo, &tree, &package.name)?;
     let prefix = prefix.as_ref().map(|s| s.as_str()).unwrap_or("");
 
     iter_blobs(&repo, &tree, |base, name, blob| {
-        let rel_path = if base.starts_with(prefix) {&base[prefix.len()..]} else {base};
+        if found_best {
+            return Ok(()); // done
+        }
+        let is_correct_dir = base.starts_with(prefix);
+        let rel_path = if is_correct_dir {
+            &base[prefix.len()..]
+        } else if readme.is_none() {
+            base
+        } else {
+            return Ok(()); // don't search bad dirs if there's some readme already
+        };
         let rel_path_name = Path::new(rel_path).join(name);
         if is_readme_filename(&rel_path_name, Some(package)) {
             let text = String::from_utf8_lossy(blob.content()).to_string();
@@ -256,6 +267,7 @@ pub fn find_readme(repo: &Repository, package: &Package) -> Result<Option<Readme
                 Markup::Markdown(text)
             };
             readme = Some(readme_from_repo(markup, &package.repository, base));
+            found_best = is_correct_dir;
         }
         Ok(())
     })?;

@@ -137,7 +137,7 @@ impl GitFS<'_,'_> {
                     }
                 }
             }
-            Err(io::Error::new(io::ErrorKind::NotFound, subdir_name))
+            Ok(HashSet::new()) // dir not found
         } else {
             let mut res = HashSet::new();
             for item in curr_dir.iter() {

@@ -1,5 +1,7 @@
 #[macro_use] extern crate failure;
 
+use chrono::prelude::*;
+use rich_crate::DownloadWeek;
 use crate_files;
 use crate_git_checkout;
 use crates_index;
@@ -16,6 +18,8 @@ use user_db;
 
 mod index;
 pub use crate::index::*;
+mod yearly;
+pub use crate::yearly::*;
 pub use github_info::UserOrg;
 use rayon::prelude::*;
 mod deps_stats;
@@ -132,6 +136,7 @@ pub struct KitchenSink {
     top_crates_cached: RwLock<FxHashMap<String, Arc<Vec<(Origin, u32)>>>>,
     git_checkout_path: PathBuf,
     main_cache_dir: PathBuf,
+    yearly: AllDownloads,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -181,6 +186,7 @@ impl KitchenSink {
             category_crate_counts: LazyOnce::new(),
             removals: LazyOnce::new(),
             top_crates_cached: RwLock::new(FxHashMap::default()),
+            yearly: AllDownloads::new(&main_cache_dir),
             main_cache_dir,
         })
     }
@@ -229,6 +235,57 @@ impl KitchenSink {
     /// so `rich_crate`/`rich_crate_version` is needed to do more.
     pub fn all_crates(&self) -> &FxHashMap<Origin, Crate> {
         self.index.crates()
+    }
+
+    /// Gets cratesio download data, but not from the API, but from our local copy
+    pub fn weekly_downloads(&self, k: &RichCrate, num_weeks: u16) -> CResult<Vec<DownloadWeek>> {
+        let mut res = Vec::with_capacity(num_weeks.into());
+        let mut now = Utc::today();
+
+        let mut curr_year = now.year();
+        let mut curr_year_data = self.yearly.get_crate_year(k.name(), curr_year as _)?.unwrap_or_default();
+
+        let day_of_year = now.ordinal0();
+        let missing_data_days = curr_year_data.is_set[0..day_of_year as usize].iter().cloned().rev().take_while(|s| !s).count();
+
+        if missing_data_days > 0 {
+            now = now - chrono::Duration::days(missing_data_days as _);
+        }
+
+        for i in (0..num_weeks).rev() {
+            let date = now - chrono::Duration::weeks(i.into());
+            let mut total = 0;
+            let mut any_set = false;
+
+            for d in 0..7 {
+                let this_date = date + chrono::Duration::days(d);
+                let day_of_year = this_date.ordinal0() as usize;
+                let year = this_date.year();
+                if year != curr_year {
+                    curr_year = year;
+                    curr_year_data = self.yearly.get_crate_year(k.name(), curr_year as _)?.unwrap_or_default();
+                }
+                if curr_year_data.is_set[day_of_year] {
+                    any_set = true;
+                }
+                for dl in curr_year_data.versions.values() {
+                    total += dl.0[day_of_year] as usize;
+                }
+            }
+            if any_set {
+                res.push(DownloadWeek {
+                    date,
+                    total,
+                    downloads: HashMap::new(), // format of this is stupid, as it requires crates.io's version IDs
+                });
+            }
+        }
+        Ok(res)
+    }
+
+    pub fn all_downloads_of_all_crates(&self, cb: impl FnMut(String, u32, Option<String>, u32)) -> CResult<()> {
+        self.crate_db.all_downloads_of_all_crates(cb)?;
+        Ok(())
     }
 
     pub fn all_new_crates<'a>(&'a self) -> CResult<impl Iterator<Item = RichCrate> + 'a> {
@@ -687,6 +744,56 @@ impl KitchenSink {
     pub fn index_crate(&self, k: &RichCrate) -> CResult<()> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
         self.crate_db.index_versions(k)?;
+        self.index_crate_downloads(k)?;
+        Ok(())
+    }
+
+    pub fn index_crate_downloads(&self, k: &RichCrate) -> CResult<()> {
+        let mut modified = false;
+        let mut curr_year = Utc::today().year() as u16;
+        let mut curr_year_data = self.yearly.get_crate_year(k.name(), curr_year)?.unwrap_or_default();
+
+        let dd = k.daily_downloads();
+        let mut by_day = FxHashMap::<_, Vec<_>>::default();
+        for dl in dd {
+            by_day.entry(dl.date).or_insert_with(Default::default).push(dl);
+        }
+        // The latest day in the data is going to be incomplete, so throw it out
+        if let Some(max_date) = by_day.keys().max().cloned() {
+            by_day.remove(&max_date);
+        }
+        for (day, dls) in by_day {
+            let day_of_year = day.ordinal0() as usize;
+            let y = day.year() as u16;
+            if y != curr_year {
+                if modified {
+                    modified = false;
+                    self.yearly.set_crate_year(k.name(), curr_year, &curr_year_data)?;
+                }
+                curr_year = y;
+                curr_year_data = self.yearly.get_crate_year(k.name(), curr_year)?.unwrap_or_default();
+            }
+
+            // crates.io data gets worse as it gets older, so the first one was the best
+            if curr_year_data.is_set[day_of_year] {
+                continue;
+            }
+
+            modified = true;
+            curr_year_data.is_set[day_of_year] = true;
+            for ver in curr_year_data.versions.values_mut() {
+                ver.0[day_of_year] = 0; // clear that day only
+            }
+
+            for dl in dls {
+                let ver = dl.version.map(|v| v.num.clone().into_boxed_str());
+                let ver_year = curr_year_data.versions.entry(ver).or_insert_with(|| DailyDownloads([0; 366]));
+                ver_year.0[day_of_year] += dl.downloads as u32;
+            }
+        }
+        if modified {
+            self.yearly.set_crate_year(k.name(), curr_year, &curr_year_data)?;
+        }
         Ok(())
     }
 

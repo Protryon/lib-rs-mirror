@@ -1034,18 +1034,21 @@ impl KitchenSink {
                 return Ok(category.clone());
             }
         }
+        let total_count = self.category_crate_count(slug)?;
+        let wanted_num = ((total_count/3+25)/50 * 50).max(100);
         let mut cache = self.top_crates_cached.write().unwrap();
         use std::collections::hash_map::Entry::*;
         Ok(match cache.entry(slug.to_owned()) {
             Occupied(e) => Arc::clone(e.get()),
             Vacant(e) => {
-                let mut crates = self.crate_db.top_crates_in_category_partially_ranked(slug, 130)?;
+                let some_extra_for_removals = 30 + wanted_num/10;
+                let mut crates = self.crate_db.top_crates_in_category_partially_ranked(slug, wanted_num + some_extra_for_removals)?;
                 let removals = self.removals.get(|| self.crate_db.removals().unwrap());
                 for c in &mut crates {
                     c.2 /= 300. + removals.get(&c.0).cloned().unwrap_or(2.);
                 }
                 crates.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap());
-                let crates: Vec<_> = crates.into_iter().map(|(o, r, _)| (o, r)).take(100).collect();
+                let crates: Vec<_> = crates.into_iter().map(|(o, r, _)| (o, r)).take(wanted_num as usize).collect();
                 let res = Arc::new(crates);
                 e.insert(Arc::clone(&res));
                 res
@@ -1086,7 +1089,6 @@ impl KitchenSink {
             .ok_or(KitchenSinkErr::CategoryQueryFailed)
             .and_then(|h| {
                 h.get(slug).map(|&c| c).ok_or_else(|| {
-                    eprintln!("Known categories: {:?}", h);
                     KitchenSinkErr::CategoryNotFound(slug.to_string())
                 })
             })

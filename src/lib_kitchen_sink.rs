@@ -484,6 +484,16 @@ impl KitchenSink {
         }
     }
 
+    pub fn is_build_or_dev(&self, k: &RichCrateVersion) -> (bool, bool) {
+        self.dependents_stats_of(k)
+        .map(|d| {
+            let is_build = d.build.0 > 3 * (d.runtime.0 + d.runtime.1 + 5);
+            let is_dev = !is_build && d.dev > (3 * d.runtime.0 + d.runtime.1 + 3 * d.build.0 + d.build.1 + 5);
+            (is_build, is_dev)
+        })
+        .unwrap_or((false, false))
+    }
+
     fn add_readme_from_repo(&self, meta: &mut CrateFile, maybe_repo: Option<&Repo>) -> Warnings {
         let mut warnings = HashSet::new();
         let package = match meta.manifest.package.as_ref() {
@@ -700,7 +710,7 @@ impl KitchenSink {
                 }
             }
         }
-        self.crate_db.index_latest(v, &weighed_deps)?;
+        self.crate_db.index_latest(v, &weighed_deps, self.is_build_or_dev(v))?;
         Ok(())
     }
 

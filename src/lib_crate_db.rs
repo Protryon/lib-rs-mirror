@@ -698,6 +698,7 @@ impl CrateDb {
                     join crates k on v.crate_id = k.id
                     where c.slug = ?1
                     group by v.crate_id
+                    having count(*) > 1 -- so these are updates, not new releases
                     order by 1 desc
                     limit 20
             "#)?;

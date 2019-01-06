@@ -156,14 +156,7 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn is_build_or_dev(&self) -> (bool, bool) {
-        self.kitchen_sink
-            .dependents_stats_of(self.ver)
-            .map(|d| {
-                let is_build = d.build.0 > (d.runtime.0 + d.runtime.1 + 5) * 2;
-                let is_dev = !is_build && d.dev > (d.runtime.0 * 2 + d.runtime.1 + d.build.0 * 2 + d.build.1 + 5);
-                (is_build, is_dev)
-            })
-            .unwrap_or((false, false))
+        self.kitchen_sink.is_build_or_dev(self.ver)
     }
 
     pub fn dependents_stats(&self) -> Option<(u32, u32)> {

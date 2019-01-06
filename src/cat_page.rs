@@ -45,6 +45,14 @@ impl<'a> CatPage<'a> {
         })
     }
 
+    pub fn has_subcategories_and_siblings(&self) -> bool {
+        !self.cat.sub.is_empty() || !self.cat.siblings.is_empty()
+    }
+
+    pub fn subcategories_and_siblings(&self) -> impl Iterator<Item=&Category> {
+        self.cat.sub.values().chain(self.cat.siblings.iter().flat_map(|slug| CATEGORIES.from_slug(slug)))
+    }
+
     /// Used to render descriptions
     pub fn render_markdown_str(&self, s: &str) -> templates::Html<String> {
         templates::Html(self.markup.markdown_str(s, false))

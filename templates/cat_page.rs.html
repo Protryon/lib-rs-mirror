@@ -59,11 +59,11 @@
     </header>
 
     <main>
-        @if !p.cat.sub.is_empty() {
+        @if p.has_subcategories_and_siblings() {
           <nav id="category-subcategories" role="navigation">
             <div class="inner-col">
               <ul>
-                @for subcat in p.cat.sub.values() {
+                @for subcat in p.subcategories_and_siblings() {
                     <li><a href="@url.category(subcat)">
                       <div class=h>
                         <h4>@subcat.name</h4>

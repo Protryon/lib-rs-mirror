@@ -10,7 +10,7 @@ name = "front_end"
 path = "src/front_end.rs"
 
 [build-dependencies]
-ructe = { git = "https://github.com/kornelski/ructe" }
+ructe = "0.5.6"
 
 [dependencies]
 kitchen_sink = { git = "https://gitlab.com/crates.rs/kitchen_sink.git", version = "0.6.0" }

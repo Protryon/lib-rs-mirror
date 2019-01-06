@@ -40,6 +40,7 @@ impl CrateOwner {
         }
     }
 
+    /// Be careful about case-insensitivity
     pub fn github_login(&self) -> Option<&str> {
         match self.kind {
             OwnerKind::User => Some(&self.login),

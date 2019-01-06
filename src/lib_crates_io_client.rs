@@ -130,8 +130,8 @@ impl CratesIoClient {
         }
 
         let url = format!("https://crates.io/api/v1/crates/{}", path.as_ref());
-
         let res = self.cache.get_json(key.0, url, |raw: B| {
+            std::thread::sleep(std::time::Duration::from_secs(1));
             Some((key.1.to_string(), raw.to()))
         })?;
         Ok(res.map(|(_, res)| B::from(res)))

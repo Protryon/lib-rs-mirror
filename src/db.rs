@@ -11,6 +11,7 @@ use std::path::Path;
 use thread_local::ThreadLocal;
 use std::thread;
 use std::time::Duration;
+use std::panic;
 
 #[derive(Debug)]
 pub struct SimpleCache {
@@ -128,16 +129,19 @@ impl SimpleCache {
     }
 
     pub(crate) fn fetch(url: &str) -> Result<Vec<u8>, Error> {
-        let client = reqwest::Client::builder().build()?;
-        let mut res = client.get(url)
-            .header(reqwest::header::USER_AGENT, "crates.rs/1.0")
-            .send()?;
-        if res.status() != reqwest::StatusCode::OK {
-            Err(res.status())?;
-        }
-        let mut buf = Vec::new();
-        res.copy_to(&mut buf)?;
-        Ok(buf)
+        panic::catch_unwind(|| {
+
+            let client = reqwest::Client::builder().build()?;
+            let mut res = client.get(url)
+                .header(reqwest::header::USER_AGENT, "crates.rs/1.0")
+                .send()?;
+            if res.status() != reqwest::StatusCode::OK {
+                Err(res.status())?;
+            }
+            let mut buf = Vec::new();
+            res.copy_to(&mut buf)?;
+            Ok(buf)
+        }).unwrap_or_else(|e| {panic!("bad url: {}: {:?}", url, e);})
     }
 }
 

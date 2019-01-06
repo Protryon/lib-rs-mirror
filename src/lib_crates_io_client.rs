@@ -3,6 +3,7 @@ use serde;
 
 #[macro_use] extern crate serde_derive;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::path::Path;
 use chrono::{Date, TimeZone, Utc};
 
@@ -60,23 +61,27 @@ impl CratesIoClient {
     }
 
     pub fn krate(&self, crate_name: &str, cache_buster: &str) -> Result<Option<CratesIoCrate>, Error> {
-        let meta = match self.crate_meta(crate_name, cache_buster)? {
-            Some(d) => d,
-            None => return Ok(None),
-        };
-        let downloads = match self.crate_downloads(crate_name, cache_buster)? {
-            Some(d) => d,
-            None => return Ok(None),
-        };
-        let owners = match self.crate_owners(crate_name, cache_buster)? {
-            Some(d) => d,
-            None => return Ok(None),
-        };
+        let mut meta = cioopt!(self.crate_meta(crate_name, cache_buster)?);
+        let downloads = cioopt!(self.crate_downloads(crate_name, cache_buster)?);
+        if !self.cache.cache_only && !Self::are_downloads_consistent(&meta, &downloads) {
+            eprintln!("Meta is missing versions {}@{}", crate_name, cache_buster);
+            let _ = self.cache.delete(crate_name);
+            meta = cioopt!(self.crate_meta(crate_name, cache_buster)?);
+            assert!(Self::are_downloads_consistent(&meta, &downloads));
+        }
+        let owners = cioopt!(self.crate_owners(crate_name, cache_buster)?);
         Ok(Some(CratesIoCrate {
             meta,
             downloads,
             owners,
         }))
+    }
+
+    fn are_downloads_consistent(meta: &CrateMetaFile, downloads: &CrateDownloadsFile) -> bool {
+        let versions: HashSet<_> = meta.versions.iter().map(|v| v.id).collect();
+        downloads.version_downloads.iter().all(|d| {
+            versions.contains(&d.version)
+        })
     }
 
     pub fn crate_meta(&self, crate_name: &str, as_of_version: &str) -> Result<Option<CrateMetaFile>, Error> {
@@ -178,7 +183,7 @@ impl CratesIoCrate {
         let versions: HashMap<_,_> = self.meta.versions.iter().map(|v| (v.id, v)).collect();
         self.downloads.version_downloads.iter().map(|d| {
             DailyVersionDownload {
-                version: versions.get(&d.version).map(|v| *v),
+                version: versions.get(&d.version).cloned(),
                 downloads: d.downloads,
                 date: parse_date(&d.date),
             }

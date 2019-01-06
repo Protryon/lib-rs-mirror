@@ -1,15 +1,15 @@
+use fxhash::FxHashSet;
+use fxhash::FxHashMap;
 use crate::index::*;
 use crate::KitchenSinkErr;
 use crates_index::Crate;
 use rayon::prelude::*;
-use std::collections::HashMap;
-use std::collections::HashSet;
 use std::sync::Mutex;
 use string_interner::Sym;
 
 pub struct DepsStats {
     pub total: usize,
-    pub counts: HashMap<Box<str>, RevDependencies>,
+    pub counts: FxHashMap<Box<str>, RevDependencies>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -19,7 +19,7 @@ pub struct RevDependencies {
     pub build: (u16, u16),
     pub dev: u16,
     pub direct: u16,
-    pub versions: HashMap<MiniVer, u16>,
+    pub versions: FxHashMap<MiniVer, u16>,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -37,18 +37,18 @@ pub struct DepInf {
 }
 
 pub struct DepVisitor {
-    node_visited: HashSet<(DepInf, *const Mutex<DepSet>)>,
+    node_visited: FxHashSet<(DepInf, *const Mutex<DepSet>)>,
 }
 
 impl DepVisitor {
     pub fn new() -> Self {
         Self {
-            node_visited: HashSet::with_capacity(120),
+            node_visited: FxHashSet::with_capacity_and_hasher(120, Default::default()),
         }
     }
 
     pub fn visit(&mut self, depset: &ArcDepSet, depinf: DepInf, mut cb: impl FnMut(&mut Self, &DepName, &Dep)) {
-        let target_addr: &Mutex<HashMap<DepName, Dep>> = &*depset;
+        let target_addr: &Mutex<FxHashMap<DepName, Dep>> = &*depset;
         if self.node_visited.insert((depinf, target_addr as *const _)) {
             if let Ok(depset) = depset.try_lock() {
                 for (name, dep) in depset.iter() {
@@ -77,8 +77,8 @@ impl DepVisitor {
 }
 
 impl Index {
-    pub fn all_dependencies_flattened(&self, c: &Crate) -> Result<HashMap<Box<str>, (DepInf, MiniVer)>, KitchenSinkErr> {
-        let mut collected = HashMap::with_capacity(120);
+    pub fn all_dependencies_flattened(&self, c: &Crate) -> Result<FxHashMap<Box<str>, (DepInf, MiniVer)>, KitchenSinkErr> {
+        let mut collected = FxHashMap::with_capacity_and_hasher(120, Default::default());
         let mut visitor = DepVisitor::new();
 
         flatten(&self.deps_of_crate(c, DepQuery {
@@ -112,12 +112,12 @@ impl Index {
         }, &mut collected, &mut visitor);
 
         if collected.is_empty() {
-            return Ok(HashMap::new());
+            return Ok(FxHashMap::default());
         }
 
 
         let inter = self.inter.read().unwrap();
-        let mut converted = HashMap::with_capacity(collected.len());
+        let mut converted = FxHashMap::with_capacity_and_hasher(collected.len(), Default::default());
         converted.extend(collected.into_iter().map(|(k, v)| {
             (inter.resolve(k).unwrap().into(), v)
         }));
@@ -126,7 +126,7 @@ impl Index {
 
     pub(crate) fn get_deps_stats(&self) -> DepsStats {
         let crates = self.crates();
-        let crates: Vec<HashMap<_,_>> = crates
+        let crates: Vec<FxHashMap<_,_>> = crates
         .par_iter()
         .filter_map(|(_, c)| {
             self.all_dependencies_flattened(c)
@@ -137,7 +137,7 @@ impl Index {
         self.clear_cache();
 
         let total = crates.len();
-        let mut counts = HashMap::with_capacity(total);
+        let mut counts = FxHashMap::with_capacity_and_hasher(total, Default::default());
         for deps in crates {
             for (name, (depinf, semver)) in deps {
                 let n = counts.entry(name.clone()).or_insert_with(RevDependencies::default);
@@ -172,11 +172,11 @@ impl Index {
     }
 }
 
-fn flatten(dep: &Dep, depinf: DepInf, collected: &mut HashMap<Sym, (DepInf, MiniVer)>, visitor: &mut DepVisitor) {
+fn flatten(dep: &Dep, depinf: DepInf, collected: &mut FxHashMap<Sym, (DepInf, MiniVer)>, visitor: &mut DepVisitor) {
     visitor.start(dep, depinf, |vis, dep, depinf| flatten_set(dep, depinf, collected, vis));
 }
 
-fn flatten_set(depset: &ArcDepSet, depinf: DepInf, collected: &mut HashMap<Sym, (DepInf, MiniVer)>, visitor: &mut DepVisitor) {
+fn flatten_set(depset: &ArcDepSet, depinf: DepInf, collected: &mut FxHashMap<Sym, (DepInf, MiniVer)>, visitor: &mut DepVisitor) {
     visitor.visit(depset, depinf, |vis, (name, _), dep| {
         collected.entry(name.clone())
             .and_modify(|(old, semver)| {

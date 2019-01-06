@@ -10,12 +10,11 @@ use lazyonce::LazyOnce;
 use rich_crate::Origin;
 use semver::Version as SemVer;
 use semver::VersionReq;
-use std::collections::HashMap;
-use std::collections::HashSet;
 use std::iter;
 use std::path::PathBuf;
 use std::sync::RwLock;
 use std::sync::{Arc, Mutex};
+use fxhash::{FxHashMap, FxHashSet};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct MiniVer {
@@ -39,9 +38,9 @@ impl MiniVer {
 }
 
 pub struct Index {
-    crates: HashMap<Origin, Crate>,
+    crates: FxHashMap<Origin, Crate>,
     pub(crate) inter: RwLock<StringInterner<Sym>>,
-    pub(crate) cache: RwLock<HashMap<(Box<str>, Features), ArcDepSet>>,
+    pub(crate) cache: RwLock<FxHashMap<(Box<str>, Features), ArcDepSet>>,
     deps_stats: LazyOnce<DepsStats>,
 }
 
@@ -56,7 +55,7 @@ impl Index {
                 .map(|c| (Origin::from_crates_io_name(c.name()), c))
                 .collect();
         Self {
-            cache: RwLock::new(HashMap::with_capacity(5000)),
+            cache: RwLock::new(FxHashMap::with_capacity_and_hasher(5000, Default::default())),
             inter: RwLock::new(StringInterner::new()),
             deps_stats: LazyOnce::new(),
             crates,
@@ -67,7 +66,7 @@ impl Index {
     ///
     /// It returns only a thin and mostly useless data from the index itself,
     /// so `rich_crate`/`rich_crate_version` is needed to do more.
-    pub fn crates(&self) -> &HashMap<Origin, Crate> {
+    pub fn crates(&self) -> &FxHashMap<Origin, Crate> {
         &self.crates
     }
 
@@ -132,8 +131,8 @@ impl Index {
             return Ok(cached.clone());
         }
 
-        let mut to_enable = HashMap::new();
         let ver_features = ver.features(); // available features
+        let mut to_enable = FxHashMap::with_capacity_and_hasher(wants.features.len(), Default::default());
         let all_wanted_features = wants.features.iter()
                         .map(|s| s.as_ref())
                         .chain(iter::repeat("default").take(if wants.default {1} else {0}));
@@ -143,17 +142,17 @@ impl Index {
                     let mut t = enable.splitn(2, '/');
                     let dep_name = t.next().unwrap();
                     let enabled = to_enable.entry(dep_name.to_owned())
-                        .or_insert(HashSet::new());
+                        .or_insert(FxHashSet::default());
                     if let Some(enable) = t.next() {
                         enabled.insert(enable);
                     }
                 }
             } else {
-                to_enable.entry(feat.to_owned()).or_insert_with(HashSet::new);
+                to_enable.entry(feat.to_owned()).or_insert_with(FxHashSet::default);
             }
         }
 
-        let mut set: HashMap<DepName, (_, _, SemVer, HashSet<String>)> = HashMap::with_capacity(60);
+        let mut set: FxHashMap<DepName, (_, _, SemVer, FxHashSet<String>)> = FxHashMap::with_capacity_and_hasher(60, Default::default());
         for d in ver.dependencies() {
             // people forget to include winapi conditionally
             let is_target_specific = d.name() == "winapi" || d.target().is_some();
@@ -205,7 +204,7 @@ impl Index {
             };
 
             let (_, _, _, all_features) = set.entry(key)
-                .or_insert_with(|| (d, matched.clone(), semver, HashSet::new()));
+                .or_insert_with(|| (d, matched.clone(), semver, FxHashSet::default()));
             all_features.extend(d.features().iter().cloned());
             if let Some(s) = enable_dep_features {
                 all_features.extend(s.iter().map(|s| s.to_string()));
@@ -214,7 +213,7 @@ impl Index {
 
         // break infinite recursion. Must be inserted first, since depth-first search
         // may end up requesting it.
-        let result = Arc::new(Mutex::new(HashMap::new()));
+        let result = Arc::new(Mutex::new(FxHashMap::default()));
         self.cache.write().unwrap().insert(key, result.clone());
 
         let set: Result<_,_> = set.into_iter().map(|(k, (d, matched, semver, all_features))| {
@@ -354,7 +353,7 @@ pub struct Features {
 }
 
 pub type DepName = (Sym, Sym);
-pub type DepSet = HashMap<DepName, Dep>;
+pub type DepSet = FxHashMap<DepName, Dep>;
 pub type ArcDepSet = Arc<Mutex<DepSet>>;
 
 pub struct Dep {

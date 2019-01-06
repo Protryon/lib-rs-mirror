@@ -41,6 +41,7 @@ pub use rich_crate::RichCrateVersion;
 pub use rich_crate::RichDep;
 pub use rich_crate::{Cfg, Target};
 
+use fxhash::FxHashMap;
 use cargo_toml::Manifest;
 use cargo_toml::Package;
 use chrono::DateTime;
@@ -125,10 +126,10 @@ pub struct KitchenSink {
     user_db: user_db::UserDb,
     gh: github_info::GitHub,
     crate_derived_cache: TempCache<(String, RichCrateVersionCacheData, Warnings)>,
-    loaded_rich_crate_version_cache: RwLock<HashMap<Box<str>, RichCrateVersion>>,
+    loaded_rich_crate_version_cache: RwLock<FxHashMap<Box<str>, RichCrateVersion>>,
     category_crate_counts: LazyOnce<Option<HashMap<String, u32>>>,
     removals: LazyOnce<HashMap<Origin, f64>>,
-    top_crates_cached: RwLock<HashMap<String, Arc<Vec<(Origin, u32)>>>>,
+    top_crates_cached: RwLock<FxHashMap<String, Arc<Vec<(Origin, u32)>>>>,
     git_checkout_path: PathBuf,
     main_cache_dir: PathBuf,
 }
@@ -175,11 +176,11 @@ impl KitchenSink {
             user_db: user_db::UserDb::new(Self::assert_exists(data_path.join("users.db"))?)?,
             gh: gh?,
             crate_derived_cache: crate_derived_cache?,
-            loaded_rich_crate_version_cache: RwLock::new(HashMap::new()),
+            loaded_rich_crate_version_cache: RwLock::new(FxHashMap::default()),
             git_checkout_path: data_path.join("git"),
             category_crate_counts: LazyOnce::new(),
             removals: LazyOnce::new(),
-            top_crates_cached: RwLock::new(HashMap::new()),
+            top_crates_cached: RwLock::new(FxHashMap::default()),
             main_cache_dir,
         })
     }
@@ -226,7 +227,7 @@ impl KitchenSink {
     ///
     /// It returns only a thin and mostly useless data from the index itself,
     /// so `rich_crate`/`rich_crate_version` is needed to do more.
-    pub fn all_crates(&self) -> &HashMap<Origin, Crate> {
+    pub fn all_crates(&self) -> &FxHashMap<Origin, Crate> {
         self.index.crates()
     }
 
@@ -585,7 +586,7 @@ impl KitchenSink {
         }
     }
 
-    pub fn all_dependencies_flattened(&self, origin: &Origin) -> Result<HashMap<Box<str>, (DepInf, MiniVer)>, KitchenSinkErr> {
+    pub fn all_dependencies_flattened(&self, origin: &Origin) -> Result<FxHashMap<Box<str>, (DepInf, MiniVer)>, KitchenSinkErr> {
         self.index.all_dependencies_flattened(self.index.crate_by_name(origin)?)
     }
 

@@ -12,7 +12,7 @@ data/crate_data.db:
 
 	cd data; unxz < data.tar.xz | tar xv
 
-styles: style/public/index.css
+styles: style/public/index.css style/public/search.css
 
 style/public/index.css: style/node_modules/.bin/gulp
 	cd style && npm run build

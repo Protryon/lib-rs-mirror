@@ -166,6 +166,7 @@ impl Payloadable for CrateTeamsFile {
     fn from(val: Payload) -> Self { match val { Payload::CrateTeamsFile(d) => d, _ => panic!("bad cache") } }
 }
 
+#[derive(Debug, Clone)]
 pub struct DailyVersionDownload<'a> {
     pub version: Option<&'a CrateMetaVersion>,
     pub downloads: usize,

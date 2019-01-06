@@ -34,7 +34,7 @@ pub struct CrateExtraDailyDownload {
 pub struct DownloadWeek {
     pub date: Date<Utc>,
     pub total: usize,
-    pub downloads: Vec<(Option<usize>, usize)>,
+    pub downloads: HashMap<Option<usize>, usize>,
 }
 
 impl CrateDownloadsFile {
@@ -82,7 +82,7 @@ impl CrateDownloadsFile {
             DownloadWeek {
                 date,
                 total: downloads.values().sum(),
-                downloads: downloads.into_iter().collect(),
+                downloads,
             }
         }).collect()
     }

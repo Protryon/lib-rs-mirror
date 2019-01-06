@@ -1,6 +1,5 @@
 use std::borrow::Borrow;
 use std::sync::RwLock;
-use std::collections::HashMap;
 use serde::de::DeserializeOwned;
 use crate::error::Error;
 use serde::*;
@@ -16,9 +15,10 @@ use crate::SimpleCache;
 use flate2::Compression;
 use flate2::write::DeflateEncoder;
 use flate2::read::DeflateDecoder;
+use fxhash::FxHashMap;
 
 struct Inner {
-    data: HashMap<Box<str>, Box<[u8]>>,
+    data: FxHashMap<Box<str>, Box<[u8]>>,
     writes: usize,
     next_autosave: usize,
 }
@@ -40,7 +40,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
                 e
             })?
         } else {
-            HashMap::new()
+            FxHashMap::default()
         };
 
         Ok(Self {

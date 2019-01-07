@@ -662,8 +662,11 @@ impl KitchenSink {
     }
 
     pub fn dependents_stats_of(&self, krate: &RichCrateVersion) -> Option<RevDependencies> {
-        let deps = self.index.deps_stats();
-        deps.counts.get(krate.short_name()).cloned()
+        self.dependents_stats_of_crates_io_crate(krate.short_name())
+    }
+
+    pub fn dependents_stats_of_crates_io_crate(&self, crate_name: &str) -> Option<RevDependencies> {
+        self.index.deps_stats().counts.get(crate_name).cloned()
     }
 
     /// (latest, pop)
@@ -1141,7 +1144,11 @@ impl KitchenSink {
     }
 
     fn crate_owners(&self, krate: &RichCrateVersion) -> CResult<Vec<CrateOwner>> {
-        Ok(self.crates_io.crate_owners(krate.short_name(), krate.version()).context("crate_owners")?.unwrap_or_default())
+        self.crates_io_crate_owners(krate.short_name(), krate.version())
+    }
+
+    pub fn crates_io_crate_owners(&self, crate_name: &str, version: &str) -> CResult<Vec<CrateOwner>> {
+        Ok(self.crates_io.crate_owners(crate_name, version).context("crate_owners")?.unwrap_or_default())
     }
 
     // Sorted from the top, returns `(origin, recent_downloads)`

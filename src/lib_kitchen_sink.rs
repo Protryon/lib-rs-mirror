@@ -126,6 +126,7 @@ pub struct KitchenSink {
     pub index: Index,
     crates_io: crates_io_client::CratesIoClient,
     docs_rs: docs_rs_client::DocsRsClient,
+    url_check_cache: TempCache<bool>,
     crate_db: CrateDb,
     user_db: user_db::UserDb,
     gh: github_info::GitHub,
@@ -176,6 +177,7 @@ impl KitchenSink {
         Ok(Self {
             crates_io: crates_io?,
             index,
+            url_check_cache: TempCache::new(&data_path.join("url_check.db"))?,
             docs_rs: docs_rs_client::DocsRsClient::new(data_path.join("docsrs.db"))?,
             crate_db: CrateDb::new(Self::assert_exists(data_path.join("crate_data.db"))?)?,
             user_db: user_db::UserDb::new(Self::assert_exists(data_path.join("users.db"))?)?,
@@ -372,7 +374,7 @@ impl KitchenSink {
         };
 
         let (d, warn) = if let Some(res) = cached {res} else {
-            let (d, warn) = self.rich_crate_version_data(krate, fetch_type).with_context(|_| format!("get rich crate data for {}", key.0))?;
+            let (d, warn) = self.rich_crate_version_data(krate, fetch_type).with_context(|_| format!("failed geting rich crate data for {}", key.0))?;
             if fetch_type == CrateData::Full {
                 self.crate_derived_cache.set(key.0, (key.1.to_string(), d.clone(), warn.clone()))?;
             } else if fetch_type == CrateData::FullNoDerived {
@@ -624,12 +626,18 @@ impl KitchenSink {
     }
 
     pub fn check_url_is_valid(&self, url: &str) -> bool {
-        reqwest::Client::builder().build()
+        if let Ok(Some(res)) = self.url_check_cache.get(url) {
+            return res;
+        }
+        eprintln!("CHK: {}", url);
+        let res = reqwest::Client::builder().build()
         .and_then(|res| res.get(url).send())
         .map(|res| {
             res.status().is_success()
         })
-        .unwrap_or(false)
+        .unwrap_or(false);
+        self.url_check_cache.set(url, res).unwrap();
+        return res;
     }
 
     fn is_docs_rs_link(d: &str) -> bool {

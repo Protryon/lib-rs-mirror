@@ -120,7 +120,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
 
 
     #[inline]
-    pub fn get_json<B>(&self, key: &str, url: impl AsRef<str>, cb: impl FnOnce(B) -> Option<T>) -> Result<Option<T>, Error>
+    pub fn get_json<B>(&self, key: &str, url: impl AsRef<str>, on_miss: impl FnOnce(B) -> Option<T>) -> Result<Option<T>, Error>
         where B: for<'a> Deserialize<'a>
     {
         if let Some(res) = self.get(key)? {
@@ -134,7 +134,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
         let data = SimpleCache::fetch(url.as_ref())?;
         match serde_json::from_slice(&data) {
             Ok(res) => {
-                let res = cb(res);
+                let res = on_miss(res);
                 if let Some(ref res) = res {
                     self.set(key, res)?
                 }

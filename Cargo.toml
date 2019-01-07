@@ -1,6 +1,6 @@
 [package]
 name = "crates-server"
-version = "0.1.7"
+version = "0.1.8"
 authors = ["Kornel <kornel@geekhood.net>"]
 edition = "2018"
 description = "Crates.rs web server"
@@ -9,7 +9,7 @@ readme = "README.md"
 [package.metadata.deb]
 assets = [
     ["target/release/crates-server", "usr/bin/", "755"],
-    ["../data/tantivy/*", "var/lib/crates-server/tantivy/", "755"],
+    ["../data/tantivy/*", "var/lib/crates-server/tantivy/", "644"],
 ]
 
 [dependencies]
@@ -20,6 +20,6 @@ futures-cpupool = "0.1.8"
 futures = "0.1.25"
 render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git", version = "0.5.0" }
 search_index = { git = "https://gitlab.com/crates.rs/search_index.git" }
-kitchen_sink = { git = "https://gitlab.com/crates.rs/kitchen_sink.git", version = "0.6.0" }
+kitchen_sink = { git = "https://gitlab.com/crates.rs/kitchen_sink.git", version = "0.7.0" }
 front_end = { git = "https://gitlab.com/crates.rs/front_end.git", version = "0.3.1" }
 urlencoding = "1.0.0"

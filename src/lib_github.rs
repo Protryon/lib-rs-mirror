@@ -76,6 +76,7 @@ pub struct GitHub {
     releases: TempCache<(String, Option<Vec<GitHubRelease>>)>,
     contribs: TempCache<(String, Option<Vec<UserContrib>>)>,
     topics: TempCache<(String, Option<Vec<String>>)>,
+    repos: TempCache<(String, Option<GitHubRepo>)>,
 }
 
 impl GitHub {
@@ -89,6 +90,7 @@ impl GitHub {
             releases: TempCache::new(&cache_path.as_ref().with_file_name("github_releases.bin"))?,
             contribs: TempCache::new(&cache_path.as_ref().with_file_name("github_contribs.bin"))?,
             topics: TempCache::new(&cache_path.as_ref().with_file_name("github_topics.bin"))?,
+            repos: TempCache::new(&cache_path.as_ref().with_file_name("github_repos.bin"))?,
         })
     }
 
@@ -154,27 +156,25 @@ impl GitHub {
     }
 
     pub fn repo(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Option<GitHubRepo>> {
-        let key = format!("{}/{}/repo", repo.owner, repo.repo);
-        let mut ghdata: GitHubRepo = match self.get_cached_old(&self.cache, (&key, as_of_version), |client| client.get()
-                           .repos().owner(&repo.owner).repo(&repo.repo)
-                           .execute()).map_err(|e| e.context("repo"))? {
-            Some(data) => data,
-            None => return Ok(None),
-        };
-
-        // Keep GH-specific logic in here
-        if ghdata.has_pages {
-            // Name is case-sensitive
-            ghdata.github_page_url = Some(format!("https://{}.github.io/{}/", repo.owner, ghdata.name));
-        }
-        // Some homepages are empty strings
-        if ghdata.homepage.as_ref().map_or(false, |h| !h.starts_with("http")) {
-            ghdata.homepage = None;
-        }
-        if !ghdata.has_issues {
-            ghdata.open_issues_count = None;
-        }
-        Ok(Some(ghdata))
+        let key = format!("{}/{}", repo.owner, repo.repo);
+        self.get_cached(&self.repos, (&key, as_of_version), |client| client.get()
+                .repos().owner(&repo.owner).repo(&repo.repo)
+                .execute(), |mut ghdata: GitHubRepo| {
+                    // Keep GH-specific logic in here
+                    if ghdata.has_pages {
+                        // Name is case-sensitive
+                        ghdata.github_page_url = Some(format!("https://{}.github.io/{}/", repo.owner, ghdata.name));
+                    }
+                    // Some homepages are empty strings
+                    if ghdata.homepage.as_ref().map_or(false, |h| !h.starts_with("http")) {
+                        ghdata.homepage = None;
+                    }
+                    if !ghdata.has_issues {
+                        ghdata.open_issues_count = None;
+                    }
+                    ghdata
+                })
+                .map_err(|e| e.context("repo"))
     }
 
     pub fn contributors(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Option<Vec<UserContrib>>> {
@@ -375,18 +375,6 @@ impl Payloadable for SearchResults<User> {
     }
 }
 
-impl Payloadable for GitHubRepo {
-    fn to(&self) -> Payload {
-        Payload::GitHubRepo(self.clone())
-    }
-
-    fn from(p: Payload) -> Option<Self> {
-        match p {
-            Payload::GitHubRepo(d) => Some(d), _ => None,
-        }
-    }
-}
-
 impl Payloadable for User {
     fn to(&self) -> Payload {
         Payload::User(self.clone())
@@ -395,17 +383,6 @@ impl Payloadable for User {
     fn from(p: Payload) -> Option<Self> {
         match p {
             Payload::User(d) => Some(d), _ => None,
-        }
-    }
-}
-impl Payloadable for Topics {
-    fn to(&self) -> Payload {
-        Payload::Topics(self.clone())
-    }
-
-    fn from(p: Payload) -> Option<Self> {
-        match p {
-            Payload::Topics(d) => Some(d), _ => None,
         }
     }
 }

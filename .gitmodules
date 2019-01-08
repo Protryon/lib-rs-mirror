@@ -67,3 +67,6 @@
 [submodule "search_index"]
 	path = search_index
 	url = https://gitlab.com/crates.rs/search_index.git
+[submodule "ranking"]
+	path = ranking
+	url = https://gitlab.com/crates.rs/ranking.git

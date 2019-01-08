@@ -21,6 +21,7 @@ members = [
 "crate_git_checkout",
 "udedokei",
 "search_index",
+"ranking",
 "server",
 "render_readme/dump",
 ]

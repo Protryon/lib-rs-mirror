@@ -285,11 +285,6 @@ impl KitchenSink {
         Ok(res)
     }
 
-    pub fn all_downloads_of_all_crates(&self, cb: impl FnMut(String, u32, Option<String>, u32)) -> CResult<()> {
-        self.crate_db.all_downloads_of_all_crates(cb)?;
-        Ok(())
-    }
-
     pub fn all_new_crates<'a>(&'a self) -> CResult<impl Iterator<Item = RichCrate> + 'a> {
         let min_timestamp = self.crate_db.latest_crate_update_timestamp()?.unwrap_or(0);
         let res: Vec<RichCrate> = self.index.crates()

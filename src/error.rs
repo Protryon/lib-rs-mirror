@@ -33,6 +33,7 @@ quick_error! {
             cause(err)
         }
         KvPoison {}
+        NotInCache {}
         Status(code: reqwest::StatusCode) {
             from()
             display("Request error {}", code)

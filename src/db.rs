@@ -130,7 +130,7 @@ impl SimpleCache {
 
     pub(crate) fn fetch(url: &str) -> Result<Vec<u8>, Error> {
         panic::catch_unwind(|| {
-
+            println!("REQ {}", url);
             let client = reqwest::Client::builder().build()?;
             let mut res = client.get(url)
                 .header(reqwest::header::USER_AGENT, "crates.rs/1.0")

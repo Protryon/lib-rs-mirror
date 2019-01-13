@@ -76,7 +76,7 @@ pub struct GitHub {
     contribs: TempCache<(String, Option<Vec<UserContrib>>)>,
     topics: TempCache<(String, Option<Vec<String>>)>,
     repos: TempCache<(String, Option<GitHubRepo>)>,
-    emails: TempCache<(String, Option<Option<User>>)>,
+    emails: TempCache<(String, Option<Vec<User>>)>,
 }
 
 impl GitHub {
@@ -98,22 +98,21 @@ impl GitHub {
         Ok(client::Github::new(&self.token)?)
     }
 
-    pub fn user_by_email(&self, email: &str) -> CResult<Option<User>> {
+    pub fn user_by_email(&self, email: &str) -> CResult<Option<Vec<User>>> {
         let std_suffix = "@users.noreply.github.com";
         if email.ends_with(std_suffix) {
             let login = email[0..email.len() - std_suffix.len()].split('+').last().unwrap();
             if let Some(user) = self.user_by_login(login)? {
-                return Ok(Some(user));
+                return Ok(Some(vec![user]));
             }
         }
         let enc_email = encode(email);
-        let res: Option<Option<User>> = self.get_cached(&self.emails, (email, ""), |client| client.get()
+        self.get_cached(&self.emails, (email, ""), |client| client.get()
                        .custom_endpoint(&format!("search/users?q=in:email%20{}", enc_email))
                        .execute(), |res: SearchResults<User>| {
                         println!("Found {} = {:#?}", email, res.items);
-                        res.items.into_iter().next()
-                    })?;
-        Ok(res.and_then(|r| r))
+                        res.items
+                    })
     }
 
     pub fn user_by_login(&self, login: &str) -> CResult<Option<User>> {
@@ -371,6 +370,6 @@ fn test_user_by_email() {
         "../data/github.db",
         std::env::var("GITHUB_TOKEN").expect("GITHUB_TOKEN env var")).unwrap();
     let user = gh.user_by_email("github@pornel.net").unwrap().unwrap();
-    assert_eq!("kornelski", user.login);
+    assert_eq!("kornelski", user[0].login);
 }
 

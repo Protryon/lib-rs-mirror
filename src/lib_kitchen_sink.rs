@@ -737,9 +737,11 @@ impl KitchenSink {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
         if !self.user_db.email_has_github(&email)? {
             match self.gh.user_by_email(&email) {
-                Ok(Some(user)) => {
-                    println!("{} == {} ({:?})", user.login, email, name);
-                    self.user_db.index_user(&user, Some(email), name)?;
+                Ok(Some(users)) => {
+                    for user in users {
+                        println!("{} == {} ({:?})", user.login, email, name);
+                        self.user_db.index_user(&user, Some(email), name)?;
+                    }
                 },
                 Ok(None) => println!("{} not found on github", email),
                 Err(e) => eprintln!("•••• {}", e),

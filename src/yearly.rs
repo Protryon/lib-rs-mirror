@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry::*;
 use std::path::PathBuf;
 use std::sync::Mutex;
+use std::fmt;
 
 /// Downloads each day of the year
 #[derive(Serialize, Deserialize, Clone)]
@@ -75,7 +76,6 @@ impl Default for VersionMap {
 }
 
 // Serde workaround
-use std::fmt;
 use serde::ser::{Serializer, SerializeTuple};
 use serde::de::{Deserializer, Visitor, SeqAccess, Error};
 
@@ -175,3 +175,8 @@ impl<'de> BigArrayBool<'de> for [bool; 366]
     }
 }
 
+impl fmt::Debug for VersionMap {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("VersionMap {…}")
+    }
+}

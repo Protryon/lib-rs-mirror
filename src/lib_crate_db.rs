@@ -563,7 +563,7 @@ impl CrateDb {
         })
     }
 
-    pub fn related_crates(&self, origin: &Origin) -> FResult<Vec<Origin>> {
+    pub fn related_crates(&self, origin: &Origin, min_recent_downloads: u32) -> FResult<Vec<Origin>> {
         self.with_connection(|conn| {
             let mut query = conn.prepare_cached(r#"
                 SELECT sum(k2.weight * k1.weight) as w, c2.origin
@@ -573,15 +573,16 @@ impl CrateDb {
                 JOIN crates c2 on k2.crate_id = c2.id
                 WHERE c1.origin = ?1
                 AND k2.crate_id != c1.id
-                AND c2.recent_downloads > 150
+                AND c2.recent_downloads > ?2
                 GROUP by k2.crate_id
                 HAVING w > 200
                 ORDER by 1 desc
                 LIMIT 6
             "#)?;
-            let res = query.query_map(&[&origin.to_str()], |row| {
+            let args: &[&dyn ToSql] = &[&origin.to_str(), &min_recent_downloads];
+            let res = query.query_map(args, |row| {
                 let s: String = row.get(1);
-                Origin::from_string(s)
+                Origin::from_str(s)
             }).context("related_crates")?;
             Ok(res.collect::<std::result::Result<_,_>>()?)
         })
@@ -674,7 +675,7 @@ impl CrateDb {
             let args: &[&dyn ToSql] = &[&slug, &limit];
             let q = query.query_map(args, |row| {
                 let s: String = row.get(0);
-                (Origin::from_string(s), row.get(1), row.get(2))
+                (Origin::from_str(s), row.get(1), row.get(2))
             })?;
             let q = q.filter_map(|r| r.ok());
             Ok(q.collect())
@@ -699,7 +700,7 @@ impl CrateDb {
             "#)?;
             let q = query.query_map(&[&slug], |row| {
                 let s: String = row.get(1);
-                Origin::from_string(s)
+                Origin::from_str(s)
             })?;
             let q = q.filter_map(|r| r.ok());
             Ok(q.collect())

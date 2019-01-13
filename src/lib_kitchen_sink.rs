@@ -119,6 +119,8 @@ pub enum KitchenSinkErr {
     SemverParsingError,
     #[fail(display = "Stopped")]
     Stopped,
+    #[fail(display = "Missing github login for crate owner")]
+    OwnerWithoutLogin,
 }
 
 /// This is a collection of various data sources. It mostly acts as a starting point and a factory for other objects.
@@ -685,10 +687,10 @@ impl KitchenSink {
     }
 
     /// Recommendations
-    pub fn related_crates(&self, krate: &RichCrateVersion) -> CResult<Vec<Origin>> {
+    pub fn related_crates(&self, krate: &RichCrateVersion, min_recent_downloads: u32) -> CResult<Vec<Origin>> {
         let (replacements, related) = rayon::join(
             || self.crate_db.replacement_crates(krate.short_name()).context("related_crates1"),
-            || self.crate_db.related_crates(krate.origin()).context("related_crates2"),
+            || self.crate_db.related_crates(krate.origin(), min_recent_downloads).context("related_crates2"),
         );
 
         Ok(replacements?.into_iter()
@@ -938,7 +940,8 @@ impl KitchenSink {
 
     /// Merge authors, owners, contributors
     pub fn all_contributors<'a>(&self, krate: &'a RichCrateVersion) -> CResult<(Vec<CrateAuthor<'a>>, Vec<CrateAuthor<'a>>, bool, usize)> {
-        let mut contributors = match krate.repository().as_ref() {
+        let mut hit_max_contributor_count = false;
+        let mut contributors_by_login = match krate.repository().as_ref() {
             Some(crate_repo) => match crate_repo.host() {
                 // TODO: warn on errors?
                 RepoHost::GitHub(ref repo) => {
@@ -946,6 +949,9 @@ impl KitchenSink {
                     // so pick one of them and track just that one version
                     let cachebust = self.cachebust_string_for_repo(crate_repo).context("contrib")?;
                     let contributors = self.gh.contributors(repo, &cachebust).context("contributors")?.unwrap_or_default();
+                    if contributors.len() == 100 {
+                        hit_max_contributor_count = true;
+                    }
                     let mut by_login = HashMap::new();
                     for contr in contributors {
                         if let Some(author) = contr.author {
@@ -954,7 +960,7 @@ impl KitchenSink {
                                     w.commits as f64 +
                                     ((w.added + w.deleted*2) as f64).sqrt()
                                 }).sum::<f64>();
-                            by_login.entry(author.login.to_ascii_lowercase())
+                            by_login.entry(author.login.to_lowercase())
                                 .or_insert((0., author)).0 += count;
                         }
                     }
@@ -967,7 +973,6 @@ impl KitchenSink {
             None => HashMap::new(),
         };
 
-        let hit_max_contributor_count = contributors.len() == 100;
 
         let mut authors: HashMap<AuthorId, CrateAuthor<'_>> = krate.authors()
             .iter().enumerate().map(|(i,author)| {
@@ -980,9 +985,9 @@ impl KitchenSink {
                 };
                 if let Some(ref email) = author.email {
                     if let Ok(Some(github)) = self.user_db.user_by_email(email) {
-                        let login = github.login.to_ascii_lowercase();
+                        let id = github.id;
                         ca.github = Some(github);
-                        return (AuthorId::GitHub(login), ca);
+                        return (AuthorId::GitHub(id), ca);
                     }
                 }
                 if let Some(ref url) = author.url {
@@ -990,34 +995,34 @@ impl KitchenSink {
                     if url.to_ascii_lowercase().starts_with(gh_url) {
                         let login = url[gh_url.len()..].splitn(1, '/').next().unwrap();
                         if let Ok(Some(gh)) = self.gh.user_by_login(login) {
-                            let login = gh.login.to_ascii_lowercase();
+                            let id = gh.id;
                             ca.github = Some(gh);
-                            return (AuthorId::GitHub(login), ca);
+                            return (AuthorId::GitHub(id), ca);
                         }
                     }
                 }
                 // name only, no email
                 if ca.github.is_none() && author.email.is_none() {
                     if let Some(ref name) = author.name {
-                        if let Some((contribution, github)) = contributors.remove(&name.to_lowercase()) {
-                            let login = github.login.to_ascii_lowercase();
+                        if let Some((contribution, github)) = contributors_by_login.remove(&name.to_lowercase()) {
+                            let id = github.id;
                             ca.github = Some(github);
                             ca.info = None; // was useless; just a login; TODO: only clear name once it's Option
                             ca.contribution = contribution;
-                            return (AuthorId::GitHub(login), ca);
+                            return (AuthorId::GitHub(id), ca);
                         }
                     }
                 }
                 let key = author.email.as_ref().map(|e| AuthorId::Email(e.to_ascii_lowercase()))
-                    .or_else(|| author.name.clone().map(AuthorId::Name))
+                    .or_else(|| author.name.as_ref().map(|n| AuthorId::Name(n.to_lowercase())))
                     .unwrap_or(AuthorId::Meh(i));
                 (key, ca)
             }).collect();
 
         if let Ok(owners) = self.crate_owners(krate) {
             for owner in owners {
-                if let Some(login) = owner.github_login() {
-                    match authors.entry(AuthorId::GitHub(login.to_ascii_lowercase())) {
+                if let Ok(id) = self.owners_github_id(&owner) {
+                    match authors.entry(AuthorId::GitHub(id)) {
                         Occupied(mut e) => {
                             let e = e.get_mut();
                             e.owner = true;
@@ -1036,7 +1041,7 @@ impl KitchenSink {
                         Vacant(e) => {
                             e.insert(CrateAuthor {
                                 contribution: 0.,
-                                github: self.user_by_github_login(login).ok().and_then(|a|a),
+                                github: self.gh.user_by_id(id).ok().and_then(|a|a),
                                 info: Some(Cow::Owned(Author{
                                     name: Some(owner.name().to_owned()),
                                     email: None,
@@ -1051,8 +1056,8 @@ impl KitchenSink {
             }
         }
 
-        for (login, (contribution, github)) in contributors {
-            authors.entry(AuthorId::GitHub(login.to_ascii_lowercase()))
+        for (_, (contribution, github)) in contributors_by_login {
+            authors.entry(AuthorId::GitHub(github.id))
             .or_insert(CrateAuthor {
                 nth_author: None,
                 contribution: 0.,
@@ -1146,6 +1151,24 @@ impl KitchenSink {
         Ok((authors, owners, owners_partial, if hit_max_contributor_count { 100 } else { contributors }))
     }
 
+    fn owners_github_id(&self, owner: &CrateOwner) -> CResult<u32> {
+        // this is silly, but crates.io doesn't keep the github ID explicitly
+        // (the id field is crates-io's field), but it does keep the avatar URL
+        // which contains github's ID
+        if let Some(ref avatar) = owner.avatar {
+            let r = regex::Regex::new("https://avatars[0-9]+.githubusercontent.com/u/([0-9]+)").expect("regex");
+            if let Some(c) = r.captures(avatar) {
+                let id = c.get(1).expect("regex").as_str();
+                return Ok(id.parse().expect("regex"))
+            }
+        }
+        // This is a bit weak, since logins are not permanent
+        if let Some(user) = self.gh.user_by_login(owner.github_login().ok_or(KitchenSinkErr::OwnerWithoutLogin)?)? {
+            return Ok(user.id);
+        }
+        Err(KitchenSinkErr::OwnerWithoutLogin)?
+    }
+
     fn crate_owners(&self, krate: &RichCrateVersion) -> CResult<Vec<CrateOwner>> {
         self.crates_io_crate_owners(krate.short_name(), krate.version())
     }
@@ -1237,7 +1260,7 @@ pub enum CrateData {
 /// This is used to uniquely identify authors based on as little information as is available
 #[derive(Debug, Hash, Eq, PartialEq)]
 enum AuthorId {
-    GitHub(String),
+    GitHub(u32),
     Name(String),
     Email(String),
     Meh(usize),

@@ -69,7 +69,6 @@ impl Error {
 
 pub struct GitHub {
     token: String,
-    cache: TempCache<(String, Payload)>,
     orgs: TempCache<(String, Option<Vec<UserOrg>>)>,
     users: TempCache<(String, Option<User>)>,
     commits: TempCache<(String, Option<Vec<CommitMeta>>)>,
@@ -77,13 +76,13 @@ pub struct GitHub {
     contribs: TempCache<(String, Option<Vec<UserContrib>>)>,
     topics: TempCache<(String, Option<Vec<String>>)>,
     repos: TempCache<(String, Option<GitHubRepo>)>,
+    emails: TempCache<(String, Option<Option<User>>)>,
 }
 
 impl GitHub {
     pub fn new(cache_path: impl AsRef<Path>, token: impl Into<String>) -> CResult<Self> {
         Ok(Self {
             token: token.into(),
-            cache: TempCache::new(&cache_path.as_ref())?,
             orgs: TempCache::new(&cache_path.as_ref().with_file_name("github_orgs.bin"))?,
             users: TempCache::new(&cache_path.as_ref().with_file_name("github_users.bin"))?,
             commits: TempCache::new(&cache_path.as_ref().with_file_name("github_commits.bin"))?,
@@ -91,6 +90,7 @@ impl GitHub {
             contribs: TempCache::new(&cache_path.as_ref().with_file_name("github_contribs.bin"))?,
             topics: TempCache::new(&cache_path.as_ref().with_file_name("github_topics.bin"))?,
             repos: TempCache::new(&cache_path.as_ref().with_file_name("github_repos.bin"))?,
+            emails: TempCache::new(&cache_path.as_ref().with_file_name("github_emails.bin"))?,
         })
     }
 
@@ -106,34 +106,34 @@ impl GitHub {
                 return Ok(Some(user));
             }
         }
-        let key = format!("search/{}", email);
         let enc_email = encode(email);
-        let res: Option<SearchResults<User>> = self.get_cached_old(&self.cache, (&key, ""), |client| client.get()
+        let res: Option<Option<User>> = self.get_cached(&self.emails, (email, ""), |client| client.get()
                        .custom_endpoint(&format!("search/users?q=in:email%20{}", enc_email))
-                       .execute())?;
-        Ok(res.and_then(|res| res.items.into_iter().next()))
+                       .execute(), |res: SearchResults<User>| {
+                        println!("Found {} = {:#?}", email, res.items);
+                        res.items.into_iter().next()
+                    })?;
+        Ok(res.and_then(|r| r))
     }
 
     pub fn user_by_login(&self, login: &str) -> CResult<Option<User>> {
-        let enc_login = encode(&login.to_ascii_lowercase());
-        let key = format!("user/{}", enc_login);
+        let key = login.to_ascii_lowercase();
         self.get_cached(&self.users, (&key, ""), |client| client.get()
                        .users().username(login)
                        .execute(), id).map_err(|e| e.context("user_by_login"))
     }
 
     pub fn user_by_id(&self, user_id: u32) -> CResult<Option<User>> {
-        let key = format!("id/{}", user_id);
-        self.get_cached(&self.users, (&key, ""), |client| client.get()
-                       .users().username(&user_id.to_string())
+        let user_id = user_id.to_string();
+        self.get_cached(&self.users, (&user_id, ""), |client| client.get()
+                       .users().username(&user_id)
                        .execute(), id).map_err(|e| e.context("user_by_id"))
     }
 
     pub fn user_orgs(&self, login: &str) -> CResult<Option<Vec<UserOrg>>> {
-        let login = login.to_ascii_lowercase();
-        let key = format!("user/{}", login);
+        let key = login.to_ascii_lowercase();
         self.get_cached(&self.orgs, (&key, ""), |client| client.get()
-                       .users().username(&login).orgs()
+                       .users().username(login).orgs()
                        .execute(), id).map_err(|e| e.context("user_orgs"))
     }
 
@@ -263,66 +263,6 @@ impl GitHub {
             Err(_) if non_parsable_body => {
                 if keep_cached {
                     cache.set(key.0, (key.1.to_string(), None))?;
-                }
-                Ok(None)
-            },
-            Err(err) => Err(err)?
-        }
-    }
-
-    fn get_cached_old<F, B>(&self, cache: &TempCache<(String, Payload)>, key: (&str, &str), cb: F) -> CResult<Option<B>>
-        where B: for<'de> serde::Deserialize<'de> + Payloadable,
-        F: FnOnce(&client::Github) -> Result<(HeaderMap, StatusCode, Option<serde_json::Value>), github_rs::errors::Error>
-    {
-        if let Some((ver, payload)) = cache.get(key.0)? {
-            if ver == key.1 {
-                return Ok(B::from(payload));
-            }
-        }
-
-        let client = &self.client()?;
-        let (headers, status, body) = cb(&*client)?;
-        eprintln!("Recvd {}@{} {:?} {:?}", key.0, key.1, status, headers);
-        if let (Some(rl), Some(rs)) = (rate_limit_remaining(&headers), rate_limit_reset(&headers)) {
-            let end_timestamp = Duration::from_secs(rs.into());
-            let now = SystemTime::now().duration_since(UNIX_EPOCH)?;
-            let wait = (end_timestamp.checked_sub(now)).and_then(|d| d.checked_div(rl + 2));
-            if let Some(wait) = wait {
-                if wait.as_secs() > 2 && (rl < 8 || wait.as_secs() < 15) {
-                    eprintln!("need to wait! {:?}", wait);
-                    thread::sleep(wait);
-                }
-            }
-        }
-
-        let non_parsable_body = match status {
-            StatusCode::ACCEPTED |
-            StatusCode::CREATED => return Err(Error::TryAgainLater),
-            StatusCode::NO_CONTENT |
-            StatusCode::NOT_FOUND |
-            StatusCode::GONE |
-            StatusCode::MOVED_PERMANENTLY => true,
-            _ => false,
-        };
-
-        let keep_cached = match status {
-            StatusCode::NOT_FOUND |
-            StatusCode::GONE |
-            StatusCode::MOVED_PERMANENTLY => true,
-            _ => status.is_success(),
-        };
-
-        match body.ok_or(Error::NoBody).and_then(|stats| Ok(serde_json::from_value(stats)?)) {
-            Ok(val) => {
-                let val: B = val;
-                if keep_cached {
-                    cache.set(key.0, (key.1.to_string(), val.to()))?;
-                }
-                Ok(Some(val))
-            },
-            Err(_) if non_parsable_body => {
-                if keep_cached {
-                    cache.set(key.0, (key.1.to_string(), Payload::Dud))?;
                 }
                 Ok(None)
             },

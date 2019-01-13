@@ -1084,7 +1084,7 @@ impl KitchenSink {
 
         let mut authors_by_name = HashMap::<String, CrateAuthor<'_>>::new();
         for (_, a) in authors {
-            match authors_by_name.entry(a.name().to_owned()) {
+            match authors_by_name.entry(a.name().to_lowercase()) {
                 Occupied(mut e) => {
                     let e = e.get_mut();
                     // TODO: should keep both otherwise

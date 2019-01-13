@@ -581,7 +581,11 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn related_crates(&self) -> Option<Vec<Origin>> {
-        self.kitchen_sink.related_crates(&self.ver).map_err(|e| eprintln!("related crates fail: {}", e)).ok()
+        // require some level of downloads to avoid recommending spam
+        // but limit should be relative to the current crate, so that minor crates
+        // get related suggestions too
+        let min_recent_downloads = (self.all.downloads_recent() as u32/5).min(200);
+        self.kitchen_sink.related_crates(&self.ver, min_recent_downloads).map_err(|e| eprintln!("related crates fail: {}", e)).ok()
     }
 
     /// data for piechart

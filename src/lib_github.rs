@@ -115,15 +115,22 @@ impl GitHub {
     }
 
     pub fn user_by_login(&self, login: &str) -> CResult<Option<User>> {
-        let enc_login = encode(&login.to_lowercase());
+        let enc_login = encode(&login.to_ascii_lowercase());
         let key = format!("user/{}", enc_login);
         self.get_cached(&self.users, (&key, ""), |client| client.get()
                        .users().username(login)
                        .execute(), id).map_err(|e| e.context("user_by_login"))
     }
 
+    pub fn user_by_id(&self, user_id: u32) -> CResult<Option<User>> {
+        let key = format!("id/{}", user_id);
+        self.get_cached(&self.users, (&key, ""), |client| client.get()
+                       .users().username(&user_id.to_string())
+                       .execute(), id).map_err(|e| e.context("user_by_id"))
+    }
+
     pub fn user_orgs(&self, login: &str) -> CResult<Option<Vec<UserOrg>>> {
-        let login = login.to_lowercase();
+        let login = login.to_ascii_lowercase();
         let key = format!("user/{}", login);
         self.get_cached(&self.orgs, (&key, ""), |client| client.get()
                        .users().username(&login).orgs()

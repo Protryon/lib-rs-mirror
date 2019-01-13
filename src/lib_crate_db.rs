@@ -348,7 +348,7 @@ impl CrateDb {
             let mut child_path = child_path.as_str();
 
             loop {
-                child_path = child_path.rsplitn(1, '/').nth(1).unwrap_or("");
+                child_path = child_path.rsplitn(2, '/').nth(1).unwrap_or("");
                 if let Some(child) = paths.get(child_path) {
                     return Ok(Some(child.to_owned()));
                 }

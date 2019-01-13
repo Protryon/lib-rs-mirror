@@ -3,6 +3,7 @@ use string_interner::Sym;
 use crate::deps_stats::DepsStats;
 use crate::KitchenSink;
 use crate::KitchenSinkErr;
+use crate::git_crates_index::*;
 use crates_index;
 use crates_index::Crate;
 use crates_index::Version;
@@ -11,7 +12,7 @@ use rich_crate::Origin;
 use semver::Version as SemVer;
 use semver::VersionReq;
 use std::iter;
-use std::path::PathBuf;
+use std::path::Path;
 use std::sync::RwLock;
 use std::sync::{Arc, Mutex};
 use fxhash::{FxHashMap, FxHashSet};
@@ -38,7 +39,9 @@ impl MiniVer {
 }
 
 pub struct Index {
-    crates: FxHashMap<Origin, Crate>,
+    crates_io_index: FxHashMap<Origin, Crate>,
+    git_index: GitIndex,
+
     pub(crate) inter: RwLock<StringInterner<Sym>>,
     pub(crate) cache: RwLock<FxHashMap<(Box<str>, Features), ArcDepSet>>,
     deps_stats: LazyOnce<DepsStats>,
@@ -46,28 +49,35 @@ pub struct Index {
 
 impl Index {
     pub fn new_default() -> Result<Self, KitchenSinkErr> {
-        Ok(Self::new(KitchenSink::data_path()?.join("index")))
+        Self::new(&KitchenSink::data_path()?)
     }
 
-    pub fn new(path: PathBuf) -> Self {
-        let index = crates_index::Index::new(path);
-        let crates = index.crates()
+    pub fn new(data_dir: &Path) -> Result<Self, KitchenSinkErr> {
+        let index = crates_index::Index::new(data_dir.join("index"));
+        let crates_io_index = index.crates()
                 .map(|c| (Origin::from_crates_io_name(c.name()), c))
                 .collect();
-        Self {
+        Ok(Self {
+            git_index: GitIndex::new(data_dir)?,
             cache: RwLock::new(FxHashMap::with_capacity_and_hasher(5000, Default::default())),
             inter: RwLock::new(StringInterner::new()),
             deps_stats: LazyOnce::new(),
-            crates,
-        }
+            crates_io_index,
+        })
     }
 
-    /// All crates available in the index
+    /// Crates available in the crates.io index
     ///
     /// It returns only a thin and mostly useless data from the index itself,
     /// so `rich_crate`/`rich_crate_version` is needed to do more.
-    pub fn crates(&self) -> &FxHashMap<Origin, Crate> {
-        &self.crates
+    pub fn crates_io_crates(&self) -> &FxHashMap<Origin, Crate> {
+        &self.crates_io_index
+    }
+
+    /// All crates available in the crates.io index and our index
+    ///
+    pub fn all_crates(&self) -> impl Iterator<Item=&Origin> {
+        self.git_index.crates().chain(self.crates_io_index.keys())
     }
 
     pub fn deps_stats(&self) -> &DepsStats {
@@ -77,14 +87,14 @@ impl Index {
         res
     }
 
-    pub fn crate_by_name(&self, name: &Origin) -> Result<&Crate, KitchenSinkErr> {
-        self.crates()
+    pub fn crates_io_crate_by_name(&self, name: &Origin) -> Result<&Crate, KitchenSinkErr> {
+        self.crates_io_crates()
         .get(name)
         .ok_or_else(|| KitchenSinkErr::CrateNotFound(name.clone()))
     }
 
     pub fn crate_version_latest_unstable(&self, name: &Origin) -> Result<&Version, KitchenSinkErr> {
-        Ok(Self::highest_version(self.crate_by_name(name)?, false))
+        Ok(Self::highest_version(self.crates_io_crate_by_name(name)?, false))
     }
 
     pub fn highest_version(krate: &Crate, stable_only: bool) -> &Version {
@@ -178,7 +188,7 @@ impl Index {
 
             let req = VersionReq::parse(d.requirement()).map_err(|_| KitchenSinkErr::SemverParsingError)?;
             let name = d.name();
-            let krate = match self.crate_by_name(&Origin::from_crates_io_name(name)) {
+            let krate = match self.crates_io_crate_by_name(&Origin::from_crates_io_name(name)) {
                 Ok(k) => k,
                 Err(e) => {
                     eprintln!("{}@{} depends on missing crate {} (@{}): {}", ver.name(), ver.version(), name, req, e);
@@ -257,7 +267,7 @@ impl Index {
         }
 
         let matches_latest = self
-            .crate_by_name(&Origin::from_crates_io_name(crate_name))
+            .crates_io_crate_by_name(&Origin::from_crates_io_name(crate_name))
             .ok()
             .and_then(|krate| Self::highest_version(krate, true).version().parse().ok())
             .map_or(false, |latest| requirement.matches(&latest));

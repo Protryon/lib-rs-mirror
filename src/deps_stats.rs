@@ -125,7 +125,7 @@ impl Index {
     }
 
     pub(crate) fn get_deps_stats(&self) -> DepsStats {
-        let crates = self.crates();
+        let crates = self.crates_io_crates();
         let crates: Vec<FxHashMap<_,_>> = crates
         .par_iter()
         .filter_map(|(_, c)| {

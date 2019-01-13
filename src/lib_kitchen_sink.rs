@@ -25,6 +25,8 @@ use rayon::prelude::*;
 mod deps_stats;
 pub use crate::deps_stats::*;
 
+mod git_crates_index;
+
 mod ctrlcbreak;
 pub use crate::ctrlcbreak::*;
 
@@ -121,6 +123,10 @@ pub enum KitchenSinkErr {
     Stopped,
     #[fail(display = "Missing github login for crate owner")]
     OwnerWithoutLogin,
+    #[fail(display = "Git index parsing failed: {}", _0)]
+    GitIndexParse(String),
+    #[fail(display = "Git index {:?}: {}", _0, _1)]
+    GitIndexFile(PathBuf, String),
 }
 
 /// This is a collection of various data sources. It mostly acts as a starting point and a factory for other objects.
@@ -168,17 +174,16 @@ impl KitchenSink {
 
     pub fn new(data_path: &Path, github_token: &str) -> CResult<Self> {
         let main_cache_dir = data_path.to_owned();
-        let index_path = Self::assert_exists(data_path.join("index"))?;
 
         let ((crates_io, gh), (index, crate_derived_cache)) = rayon::join(|| rayon::join(
                 || crates_io_client::CratesIoClient::new(data_path),
                 || github_info::GitHub::new(&data_path.join("github.db"), github_token)),
             || rayon::join(
-                || Index::new(index_path),
+                || Index::new(data_path),
                 || TempCache::new(&data_path.join("crate_derived.db"))));
         Ok(Self {
             crates_io: crates_io?,
-            index,
+            index: index?,
             url_check_cache: TempCache::new(&data_path.join("url_check.db"))?,
             docs_rs: docs_rs_client::DocsRsClient::new(data_path.join("docsrs.db"))?,
             crate_db: CrateDb::new(Self::assert_exists(data_path.join("crate_data.db"))?)?,
@@ -235,10 +240,18 @@ impl KitchenSink {
 
     /// Iterator over all crates available in the index
     ///
-    /// It returns only a thin and mostly useless data from the index itself,
+    /// It returns only identifiers,
     /// so `rich_crate`/`rich_crate_version` is needed to do more.
-    pub fn all_crates(&self) -> &FxHashMap<Origin, Crate> {
-        self.index.crates()
+    pub fn all_crates(&self) -> impl Iterator<Item=&Origin> {
+        self.index.all_crates()
+    }
+
+    /// Iterator over all crates available in the index
+    ///
+    /// It returns only identifiers,
+    /// so `rich_crate`/`rich_crate_version` is needed to do more.
+    pub fn all_crates_io_crates(&self) -> &FxHashMap<Origin, Crate> {
+        self.index.crates_io_crates()
     }
 
     /// Gets cratesio download data, but not from the API, but from our local copy
@@ -289,7 +302,7 @@ impl KitchenSink {
 
     pub fn all_new_crates<'a>(&'a self) -> CResult<impl Iterator<Item = RichCrate> + 'a> {
         let min_timestamp = self.crate_db.latest_crate_update_timestamp()?.unwrap_or(0);
-        let res: Vec<RichCrate> = self.index.crates()
+        let res: Vec<RichCrate> = self.index.crates_io_crates()
         .par_iter().map(|(_, v)| v)
         .filter_map(move |k| {
             self.rich_crate_from_index(k).ok()
@@ -308,7 +321,7 @@ impl KitchenSink {
 
     /// Wrapper object for metadata common for all versions of a crate
     pub fn rich_crate(&self, origin: &Origin) -> CResult<RichCrate> {
-        self.rich_crate_from_index(self.index.crate_by_name(origin).context("rich_crate")?)
+        self.rich_crate_from_index(self.index.crates_io_crate_by_name(origin).context("rich_crate")?)
     }
 
     pub fn rich_crate_from_index(&self, krate: &Crate) -> CResult<RichCrate> {
@@ -659,7 +672,7 @@ impl KitchenSink {
     }
 
     pub fn all_dependencies_flattened(&self, origin: &Origin) -> Result<FxHashMap<Box<str>, (DepInf, MiniVer)>, KitchenSinkErr> {
-        self.index.all_dependencies_flattened(self.index.crate_by_name(origin)?)
+        self.index.all_dependencies_flattened(self.index.crates_io_crate_by_name(origin)?)
     }
 
     pub fn prewarm(&self) {

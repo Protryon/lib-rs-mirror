@@ -416,7 +416,6 @@ impl CrateDb {
             let mut update_recent = tx.prepare_cached("UPDATE crates SET recent_downloads = ?1 WHERE id = ?2")?;
             let mut get_crate_id = tx.prepare_cached("SELECT id FROM crates WHERE origin = ?1")?;
             let mut insert_version = tx.prepare_cached("INSERT OR IGNORE INTO crate_versions (crate_id, version, created) VALUES (?1, ?2, ?3)")?;
-            let mut insert_dl = tx.prepare_cached("INSERT OR REPLACE INTO crate_downloads (crate_id, period, version, downloads) VALUES (?1, ?2, ?3, ?4)").context("cr dl")?;
 
             let origin = all.origin().to_str();
             let crate_id: u32 = get_crate_id.query_row(&[&origin], |row| row.get(0))
@@ -428,16 +427,6 @@ impl CrateDb {
                 let timestamp = DateTime::parse_from_rfc3339(&ver.created_at).context("version timestamp")?;
                 let args: &[&dyn ToSql] = &[&crate_id, &ver.num, &timestamp.timestamp()];
                 insert_version.execute(args).context("insert ver")?;
-            }
-
-            for dl in all.daily_downloads() {
-                let downloads = dl.downloads as u32;
-                if downloads > 0 {
-                    let period = dl.date.and_hms(0, 0, 0).timestamp();
-                    let ver = dl.version.map(|v| v.num.as_str()); // `NULL` means all versions together
-                    let args: &[&dyn ToSql] = &[&crate_id, &period, &ver, &downloads];
-                    insert_dl.execute(args).context("insert dl")?; // FIXME: ignore 0s?
-                }
             }
             Ok(())
         })

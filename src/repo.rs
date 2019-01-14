@@ -21,8 +21,8 @@ pub enum RepoHost {
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct SimpleRepo {
-    pub owner: String,
-    pub repo: String,
+    pub owner: Box<str>,
+    pub repo: Box<str>,
 }
 
 #[derive(Debug, Clone)]
@@ -69,8 +69,8 @@ impl Repo {
 
     fn repo_from_path<'a>(mut path: impl Iterator<Item = &'a str>) -> GResult<SimpleRepo> {
         Ok(SimpleRepo {
-            owner: path.next().ok_or(GitError::IncompleteUrl)?.to_lowercase().to_string(),
-            repo: path.next().ok_or(GitError::IncompleteUrl)?.to_lowercase().trim_end_matches(".git").to_string(),
+            owner: path.next().ok_or(GitError::IncompleteUrl)?.to_ascii_lowercase().into_boxed_str(),
+            repo: path.next().ok_or(GitError::IncompleteUrl)?.trim_end_matches(".git").to_ascii_lowercase().into_boxed_str(),
         })
     }
 

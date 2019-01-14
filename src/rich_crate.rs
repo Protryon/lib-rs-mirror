@@ -1,7 +1,7 @@
+use crates_io_client::CrateDownloadsFile;
 use crates_io_client::CrateOwner;
 use crates_io_client::CrateMetaVersion;
 use crates_io_client::CratesIoCrate;
-use crates_io_client::DailyVersionDownload;
 pub use crates_io_client::DownloadWeek;
 use crate::Origin;
 
@@ -12,19 +12,30 @@ use crate::Origin;
 #[derive(Debug)]
 pub struct RichCrate {
     origin: Origin,
-    crates_io: CratesIoCrate,
+    // crates_io: CratesIoCrate,
+    name: String,
+    owners: Vec<CrateOwner>,
+    versions: Vec<CrateMetaVersion>,
+    downloads: CrateDownloadsFile,
+    downloads_recent: usize,
+    downloads_total: usize,
 }
 
 impl RichCrate {
     pub fn new(crates_io: CratesIoCrate) -> Self {
         Self {
             origin: Origin::from_crates_io_name(&crates_io.meta.krate.name),
-            crates_io,
+            versions: crates_io.meta.versions().collect(),
+            downloads: crates_io.downloads,
+            name: crates_io.meta.krate.name,
+            owners: crates_io.owners,
+            downloads_recent: crates_io.meta.krate.recent_downloads.unwrap_or(0),
+            downloads_total: crates_io.meta.krate.downloads,
         }
     }
 
     pub fn name(&self) -> &str {
-        &self.crates_io.meta.krate.name
+        &self.name
     }
 
     pub fn origin(&self) -> &Origin {
@@ -32,28 +43,24 @@ impl RichCrate {
     }
 
     pub fn owners(&self) -> &[CrateOwner] {
-        &self.crates_io.owners
+        &self.owners
     }
 
     pub fn weekly_downloads(&self) -> Vec<DownloadWeek> {
-        self.crates_io.downloads.weekly_downloads()
-    }
-
-    pub fn daily_downloads(&self) -> Vec<DailyVersionDownload<'_>> {
-        self.crates_io.daily_downloads()
+        self.downloads.weekly_downloads()
     }
 
     pub fn versions(&self) -> impl Iterator<Item = &CrateMetaVersion> {
-        self.crates_io.meta.versions()
+        self.versions.iter()
     }
 
     pub fn downloads_total(&self) -> usize {
-        self.crates_io.meta.krate.downloads
+        self.downloads_total
     }
 
     /// Per 90 days
     pub fn downloads_recent(&self) -> usize {
-        self.crates_io.meta.krate.recent_downloads.unwrap_or(0)
+        self.downloads_recent
     }
 
     pub fn downloads_per_month(&self) -> usize {

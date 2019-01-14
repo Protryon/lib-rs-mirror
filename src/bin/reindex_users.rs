@@ -23,7 +23,7 @@ fn main() {
         let all_crates = crates.all_crates();
         let crates = Arc::clone(&crates);
         rayon::scope(move |s1| {
-            for (o, k) in all_crates {
+            for o in all_crates {
                 if stopped() {
                     eprintln!("STOPPING");
                     break;
@@ -31,7 +31,7 @@ fn main() {
                 let crates = Arc::clone(&crates);
                 let tx = tx1.clone();
                 s1.spawn(move |_| {
-                    println!("{:?}", k.name());
+                    println!("{:?}", o.short_crate_name());
                     let r1 = crates.rich_crate_version(o, CrateData::Minimal);
                     let res = r1.and_then(|c| {
                         for a in c.authors().iter().filter(|a| a.email.is_some()) {

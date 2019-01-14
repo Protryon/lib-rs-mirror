@@ -29,7 +29,7 @@ fn run() -> Result<(), failure::Error> {
 
     let t = thread::spawn(move || {
         let c = crates.clone();
-        let mut c: Vec<_> = c.all_crates().keys().collect::<Vec<_>>();
+        let mut c: Vec<_> = c.all_crates().collect::<Vec<_>>();
         c.shuffle(&mut thread_rng());
         c.into_par_iter()
         .for_each(|k| {

@@ -10,9 +10,9 @@ pub struct CrateMetaFile {
 }
 
 impl CrateMetaFile {
-    pub fn versions<'a>(&'a self) -> impl Iterator<Item=&'a CrateMetaVersion> {
+    pub fn versions(&self) -> impl Iterator<Item=CrateMetaVersion> + '_ {
         self.krate.versions.iter().filter_map(move |&id| {
-            self.versions.iter().find(|v| v.id == id)
+            self.versions.iter().find(|v| v.id == id).cloned()
         })
     }
 }

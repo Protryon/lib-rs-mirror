@@ -302,10 +302,10 @@ impl KitchenSink {
 
     pub fn all_new_crates<'a>(&'a self) -> CResult<impl Iterator<Item = RichCrate> + 'a> {
         let min_timestamp = self.crate_db.latest_crate_update_timestamp()?.unwrap_or(0);
-        let res: Vec<RichCrate> = self.index.crates_io_crates()
-        .par_iter().map(|(_, v)| v)
-        .filter_map(move |k| {
-            self.rich_crate_from_index(k).ok()
+        let all: Vec<_> = self.index.all_crates().collect();
+        let res: Vec<RichCrate> = all.into_par_iter()
+        .filter_map(move |o| {
+            self.rich_crate(o).ok()
         })
         .filter(move |k| {
             let latest = k.versions().map(|v| v.created_at.as_str()).max().unwrap_or("");
@@ -321,17 +321,25 @@ impl KitchenSink {
 
     /// Wrapper object for metadata common for all versions of a crate
     pub fn rich_crate(&self, origin: &Origin) -> CResult<RichCrate> {
-        self.rich_crate_from_index(self.index.crates_io_crate_by_name(origin).context("rich_crate")?)
+        if stopped() {Err(KitchenSinkErr::Stopped)?;}
+        match origin {
+            Origin::CratesIO(_) => {
+                let meta = self.crates_io_meta(origin)?;
+                Ok(RichCrate::new(meta))
+            },
+            Origin::GitHub {repo, package} => {
+                unimplemented!()
+            }
+        }
     }
 
-    pub fn rich_crate_from_index(&self, krate: &Crate) -> CResult<RichCrate> {
-        if stopped() {Err(KitchenSinkErr::Stopped)?;}
+    fn crates_io_meta(&self, origin: &Origin) -> CResult<CratesIoCrate> {
+        let krate = self.index.crates_io_crate_by_name(origin).context("rich_crate")?;
         let name = krate.name();
         let cache_bust = krate.latest_version().version(); // most recently published version
         let meta = self.crates_io.krate(name, cache_bust)
             .with_context(|_| format!("crates.io meta for {} {}", name, cache_bust))?;
-        let meta = meta.ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?;
-        Ok(RichCrate::new(meta))
+        Ok(meta.ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?)
     }
 
     /// Wrapper for the latest version of a given crate.
@@ -766,17 +774,28 @@ impl KitchenSink {
     /// Maintenance: add crate to local db index
     pub fn index_crate(&self, k: &RichCrate) -> CResult<()> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
-        self.crate_db.index_versions(k)?;
-        self.index_crate_downloads(k)?;
+        let (res1, res2) = rayon::join(|| -> CResult<()> {
+            let origin = k.origin();
+            match origin {
+                Origin::CratesIO(name) => {
+                    let meta = self.crates_io_meta(origin)?;
+                    self.index_crate_downloads(name, &meta)?;
+                },
+                _ => {},
+            }
+            Ok(())
+        }, || self.crate_db.index_versions(k));
+        res1?;
+        res2?;
         Ok(())
     }
 
-    pub fn index_crate_downloads(&self, k: &RichCrate) -> CResult<()> {
+    pub fn index_crate_downloads(&self, crates_io_name: &str, crates_io_data: &CratesIoCrate) -> CResult<()> {
         let mut modified = false;
         let mut curr_year = Utc::today().year() as u16;
-        let mut curr_year_data = self.yearly.get_crate_year(k.name(), curr_year)?.unwrap_or_default();
+        let mut curr_year_data = self.yearly.get_crate_year(crates_io_name, curr_year)?.unwrap_or_default();
 
-        let dd = k.daily_downloads();
+        let dd = crates_io_data.daily_downloads();
         let mut by_day = FxHashMap::<_, Vec<_>>::default();
         for dl in dd {
             by_day.entry(dl.date).or_insert_with(Default::default).push(dl);
@@ -791,10 +810,10 @@ impl KitchenSink {
             if y != curr_year {
                 if modified {
                     modified = false;
-                    self.yearly.set_crate_year(k.name(), curr_year, &curr_year_data)?;
+                    self.yearly.set_crate_year(crates_io_name, curr_year, &curr_year_data)?;
                 }
                 curr_year = y;
-                curr_year_data = self.yearly.get_crate_year(k.name(), curr_year)?.unwrap_or_default();
+                curr_year_data = self.yearly.get_crate_year(crates_io_name, curr_year)?.unwrap_or_default();
             }
 
             // crates.io data gets worse as it gets older, so the first one was the best
@@ -815,7 +834,7 @@ impl KitchenSink {
             }
         }
         if modified {
-            self.yearly.set_crate_year(k.name(), curr_year, &curr_year_data)?;
+            self.yearly.set_crate_year(crates_io_name, curr_year, &curr_year_data)?;
         }
         Ok(())
     }

@@ -10,7 +10,7 @@ path = "src/lib_ranking.rs"
 
 [dependencies]
 rayon = "1.0.3"
-kitchen_sink = { git = "https://gitlab.com/crates.rs/kitchen_sink.git", version = "0.6.0" }
-rich_crate = { git = "https://gitlab.com/crates.rs/rich_crate.git", version = "0.3.3" }
+kitchen_sink = { git = "https://gitlab.com/crates.rs/kitchen_sink.git", version = "0.7.0" }
+rich_crate = { git = "https://gitlab.com/crates.rs/rich_crate.git", version = "0.4.0" }
 fxhash = "0.2.1"
 chrono = "0.4.6"

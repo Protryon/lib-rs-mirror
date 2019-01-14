@@ -35,7 +35,7 @@ fn main() {
 
 fn crates_by_rev_dep(crates: &KitchenSink) -> Vec<(&str, u32, Vec<Box<str>>)> {
     let mut res = Vec::new();
-    for k in crates.all_crates().values() {
+    for k in crates.all_crates_io_crates().values() {
         let name = k.name();
         if let Some(rev) = crates.dependents_stats_of_crates_io_crate(name) {
             if let Ok(owners) = crates.crates_io_crate_owners(name, k.latest_version().version()) {

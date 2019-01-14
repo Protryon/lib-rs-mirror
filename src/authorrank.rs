@@ -20,11 +20,11 @@ pub struct CrateScore {
 
 
 pub fn do_author_pr(crates: &KitchenSink) -> Option<FxHashMap<String, f64>> {
-    let all_crates = crates.all_crates();
+    let crates_io_crates = crates.all_crates_io_crates();
 
     let (crate_pr, crate_ownership) = rayon::join(
-        || get_crate_pr(&crates, all_crates),
-        || get_crate_ownership(&crates, all_crates));
+        || get_crate_pr(&crates, crates_io_crates),
+        || get_crate_ownership(&crates, crates_io_crates));
 
     let mut all_authors = FxHashMap::default();
     for (crate_name, crate_importance) in &crate_pr {
@@ -110,9 +110,9 @@ struct UserContrib {
 /// For each crate list of all users (by their github login) who contributed to that crate
 /// along with percentage of how much each user "owns" the crate, based on crates.io ownership,
 /// weighed by approximate code contribution (derived from number of commits)
-fn get_crate_ownership<'a>(crates: &KitchenSink, all_crates: &'a FxHashMap<Origin, Crate>) -> FxHashMap<&'a str, FxHashMap<String, UserContrib>> {
+fn get_crate_ownership<'a>(crates: &KitchenSink, crates_io_crates: &'a FxHashMap<Origin, Crate>) -> FxHashMap<&'a str, FxHashMap<String, UserContrib>> {
     let crate_ownership = Mutex::new(FxHashMap::<&str, FxHashMap<String, UserContrib>>::default());
-    all_crates.par_iter().for_each(|(origin, k1)| {
+    crates_io_crates.par_iter().for_each(|(origin, k1)| {
         if stopped() {return;}
 
         let name = k1.name();
@@ -261,11 +261,11 @@ fn normalize(scores: &mut FxHashMap<&str, CrateScore>) {
     }
 }
 
-fn get_crate_pr<'a>(crates: &KitchenSink, all_crates: &'a FxHashMap<Origin, Crate>) -> FxHashMap<&'a str, CrateScore> {
-    let mut initial_scores = FxHashMap::<&str, CrateScore>::with_capacity_and_hasher(all_crates.len(), Default::default());
-    initial_scores.extend(all_crates.values()
-        .filter_map(|k1| {
-            crates.rich_crate_from_index(k1)
+fn get_crate_pr<'a>(crates: &KitchenSink, crates_io_crates: &'a FxHashMap<Origin, Crate>) -> FxHashMap<&'a str, CrateScore> {
+    let mut initial_scores = FxHashMap::<&str, CrateScore>::with_capacity_and_hasher(crates_io_crates.len(), Default::default());
+    initial_scores.extend(crates_io_crates.iter()
+        .filter_map(|(o, k1)| {
+            crates.rich_crate(o)
                 .map_err(|e| eprintln!("{}: {}", k1.name(), e)).ok()
                 .map(|k| (k1.name(), k))
         })
@@ -281,7 +281,7 @@ fn get_crate_pr<'a>(crates: &KitchenSink, all_crates: &'a FxHashMap<Origin, Crat
     for _pass in 0..10 {
         let mut pool = CrateScore::default();
         let mut next_pass = FxHashMap::with_capacity_and_hasher(prev_pass.len(), Default::default());
-        for k in all_crates.values() {
+        for k in crates_io_crates.values() {
             if let Some(this_crate_pr) = prev_pass.get(k.name()).cloned() {
                 let deps = k.latest_version().dependencies();
                 if deps.is_empty() {

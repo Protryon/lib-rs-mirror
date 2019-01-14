@@ -127,7 +127,7 @@ impl cargo_toml::AbstractFilesystem for GitFS<'_,'_> {
 impl GitFS<'_,'_> {
     fn file_names_in_tree(&self, curr_dir: &Tree<'_>, dir_path: Option<&str>) -> Result<HashSet<Box<str>>, io::Error> {
         if let Some(dir_path) = dir_path {
-            let mut parts = dir_path.splitn(1, '/');
+            let mut parts = dir_path.splitn(2, '/');
             let subdir_name = parts.next().unwrap();
             let rest = parts.next();
             for item in curr_dir.iter() {

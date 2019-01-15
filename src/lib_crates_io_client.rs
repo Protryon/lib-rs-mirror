@@ -5,6 +5,7 @@ use serde;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::Path;
+use std::sync::Mutex;
 use chrono::{Date, TimeZone, Utc};
 
 mod crate_meta;
@@ -18,6 +19,8 @@ pub use crate::crate_downloads::*;
 pub use simple_cache::Error;
 use simple_cache::SimpleCache;
 use simple_cache::TempCache;
+use lazy_static::lazy_static;
+use mysteriouspants_throttle::Throttle;
 
 pub struct CratesIoClient {
     cache: TempCache<(String, Payload)>,
@@ -31,6 +34,10 @@ macro_rules! cioopt {
             None => return Ok(None),
         }
     };
+}
+
+lazy_static! {
+    static ref THROTTLE: Mutex<Throttle<()>> = Mutex::new(Throttle::new_tps_throttle(1.));
 }
 
 #[derive(Debug)]
@@ -92,7 +99,7 @@ impl CratesIoClient {
         let url = format!("{}/downloads", crate_name);
         let new_key = (url.as_str(), as_of_version);
         let data: CrateDownloadsFile = cioopt!(self.get_json(new_key, &url)?);
-        if !self.cache.cache_only && data.is_stale() && rand::random::<u8>() > 200 {
+        if !self.cache.cache_only && data.is_stale() && rand::random::<u8>() > 250 {
             eprintln!("downloads expired {}@{}", crate_name, as_of_version);
             let _ = self.cache.delete(new_key.0);
             let fresh: CrateDownloadsFile = cioopt!(self.get_json(new_key, &url)?);
@@ -135,9 +142,10 @@ impl CratesIoClient {
 
         self.cache.delete(key.0)?; // out of date
 
+        let mut throttle = THROTTLE.lock().unwrap(); // enforce one req at a time
         let url = format!("https://crates.io/api/v1/crates/{}", path.as_ref());
         let res = self.cache.get_json(key.0, url, |raw: B| {
-            std::thread::sleep(std::time::Duration::from_secs(1));
+            throttle.acquire(()); // enforce one req per second
             Some((key.1.to_string(), raw.to()))
         })?;
         Ok(res.map(|(_, res)| B::from(res)))

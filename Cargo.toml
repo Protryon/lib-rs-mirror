@@ -16,3 +16,5 @@ simple_cache = { git = "https://gitlab.com/crates.rs/simple_cache.git", version 
 chrono = "0.4.3"
 rand = "0.6"
 semver = "0.9.0"
+mysteriouspants-throttle = "0.2.5"
+lazy_static = "1.2.0"

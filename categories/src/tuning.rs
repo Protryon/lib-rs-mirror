@@ -338,7 +338,7 @@ lazy_static! {
         (Cond::All(&["binary", "image"]), &[("multimedia::images", 0.8, 0.)]),
         (Cond::All(&["bootable", "image"]), &[("multimedia::images", 0.1, 0.)]),
         (Cond::Any(&["imagemagick", "gamma", "photo", "exif", "openexr", "flif", "png", "jpeg2000", "jpeg", "svg", "pixel"]), &[("multimedia::images", 1.3, 0.15), ("encoding", 0.5, 0.), ("parsing", 0.6, 0.)]),
-        (Cond::Any(&["color", "colors"]), &[("multimedia::images", 1.2, 0.1), ("multimedia", 1.1, 0.)]),
+        (Cond::Any(&["color", "colors", "opencv"]), &[("multimedia::images", 1.2, 0.1), ("multimedia", 1.1, 0.)]),
         (Cond::Any(&["quantization"]), &[("multimedia::images", 1.2, 0.1), ("multimedia", 1.1, 0.), ("command-line-interface", 0.2, 0.)]),
         (Cond::Any(&["webm", "av1", "dvd", "codec"]), &[("multimedia::encoding", 1.5, 0.2), ("multimedia::video", 1.4, 0.3), ("encoding", 0.15, 0.), ("parsing", 0.8, 0.)]),
         (Cond::Any(&["h265", "h264", "ffmpeg", "h263", "vp9", "video", "movies", "movie"]), &[("multimedia::video", 1.5, 0.3), ("multimedia::encoding", 1.3, 0.1), ("encoding", 0.15, 0.)]),

@@ -1,0 +1,334 @@
+@use crate::templates::base;
+@use crate::templates::labels;
+@use crate::templates::downloads;
+@use crate::templates::deps_list;
+@use crate::date_now;
+@use crate::iter::*;
+@use crate::Urler;
+@use crate::CratePage;
+@use crate::Contributors;
+@use rich_crate::Include;
+@use rich_crate::Edition;
+@use std::ops::Div;
+
+@(url: &Urler, c: &CratePage)
+
+@:base(&c.page(url), {
+  <div typeof="SoftwareApplication">
+  <header id="package" @if c.ver.is_yanked() {class="yanked"} else {@if c.ver.is_nightly() {class="nightly"}}>
+    <div class="inner-col">
+    <div class="breadcrumbs" typeof="BreadcrumbList">
+    <h1>
+      <span property="itemListElement" typeof="ListItem"><a property="item"
+        typeof="WebPage" href="/"><span property="name">Crates</span>.rs</a><meta
+        property="position" content="1"></span>
+    </h1>
+     ›
+    @if c.ver.has_categories() {
+      <span class="categories @if c.ver.keywords(Include::Cleaned).next().is_some() {has-keywords}" role="navigaton" aria-label="Categories">
+      @for (last, (major, cat)) in c.category_slugs_unique().iter().enumerate().identify_last() {
+        @for (last, (i, subcat)) in cat.iter().enumerate().identify_last() {
+          @if major < 2 {
+            <span property="itemListElement" typeof="ListItem"><a href="@url.category(subcat)"
+              title="@subcat.short_description" property="item" typeof="WebPage"><span
+              property="name">@subcat.name</span></a><meta property="position" content="@(i+2)"></span>
+          } else {
+            <a href="@url.category(subcat)" title="@subcat.short_description">@subcat.name</a>
+          }
+          @if !last {&rsaquo;}
+        }
+        @if !last {|}
+      }
+      @if let Some(parent) = c.parent_crate() {
+        › <span class="parent-crate"><a href="@url.krate(&parent)">@parent.capitalized_name()</a></span>
+      }
+      </span>
+    }
+    </div>
+    @if let Some(keywords) = c.keywords_populated() {
+      <span class="keywords">
+        <span>
+          @for (key, link) in keywords.iter().take(3) {
+              <a property="applicationCategory" @if *link {href="@url.keyword(key)"} class=keyword><span>#</span>@key</a>
+          }
+        </span>
+        @for (key, link) in keywords.into_iter().skip(3) {
+          <a property="applicationCategory" @if link {href="@url.keyword(&key)"} class=keyword><span>#</span>@key</a>
+        }
+      </span>
+    }
+    </h1>
+    <h2>
+      @:labels(&c.ver, c.is_build_or_dev())
+
+      <span property="name">
+      @if c.ver.is_yanked() {
+        <del>@c.ver.short_name()</del>
+      } else {
+        @for (last, part) in c.ver.short_name().split('_').identify_last() {@part@if !last {<span class=un>_<wbr></span>}}
+      }
+      </span>
+
+    </h2>
+    @if let Some(desc) = c.ver.description() {
+      <p class=desc>@c.render_markdown_str(desc)</p>
+    }
+    <p class=byline>
+      @if c.ver.is_yanked() {
+        was
+      }
+      by
+      @if let Some(Contributors {authors, owners, co_owned, contributors, period_after_authors, contributors_as_a_team}) = Some(c.all_contributors()) {
+        @for (last, a) in authors.iter().identify_last() {
+          @if let Some(url) = url.author(a) {
+            <a href="@url" property="author" typeof="Person"><span property="name">@a.name()</span></a>@if !last {,} else {@if period_after_authors {.}}
+          } else {
+            @a.name()@if !last {,} else {@if period_after_authors {.}}
+          }
+        }
+        @if contributors > 1 {
+          <span class=contributors>@if !contributors_as_a_team {and}
+          @if let Some(repo) = c.ver.repository() {
+            @if contributors_as_a_team {(}<a href="@repo.contributors_http_url()">@if contributors == 100 {over }@contributors contributors</a>@if contributors_as_a_team {)}@if !owners.is_empty() {.}
+          } else {
+            @contributors contributors@if contributors_as_a_team {)}@if !owners.is_empty() {.}
+          }
+          </span>
+        }
+        @if !owners.is_empty() {
+          <span class=coowners>
+          <span>@if co_owned {Co-owned} else {Owned}</span>
+          by @for (last, a) in owners.iter().identify_last() {
+            @if let Some(url) = url.author(a) {
+              <a href="@url" property="author" typeof="Person"><span property="name">@a.name()</span></a>@if !last {,} else {.}
+            } else {
+              @a.name()@if !last {,} else {.}
+            }
+          }
+          </span>
+        }
+      }
+    </p>
+    <nav><ul>
+      <li class=active>About</li>
+      @if let Some(doc) = c.api_reference_url() {
+        <li><a href="@doc">API reference</a></li>
+      }
+      @if let Some((url, label)) = c.repository_link() {
+        <li><a href="@url" @if c.homepage_link().is_none() {property="url"}>@label</a></li>
+      }
+      @if let Some((url, label)) = c.documentation_link() {
+        <li><a href="@url">@label</a></li>
+      }
+      @if let Some((url, label)) = c.homepage_link() {
+        <li><a href="@url" property="url" >@label</a></li>
+      }
+    </ul></nav>
+    </div>
+  </header>
+  <main>
+    <div class="inner-col">
+      <section id="readme-deps">
+        <div>
+          <section class="about-crate">
+            <section id="versions">
+              @if let Some(parts) = Some(c.version_stats_summary()) {
+                <h3>
+                  @if let Some(url) = c.changelog_url() {
+                    <a href="@url">@parts.0</a>
+                  } else {
+                    @parts.0
+                  }
+                  @if let Some(extra) = parts.1 {<span>@extra</span>}
+                </h3>
+              }
+              @if c.ver.edition() == Edition::E2018 {
+                <p class="edition-2018">✓ Uses <a href="https://rust-lang-nursery.github.io/edition-guide/rust-2018/index.html">Rust 2018</a> edition</p>
+              }
+              <table>
+                @for (i,gr) in c.top_versions().enumerate() {
+                  <tr><th content="@gr.ver.num" property="@if i == 0 {softwareVersion}">
+                    @if c.is_version_new(&gr.ver, i) {
+                      <span class=new vocab="" property="">new</span>
+                    }
+                    @gr.ver.num
+                  </th><td property="@if i == 0 {datePublished}" class="date">
+                    @if gr.ver.yanked {
+                      <del>@CratePage::format(&gr.ver.created_at)</del>
+                    } else {
+                      @CratePage::format(&gr.ver.created_at)
+                    }
+                  </td></tr>
+                }
+              </table>
+            </section>
+
+            <section id="downloads">
+              @if let Some((top, cat)) = c.top_category() {
+                <p class="top-n">#<b>@top</b> in <a href="@url.category(cat)" title="@cat.description">@cat.name</a></p>
+              } else {
+                @if let Some((top, keyword)) = c.top_keyword() {
+                  <p class="top-n">#<b>@top</b> in <a href="@url.keyword(&keyword)">#@keyword</a></p>
+                }
+              }
+              @:downloads(&c.download_graph(182, 56))
+              <p><b>@c.format_number(c.all.downloads_per_month())</b> downloads per month
+                @if let Some((deps, direct)) = c.dependents_stats() {
+                  <br>
+                    @if deps != direct {
+                      Used in <strong>@c.format_number(deps)</strong> crate@if deps != 1 {s} (<a href="@url.reverse_deps(&c.ver)">@c.format_number(direct)&nbsp;directly</a>)
+                    } else {
+                      Used in <a href="@url.reverse_deps(&c.ver)"><strong>@c.format_number(deps)</strong>&nbsp;crate@if deps != 1 {s}</a>
+                    }
+                }
+              </p>
+            </section>
+            <section id="sloc">
+              <section id="license">
+                @if let Some(lic) = c.ver.license_name() {
+                  <b property="license">@lic</b>
+                  @if lic.len() < 8 {
+                    license
+                  }
+                }
+                @if let Some(filename) = c.ver.license_file() {
+                  <b title="@filename">Custom license</b>
+                }
+              </section>
+
+              @if let Some(((tarball, uncompressed), _, _)) = c.sizes {
+                <p>
+                  <span title="@c.format_kbytes(tarball) as tarball">@if tarball > 1000000 || uncompressed > 10000000 {
+                    <b>@c.format_kbytes(tarball.max(uncompressed))</b>
+                  } else {
+                    @c.format_kbytes(tarball.max(uncompressed))
+                  }</span>
+                  @if let Some((total, _)) = c.lang_stats {
+                    @if total >= 50 {
+                      <br>
+                      @if total >= 1000 {
+                        @if let Some((val, unit)) = Some(c.format_knumber(total)) {
+                          <span title="@c.format_number(total)">
+                            @if total > 20000 {
+                              <b>@val@unit</b>
+                            } else {
+                              @val@unit
+                            }
+                          </span>
+                          <abbr title="Lines of code, excluding comments">SLoC</abbr>
+                        }
+                      } else {
+                        @total <span title="Lines of code, excluding comments">lines</span>
+                      }
+                    }
+                  }
+                </p>
+                @if let Some((total, stats)) = &c.lang_stats {
+                  @if let Some(sloc) = c.langs_chart(stats, 360) {
+                    @if sloc.len() > 1 && *total > 1000 {
+                      <svg viewBox="-1 -1 59 59" width="60" height="60">
+                        @for (lang, lines, (x, w)) in sloc {
+                          <path d="@CratePage::svg_path_for_slice(x,if x+w < 359 {w+1} else {w},360,58)" fill="@lang.color()"><title>@lang.name() @if let Some((val,unit)) = Some(c.format_knumber(lines.code as usize)) {@val@unit} SLoC @if lines.comments > 1 { // @c.format_fraction(lines.comments as f64 / (lines.code+lines.comments) as f64) comments }</title></path>
+                        }
+                      </svg>
+                    }
+                  }
+                }
+              }
+            </section>
+          </section>
+
+          @if let Ok(readme) = c.ver.readme() {
+            @if let Some(readme) = readme {
+              <section id=readme class="readme" vocab="">
+                @c.render_readme(readme)
+              </section>
+            }
+          } else {
+            <section id=readme>
+              <p class=error>Error while getting readme</p>
+            </section>
+          }
+
+          @if c.is_readme_short() {
+            @if let Some(intro) = c.render_lib_intro() {
+              <hr>
+              <section id=lib_intro class="readme" vocab="">
+                <h3>
+                  @if let Some(doc) = c.api_reference_url() {
+                    <a href="@doc"><code>lib.rs</code></a>:
+                  } else {
+                    <code>lib.rs</code>:
+                  }
+                </h3>
+                @intro
+              </section>
+            }
+          }
+        </div>
+        <section id="deps">
+          @if let Some((normal, dev, build)) = c.dependencies() {
+            @if c.has_runtime_deps() || c.ver.links().is_some() {
+              <h4><a href="@url.deps(&c.ver)">Dependencies</a></h4>
+            } else {
+              <h4>No runtime deps</h4>
+            }
+            @if let Some(((main_tarball, _), _, deps)) = c.sizes {
+              @if deps.tarball > 1000000 || deps.tarball > main_tarball.div(2) {
+                <p>
+                  <span title="amortized size; approx. @c.format_kbytes(deps.tarball) compressed">@if deps.tarball > 8000000 || deps.uncompressed > 50000000 {
+                    ~<b>@c.format_kbytes(deps.tarball.max(deps.uncompressed))</b>
+                  } else {
+                    ~@c.format_kbytes(deps.tarball.max(deps.uncompressed))
+                  }</span>
+                  <br>
+                  @if deps.lines >= 10000 {
+                    @if let Some((val, unit)) = Some(c.format_knumber(deps.lines)) {
+                      <span title="estimated">~@val@unit</span> <abbr title="approx. additional lines of code">SLoC</abbr>
+                    }
+                  }
+                </p>
+              }
+            }
+            <div role="navigation" aria-label="Dependencies">
+            <ul class="@if normal.len() > 4 {long}">
+              @:deps_list(c, url, &normal, "")
+              @if let Some(links) = c.ver.links() {
+                <li><span class="label label-build">links</span> <code>@links</code></li>
+              }
+            </ul>
+            <ul class="dev @if dev.len() > 4 {long}">
+              @if c.ver.has_buildrs() {
+                <li><span class="label label-build">build</span> <code>build.rs</code></li>
+              }
+              @:deps_list(c, url, &build, "build")
+              @:deps_list(c, url, &dev, "dev")
+            </ul>
+            </div>
+          } else {
+            <p class="error">Dependencies unknown</p>
+          }
+        </section>
+      </section>
+    </div>
+  </main>
+  </div>
+
+  <footer>
+
+    <div class="inner-col">
+      @if let Some(crates) = c.related_crates() {
+        @if !crates.is_empty() {
+          <div class=seealso role="navigaton" aria-label="See also">
+            See also:
+            @for (last, cra) in crates.into_iter().identify_last() {
+              <a href="@url.krate_by_origin(&cra)">@cra.short_crate_name()</a>@if !last {,}
+            }
+          </div>
+        }
+      }
+      <aside role="contentinfo"><p><a href="/"><strong>Crates.rs</strong></a> is an unofficial <a href="https://gitlab.com/crates.rs">open-source Rust project</a> by <a href="https://kornel.ski">kornelski</a>. This page was generated on @date_now() based on data from crates.io, GitHub API and public git repositories.</p></aside>
+
+    </div>
+  </footer>
+})

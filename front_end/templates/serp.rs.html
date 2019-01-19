@@ -1,0 +1,87 @@
+@use crate::templates::base;
+@use crate::Urler;
+@use crate::SearchPage;
+@use crate::SearchKind;
+
+@(p: &SearchPage, url: &Urler)
+
+@:base(&p.page(), {
+
+<header id="serp">
+    <div class="inner-col">
+        <div class="breadcrumbs">
+            <h1><a href="/">Crates.rs</a></h1>
+            ›
+            @if let SearchKind::Keyword(_) = p.query {
+                Keywords
+            }
+            @if let SearchKind::Query(_) = p.query {
+                Search (beta)
+            }
+        </div>
+        @if let SearchKind::Query(query) = p.query {
+            <form role="search" id=search method="get" action="/search">
+                <input placeholder="name, keywords, description" autocapitalize="off" autocorrect="off" autocomplete="off" tabindex="1" type=search value="@query" name=q><button type=submit>Search</button>
+            </form>
+            <nav>
+                <ul>
+                    @if !p.good_results.is_empty() {
+                        <li class=active>Sorted by relevance</li>
+                    }
+                    <li><a href="@url.search_ddg(query)">I'm feeling ducky</a></li>
+                </ul>
+            </nav>
+        }
+        @if let SearchKind::Keyword(k) = p.query {
+            <h2>#@k</h2>
+            <nav>
+                <ul>
+                    @if !p.good_results.is_empty() {
+                        <li class=active>Keyword</li>
+                    }
+                    <li><a href="@url.search_crates_rs(k)">Search</a></li>
+                </ul>
+            </nav>
+        }
+    </div>
+</header>
+<main id="results">
+    <div class="inner-col">
+        @if p.good_results.is_empty() {
+            <p class=notfound>Nothing found :(</p>
+            @if let SearchKind::Query(query) = p.query {
+                <p class=tryalso>Try <a href="@url.search_ddg(query)">searching with duckduckgo</a> or <a href="@url.search_crates_io(query)">on crates.io</a>.</p>
+            }
+        } else {
+            <ol>
+            @for (i, c) in p.good_results.iter().chain(p.bad_results).enumerate() {
+                <li>
+                    <a href="@url.krate_by_name(&c.crate_name)"><div class=h>
+                        <h4>@c.crate_name</h4>
+                        <p class=desc>@p.render_markdown_str(&c.description)</p>
+                    </div>
+                    <div class=meta>
+                        <span class="version @p.version_class(&c.version)"><span>v</span>@c.version</span>
+                        @if c.monthly_downloads >= 100 {
+                            <span class=downloads title="c.monthly_downloads recent downloads">@if let Some((num,unit)) = Some(p.downloads(c.monthly_downloads)) {@num<b>@unit</b>}</span>
+                        }
+                    </div></a>
+                </li>
+                @if i == p.good_results.len() {
+                    @if let SearchKind::Query(query) = p.query {
+                        <p class=tryalso>Try <a href="@url.search_ddg(query)">searching with duckduckgo</a> or <a href="@url.search_crates_io(query)">on crates.io</a>.</p>
+                    }
+                }
+            }
+            </ol>
+        }
+    </div>
+</main>
+
+<footer>
+    <div class="inner-col">
+        <p>Search powered by <a href="https://crates.rs/crates/tantivy">tantivy</a>.</p>
+        <p>Browse <a href="/">all categories</a>.
+    </div>
+</footer>
+})

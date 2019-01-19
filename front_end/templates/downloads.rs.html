@@ -1,0 +1,13 @@
+@use crate::download_graph::DownloadsGraph;
+
+@(dg: &DownloadsGraph)
+<svg viewBox="0 0 @dg.width @dg.height" width=@dg.width height=@dg.height>
+    <title>Download history</title>
+    @for (y,w) in dg.ticks() {
+        <line x1=1 x2="@(dg.width - 1)" y1=@y y2=@y stroke="black" stroke-width=@w stroke-linecap="butt" stroke-opacity=0.3 />
+    }
+    @for (x, y, w, h, f, l) in dg.graph_data() {
+        <rect x=@x y=@y width=@w height=@h fill="@f" fill-opacity="0.95"><title>@l</title></rect>
+    }
+    <rect x=0.5 y=0.5 width="@(dg.width - 1)" height="@(dg.height - 1)" stroke="black" fill=none stroke-opacity=0.3 stroke-linecap=square stroke-width=1>
+</svg>

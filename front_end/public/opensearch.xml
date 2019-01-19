@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
+<ShortName>Crates.rs</ShortName>
+<Description>Rust packages/libraries/programs</Description>
+<InputEncoding>UTF-8</InputEncoding>
+<LongName>Crates.rs Rust package search</LongName>
+<Image height="32" width="32">https://crates.rs/favicon.png</Image>
+<Url type="text/html" method="get" template="https://crates.res/search?q={searchTerms}"/>
+<Developer>@kornelski</Developer>
+<Language>en-us</Language>
+<SyndicationRight>open</SyndicationRight>
+</OpenSearchDescription>

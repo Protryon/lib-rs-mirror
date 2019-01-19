@@ -1,0 +1,30 @@
+@use kitchen_sink::Cfg;
+
+@(cfg: &Cfg)
+
+
+@if let Cfg::Is(k) = cfg {
+    <span class="cfg k">@k</span>
+}
+@if let Cfg::Equal(k, v) = cfg {
+    <span class="cfg k" title="@k">@if k == "target_has_atomic" {atomic }@v@if k == "target_pointer_width" {-bit}</span>
+}
+@if let Cfg::Not(cfg) = cfg {
+
+    @if let Cfg::All(ref v) = *(*cfg) {
+        <span class="cfg any" title="any">
+        @for v in v {
+            <span class="cfg not">not @:target_cfg(v)</span>
+        }
+        </span>
+    } else {
+        <span class="cfg not">not @:target_cfg(cfg)</span>
+    }
+
+}
+@if let Cfg::All(v) = cfg {
+    <span class="cfg all" title="all">@for v in v {@:target_cfg(v)}</span>
+}
+@if let Cfg::Any(v) = cfg {
+    <span class="cfg any" title="any">@for v in v {@:target_cfg(v)}</span>
+}

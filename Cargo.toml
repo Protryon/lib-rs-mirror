@@ -51,9 +51,6 @@ crates_io_client = { path = "crates_io_client" }
 [patch.'https://gitlab.com/crates.rs/docs_rs_client.git']
 docs_rs_client = { path = "docs_rs_client" }
 
-[patch.'https://gitlab.com/crates.rs/front_end.git']
-front_end = { path = "front_end" }
-
 [patch.'https://gitlab.com/crates.rs/github_info.git']
 github_info = { path = "github_info" }
 

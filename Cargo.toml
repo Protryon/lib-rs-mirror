@@ -39,9 +39,6 @@ lazyonce = { path = "lazyonce" }
 rmp = { git = "https://github.com/kornelski/msgpack-rust", rev = "1a05988fb11d73d2e1a89b393105b8e5986a22a2" }
 rmp-serde = { git = "https://github.com/kornelski/msgpack-rust", rev = "1a05988fb11d73d2e1a89b393105b8e5986a22a2" }
 
-[patch.'https://gitlab.com/crates.rs/categories.git']
-categories = { path = "categories" }
-
 [patch.'https://gitlab.com/crates.rs/crate_db.git']
 crate_db = { path = "crate_db" }
 
@@ -63,20 +60,11 @@ front_end = { path = "front_end" }
 [patch.'https://gitlab.com/crates.rs/github_info.git']
 github_info = { path = "github_info" }
 
-[patch.'https://gitlab.com/crates.rs/kitchen_sink.git']
-kitchen_sink = { path = "kitchen_sink" }
-
-[patch.'https://gitlab.com/crates.rs/reindex.git']
-reindex = { path = "reindex" }
-
 [patch.'https://gitlab.com/crates.rs/render_readme.git']
 render_readme = { path = "render_readme" }
 
 [patch.'https://gitlab.com/crates.rs/repo_url.git']
 repo_url = { path = "repo_url" }
-
-[patch.'https://gitlab.com/crates.rs/rich_crate.git']
-rich_crate = { path = "rich_crate" }
 
 [patch.'https://gitlab.com/crates.rs/simple_cache.git']
 simple_cache = { path = "simple_cache" }

@@ -1,0 +1,18 @@
+[package]
+edition = "2018"
+name = "categories"
+version = "0.1.1"
+authors = ["Kornel <kornel@geekhood.net>"]
+license = "MIT OR Apache-2.0"
+description = "List of categories from crates.io"
+
+[lib]
+name = "categories"
+path = "src/categories.rs"
+
+[dependencies]
+serde = "1.0.66"
+toml = "0.4.6"
+serde_derive = "1.0.66"
+lazy_static = "1.0.1"
+quick-error = "1.2.2"

@@ -4,9 +4,6 @@
 [submodule "cargo_toml"]
 	path = cargo_toml
 	url = https://gitlab.com/crates.rs/cargo_toml.git
-[submodule "crate_db"]
-	path = crate_db
-	url = https://gitlab.com/crates.rs/crate_db.git
 [submodule "crate_files"]
 	path = crate_files
 	url = https://gitlab.com/crates.rs/crate_files.git

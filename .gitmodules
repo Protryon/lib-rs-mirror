@@ -25,9 +25,6 @@
 [submodule "lazyonce"]
 	path = lazyonce
 	url = https://gitlab.com/crates.rs/lazyonce.git
-[submodule "reindex"]
-	path = reindex
-	url = https://gitlab.com/crates.rs/reindex.git
 [submodule "render_readme"]
 	path = render_readme
 	url = https://gitlab.com/crates.rs/render_readme.git

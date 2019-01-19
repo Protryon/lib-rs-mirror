@@ -133,6 +133,8 @@ impl CratesIoClient {
             return Err(Error::NotInCache);
         }
 
+        self.cache.delete(key.0)?; // out of date
+
         let url = format!("https://crates.io/api/v1/crates/{}", path.as_ref());
         let res = self.cache.get_json(key.0, url, |raw: B| {
             std::thread::sleep(std::time::Duration::from_secs(1));

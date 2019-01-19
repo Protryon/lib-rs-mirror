@@ -52,9 +52,6 @@
 [submodule "udedokei"]
 	path = udedokei
 	url = https://gitlab.com/crates.rs/udedokei
-[submodule "server"]
-	path = server
-	url = https://gitlab.com/crates.rs/server.git
 [submodule "search_index"]
 	path = search_index
 	url = https://gitlab.com/crates.rs/search_index.git

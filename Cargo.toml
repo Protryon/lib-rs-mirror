@@ -39,9 +39,6 @@ lazyonce = { path = "lazyonce" }
 rmp = { git = "https://github.com/kornelski/msgpack-rust", rev = "1a05988fb11d73d2e1a89b393105b8e5986a22a2" }
 rmp-serde = { git = "https://github.com/kornelski/msgpack-rust", rev = "1a05988fb11d73d2e1a89b393105b8e5986a22a2" }
 
-[patch.'https://gitlab.com/crates.rs/crate_db.git']
-crate_db = { path = "crate_db" }
-
 [patch.'https://gitlab.com/crates.rs/crate_files.git']
 crate_files = { path = "crate_files" }
 

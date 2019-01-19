@@ -25,9 +25,6 @@
 [submodule "github_info"]
 	path = github_info
 	url = https://gitlab.com/crates.rs/github_info.git
-[submodule "kitchen_sink"]
-	path = kitchen_sink
-	url = https://gitlab.com/crates.rs/kitchen_sink.git
 [submodule "lazyonce"]
 	path = lazyonce
 	url = https://gitlab.com/crates.rs/lazyonce.git

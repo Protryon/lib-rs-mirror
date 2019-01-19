@@ -37,9 +37,6 @@
 [submodule "data/index"]
 	path = data/index
 	url = https://github.com/rust-lang/crates.io-index.git
-[submodule "front_end"]
-	path = front_end
-	url = https://gitlab.com/crates.rs/front_end.git
 [submodule "crate_git_checkout"]
 	path = crate_git_checkout
 	url = https://gitlab.com/crates.rs/crate_git_checkout.git

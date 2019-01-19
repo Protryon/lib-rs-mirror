@@ -74,6 +74,3 @@ user_db = { path = "user_db" }
 
 [patch.'https://gitlab.com/crates.rs/udedokei.git']
 udedokei = { path = "udedokei" }
-
-[patch.'https://gitlab.com/crates.rs/search_index.git']
-search_index = { path = "search_index" }

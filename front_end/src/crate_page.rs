@@ -44,12 +44,14 @@ pub struct CratePage<'a> {
 }
 
 /// Helper used to find most "interesting" versions
+#[derive(Debug)]
 pub struct VersionGroup<'a> {
     pub ver: Version<'a>,
     pub downloads: usize,
     pub count: usize,
 }
 
+#[derive(Debug)]
 pub struct Version<'a> {
     pub downloads: usize,
     pub num: &'a str,
@@ -379,7 +381,6 @@ impl<'a> CratePage<'a> {
                 (key, VersionGroup { count: 1, downloads: ver.downloads, ver })
             }),
         );
-
         let grouped2 = if grouped1.len() > 5 {
             Self::group_versions(
                 1,

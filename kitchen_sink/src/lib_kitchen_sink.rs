@@ -336,10 +336,19 @@ impl KitchenSink {
     fn crates_io_meta(&self, origin: &Origin) -> CResult<CratesIoCrate> {
         let krate = self.index.crates_io_crate_by_name(origin).context("rich_crate")?;
         let name = krate.name();
-        let cache_bust = krate.latest_version().version(); // most recently published version
-        let meta = self.crates_io.krate(name, cache_bust)
-            .with_context(|_| format!("crates.io meta for {} {}", name, cache_bust))?;
-        Ok(meta.ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?)
+        let latest_in_index = krate.latest_version().version(); // most recently published version
+        let meta = self.crates_io.krate(name, latest_in_index)
+            .with_context(|_| format!("crates.io meta for {} {}", name, latest_in_index))?;
+        let mut meta = meta.ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?;
+        if !meta.meta.versions.iter().any(|v| v.num == latest_in_index) {
+            eprintln!("Crate data missing latest version {:?}@{}", origin, latest_in_index);
+            meta = self.crates_io.krate(name, &format!("{}-try-again", latest_in_index))?
+                .ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?;
+            if !meta.meta.versions.iter().any(|v| v.num == latest_in_index) {
+                eprintln!("Error: crate data is borked {:?}@{}. Has only: {:?}", origin, latest_in_index, meta.meta.versions.iter().map(|v| &v.num).collect::<Vec<_>>());
+            }
+        }
+        Ok(meta)
     }
 
     /// Wrapper for the latest version of a given crate.

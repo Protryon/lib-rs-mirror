@@ -20,11 +20,6 @@ fn main() {
 }
 
 fn is_useful1(allver: &RichCrate) -> bool {
-    if allver.downloads_recent() < 5 {
-        eprintln!("{} meh", allver.name());
-        return false;
-    }
-
     if allver.versions().count() < 2 {
         eprintln!("{} one release", allver.name());
         return false;

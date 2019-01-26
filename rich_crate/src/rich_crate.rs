@@ -1,7 +1,5 @@
-use crates_io_client::CrateDownloadsFile;
 use crates_io_client::CrateOwner;
-use crates_io_client::CrateMetaVersion;
-use crates_io_client::CratesIoCrate;
+use crates_io_client::CrateMetaFile;
 pub use crates_io_client::DownloadWeek;
 use crate::Origin;
 
@@ -15,22 +13,33 @@ pub struct RichCrate {
     // crates_io: CratesIoCrate,
     name: String,
     owners: Vec<CrateOwner>,
-    versions: Vec<CrateMetaVersion>,
-    downloads: CrateDownloadsFile,
-    downloads_recent: usize,
-    downloads_total: usize,
+    versions: Vec<CrateVersion>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CrateVersion {
+    pub num: String, // "1.4.0",
+    pub updated_at: String, // "2018-01-29T23:10:11.539889+00:00",
+    pub created_at: String, // "2018-01-29T23:10:11.539889+00:00",
+    // pub downloads: usize,   // 154,
+    // pub features: HashMap<String, Vec<String>>,
+    pub yanked: bool,
+    // pub license: Option<String>, // "MIT",
+
 }
 
 impl RichCrate {
-    pub fn new(crates_io: CratesIoCrate) -> Self {
+    pub fn new(origin: Origin, owners: Vec<CrateOwner>, meta: CrateMetaFile) -> Self {
         Self {
-            origin: Origin::from_crates_io_name(&crates_io.meta.krate.name),
-            versions: crates_io.meta.versions().collect(),
-            downloads: crates_io.downloads,
-            name: crates_io.meta.krate.name,
-            owners: crates_io.owners,
-            downloads_recent: crates_io.meta.krate.recent_downloads.unwrap_or(0),
-            downloads_total: crates_io.meta.krate.downloads,
+            origin,
+            versions: meta.versions().map(|c| CrateVersion {
+                num: c.num,
+                updated_at: c.updated_at,
+                created_at: c.created_at,
+                yanked: c.yanked,
+            }).collect(),
+            name: meta.krate.name,
+            owners,
         }
     }
 
@@ -46,24 +55,7 @@ impl RichCrate {
         &self.owners
     }
 
-    pub fn weekly_downloads(&self) -> Vec<DownloadWeek> {
-        self.downloads.weekly_downloads()
-    }
-
-    pub fn versions(&self) -> impl Iterator<Item = &CrateMetaVersion> {
+    pub fn versions(&self) -> impl Iterator<Item = &CrateVersion> {
         self.versions.iter()
-    }
-
-    pub fn downloads_total(&self) -> usize {
-        self.downloads_total
-    }
-
-    /// Per 90 days
-    pub fn downloads_recent(&self) -> usize {
-        self.downloads_recent
-    }
-
-    pub fn downloads_per_month(&self) -> usize {
-        self.downloads_recent() / 3
     }
 }

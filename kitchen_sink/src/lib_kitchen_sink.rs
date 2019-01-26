@@ -1,5 +1,6 @@
 #[macro_use] extern crate failure;
 
+use github_info::GitHubRepo;
 use chrono::prelude::*;
 use rich_crate::DownloadWeek;
 use crate_files;
@@ -30,7 +31,7 @@ mod git_crates_index;
 mod ctrlcbreak;
 pub use crate::ctrlcbreak::*;
 
-pub use crates_index::Crate;
+pub use crates_index::Crate as CratesIndexCrate;
 use crates_index::Version;
 pub use crates_io_client::CrateDepKind;
 pub use crates_io_client::CrateDependency;
@@ -250,7 +251,7 @@ impl KitchenSink {
     ///
     /// It returns only identifiers,
     /// so `rich_crate`/`rich_crate_version` is needed to do more.
-    pub fn all_crates_io_crates(&self) -> &FxHashMap<Origin, Crate> {
+    pub fn all_crates_io_crates(&self) -> &FxHashMap<Origin, CratesIndexCrate> {
         self.index.crates_io_crates()
     }
 
@@ -323,15 +324,49 @@ impl KitchenSink {
     pub fn rich_crate(&self, origin: &Origin) -> CResult<RichCrate> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
         match origin {
-            Origin::CratesIO(_) => {
+            Origin::CratesIo(_) => {
                 let meta = self.crates_io_meta(origin)?;
-                Ok(RichCrate::new(meta))
+                Ok(RichCrate::new(origin.clone(), meta.owners, meta.meta))
             },
             Origin::GitHub {repo, package} => {
                 unimplemented!()
             }
         }
     }
+
+
+    pub fn downloads_per_month(&self, origin: &Origin) -> CResult<Option<usize>> {
+        self.downloads_recent(origin).map(|dl| dl.map(|n| n/3))
+    }
+
+    pub fn downloads_per_month_or_equivalent(&self, origin: &Origin) -> CResult<Option<usize>> {
+        if let Some(dl) = self.downloads_recent(origin)? {
+            return Ok(Some(dl));
+        }
+
+        match origin {
+            Origin::GitHub {repo, ..} => {
+                let repo = Repo::new(&format!("https://github.com/{}/{}", repo.owner, repo.repo))?;
+                if let Some(gh) = self.github_repo(&repo)? {
+                    // arbitrary multiplier. TODO: it's not fair for apps vs libraries
+                    return Ok(Some(gh.stargazers_count as usize * 100));
+                }
+            },
+            _ => {},
+        }
+        Ok(None)
+    }
+
+    fn downloads_recent(&self, origin: &Origin) -> CResult<Option<usize>> {
+        Ok(match origin {
+            Origin::CratesIo(_) => {
+                let meta = self.crates_io_meta(origin)?;
+                meta.meta.krate.recent_downloads
+            },
+            _ => None,
+        })
+    }
+
 
     fn crates_io_meta(&self, origin: &Origin) -> CResult<CratesIoCrate> {
         let krate = self.index.crates_io_crate_by_name(origin).context("rich_crate")?;
@@ -524,23 +559,17 @@ impl KitchenSink {
 
         if fetch_type != CrateData::Minimal {
             if let Some(ref crate_repo) = maybe_repo {
-                match crate_repo.host() {
-                    RepoHost::GitHub(ref repo) => {
-                        let cachebust = self.cachebust_string_for_repo(crate_repo).context("ghrepo")?;
-                        if let Some(ghrepo) = self.gh.repo(repo, &cachebust)? {
-                            if package.homepage.is_none() {
-                                if let Some(url) = ghrepo.github_page_url {
-                                    package.homepage = Some(url);
-                                } else if let Some(url) = ghrepo.homepage {
-                                    package.homepage = Some(url);
-                                }
-                                warnings.extend(self.remove_redundant_links(package, maybe_repo.as_ref()));
-                            }
-                            derived.github_description = ghrepo.description;
-                            derived.github_name = Some(ghrepo.name);
+                if let Some(ghrepo) = self.github_repo(crate_repo)? {
+                    if package.homepage.is_none() {
+                        if let Some(url) = ghrepo.github_page_url {
+                            package.homepage = Some(url);
+                        } else if let Some(url) = ghrepo.homepage {
+                            package.homepage = Some(url);
                         }
-                    },
-                    _ => {}, // TODO
+                        warnings.extend(self.remove_redundant_links(package, maybe_repo.as_ref()));
+                    }
+                    derived.github_description = ghrepo.description;
+                    derived.github_name = Some(ghrepo.name);
                 }
             }
         }
@@ -558,6 +587,16 @@ impl KitchenSink {
             lib_file: meta.lib_file.map(|s| s.into()),
             path_in_repo,
         }, warnings))
+    }
+
+    fn github_repo(&self, crate_repo: &Repo) -> CResult<Option<GitHubRepo>> {
+        Ok(match crate_repo.host() {
+            RepoHost::GitHub(ref repo) => {
+                let cachebust = self.cachebust_string_for_repo(crate_repo).context("ghrepo")?;
+                self.gh.repo(repo, &cachebust)?
+            },
+            _ => None,
+        })
     }
 
     pub fn is_readme_short(&self, readme: Result<Option<&Readme>, ()>) -> bool {
@@ -786,14 +825,14 @@ impl KitchenSink {
         let (res1, res2) = rayon::join(|| -> CResult<()> {
             let origin = k.origin();
             match origin {
-                Origin::CratesIO(name) => {
+                Origin::CratesIo(name) => {
                     let meta = self.crates_io_meta(origin)?;
                     self.index_crate_downloads(name, &meta)?;
                 },
                 _ => {},
             }
             Ok(())
-        }, || self.crate_db.index_versions(k));
+        }, || self.crate_db.index_versions(k, self.downloads_recent(k.origin())?));
         res1?;
         res2?;
         Ok(())

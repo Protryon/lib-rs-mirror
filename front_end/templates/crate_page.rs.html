@@ -171,8 +171,11 @@
                   <p class="top-n">#<b>@top</b> in <a href="@url.keyword(&keyword)">#@keyword</a></p>
                 }
               }
-              @:downloads(&c.download_graph(182, 56))
-              <p><b>@c.format_number(c.all.downloads_per_month())</b> downloads per month
+              @if let Some(g) = c.download_graph(182, 56) {
+                @:downloads(&g)
+              }
+              <p>
+                @if let Some(dl) = c.downloads_per_month() {<b>@c.format_number(dl)</b> downloads per month}
                 @if let Some((deps, direct)) = c.dependents_stats() {
                   <br>
                     @if deps != direct {

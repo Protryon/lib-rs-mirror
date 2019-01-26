@@ -16,13 +16,13 @@ pub use repo_url::SimpleRepo;
 /// URL-like identifier of location where crate has been published + normalized crate name
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Origin {
-    CratesIO(Box<str>),
+    CratesIo(Box<str>),
     GitHub {repo: SimpleRepo, package: Box<str>},
 }
 
 impl Origin {
     pub fn from_crates_io_name(name: &str) -> Self {
-        Origin::CratesIO(name.to_ascii_lowercase().into())
+        Origin::CratesIo(name.to_ascii_lowercase().into())
     }
 
     pub fn from_github(repo: SimpleRepo, package: impl Into<Box<str>>) -> Self {
@@ -55,14 +55,14 @@ impl Origin {
 
     pub fn to_str(&self) -> String {
         match *self {
-            Origin::CratesIO(ref s) => format!("crates.io:{}", s),
+            Origin::CratesIo(ref s) => format!("crates.io:{}", s),
             Origin::GitHub {ref repo, ref package} => format!("github:{}/{}/{}", repo.owner, repo.repo, package),
         }
     }
 
     pub fn short_crate_name(&self) -> &str {
         match *self {
-            Origin::CratesIO(ref s) => s,
+            Origin::CratesIo(ref s) => s,
             Origin::GitHub {ref package, ..} => package,
         }
     }

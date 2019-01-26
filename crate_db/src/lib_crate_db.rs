@@ -411,17 +411,20 @@ impl CrateDb {
     }
 
     /// Update download counts of the crate
-    pub fn index_versions(&self, all: &RichCrate) -> FResult<()> {
+    pub fn index_versions(&self, all: &RichCrate, downloads_recent: Option<usize>) -> FResult<()> {
         self.with_tx(|tx| {
-            let mut update_recent = tx.prepare_cached("UPDATE crates SET recent_downloads = ?1 WHERE id = ?2")?;
             let mut get_crate_id = tx.prepare_cached("SELECT id FROM crates WHERE origin = ?1")?;
             let mut insert_version = tx.prepare_cached("INSERT OR IGNORE INTO crate_versions (crate_id, version, created) VALUES (?1, ?2, ?3)")?;
 
             let origin = all.origin().to_str();
             let crate_id: u32 = get_crate_id.query_row(&[&origin], |row| row.get(0))
                 .with_context(|_| format!("the crate {} hasn't been indexed yet", origin))?;
-            let recent = all.downloads_recent() as u32;
-            update_recent.execute(&[&recent, &crate_id]).context("update recent")?;
+
+            if let Some(recent) = downloads_recent {
+                let recent = recent as u32;
+                let mut update_recent = tx.prepare_cached("UPDATE crates SET recent_downloads = ?1 WHERE id = ?2")?;
+                update_recent.execute(&[&recent, &crate_id]).context("update recent")?;
+            }
 
             for ver in all.versions() {
                 let timestamp = DateTime::parse_from_rfc3339(&ver.created_at).context("version timestamp")?;

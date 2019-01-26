@@ -47,13 +47,11 @@ pub struct CratePage<'a> {
 #[derive(Debug)]
 pub struct VersionGroup<'a> {
     pub ver: Version<'a>,
-    pub downloads: usize,
     pub count: usize,
 }
 
 #[derive(Debug)]
 pub struct Version<'a> {
-    pub downloads: usize,
     pub num: &'a str,
     pub semver: SemVer,
     pub yanked: bool,
@@ -222,7 +220,7 @@ impl<'a> CratePage<'a> {
 
     pub fn nofollow(&self) -> bool {
         // TODO: take multiple factors into account, like # of contributors, author reputation, dependents
-        self.all.downloads_recent() < 100
+        self.kitchen_sink.downloads_per_month_or_equivalent(self.all.origin()).ok().and_then(|x| x).unwrap_or(0) < 50
     }
 
     pub(crate) fn all_contributors(&self) -> Contributors<'_> {
@@ -347,7 +345,6 @@ impl<'a> CratePage<'a> {
                 Occupied(mut e) => {
                     let old = e.get_mut();
                     old.count += v.count;
-                    old.downloads += v.downloads;
                     if old.ver.semver < v.ver.semver && (old.ver.yanked || !v.ver.yanked) && (old.ver.semver.is_prerelease() || !v.ver.semver.is_prerelease()) {
                         old.ver = v.ver;
                     }
@@ -378,7 +375,7 @@ impl<'a> CratePage<'a> {
                     if ver.semver.major == 0 { ver.semver.patch + 1 } else { 0 },
                     ver.semver.minor,
                 );
-                (key, VersionGroup { count: 1, downloads: ver.downloads, ver })
+                (key, VersionGroup { count: 1, ver })
             }),
         );
         let grouped2 = if grouped1.len() > 5 {
@@ -564,7 +561,6 @@ impl<'a> CratePage<'a> {
     pub fn all_versions(&self) -> impl Iterator<Item = Version<'a>> {
         self.all.versions().map(|v| Version {
             yanked: v.yanked,
-            downloads: v.downloads,
             num: &v.num,
             semver: SemVer::parse(&v.num).expect("semver parse"),
             created_at: DateTime::parse_from_rfc3339(&v.created_at).expect("created_at parse"),
@@ -577,15 +573,21 @@ impl<'a> CratePage<'a> {
     }
 
     /// Data for weekly breakdown of recent downloads
-    pub fn download_graph(&self, width: usize, height: usize) -> DownloadsGraph {
-        DownloadsGraph::new(self.all.weekly_downloads(), self.ver.has_bin(), width, height)
+    pub fn download_graph(&self, width: usize, height: usize) -> Option<DownloadsGraph> {
+        Some(DownloadsGraph::new(self.kitchen_sink.weekly_downloads(self.all, 16).ok()?, self.ver.has_bin(), width, height))
+    }
+
+
+    pub fn downloads_per_month(&self) -> Option<usize> {
+        self.kitchen_sink.downloads_per_month(self.all.origin()).ok().and_then(|x| x)
     }
 
     pub fn related_crates(&self) -> Option<Vec<Origin>> {
         // require some level of downloads to avoid recommending spam
         // but limit should be relative to the current crate, so that minor crates
         // get related suggestions too
-        let min_recent_downloads = (self.all.downloads_recent() as u32/5).min(200);
+        let dl = self.kitchen_sink.downloads_per_month_or_equivalent(self.all.origin()).ok().and_then(|x| x).unwrap_or(100);
+        let min_recent_downloads = (dl as u32/2).min(200);
         self.kitchen_sink.related_crates(&self.ver, min_recent_downloads).map_err(|e| eprintln!("related crates fail: {}", e)).ok()
     }
 

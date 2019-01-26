@@ -24,6 +24,7 @@ fn main() {
 fn run() -> Result<(), failure::Error> {
     println!("start");
     let crates = Arc::new(KitchenSink::new_default()?);
+    let crates2 = crates.clone();
     let mut indexer = Indexer::new(CrateSearchIndex::new(crates.main_cache_dir())?)?;
     let (tx, rx) = mpsc::sync_channel(64);
 
@@ -49,7 +50,7 @@ fn run() -> Result<(), failure::Error> {
     let mut n = 0;
     let mut next_n = 100;
     while let Ok((all, ver)) = rx.recv() {
-        index(&mut indexer, &all, &ver)?;
+        index(&mut indexer, &all, &ver, crates2.downloads_per_month_or_equivalent(all.origin())?.unwrap_or(0))?;
         if stopped() {break;}
         n += 1;
         if n == next_n {
@@ -64,7 +65,7 @@ fn run() -> Result<(), failure::Error> {
     t.join().unwrap()
 }
 
-fn index(indexer: &mut Indexer, all: &RichCrate, k: &RichCrateVersion) -> Result<(), failure::Error> {
+fn index(indexer: &mut Indexer, all: &RichCrate, k: &RichCrateVersion, popularity: usize) -> Result<(), failure::Error> {
 
     let keywords: Vec<_> = k.keywords(Include::Cleaned).collect();
     let readme = match k.readme() {
@@ -73,12 +74,11 @@ fn index(indexer: &mut Indexer, all: &RichCrate, k: &RichCrateVersion) -> Result
         }),
         _ => None,
     };
-    let downloads = all.downloads_per_month();
     let version = k.version();
 
-    // Base score is from popularity.
+    // Base score is from donwloads per month.
     // apps have it harder to get download numbers
-    let mut score = ((downloads+10) as f64).log2() / (if k.is_app() {7.0} else {14.0});
+    let mut score = ((popularity+10) as f64).log2() / (if k.is_app() {7.0} else {14.0});
 
     // Try to get rid of junk crates
     if !version.starts_with("0.0.") && !version.starts_with("0.1.0") {
@@ -118,7 +118,7 @@ fn index(indexer: &mut Indexer, all: &RichCrate, k: &RichCrateVersion) -> Result
 
     println!("{:0.3} {}: {}", score, k.short_name(), k.description().unwrap_or(""));
 
-    indexer.add(k.short_name(), version, k.description().unwrap_or(""), &keywords, readme, downloads as u64, score);
+    indexer.add(k.short_name(), version, k.description().unwrap_or(""), &keywords, readme, popularity as u64, score);
     Ok(())
 }
 

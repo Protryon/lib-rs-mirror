@@ -1,6 +1,6 @@
 use rich_crate::RichCrate;
 use std::collections::HashMap;
-use kitchen_sink::{KitchenSink, Crate, Origin, CrateData, stopped};
+use kitchen_sink::{KitchenSink, CratesIndexCrate, Origin, CrateData, stopped};
 use fxhash::FxHashMap;
 use fxhash::FxHashSet;
 use rayon::prelude::*;
@@ -110,7 +110,7 @@ struct UserContrib {
 /// For each crate list of all users (by their github login) who contributed to that crate
 /// along with percentage of how much each user "owns" the crate, based on crates.io ownership,
 /// weighed by approximate code contribution (derived from number of commits)
-fn get_crate_ownership<'a>(crates: &KitchenSink, crates_io_crates: &'a FxHashMap<Origin, Crate>) -> FxHashMap<&'a str, FxHashMap<String, UserContrib>> {
+fn get_crate_ownership<'a>(crates: &KitchenSink, crates_io_crates: &'a FxHashMap<Origin, CratesIndexCrate>) -> FxHashMap<&'a str, FxHashMap<String, UserContrib>> {
     let crate_ownership = Mutex::new(FxHashMap::<&str, FxHashMap<String, UserContrib>>::default());
     crates_io_crates.par_iter().for_each(|(origin, k1)| {
         if stopped() {return;}
@@ -222,10 +222,10 @@ fn time_between_first_and_last_version(k: &RichCrate) -> chrono::Duration {
 }
 
 /// This is very rough
-fn initial_crate_score(k: &RichCrate) -> CrateScore {
+fn initial_crate_score(k: &RichCrate, downloads_or_equivalent: usize) -> CrateScore {
     // Start with rank based on log2 of 3-month downloads
-    let dl = k.downloads_recent().saturating_sub(100); // sub = denoising (bots, etc.)
-    let dl = ((dl + 1) as f64).log2();
+    let dl = downloads_or_equivalent;
+    let dl = ((dl*3 + 1) as f64).log2();
 
     // If there are co-owners, that's a better crate
     // and shows more involvement from the author
@@ -261,16 +261,17 @@ fn normalize(scores: &mut FxHashMap<&str, CrateScore>) {
     }
 }
 
-fn get_crate_pr<'a>(crates: &KitchenSink, crates_io_crates: &'a FxHashMap<Origin, Crate>) -> FxHashMap<&'a str, CrateScore> {
+fn get_crate_pr<'a>(crates: &KitchenSink, crates_io_crates: &'a FxHashMap<Origin, CratesIndexCrate>) -> FxHashMap<&'a str, CrateScore> {
     let mut initial_scores = FxHashMap::<&str, CrateScore>::with_capacity_and_hasher(crates_io_crates.len(), Default::default());
     initial_scores.extend(crates_io_crates.iter()
         .filter_map(|(o, k1)| {
+            let dl = crates.downloads_per_month_or_equivalent(o).ok()?.unwrap_or(0);
             crates.rich_crate(o)
                 .map_err(|e| eprintln!("{}: {}", k1.name(), e)).ok()
-                .map(|k| (k1.name(), k))
+                .map(|k| (k1.name(), k, dl))
         })
-        .map(|(name, k)| {
-            (name, initial_crate_score(&k))
+        .map(|(name, k, dl)| {
+            (name, initial_crate_score(&k, dl))
         }));
     normalize(&mut initial_scores);
 

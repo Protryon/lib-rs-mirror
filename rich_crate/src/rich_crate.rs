@@ -1,5 +1,4 @@
 use crates_io_client::CrateOwner;
-use crates_io_client::CrateMetaFile;
 pub use crates_io_client::DownloadWeek;
 use crate::Origin;
 
@@ -29,16 +28,11 @@ pub struct CrateVersion {
 }
 
 impl RichCrate {
-    pub fn new(origin: Origin, owners: Vec<CrateOwner>, meta: CrateMetaFile) -> Self {
+    pub fn new(origin: Origin, owners: Vec<CrateOwner>, name: String, versions: Vec<CrateVersion>) -> Self {
         Self {
             origin,
-            versions: meta.versions().map(|c| CrateVersion {
-                num: c.num,
-                updated_at: c.updated_at,
-                created_at: c.created_at,
-                yanked: c.yanked,
-            }).collect(),
-            name: meta.krate.name,
+            versions,
+            name,
             owners,
         }
     }

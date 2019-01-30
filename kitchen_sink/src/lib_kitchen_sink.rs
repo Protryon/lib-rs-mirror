@@ -34,12 +34,14 @@ pub use crate::ctrlcbreak::*;
 pub use crates_index::Crate as CratesIndexCrate;
 use crates_index::Version;
 pub use crates_io_client::CrateDepKind;
+pub use crates_io_client::OwnerKind;
 pub use crates_io_client::CrateDependency;
 pub use crates_io_client::CrateMetaVersion;
 use crates_io_client::CrateOwner;
 pub use crates_io_client::CratesIoCrate;
 pub use github_info::User;
 pub use github_info::UserType;
+use rich_crate::CrateVersion;
 pub use rich_crate::Include;
 pub use rich_crate::Markup;
 pub use rich_crate::Origin;
@@ -326,10 +328,27 @@ impl KitchenSink {
         match origin {
             Origin::CratesIo(_) => {
                 let meta = self.crates_io_meta(origin)?;
-                Ok(RichCrate::new(origin.clone(), meta.owners, meta.meta))
+                let versions = meta.meta.versions().map(|c| CrateVersion {
+                    num: c.num,
+                    updated_at: c.updated_at,
+                    created_at: c.created_at,
+                    yanked: c.yanked,
+                }).collect();
+                Ok(RichCrate::new(origin.clone(), meta.owners, meta.meta.krate.name, versions))
             },
             Origin::GitHub {repo, package} => {
-                unimplemented!()
+                Ok(RichCrate::new(origin.clone(), vec![
+                    CrateOwner {
+                        id: 0,
+                        login: repo.owner.to_string(),
+                        kind: OwnerKind::User, // FIXME: not really true if this is an org
+                        url: format!("https://github.com/{}", repo.owner),
+                        name: None,
+                        avatar: None,
+                    }
+                ],
+                format!("{}/{}/{}", repo.owner, repo.repo, package),
+                vec![]))
             }
         }
     }

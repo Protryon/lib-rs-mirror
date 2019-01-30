@@ -1,3 +1,5 @@
+use std::sync::Arc;
+use std::sync::Mutex;
 use crate::iter::HistoryIter;
 use cargo_toml::{Manifest, Package};
 use failure;
@@ -14,8 +16,13 @@ use std::io;
 use std::path::Path;
 use std::process::Command;
 use urlencoding;
+use lazy_static::lazy_static;
 
 mod iter;
+
+lazy_static! {
+    static ref GLOBAL_LOCK: Mutex<HashMap<String, Arc<Mutex<()>>>> = Mutex::new(HashMap::new());
+}
 
 #[derive(Debug, Clone)]
 pub struct ParseError(pub String);
@@ -69,6 +76,10 @@ fn iter_blobs_recurse<F>(repo: &Repository, tree: &Tree<'_>, path: &mut String, 
 }
 
 fn get_repo(repo: &Repo, base_path: &Path) -> Result<Repository, git2::Error> {
+    // ensure one clone per dir at a time
+    let lock = GLOBAL_LOCK.lock().unwrap().entry(repo.canonical_git_url().to_string()).or_insert_with(|| Arc::new(Mutex::new(()))).clone();
+    let _lock = lock.lock().unwrap();
+
     let shallow = false;
     let url = &*repo.canonical_git_url();
 

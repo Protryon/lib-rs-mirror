@@ -164,13 +164,15 @@ impl Index {
 
         let mut set: FxHashMap<DepName, (_, _, SemVer, FxHashSet<String>)> = FxHashMap::with_capacity_and_hasher(60, Default::default());
         for d in ver.dependencies() {
+            let package = d.package().unwrap_or_else(|| d.name());
+
             // people forget to include winapi conditionally
-            let is_target_specific = d.name() == "winapi" || d.target().is_some();
+            let is_target_specific = package == "winapi" || d.target().is_some();
             if !wants.all_targets && is_target_specific {
                 continue; // FIXME: allow common targets?
             }
             // hopefully nobody uses clippy at runtime, they just fail to make it dev dep
-            if !wants.dev && d.name() == "clippy" && d.is_optional() {
+            if !wants.dev && package == "clippy" && d.is_optional() {
                 continue;
             }
 
@@ -181,17 +183,16 @@ impl Index {
                 _ => continue,
             }
 
-            let enable_dep_features = to_enable.get(d.name());
+            let enable_dep_features = to_enable.get(package);
             if d.is_optional() && enable_dep_features.is_none() {
                 continue;
             }
 
             let req = VersionReq::parse(d.requirement()).map_err(|_| KitchenSinkErr::SemverParsingError)?;
-            let name = d.name();
-            let krate = match self.crates_io_crate_by_name(&Origin::from_crates_io_name(name)) {
+            let krate = match self.crates_io_crate_by_name(&Origin::from_crates_io_name(package)) {
                 Ok(k) => k,
                 Err(e) => {
-                    eprintln!("{}@{} depends on missing crate {} (@{}): {}", ver.name(), ver.version(), name, req, e);
+                    eprintln!("{}@{} depends on missing crate {} (@{}): {}", ver.name(), ver.version(), package, req, e);
                     continue;
                 },
             };
@@ -210,7 +211,7 @@ impl Index {
 
             let key = {
                 let mut inter = self.inter.write().unwrap();
-                (inter.get_or_intern(name), inter.get_or_intern(matched.version()))
+                (inter.get_or_intern(package), inter.get_or_intern(matched.version()))
             };
 
             let (_, _, _, all_features) = set.entry(key)

@@ -29,6 +29,6 @@
           <span class="cfg k">@t</span>
         }
       }
-      <a href="@url.dependency(d)">@d.name</a>&nbsp;<span class="version @c.up_to_date_class(d)">@c.pretty_print_req(d.dep.req())</span>@for f in d.dep.req_features() {<span class="with-feature"><wbr>+<span>@f</span></span>}
+      <a href="@url.dependency(d)">@d.package</a>&nbsp;<span class="version @c.up_to_date_class(d)">@c.pretty_print_req(d.dep.req())</span>@for f in d.dep.req_features() {<span class="with-feature"><wbr>+<span>@f</span></span>}
     </li>
 }

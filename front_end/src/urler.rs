@@ -17,7 +17,7 @@ impl Urler {
 
     /// Link to a dependency of a crate
     pub fn dependency(&self, dep: &RichDep) -> String {
-        format!("/crates/{}", encode(&dep.name))
+        format!("/crates/{}", encode(&dep.package))
     }
 
     /// Summary of all dependencies

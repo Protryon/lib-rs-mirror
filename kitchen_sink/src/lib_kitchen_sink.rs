@@ -918,10 +918,10 @@ impl KitchenSink {
         // runtime and (lesser) build-time deps
         for (deps, overall_weight) in all_deps.iter() {
             for dep in deps {
-                if let Some(rev) = deps_stats.counts.get(dep.name.as_str()) {
+                if let Some(rev) = deps_stats.counts.get(dep.package.as_str()) {
                     if rev.direct > 1 && rev.direct < 150 && rev.runtime.0 < 500 && rev.runtime.1 < 800 {
                         let weight = overall_weight / (1 + rev.direct) as f32;
-                        weighed_deps.push((dep.name.as_str(), weight));
+                        weighed_deps.push((dep.package.as_str(), weight));
                     }
                 }
             }

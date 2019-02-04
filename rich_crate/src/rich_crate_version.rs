@@ -330,8 +330,9 @@ impl RichCrateVersion {
     /// Runtime, dev, build
     pub fn dependencies(&self) -> Result<(Vec<RichDep>, Vec<RichDep>, Vec<RichDep>), CfgErr> {
         fn to_dep((name, dep): (&String, &Dependency)) -> (String, RichDep) {
-            (name.to_owned(), RichDep {
-                name: name.to_owned(),
+            let package = dep.package().unwrap_or(&name).to_owned();
+            (package.clone(), RichDep {
+                package,
                 dep: dep.clone(),
                 only_for_features: Vec::new(),
                 only_for_targets: Vec::new(),
@@ -343,13 +344,14 @@ impl RichCrateVersion {
         let mut dev: BTreeMap<String, RichDep> = self.dev_dependencies.iter().map(to_dep).collect();
 
         fn add_targets(dest: &mut BTreeMap<String, RichDep>, src: &DepsSet, target: &str) -> Result<(), CfgErr> {
-            for (k, v) in src {
+            for (name, dep) in src {
                 use std::collections::btree_map::Entry::*;
-                match dest.entry(k.to_string()) {
+                let package = dep.package().unwrap_or(&name);
+                match dest.entry(package.to_string()) {
                     Vacant(e) => {
                         e.insert(RichDep {
-                            name: k.to_owned(),
-                            dep: v.to_owned(),
+                            package: package.to_string(),
+                            dep: dep.clone(),
                             only_for_targets: vec![target.parse()?],
                             only_for_features: Vec::new(),
                             with_features: Vec::new(),
@@ -406,7 +408,7 @@ impl RichCrateVersion {
             dep.sort_by(|a,b| {
                 a.dep.optional().cmp(&b.dep.optional())
                 .then(a.only_for_targets.is_empty().cmp(&b.only_for_targets.is_empty()))
-                .then(a.name.cmp(&b.name))
+                .then(a.package.cmp(&b.package))
             });
             dep
         }
@@ -460,7 +462,7 @@ impl RichCrateVersion {
 }
 
 pub struct RichDep {
-    pub name: String,
+    pub package: String,
     pub dep: Dependency,
     /// it's optional, used only for a platform
     pub only_for_targets: Vec<Target>,

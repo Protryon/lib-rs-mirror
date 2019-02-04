@@ -13,9 +13,6 @@
 [submodule "docs_rs_client"]
 	path = docs_rs_client
 	url = https://gitlab.com/crates.rs/docs_rs_client.git
-[submodule "github_info"]
-	path = github_info
-	url = https://gitlab.com/crates.rs/github_info.git
 [submodule "lazyonce"]
 	path = lazyonce
 	url = https://gitlab.com/crates.rs/lazyonce.git

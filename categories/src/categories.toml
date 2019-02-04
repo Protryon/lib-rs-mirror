@@ -565,7 +565,7 @@ Loading and parsing of data for 2D/3D rendering, like 3D models or animations.""
 
 [rust-patterns]
 name = "Rust patterns"
-title = "Rust language library"
+title = "Rust library"
 description = """
 Shared solutions for particular situations specific to programming in \
 Rust.\

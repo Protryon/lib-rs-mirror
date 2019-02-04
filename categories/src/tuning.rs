@@ -409,9 +409,15 @@ lazy_static! {
 
         (Cond::Any(&["layout"]), &[("gui", 1.1, 0.06), ("rendering::graphics-api", 1.05, 0.), ("database", 0.7, 0.)]),
 
+        (Cond::NotAny(&["has:cargo-bin", "subcommand", "cargo-subcommand", "sub-command", "cargo-plugin"]),
+            &[("development-tools::cargo-plugins", 0.6, 0.)]),
         (Cond::Any(&["cargo-subcommand"]), &[
             ("development-tools::cargo-plugins", 1.8, 0.4), ("development-tools", 0.4, 0.), ("algorithms", 0.8, 0.),
             ("cryptography::cryptocurrencies", 0.6, 0.), ("development-tools::build-utils", 0.8, 0.)]),
+        (Cond::Any(&["has:cargo-bin"]), &[
+            ("development-tools::cargo-plugins", 1.2, 0.2), ("development-tools", 0.8, 0.),
+            ("development-tools::procedural-macro-helpers", 0.8, 0.), ("memory-management", 0.6, 0.)]),
+        (Cond::All(&["has:cargo-bin", "has:is_dev"]), &[("development-tools::cargo-plugins", 1.2, 0.1)]),
         (Cond::All(&["cargo", "subcommand"]), &[("development-tools::cargo-plugins", 1.8, 0.4), ("development-tools", 0.7, 0.), ("development-tools::build-utils", 0.8, 0.), ("development-tools::testing", 0.8, 0.)]),
         (Cond::All(&["cargo", "sub-command"]), &[("development-tools::cargo-plugins", 1.8, 0.4), ("development-tools", 0.7, 0.), ("development-tools::build-utils", 0.8, 0.)]),
         (Cond::All(&["cargo"]), &[("development-tools::cargo-plugins", 1.2, 0.1), ("multimedia::encoding", 0.9, 0.), ("development-tools::build-utils", 1.1, 0.1)]),
@@ -571,7 +577,8 @@ lazy_static! {
             &[("text-processing", 1.1, 0.2), ("rendering", 0.9, 0.), ("embedded", 0.8, 0.), ("games", 0.7, 0.), ("web-programming", 0.9, 0.), ("rendering::data-formats", 0.5, 0.), ("development-tools::testing", 0.6, 0.)]),
 
         (Cond::Any(&["pdf", "epub", "ebook", "book", "typesetting", "xetex"]),
-            &[("text-processing", 1.3, 0.2), ("science", 0.9, 0.), ("science::math", 0.8, 0.), ("no-std", 0.8, 0.), ("games", 0.8, 0.), ("rendering::data-formats", 1.2, 0.),
+            &[("text-processing", 1.3, 0.2), ("science", 0.9, 0.), ("science::math", 0.8, 0.), ("no-std", 0.8, 0.), ("games", 0.8, 0.),
+            ("database-implementations", 0.8, 0.), ("rendering::data-formats", 1.2, 0.),
             ("rendering", 1.05, 0.), ("web-programming::http-client", 0.5, 0.), ("parsing", 0.8, 0.), ("command-line-interface", 0.5, 0.), ("visualization", 0.7, 0.)]),
         (Cond::All(&["auto", "correct"]), &[("text-processing", 1.2, 0.1), ("multimedia::images", 0.5, 0.)]),
 
@@ -610,14 +617,9 @@ lazy_static! {
         (Cond::All(&["command", "line"]), &[("command-line-utilities", 1.15, 0.1), ("command-line-interface", 1.15, 0.)]),
         (Cond::Any(&["commandline", "command-line", "cmdline"]),
             &[("command-line-utilities", 1.1, 0.1), ("command-line-interface", 1.1, 0.), ("development-tools::ffi", 0.7, 0.)]),
-        (Cond::Any(&["has:bin"]), &[("command-line-utilities", 1.1, 0.), ("no-std", 0.7, 0.), ("game-engines", 0.9, 0.),
+        (Cond::Any(&["has:bin"]), &[("command-line-utilities", 1.1, 0.), ("development-tools::cargo-plugins", 0.8, 0.), ("no-std", 0.7, 0.), ("game-engines", 0.9, 0.),
             ("development-tools::procedural-macro-helpers", 0.7, 0.), ("memory-management", 0.4, 0.), ("algorithms", 0.8, 0.)]),
-        (Cond::NotAny(&["has:bin"]), &[("games", 0.8, 0.), ("command-line-utilities", 0.7, 0.)]),
-        (Cond::Any(&["has:cargo-bin"]), &[
-            ("development-tools::cargo-plugins", 1.2, 0.1), ("development-tools", 0.8, 0.),
-            ("development-tools::procedural-macro-helpers", 0.8, 0.), ("memory-management", 0.6, 0.)]),
-        (Cond::All(&["has:cargo-bin", "has:is_dev"]), &[("development-tools::cargo-plugins", 1.2, 0.1)]),
-        (Cond::NotAny(&["has:cargo-bin", "subcommand", "cargo-subcommand", "cargo-plugin"]), &[("development-tools::cargo-plugins", 0.6, 0.)]),
+        (Cond::NotAny(&["has:bin"]), &[("games", 0.8, 0.), ("development-tools::cargo-plugins", 0.9, 0.), ("command-line-utilities", 0.7, 0.)]),
 
         (Cond::Any(&["has:is_build", "has:is_dev"]), &[("os::windows-apis", 0.9, 0.), ("development-tools", 1.1, 0.),
             ("science", 0.8, 0.), ("science::math", 0.8, 0.), ("games", 0.8, 0.), ("value-formatting", 0.9, 0.)]),
@@ -647,10 +649,10 @@ lazy_static! {
         (Cond::All(&["text", "editor"]), &[("text-editors", 1.4, 0.4), ("text-processing", 0.8, 0.), ("parsing", 0.5, 0.), ("internationalization", 0.1, 0.)]),
         (Cond::All(&["repl"]), &[("parsing", 0.7, 0.)]),
 
-        (Cond::Any(&["terminal", "ncurses", "ansi", "progressbar", "vt100"]),
+        (Cond::Any(&["terminal", "ncurses", "ansi", "progressbar", "vt100", "ansi_term"]),
             &[("command-line-interface", 1.2, 0.1), ("multimedia::images", 0.1, 0.), ("multimedia", 0.4, 0.), ("no-std", 0.9, 0.), ("wasm", 0.9, 0.),
             ("science::math", 0.8, 0.), ("command-line-utilities", 0.75, 0.), ("internationalization", 0.9, 0.), ("algorithms", 0.8, 0.),
-            ("development-tools::procedural-macro-helpers", 0.7, 0.), ("memory-management", 0.5, 0.), ("emulators", 0.5, 0.)]),
+            ("development-tools::procedural-macro-helpers", 0.7, 0.), ("memory-management", 0.5, 0.), ("development-tools::cargo-plugins", 0.9, 0.), ("emulators", 0.5, 0.)]),
         (Cond::Any(&["term", "xterm", "console", "readline", "repl", "getopts"]),
             &[("command-line-interface", 1.2, 0.1), ("multimedia::images", 0.1, 0.), ("multimedia", 0.4, 0.), ("no-std", 0.9, 0.), ("wasm", 0.9, 0.),
             ("science::math", 0.8, 0.), ("hardware-support", 0.7, 0.), ("command-line-utilities", 0.75, 0.), ("internationalization", 0.9, 0.),

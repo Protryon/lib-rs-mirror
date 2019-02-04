@@ -20,4 +20,4 @@ quick-error = "1.2.2"
 hyper = "0.12.0"
 
 [dependencies.github-rs]
-git = "https://github.com/kornelski/github-rs"
+git = "https://github.com/mgattozzi/github-rs"

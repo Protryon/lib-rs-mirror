@@ -515,11 +515,30 @@ impl KitchenSink {
 
         ///// Fixing and faking the data /////
 
+        let crates_io_meta = self.crates_io_meta(&origin)?.meta.krate;
+
+        // it may contain data from nowhere! https://github.com/rust-lang/crates.io/issues/1624
+        if package.homepage.is_none() {
+            if let Some(repo) = crates_io_meta.homepage {
+                package.homepage = Some(repo);
+            }
+        }
+        if package.documentation.is_none() {
+            if let Some(repo) = crates_io_meta.documentation {
+                package.documentation = Some(repo);
+            }
+        }
+
         // Guess repo URL if none was specified
         if package.repository.is_none() {
             warnings.insert(Warning::NoRepositoryProperty);
-            if package.homepage.as_ref().map_or(false, |h| Repo::looks_like_repo_url(h)) {
-                package.repository = package.homepage.take();
+            // it may contain data from nowhere! https://github.com/rust-lang/crates.io/issues/1624
+            if let Some(repo) = crates_io_meta.repository {
+                package.repository = Some(repo);
+            } else {
+                if package.homepage.as_ref().map_or(false, |h| Repo::looks_like_repo_url(h)) {
+                    package.repository = package.homepage.take();
+                }
             }
         }
 

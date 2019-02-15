@@ -23,7 +23,7 @@ rich_crate = { path = "../rich_crate" }
 simple_cache = { git = "https://gitlab.com/crates.rs/simple_cache.git", version = "0.6.0" }
 lazyonce = "0.3.0"
 repo_url = { git = "https://gitlab.com/crates.rs/repo_url.git", version = "0.3.0" }
-cargo_toml = "0.6.0"
+cargo_toml = "0.6.4"
 serde = "1.0.43"
 serde_derive = "1.0.70"
 serde_json = "1.0.33"

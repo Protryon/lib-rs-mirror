@@ -17,7 +17,7 @@ kitchen_sink = { path = "../kitchen_sink", version = "0.7.0" }
 rich_crate = { path = "../rich_crate" }
 render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git", version = "0.5.0" }
 categories = { path = "../categories" }
-udedokei = { git = "https://gitlab.com/crates.rs/udedokei.git" }
+udedokei = { path = "../udedokei" }
 search_index = { path = "../search_index" }
 rayon = "1.0.3"
 failure = "0.1.2"

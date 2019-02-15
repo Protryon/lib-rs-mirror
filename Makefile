@@ -36,9 +36,9 @@ data/index/1:
 .PHONY: all download-caches styles clean clean-cache
 
 clean:
-	rm -rf style/public/*.css
+	rm -rf style/public/*.css Cargo.lock
 	git submodule update --init --recursive
 	git submodule sync
 
-clean-cache:
+clean-cache: clean
 	rm data/*rmpz data/users.db

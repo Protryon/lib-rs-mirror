@@ -14,6 +14,7 @@ $(CACHE_FILES):
 	if [ ! -f data/data.tar.xz ]; then curl --fail --output data/data.tar.xz https://crates.rs/data/data.tar.xz; fi
 
 	cd data; unxz < data.tar.xz | tar xv
+	touch $@
 
 styles: $(STYLES)
 

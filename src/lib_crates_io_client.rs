@@ -1,4 +1,3 @@
-use rand;
 use serde;
 
 #[macro_use] extern crate serde_derive;
@@ -99,7 +98,7 @@ impl CratesIoClient {
         let url = format!("{}/downloads", crate_name);
         let new_key = (url.as_str(), as_of_version);
         let data: CrateDownloadsFile = cioopt!(self.get_json(new_key, &url)?);
-        if !self.cache.cache_only && data.is_stale() && rand::random::<u8>() > 250 {
+        if !self.cache.cache_only && data.is_stale() {
             eprintln!("downloads expired {}@{}", crate_name, as_of_version);
             let _ = self.cache.delete(new_key.0);
             let fresh: CrateDownloadsFile = cioopt!(self.get_json(new_key, &url)?);

@@ -1,3 +1,4 @@
+use rand;
 use crate::parse_date;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
@@ -43,7 +44,7 @@ impl CrateDownloadsFile {
             .max_by_key(|a| &a.date)
             .map(|max| {
                 let date = parse_date(&max.date);
-                (Utc::today() - date).num_weeks() > 2
+                (Utc::today() - date).num_days() > 30 + (rand::random::<u8>() & 0x2F) as i64
             })
             .unwrap_or(true)
     }

@@ -102,7 +102,6 @@ impl CratesIoClient {
             eprintln!("downloads expired {}@{}", crate_name, as_of_version);
             let _ = self.cache.delete(new_key.0);
             let fresh: CrateDownloadsFile = cioopt!(self.get_json(new_key, &url)?);
-            assert!(!fresh.is_stale());
             Ok(Some(fresh))
         } else {
             Ok(Some(data))

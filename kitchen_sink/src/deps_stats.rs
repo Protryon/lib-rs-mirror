@@ -116,10 +116,10 @@ impl Index {
         }
 
 
-        let inter = self.inter.read().unwrap();
+        let inter = self.inter.read().expect("read lock poison");
         let mut converted = FxHashMap::with_capacity_and_hasher(collected.len(), Default::default());
         converted.extend(collected.into_iter().map(|(k, v)| {
-            (inter.resolve(k).unwrap().into(), v)
+            (inter.resolve(k).expect("resolve").into(), v)
         }));
         Ok(converted)
     }
@@ -142,27 +142,27 @@ impl Index {
             for (name, (depinf, semver)) in deps {
                 let n = counts.entry(name.clone()).or_insert_with(RevDependencies::default);
                 let t = n.versions.entry(semver).or_insert(0);
-                *t = t.checked_add(1).unwrap();
+                *t = t.checked_add(1).expect("overflow");
                 if depinf.direct {
-                    n.direct = n.direct.checked_add(1).unwrap();
+                    n.direct = n.direct.checked_add(1).expect("overflow");
                 }
                 match depinf.ty {
                     DepTy::Runtime => {
                         if depinf.default {
-                            n.runtime.0 = n.runtime.0.checked_add(1).unwrap();
+                            n.runtime.0 = n.runtime.0.checked_add(1).expect("overflow");
                         } else {
-                            n.runtime.1 = n.runtime.1.checked_add(1).unwrap();
+                            n.runtime.1 = n.runtime.1.checked_add(1).expect("overflow");
                         }
                     },
                     DepTy::Build => {
                         if depinf.default {
-                            n.build.0 = n.build.0.checked_add(1).unwrap();
+                            n.build.0 = n.build.0.checked_add(1).expect("overflow");
                         } else {
-                            n.build.1 = n.build.1.checked_add(1).unwrap();
+                            n.build.1 = n.build.1.checked_add(1).expect("overflow");
                         }
                     },
                     DepTy::Dev => {
-                        n.dev = n.dev.checked_add(1).unwrap();
+                        n.dev = n.dev.checked_add(1).expect("overflow");
                     },
                 }
             }

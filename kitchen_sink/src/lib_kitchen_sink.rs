@@ -1113,7 +1113,7 @@ impl KitchenSink {
                 if let Some(ref url) = author.url {
                     let gh_url = "https://github.com/";
                     if url.to_ascii_lowercase().starts_with(gh_url) {
-                        let login = url[gh_url.len()..].splitn(1, '/').next().unwrap();
+                        let login = url[gh_url.len()..].splitn(1, '/').next().expect("can't happen");
                         if let Ok(Some(gh)) = self.gh.user_by_login(login) {
                             let id = gh.id;
                             ca.github = Some(gh);
@@ -1300,14 +1300,14 @@ impl KitchenSink {
     // Sorted from the top, returns `(origin, recent_downloads)`
     pub fn top_crates_in_category(&self, slug: &str) -> CResult<Arc<Vec<(Origin, u32)>>> {
         {
-            let cache = self.top_crates_cached.read().unwrap();
+            let cache = self.top_crates_cached.read().expect("poison");
             if let Some(category) = cache.get(slug) {
                 return Ok(category.clone());
             }
         }
         let total_count = self.category_crate_count(slug)?;
         let wanted_num = ((total_count/3+25)/50 * 50).max(100);
-        let mut cache = self.top_crates_cached.write().unwrap();
+        let mut cache = self.top_crates_cached.write().expect("poison");
         use std::collections::hash_map::Entry::*;
         Ok(match cache.entry(slug.to_owned()) {
             Occupied(e) => Arc::clone(e.get()),
@@ -1318,7 +1318,7 @@ impl KitchenSink {
                 for c in &mut crates {
                     c.2 /= 300. + removals.get(&c.0).cloned().unwrap_or(2.);
                 }
-                crates.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap());
+                crates.sort_by(|a, b| b.2.partial_cmp(&a.2).expect("nan?"));
                 let crates: Vec<_> = crates.into_iter().map(|(o, r, _)| (o, r)).take(wanted_num as usize).collect();
                 let res = Arc::new(crates);
                 e.insert(Arc::clone(&res));

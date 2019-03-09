@@ -102,7 +102,7 @@ impl<'a> CatPage<'a> {
     /// Metadata about the category
     pub fn page(&self) -> Page {
         Page {
-            title: format!("{} — Rust crates", self.cat.standalone_name()),
+            title: format!("{} — list of Rust libraries/crates", self.cat.standalone_name()),
             description: Some(self.cat.description.clone()),
             item_name: Some(self.cat.name.clone()),
             item_description: Some(self.cat.short_description.clone()),

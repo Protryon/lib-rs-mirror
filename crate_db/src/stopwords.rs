@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 lazy_static! {
     /// ignore these as keywords
     pub(crate) static ref STOPWORDS: HashSet<&'static str> = [
-    "sys", "ffi", "placeholder", "app", "loops", "master", "library", "rs",
+    "a", "sys", "ffi", "placeholder", "app", "loops", "master", "library", "rs",
     "accidentally", "additional", "adds", "against", "all", "allow", "allows",
     "already", "also", "alternative", "always", "an", "and", "any", "appropriate",
     "arbitrary", "are", "as", "at", "available", "based", "be", "because", "been",

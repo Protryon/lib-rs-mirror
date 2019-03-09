@@ -28,7 +28,7 @@ fn run() -> Result<(), failure::Error> {
     println!("http://localhost:3000/search");
 
     let image_filter = Arc::new(ImageOptimAPIFilter::new("czjpqfbdkz", "../data/images.db")?);
-    let markup = Renderer::new_filter(Highlighter::new(), image_filter);
+    let markup = Renderer::new_filter(Some(Highlighter::new()), image_filter);
 
     front_end::render_serp_page(&mut f, &query, &results, &markup)?;
     Ok(())

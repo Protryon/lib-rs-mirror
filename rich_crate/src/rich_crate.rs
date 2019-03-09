@@ -1,4 +1,4 @@
-use crates_io_client::CrateOwner;
+pub use crates_io_client::CrateOwner;
 pub use crates_io_client::DownloadWeek;
 use crate::Origin;
 
@@ -49,7 +49,7 @@ impl RichCrate {
         &self.owners
     }
 
-    pub fn versions(&self) -> impl Iterator<Item = &CrateVersion> {
-        self.versions.iter()
+    pub fn versions(&self) -> &[CrateVersion] {
+        &self.versions
     }
 }

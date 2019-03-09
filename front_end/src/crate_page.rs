@@ -559,7 +559,7 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn all_versions(&self) -> impl Iterator<Item = Version<'a>> {
-        self.all.versions().map(|v| Version {
+        self.all.versions().iter().map(|v| Version {
             yanked: v.yanked,
             num: &v.num,
             semver: SemVer::parse(&v.num).expect("semver parse"),
@@ -568,7 +568,7 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn published_date(&self) -> DateTime<FixedOffset> {
-        let min_iso_date = self.all.versions().map(|v| &v.created_at).min().expect("any version in the crate");
+        let min_iso_date = self.all.versions().iter().map(|v| &v.created_at).min().expect("any version in the crate");
         DateTime::parse_from_rfc3339(min_iso_date).expect("created_at parse")
     }
 

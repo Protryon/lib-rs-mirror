@@ -40,7 +40,7 @@ fn run() -> Result<(), failure::Error> {
     let crates = KitchenSink::new_default().context("init caches, data, etc.")?;
     let done_pages = Mutex::new(HashSet::with_capacity(5000));
     let image_filter = Arc::new(ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_dir().join("images.db"))?);
-    let markup = Renderer::new_filter(Highlighter::new(), image_filter);
+    let markup = Renderer::new_filter(Some(Highlighter::new()), image_filter);
 
     println!("Generating homepage and category pages…");
     let (res1, res2) = rayon::join(

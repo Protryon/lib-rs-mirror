@@ -1,5 +1,5 @@
 [package]
-version = "0.3.0"
+version = "0.3.1"
 edition = "2018"
 name = "reindex"
 authors = ["Kornel <kornel@geekhood.net>"]
@@ -7,11 +7,13 @@ authors = ["Kornel <kornel@geekhood.net>"]
 [dependencies]
 crate_db = { path = "../crate_db", version = "0.4.0" }
 github_info = { path = "../github_info", version = "0.8.0" }
-kitchen_sink = { path = "../kitchen_sink", version = "0.7.0" }
+kitchen_sink = { path = "../kitchen_sink", version = "0.7.1" }
 repo_url = { git = "https://gitlab.com/crates.rs/repo_url.git" }
 user_db = { path = "../user_db", version = "0.3" }
 failure = "0.1.1"
 rayon = "1.0.3"
 rand = "0.6"
 search_index = { path = "../search_index" }
+render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git" }
+ranking = { path = "../ranking" }
 either = "1.5.0"

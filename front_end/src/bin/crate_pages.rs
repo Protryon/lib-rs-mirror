@@ -20,7 +20,7 @@ fn main() {
 }
 
 fn is_useful1(allver: &RichCrate) -> bool {
-    if allver.versions().count() < 2 {
+    if allver.versions().len() < 2 {
         eprintln!("{} one release", allver.name());
         return false;
     }
@@ -64,7 +64,7 @@ fn run(filter: Option<String>) -> Result<(), failure::Error> {
     let crates = Arc::new(kitchen_sink::KitchenSink::new_default()?);
     // crates.prewarm();
     let image_filter = Arc::new(ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_dir().join("images.db"))?);
-    let markup = &Renderer::new_filter(Highlighter::new(), image_filter);
+    let markup = &Renderer::new_filter(Some(Highlighter::new()), image_filter);
     rayon::scope(move |s1| {
         for origin in crates.all_crates() {
             if let Some(ref filter) = filter {

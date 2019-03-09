@@ -311,7 +311,7 @@ impl KitchenSink {
             self.rich_crate(o).ok()
         })
         .filter(move |k| {
-            let latest = k.versions().map(|v| v.created_at.as_str()).max().unwrap_or("");
+            let latest = k.versions().iter().map(|v| v.created_at.as_str()).max().unwrap_or("");
             if let Ok(timestamp) = DateTime::parse_from_rfc3339(latest) {
                 timestamp.timestamp() >= min_timestamp as i64
             } else {

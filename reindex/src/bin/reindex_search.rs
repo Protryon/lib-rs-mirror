@@ -13,6 +13,8 @@ use kitchen_sink::stopped;
 use std::sync::Arc;
 use std::sync::mpsc;
 use std::thread;
+use ranking::CrateVersionInputs;
+use render_readme::Renderer;
 
 fn main() {
     if let Err(e) = run() {
@@ -49,8 +51,9 @@ fn run() -> Result<(), failure::Error> {
 
     let mut n = 0;
     let mut next_n = 100;
+    let renderer = Renderer::new(None);
     while let Ok((all, ver)) = rx.recv() {
-        index(&mut indexer, &all, &ver, crates2.downloads_per_month_or_equivalent(all.origin())?.unwrap_or(0))?;
+        index(&mut indexer, &renderer, &all, &ver, crates2.downloads_per_month_or_equivalent(all.origin())?.unwrap_or(0))?;
         if stopped() {break;}
         n += 1;
         if n == next_n {
@@ -65,7 +68,40 @@ fn run() -> Result<(), failure::Error> {
     t.join().unwrap()
 }
 
-fn index(indexer: &mut Indexer, all: &RichCrate, k: &RichCrateVersion, popularity: usize) -> Result<(), failure::Error> {
+
+fn crate_base_score(all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) -> f64 {
+    let readme = k.readme().ok().and_then(|r| r).map(|readme| {
+        renderer.page_node(&readme.markup, None, false)
+    });
+    ranking::crate_score_version(&CrateVersionInputs {
+        versions: all.versions(),
+        description: k.description().unwrap_or(""),
+        readme: readme.as_ref(),
+        owners: all.owners(),
+        authors: k.authors(),
+        edition: k.edition(),
+        is_app: k.is_app(),
+        has_build_rs: k.has_buildrs(),
+        has_links: k.links().is_some(),
+        has_documentation_link: k.documentation().is_some(),
+        has_homepage_link: k.homepage().is_some(),
+        has_repository_link: k.repository().is_some(),
+        has_keywords: k.has_own_keywords(),
+        has_categories: k.has_own_categories(),
+        has_features: !k.features().is_empty(),
+        has_examples: k.has_examples(),
+        has_benches: k.has_benches(),
+        has_tests: k.has_tests(),
+        // has_lockfile: k.has_lockfile(),
+        // has_changelog: k.has_changelog(),
+        license: k.license().unwrap_or(""),
+        has_badges: k.has_badges(),
+        maintenance: k.maintenance(),
+        is_nightly: k.is_nightly(),
+    }).total()
+}
+
+fn index(indexer: &mut Indexer, renderer: &Renderer, all: &RichCrate, k: &RichCrateVersion, popularity: usize) -> Result<(), failure::Error> {
 
     let keywords: Vec<_> = k.keywords(Include::Cleaned).collect();
     let readme = match k.readme() {
@@ -78,31 +114,12 @@ fn index(indexer: &mut Indexer, all: &RichCrate, k: &RichCrateVersion, popularit
 
     // Base score is from donwloads per month.
     // apps have it harder to get download numbers
-    let mut score = ((popularity+10) as f64).log2() / (if k.is_app() {7.0} else {14.0});
+    let pop_score = ((popularity+10) as f64).log2() / (if k.is_app() {7.0} else {14.0});
 
-    // Try to get rid of junk crates
-    if !version.starts_with("0.0.") && !version.starts_with("0.1.0") {
-        score += 1.;
-    }
-    let releases = all.versions().count().min(10);
-    if releases > 1 {
-        score += releases as f64 / 10.0;
-    }
+    // based on crate's own content and metadata
+    let base_score = crate_base_score(all, k, renderer);
 
-    // bus factor
-    if k.authors().len() > 1 {
-        score += 0.1;
-    }
-
-    // Prefer stable crates
-    if version.starts_with("0.") {
-        score *= 0.9;
-    }
-
-    // long descriptions are better
-    if k.description().map_or(false, |d| d.len() > 50) {
-        score += 0.1;
-    }
+    let mut score = (0.5 + pop_score) * base_score;
 
     // there's usually a non-macro sibling
     if k.is_proc_macro() {
@@ -114,9 +131,9 @@ fn index(indexer: &mut Indexer, all: &RichCrate, k: &RichCrateVersion, popularit
         score *= 0.001;
     }
 
-    score = (score / 4.0).min(1.0); // keep it in the range
+    score = score.min(1.0); // keep it in the range
 
-    println!("{:0.3} {}: {}", score, k.short_name(), k.description().unwrap_or(""));
+    println!("{:0.3} {:0.3} {}: {}", score, base_score, k.short_name(), k.description().unwrap_or(""));
 
     indexer.add(k.short_name(), version, k.description().unwrap_or(""), &keywords, readme, popularity as u64, score);
     Ok(())

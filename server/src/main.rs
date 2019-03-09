@@ -45,7 +45,7 @@ fn main() {
 
     let crates = KitchenSink::new(&data_dir, &github_token).unwrap();
     let image_filter = Arc::new(ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_dir().join("images.db")).unwrap());
-    let markup = Renderer::new_filter(Highlighter::new(), image_filter);
+    let markup = Renderer::new_filter(Some(Highlighter::new()), image_filter);
 
     let index = CrateSearchIndex::new(data_dir).expect("data directory");
 

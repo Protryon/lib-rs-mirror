@@ -1,4 +1,4 @@
-pub use cargo_toml::{Edition, FeatureSet, TargetDepsSet, DepsSet};
+pub use cargo_toml::{Edition, FeatureSet, TargetDepsSet, DepsSet, MaintenanceStatus};
 use cargo_toml::{Dependency, Package, Product, Manifest};
 use categories::Categories;
 use crates_index::Version;
@@ -28,6 +28,11 @@ pub struct RichCrateVersion {
     repo: Option<Repo>,
     path_in_repo: Option<String>,
     has_buildrs: bool,
+    has_examples: bool,
+    has_tests: bool,
+    has_benches: bool,
+    has_badges: bool,
+    maintenance: MaintenanceStatus,
 
     // Manifest content
     package: Package,
@@ -68,6 +73,11 @@ impl RichCrateVersion {
             lib_file,
             lib: manifest.lib,
             bin: manifest.bin,
+            has_examples: !manifest.example.is_empty(),
+            has_tests: !manifest.test.is_empty(),
+            has_benches: !manifest.bench.is_empty(),
+            has_badges: manifest.badges.appveyor.is_some() || manifest.badges.circle_ci.is_some() || manifest.badges.gitlab.is_some() || manifest.badges.travis_ci.is_some() || manifest.badges.codecov.is_some() || manifest.badges.coveralls.is_some(),
+            maintenance: manifest.badges.maintenance.status,
             features: manifest.features,
             target: manifest.target,
             dependencies: manifest.dependencies,
@@ -89,6 +99,14 @@ impl RichCrateVersion {
 
     pub fn edition(&self) -> Edition {
         self.package.edition
+    }
+
+    pub fn has_own_keywords(&self) -> bool {
+        !self.package.keywords.is_empty()
+    }
+
+    pub fn has_own_categories(&self) -> bool {
+        !self.package.categories.is_empty()
     }
 
     pub fn has_categories(&self) -> bool {
@@ -255,6 +273,26 @@ impl RichCrateVersion {
 
     pub fn has_buildrs(&self) -> bool {
         self.has_buildrs || self.package.build.is_some()
+    }
+
+    pub fn has_examples(&self) -> bool {
+        self.has_examples
+    }
+
+    pub fn has_tests(&self) -> bool {
+        self.has_tests
+    }
+
+    pub fn has_benches(&self) -> bool {
+        self.has_benches
+    }
+
+    pub fn has_badges(&self) -> bool {
+        self.has_badges
+    }
+
+    pub fn maintenance(&self) -> MaintenanceStatus {
+        self.maintenance
     }
 
     pub fn links(&self) -> Option<&str> {

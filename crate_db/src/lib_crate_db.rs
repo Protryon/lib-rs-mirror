@@ -10,7 +10,6 @@ extern crate failure;
 #[macro_use]
 extern crate lazy_static;
 
-use std::borrow::Cow;
 use chrono::prelude::*;
 use failure::ResultExt;
 use rich_crate::Include;
@@ -129,15 +128,27 @@ impl CrateDb {
         // add nonsense keywords if applied to freeform text
         insert_keyword.add_synonyms(&self.tag_synonyms);
 
-        if let Some((w2, d)) = Self::extract_text(&c) {
-            let d: &str = &d;
-            for (i, k) in d.split_whitespace()
-                .map(|k| k.trim_end_matches("'s"))
-                .filter(|k| k.len() >= 2)
-                .map(|k| k.to_lowercase())
-                .filter(|k| STOPWORDS.get(k.as_str()).is_none())
-                .take(25)
-                .enumerate() {
+        {
+            let d = Self::extract_text_phrases(&c);
+            let mut sw = rake::StopWords::new();
+            sw.reserve(STOPWORDS.len());
+            sw.extend(STOPWORDS.iter().map(|s| s.to_string())); // TODO: use real stopwords, THEN filter via STOPWORDS again, because multiple Rust-y words are fine
+            // normalize space and _ to -
+            let r = rake::Rake::new(sw);
+            let rake_keywords = r.run_sentences(d.iter().map(|(_, s)| s.as_str()));
+            let rake_keywords = rake_keywords.iter()
+                .map(|k| (
+                    k.score.min(1.1), //
+                    chop3words(k.keyword.as_str()) // rake generates very long setences sometimes
+                ));
+            // split on / and punctuation too
+            let keywords = d.iter().flat_map(|&(w2, ref d)| d.split_whitespace().map(move |s| (w2, s.trim_end_matches("'s"))))
+                .filter(|&(_, k)| k.len() >= 2)
+                .filter(|&(_, k)| STOPWORDS.get(k).is_none());
+
+            // replace ' ' with '-'
+            // keep if 3 words or less
+            for (i, (w2, k)) in rake_keywords.into_iter().chain(keywords).take(25).enumerate() {
                 let w: f64 = w2 * 150./(80+i) as f64;
                 insert_keyword.add(&k, w, false);
             }
@@ -687,7 +698,7 @@ impl CrateDb {
             // sort by relevance to the category, downrank for being crappy (later also downranked for being removed from crates)
             // low number of downloads is mostly by rank, rather than downloads
             let mut query = conn.prepare_cached(
-                "SELECT k.origin, (k.ranking * c.rank_weight) as w
+            "SELECT k.origin, (k.ranking * c.rank_weight) as w
                 FROM categories c
                 JOIN crates k on c.crate_id = k.id
                 WHERE c.slug = ?1
@@ -709,7 +720,7 @@ impl CrateDb {
             // sort by relevance to the category, downrank for being crappy (later also downranked for being removed from crates)
             // low number of downloads is mostly by rank, rather than downloads
             let mut query = conn.prepare_cached(
-                "SELECT k.origin, k.ranking as w
+            "SELECT k.origin, k.ranking as w
                 FROM crates k
                 LEFT JOIN categories c on c.crate_id = k.id
                 WHERE c.slug IS NULL
@@ -808,24 +819,40 @@ impl CrateDb {
         })
     }
 
-    fn extract_text(c: &RichCrateVersion) -> Option<(f64, Cow<'_, str>)> {
-        if let Some(s) = c.description() {
-            if let Some(more) = c.alternative_description() {
-                return Some((1., format!("{}{}", s, more).into()));
-            }
-            return Some((1., s.into()));
+    // returns an array of lowercase phrases
+    fn extract_text_phrases(krate: &RichCrateVersion) -> Vec<(f64, String)> {
+        let mut out = Vec::new();
+        let mut len = 0;
+        if let Some(s) = krate.description() {
+            len += s.len();
+            out.push((1., s.to_lowercase()));
         }
-        if let Ok(Some(r)) = c.readme() {
+        if let Some(s) = krate.alternative_description() {
+            len += s.len();
+            out.push((1., s.to_lowercase()));
+        }
+        if let Ok(Some(r)) = krate.readme() {
+            // render readme to DOM, extract nodes
             let sub = match r.markup {
                 Markup::Markdown(ref s) | Markup::Rst(ref s) => s,
             };
-            let end = sub.char_indices().skip(200).map(|(i,_)|i).next().unwrap_or(sub.len());
-            let sub = sub[0..end].trim_end_matches(|c:char| c.is_alphanumeric());//half-word
-            return Some((0.5, sub.into()));
+            for par in sub.split('\n') {
+                if len > 200 {
+                    break;
                 }
-        None
-    }
-}
+                let par = par.trim_start_matches(|c: char| c.is_whitespace() || c == '#' || c == '=' || c == '*' || c == '-');
+                // code block start/end and badges
+                if par.starts_with('`') || par.starts_with('<') || par.starts_with("![") || par.starts_with("[![") || par.contains("shields.io") {
+                    continue;
+                }
+                let par = par.replace("http://", " ").replace("https://", " ");
+                len += par.len();
+                out.push((0.4, par.to_lowercase()));
+            }
+                }
+        out
+                }
+        }
 
 pub enum RepoChange {
     Removed { crate_name: String, weight: f64 },
@@ -852,7 +879,7 @@ impl KeywordInsert {
         if word.is_empty() || weight <= 0.000001 {
             return;
         }
-        let word = word.to_lowercase();
+        let word = word.to_lowercase().replace(' ', "-");
         if word == "rust" || word == "rs" {
             return;
         }
@@ -915,6 +942,21 @@ impl KeywordInsert {
         Ok(())
     }
 }
+
+
+fn chop3words(s: &str) -> &str {
+    let mut words = 0;
+    for (pos, ch) in s.char_indices() {
+        if ch == ' ' {
+            words += 1;
+            if words >= 3 {
+                return &s[0..pos];
+            }
+        }
+    }
+    return s;
+}
+
 
 #[inline]
 fn none_rows<T>(res: std::result::Result<T, rusqlite::Error>) -> std::result::Result<Option<T>, rusqlite::Error> {

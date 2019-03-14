@@ -100,7 +100,7 @@ impl CrateDb {
     }
 
     /// Add data of the latest version of a crate to the index
-    pub fn index_latest(&self, c: &RichCrateVersion, deps_stats: &[(&str, f32)], (is_build, is_dev): (bool, bool)) -> FResult<()> {
+    pub fn index_latest(&self, c: &RichCrateVersion, deps_stats: &[(&str, f32)], score: f64, (is_build, is_dev): (bool, bool)) -> FResult<()> {
         let origin = c.origin().to_str();
 
         let mut insert_keyword = KeywordInsert::new()?;
@@ -202,7 +202,7 @@ impl CrateDb {
 
             let (categories, had_explicit_categories) = {
                 let keywords = insert_keyword.keywords.iter().map(|(k,_)| k.to_string());
-                self.extract_crate_categories(&tx, c, keywords, is_important_ish)?
+                self.extract_crate_categories(&tx, c, keywords, score, is_important_ish)?
             };
 
             if !had_explicit_categories {
@@ -236,7 +236,7 @@ impl CrateDb {
     /// (rank-relevance, relevance, slug)
     ///
     /// Rank relevance is normalized and biased towards one top category
-    fn extract_crate_categories(&self, conn: &Connection, c: &RichCrateVersion, keywords: impl Iterator<Item=String>, is_important_ish: bool) -> FResult<(Vec<(f64, f64, String)>, bool)> {
+    fn extract_crate_categories(&self, conn: &Connection, c: &RichCrateVersion, keywords: impl Iterator<Item=String>, score: f64, is_important_ish: bool) -> FResult<(Vec<(f64, f64, String)>, bool)> {
         let (explicit_categories, invalid_categories): (Vec<_>, Vec<_>) = c.category_slugs(Include::AuthoritativeOnly)
             .map(|k| k.to_string())
             .partition(|slug| {
@@ -274,13 +274,12 @@ impl CrateDb {
             .unwrap_or(0.)
             .max(0.3); // prevents div/0, ensures odd choices stay low
 
-        let is_sys = c.is_sys();
         let categories = categories
             .into_iter()
             .map(|(relevance_weight, slug)| {
                 let rank_weight = relevance_weight/max_weight
                 * if relevance_weight >= max_weight*0.99 {1.} else {0.4} // a crate is only in 1 category
-                * if is_sys {0.92} else {1.}; // rank sys crates below their high-level wrappers // TODO do same for derive helpers
+                * (0.5 + score * 0.5); // so far the score is a bit dodgy, so apply it lightly
                 (rank_weight, relevance_weight, slug)
             })
             .collect();
@@ -666,9 +665,10 @@ impl CrateDb {
     /// Returns recent_downloads and weight/importance as well
     pub fn top_crates_in_category_partially_ranked(&self, slug: &str, limit: u32) -> FResult<Vec<(Origin, u32, f64)>> {
         self.with_connection(|conn| {
-            // sort by relevance to the category, downrank for being removed from crates
+            // sort by relevance to the category, downrank for being crappy (later also downranked for being removed from crates)
+            // low number of downloads is mostly by rank, rather than downloads
             let mut query = conn.prepare_cached(
-            "SELECT k.origin, k.recent_downloads, (k.recent_downloads * c.rank_weight) as w
+            "SELECT k.origin, k.recent_downloads, ((k.recent_downloads + 2000) * c.rank_weight) as w
                 FROM categories c
                 JOIN crates k on c.crate_id = k.id
                 WHERE c.slug = ?1

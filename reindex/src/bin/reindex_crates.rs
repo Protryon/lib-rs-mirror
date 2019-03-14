@@ -1,3 +1,6 @@
+use ranking::CrateVersionInputs;
+use kitchen_sink::RichCrate;
+use render_readme::Renderer;
 use either::*;
 use failure;
 use kitchen_sink::{self, stopped, CrateData, KitchenSink, Origin, RichCrateVersion};
@@ -16,6 +19,7 @@ fn main() {
             std::process::exit(1);
         },
     });
+    let renderer = Arc::new(Renderer::new(None));
 
     let everything = std::env::args().nth(1).map_or(false, |a| a == "--all");
     let repos = !everything;
@@ -34,12 +38,13 @@ fn main() {
                 return;
             }
             let crates = Arc::clone(&crates);
+            let renderer = Arc::clone(&renderer);
             s1.spawn(move |s2| {
                 if stopped() {
                     return;
                 }
                 print!("{} ", i);
-                match index_crate(&crates, &k) {
+                match index_crate(&crates, &k, &renderer) {
                     Ok(v) => {
                         if repos {
                             s2.spawn(move |_| {
@@ -65,13 +70,61 @@ fn main() {
     });
 }
 
-fn index_crate(crates: &KitchenSink, c: &Origin) -> Result<RichCrateVersion, failure::Error> {
+fn index_crate(crates: &KitchenSink, c: &Origin, renderer: &Renderer) -> Result<RichCrateVersion, failure::Error> {
     let v = crates.rich_crate_version(c, CrateData::FullNoDerived)?;
-    crates.index_crate_highest_version(&v)?;
     let k = crates.rich_crate(c)?;
+    let score = crate_base_score(&k, &v, renderer);
+    crates.index_crate_highest_version(&v, score)?;
     crates.index_crate(&k)?;
     Ok(v)
 }
+
+
+fn crate_base_score(all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) -> f64 {
+    let readme = k.readme().ok().and_then(|r| r).map(|readme| {
+        renderer.page_node(&readme.markup, None, false)
+    });
+    let mut score = ranking::crate_score_version(&CrateVersionInputs {
+        versions: all.versions(),
+        description: k.description().unwrap_or(""),
+        readme: readme.as_ref(),
+        owners: all.owners(),
+        authors: k.authors(),
+        edition: k.edition(),
+        is_app: k.is_app(),
+        has_build_rs: k.has_buildrs(),
+        has_links: k.links().is_some(),
+        has_documentation_link: k.documentation().is_some(),
+        has_homepage_link: k.homepage().is_some(),
+        has_repository_link: k.repository().is_some(),
+        has_keywords: k.has_own_keywords(),
+        has_categories: k.has_own_categories(),
+        has_features: !k.features().is_empty(),
+        has_examples: k.has_examples(),
+        has_benches: k.has_benches(),
+        has_tests: k.has_tests(),
+        // has_lockfile: k.has_lockfile(),
+        // has_changelog: k.has_changelog(),
+        license: k.license().unwrap_or(""),
+        has_badges: k.has_badges(),
+        maintenance: k.maintenance(),
+        is_nightly: k.is_nightly(),
+    }).total();
+
+
+    // there's usually a non-macro/non-sys sibling
+    if k.is_proc_macro() || k.is_sys() {
+        score *= 0.9;
+    }
+
+    // k bye
+    if k.is_yanked() {
+        score *= 0.001;
+    }
+
+    score
+}
+
 
 fn print_res<T>(res: Result<T, failure::Error>) {
     if let Err(e) = res {

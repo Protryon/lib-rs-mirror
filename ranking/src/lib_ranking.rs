@@ -80,12 +80,12 @@ fn cargo_toml_score(cr: &CrateVersionInputs) -> Score {
     s.frac("description len", 20, (cr.description.len() as f64 / 300.).min(1.));
 
     // build.rs slows compilation down, so better not use it unless necessary (links means a sys create, so somewhat justified)
-    s.n("build.rs", 20, if !cr.has_build_rs && !cr.has_links {20} else if cr.has_links {10} else {0});
+    s.n("build.rs", 10, if !cr.has_build_rs && !cr.has_links {10} else if cr.has_links {5} else {0});
 
     // users report examples are super valuable
-    s.has("has_examples", 100, cr.has_examples);
+    s.has("has_examples", 50, cr.has_examples);
     // probably less buggy than if winging it
-    s.has("has_tests", 70, cr.has_tests);
+    s.has("has_tests", 50, cr.has_tests);
     // probably optimized
     s.has("has_benches", 10, cr.has_benches);
 
@@ -106,7 +106,7 @@ fn cargo_toml_score(cr: &CrateVersionInputs) -> Score {
     // it's the best practice, may help building old versions of the project
     // s.has("has_lockfile", 5, cr.has_lockfile);
     // assume it's CI, which helps improve quality
-    s.has("has_badges", 10, cr.has_badges);
+    s.has("has_badges", 20, cr.has_badges);
 
     // not official
     // s.has("has_changelog", 5, cr.has_changelog);
@@ -124,7 +124,7 @@ fn cargo_toml_score(cr: &CrateVersionInputs) -> Score {
     // TODO: being nightly should be a negative score
     s.has("works on stable", 20, !cr.is_nightly);
     // fresh
-    s.has("2018 edition", 10, cr.edition != Edition::E2015);
+    s.has("2018 edition", 5, cr.edition != Edition::E2015);
 
     // license proliferation is bad
     s.has("useful license", 10, if cr.is_app {
@@ -253,26 +253,26 @@ fn versions_score(ver: &[CrateVersion]) -> Score {
     let semver = ver.iter().filter(|s| !s.yanked).filter_map(|s| SemVer::parse(&s.num).ok()).collect::<Vec<_>>();
     s.has("more than one release", 20, semver.len() > 1);
 
-    if !semver.is_empty() { // all yanked
+    if semver.is_empty() { // all yanked
         return s;
     }
 
     let oldest = ver.iter().map(|v| &v.created_at).min().and_then(|s| s.parse::<DateTime<Utc>>().ok());
     let newest = ver.iter().map(|v| &v.created_at).max().and_then(|s| s.parse::<DateTime<Utc>>().ok());
     if let (Some(oldest), Some(newest)) = (oldest, newest) {
-        s.n("crate development time", 40, (newest - oldest).num_days() / 11);
+        s.n("development history", 40, (newest - oldest).num_days() / 11);
     }
     // don't count 0.0.x
     s.n("number of non-experimental releases", 15, semver.iter().filter(|v| (v.major > 0 || v.minor > 0) && v.pre.is_empty()).count() as u32);
 
     // patch releases are correlated with stable, polished code
-    s.n("patch releases", 20, 5 * semver.iter().filter(|v| v.major > 0 && v.patch > 0).count() as u32);
+    s.n("patch releases", 20, 4 * semver.iter().filter(|v| v.major > 0 && v.patch > 0).count() as u32);
     s.n("a high patch release", 10, semver.iter().map(|v| v.patch as u32).max().unwrap_or(0));
     // for 0.x crates it's hard to knwo what is a patch release
-    s.has("an unstable patch/feature release", 10, semver.iter().any(|v| v.major == 0 && v.patch > 1));
+    s.has("an unstable patch/feature release", 8, semver.iter().any(|v| v.major == 0 && v.patch > 1));
     // careful release process is a sign of maturity
     s.has("a prerelease", 5, semver.iter().any(|v| !v.pre.is_empty()));
-    s.has("a stable release", 15, semver.iter().any(|v| v.major > 0 && v.major < 20));
+    s.has("a stable release", 10, semver.iter().any(|v| v.major > 0 && v.major < 20));
     s.has("yanked", 2, ver.iter().any(|v| v.yanked)); // author cares to remove bad versions
     s
 }
@@ -280,7 +280,7 @@ fn versions_score(ver: &[CrateVersion]) -> Score {
 fn authors_score(authors: &[Author], owners: &[CrateOwner]) -> Score {
     let mut s = Score::new();
     s.n("bus factor", 5, owners.len() as u32);
-    s.n("more than one owner", 5, owners.len() > 1);
+    s.n("more than one owner", 8, owners.len() > 1);
     s.n("authors", 5, authors.len() as u32);
     s
 }
@@ -288,10 +288,10 @@ fn authors_score(authors: &[Author], owners: &[CrateOwner]) -> Score {
 pub fn crate_score_version(cr: &CrateVersionInputs) -> Score {
     let mut score = Score::new();
 
-    score.group("Cargo.toml", 1, cargo_toml_score(cr));
-    score.group("README", 1, readme_score(cr.readme));
-    score.group("Versions", 1, versions_score(cr.versions));
-    score.group("Authors/Owners", 1, authors_score(cr.authors, cr.owners));
+    score.group("Cargo.toml", 2, cargo_toml_score(cr));
+    score.group("README", 4, readme_score(cr.readme));
+    score.group("Versions", 4, versions_score(cr.versions));
+    score.group("Authors/Owners", 3, authors_score(cr.authors, cr.owners));
 
     score
 }

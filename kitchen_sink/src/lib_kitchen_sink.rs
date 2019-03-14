@@ -925,7 +925,7 @@ impl KitchenSink {
         Ok(())
     }
 
-    pub fn index_crate_highest_version(&self, v: &RichCrateVersion) -> CResult<()> {
+    pub fn index_crate_highest_version(&self, v: &RichCrateVersion, score: f64) -> CResult<()> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
 
         // direct deps are used as extra keywords for similarity matching,
@@ -945,7 +945,7 @@ impl KitchenSink {
                 }
             }
         }
-        self.crate_db.index_latest(v, &weighed_deps, self.is_build_or_dev(v))?;
+        self.crate_db.index_latest(v, &weighed_deps, score, self.is_build_or_dev(v))?;
         Ok(())
     }
 

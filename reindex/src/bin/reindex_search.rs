@@ -73,7 +73,7 @@ fn crate_base_score(all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) 
     let readme = k.readme().ok().and_then(|r| r).map(|readme| {
         renderer.page_node(&readme.markup, None, false)
     });
-    ranking::crate_score_version(&CrateVersionInputs {
+    let mut score = ranking::crate_score_version(&CrateVersionInputs {
         versions: all.versions(),
         description: k.description().unwrap_or(""),
         readme: readme.as_ref(),
@@ -98,7 +98,20 @@ fn crate_base_score(all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) 
         has_badges: k.has_badges(),
         maintenance: k.maintenance(),
         is_nightly: k.is_nightly(),
-    }).total()
+    }).total();
+
+
+    // there's usually a non-macro/non-sys sibling
+    if k.is_proc_macro() || k.is_sys() {
+        score *= 0.9;
+    }
+
+    // k bye
+    if k.is_yanked() {
+        score *= 0.001;
+    }
+
+    score
 }
 
 fn index(indexer: &mut Indexer, renderer: &Renderer, all: &RichCrate, k: &RichCrateVersion, popularity: usize) -> Result<(), failure::Error> {
@@ -119,19 +132,7 @@ fn index(indexer: &mut Indexer, renderer: &Renderer, all: &RichCrate, k: &RichCr
     // based on crate's own content and metadata
     let base_score = crate_base_score(all, k, renderer);
 
-    let mut score = (0.5 + pop_score) * base_score;
-
-    // there's usually a non-macro sibling
-    if k.is_proc_macro() {
-        score *= 0.9;
-    }
-
-    // k bye
-    if k.is_yanked() {
-        score *= 0.001;
-    }
-
-    score = score.min(1.0); // keep it in the range
+    let score = ((0.5 + pop_score) * base_score).min(1.0);
 
     println!("{:0.3} {:0.3} {}: {}", score, base_score, k.short_name(), k.description().unwrap_or(""));
 

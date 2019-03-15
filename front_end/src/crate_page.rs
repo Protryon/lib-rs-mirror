@@ -11,7 +11,6 @@ use kitchen_sink::CrateAuthor;
 use kitchen_sink::{CrateData, DepTy, KitchenSink, Origin};
 use locale::Numeric;
 use rayon::prelude::*;
-use render_readme::Markup;
 use render_readme::Renderer;
 use rich_crate::Include;
 use rich_crate::Readme;

@@ -45,6 +45,7 @@ use rich_crate::CrateVersion;
 pub use rich_crate::Include;
 pub use rich_crate::Markup;
 pub use rich_crate::Origin;
+pub use rich_crate::Edition;
 pub use rich_crate::RichCrate;
 pub use rich_crate::RichCrateVersion;
 pub use rich_crate::RichDep;

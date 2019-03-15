@@ -186,19 +186,15 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn render_lib_intro(&self) -> Option<templates::Html<String>> {
-        if let Some(lib) = self.ver.lib_file() {
-            let out = extract_doc_comments(lib);
-            if !out.trim().is_empty() {
-                let docs_url = self.ver.docs_rs_url();
-                let base = docs_url.as_ref().map(|u| (u.as_str(), u.as_str()));
-                let (html, warnings) = self.markup.page(&Markup::Markdown(out), base, self.nofollow());
-                if !warnings.is_empty() {
-                    eprintln!("{} lib: {:?}", self.ver.short_name(), warnings);
-                }
-                return Some(templates::Html(html));
+        self.ver.lib_file_markdown().map(|markup| {
+            let docs_url = self.ver.docs_rs_url();
+            let base = docs_url.as_ref().map(|u| (u.as_str(), u.as_str()));
+            let (html, warnings) = self.markup.page(&markup, base, self.nofollow());
+            if !warnings.is_empty() {
+                eprintln!("{} lib: {:?}", self.ver.short_name(), warnings);
             }
-        }
-        None
+            templates::Html(html)
+        })
     }
 
     pub fn is_readme_short(&self) -> bool {
@@ -788,34 +784,6 @@ impl ReleaseCounts {
             (format!("{} release{}", self.total, if self.total == 1 { "" } else { "s" }), Some(format!("({} {})", n, label)))
         }
     }
-}
-
-fn extract_doc_comments(code: &str) -> String {
-    let mut out = String::with_capacity(code.len() / 2);
-    let mut is_in_block_mode = false;
-    for l in code.lines() {
-        let l = l.trim_start();
-        if is_in_block_mode {
-            if let Some(offset) = l.find("*/") {
-                is_in_block_mode = false;
-                out.push_str(&l[0..offset]);
-            } else {
-                out.push_str(l);
-            }
-            out.push('\n');
-        } else if l.starts_with("/*!") && !l.contains("*/") {
-            is_in_block_mode = true;
-            let rest = &l[3..];
-            out.push_str(rest);
-            if !rest.trim().is_empty() {
-                out.push('\n');
-            }
-        } else if l.starts_with("//!") {
-            out.push_str(&l[3..]);
-            out.push('\n');
-        }
-    }
-    out
 }
 
 #[test]

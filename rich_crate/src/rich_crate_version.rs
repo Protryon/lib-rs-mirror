@@ -271,6 +271,40 @@ impl RichCrateVersion {
         self.lib_file.as_ref().map(|s| s.as_str())
     }
 
+    pub fn lib_file_markdown(&self) -> Option<Markup> {
+        self.lib_file.as_ref().and_then(|code| {
+            let mut out = String::with_capacity(code.len() / 2);
+            let mut is_in_block_mode = false;
+            for l in code.lines() {
+                let l = l.trim_start();
+                if is_in_block_mode {
+                    if let Some(offset) = l.find("*/") {
+                        is_in_block_mode = false;
+                        out.push_str(&l[0..offset]);
+                    } else {
+                        out.push_str(l);
+                    }
+                    out.push('\n');
+                } else if l.starts_with("/*!") && !l.contains("*/") {
+                    is_in_block_mode = true;
+                    let rest = &l[3..];
+                    out.push_str(rest);
+                    if !rest.trim().is_empty() {
+                        out.push('\n');
+                    }
+                } else if l.starts_with("//!") {
+                    out.push_str(&l[3..]);
+                    out.push('\n');
+                }
+            }
+            if !out.trim_start().is_empty() {
+                Some(Markup::Markdown(out))
+            } else {
+                None
+            }
+        })
+    }
+
     pub fn has_buildrs(&self) -> bool {
         self.has_buildrs || self.package.build.is_some()
     }

@@ -70,8 +70,12 @@ fn run() -> Result<(), failure::Error> {
 
 
 fn crate_base_score(all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) -> f64 {
-    let readme = k.readme().ok().and_then(|r| r).map(|readme| {
-        renderer.page_node(&readme.markup, None, false)
+    let mut lib_tmp = None;
+    let readme = k.readme().ok().and_then(|r| r).map(|readme| &readme.markup).or_else(|| {
+        lib_tmp = k.lib_file_markdown();
+        lib_tmp.as_ref()
+    }).map(|markup| {
+        renderer.page_node(markup, None, false)
     });
     let mut score = ranking::crate_score_version(&CrateVersionInputs {
         versions: all.versions(),
@@ -115,14 +119,17 @@ fn crate_base_score(all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) 
 }
 
 fn index(indexer: &mut Indexer, renderer: &Renderer, all: &RichCrate, k: &RichCrateVersion, popularity: usize) -> Result<(), failure::Error> {
-
     let keywords: Vec<_> = k.keywords(Include::Cleaned).collect();
-    let readme = match k.readme() {
-        Ok(Some(r)) => Some(match r.markup {
+
+    let mut lib_tmp = None;
+    let readme = k.readme().ok().and_then(|r| r).map(|readme| &readme.markup).or_else(|| {
+        lib_tmp = k.lib_file_markdown();
+        lib_tmp.as_ref()
+    }).map(|markup| {
+        match markup {
             Markup::Markdown(ref s) | Markup::Rst(ref s) => s.as_str(),
-        }),
-        _ => None,
-    };
+        }
+    });
     let version = k.version();
 
     // Base score is from donwloads per month.

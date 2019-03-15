@@ -138,7 +138,7 @@ fn check_if_uses_nightly_features(lib_source: &str) -> bool {
 fn is_source_code_file(path: &Path) -> Option<udedokei::Language> {
     use std::os::unix::ffi::OsStrExt;
 
-    if path.starts_with("tests") || path.starts_with("benches") || path.starts_with("examples") {
+    if path.starts_with("tests") || path.starts_with("benches") || path.starts_with("docs") || path.starts_with("examples") {
         return None;
     }
     if let Some(name) = path.file_name() {

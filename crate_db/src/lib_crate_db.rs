@@ -143,7 +143,7 @@ impl CrateDb {
         }
 
         for feat in c.features().keys() {
-            if feat != "default" {
+            if feat != "default" && feat != "std" && feat != "nightly" {
                 insert_keyword.add(&format!("feature:{}", feat), 0.55, false);
             }
         }

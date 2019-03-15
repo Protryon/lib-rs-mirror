@@ -25,9 +25,10 @@ lazy_static! {
     "their", "them", "then", "there", "therefore", "these", "they", "things",
     "this", "those", "to", "todo", "too", "travis", "two", "under", "us",
     "usable", "use", "used", "useful", "using", "v1", "v2", "v3", "v4", "various",
-    "very", "via", "want", "way", "well", "what", "when", "where", "which",
+    "very", "via", "want", "way", "well", "we'll", "what", "when", "where", "which",
     "while", "will", "wip", "with", "without", "working", "works", "writing",
-    "written", "yet", "you", "your",
+    "written", "yet", "you", "your", "build status", "meritbadge", "common",
+    "file was generated", "easy to use",
     ].iter().map(|s|*s).collect();
 
     /// If one is present, ignore the others
@@ -36,6 +37,7 @@ lazy_static! {
         ("game-engines", Some(&["game", "ffi"])),
         ("game-dev", Some(&["game", "games"])),
         ("gamedev", Some(&["game", "games"])),
+        ("opengl", Some(&["terminal", "console"])),
         ("protocol", Some(&["game", "games", "container"])),
         ("framework", Some(&["game", "games"])),
         ("engine", Some(&["ffi"])),
@@ -95,6 +97,7 @@ lazy_static! {
         ("regex", Some(&["text", "linear", "time", "search"])),
         ("language", Some(&["server"])),
         ("medical", Some(&["image"])),
+        ("social", Some(&["media"])),
         ("codegen", Some(&["backend"])),
         ("game", Some(&["simulator", "simulation"])),
         ("2d", Some(&["path", "paths"])),

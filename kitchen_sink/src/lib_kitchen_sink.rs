@@ -938,7 +938,8 @@ impl KitchenSink {
         for (deps, overall_weight) in all_deps.iter() {
             for dep in deps {
                 if let Some(rev) = deps_stats.counts.get(dep.package.as_str()) {
-                    if rev.direct > 1 && rev.direct < 150 && rev.runtime.0 < 500 && rev.runtime.1 < 800 {
+                    let right_popularity = rev.direct > 1 && rev.direct < 150 && rev.runtime.0 < 500 && rev.runtime.1 < 800;
+                    if Self::dep_interesting_for_index(dep.package.as_str()).unwrap_or(right_popularity) {
                         let weight = overall_weight / (1 + rev.direct) as f32;
                         weighed_deps.push((dep.package.as_str(), weight));
                     }
@@ -947,6 +948,23 @@ impl KitchenSink {
         }
         self.crate_db.index_latest(v, &weighed_deps, score, self.is_build_or_dev(v))?;
         Ok(())
+    }
+
+    // deps that are closely related to crates in some category
+    fn dep_interesting_for_index(name: &str) -> Option<bool> {
+        match name {
+            "futures" | "actix-web" | "rocket_codegen" | "iron" | "rusoto_core" | "rocket" | "router" |
+            "piston2d-graphics" | "amethyst_core" | "amethyst" | "specs" | "piston" |
+            "proc-macro2" | "cargo" |
+            "hound" |
+            "cargo_metadata" | "syntect" | "stdweb" => Some(true),
+            /////////
+            "threadpool" | "rayon" | "md5" | "arrayref" | "memmmap" | "xml" | "crossbeam" |
+            "rustc_version" | "crossbeam-channel" | "cmake" | "errno" | "zip" | "enum_primitive" | "pretty_env_logger" |
+            "skeptic" | "crc" | "hmac" | "sha1" | "serde_macros" | "serde_codegen" | "derive_builder" |
+            "derive_more" | "ron" | "fxhash" | "simple-logger" | "chan" | "stderrlog" => Some(false),
+            _ => None,
+        }
     }
 
     pub fn index_repo(&self, repo: &Repo, as_of_version: &str) -> CResult<()> {

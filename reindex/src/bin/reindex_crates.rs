@@ -75,7 +75,7 @@ fn index_crate(crates: &KitchenSink, c: &Origin, renderer: &Renderer) -> Result<
     let k = crates.rich_crate(c)?;
     let score = crate_base_score(&k, &v, renderer);
     crates.index_crate_highest_version(&v, score)?;
-    crates.index_crate(&k)?;
+    crates.index_crate(&k, score)?;
     Ok(v)
 }
 

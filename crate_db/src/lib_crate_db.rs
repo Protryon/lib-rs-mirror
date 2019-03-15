@@ -180,14 +180,14 @@ impl CrateDb {
         }
 
         self.with_tx(|tx| {
-            let mut insert_crate = tx.prepare_cached("INSERT OR IGNORE INTO crates (origin, recent_downloads) VALUES (?1, ?2)")?;
+            let mut insert_crate = tx.prepare_cached("INSERT OR IGNORE INTO crates (origin, recent_downloads, ranking) VALUES (?1, ?2, ?3)")?;
             let mut insert_repo = tx.prepare_cached("INSERT OR REPLACE INTO crate_repos (crate_id, repo) VALUES (?1, ?2)")?;
             let mut delete_repo = tx.prepare_cached("DELETE FROM crate_repos WHERE crate_id = ?1")?;
             let mut clear_categories = tx.prepare_cached("DELETE FROM categories WHERE crate_id = ?1")?;
             let mut insert_category = tx.prepare_cached("INSERT OR IGNORE INTO categories (crate_id, slug, rank_weight, relevance_weight) VALUES (?1, ?2, ?3, ?4)")?;
             let mut get_crate_id = tx.prepare_cached("SELECT id, recent_downloads FROM crates WHERE origin = ?1")?;
 
-            let args: &[&dyn ToSql] = &[&origin, &0];
+            let args: &[&dyn ToSql] = &[&origin, &0, &score];
             insert_crate.execute(args).context("insert crate")?;
             let (crate_id, downloads): (u32, u32) = get_crate_id.query_row(&[&origin], |row| (row.get(0), row.get(1))).context("crate_id")?;
             let is_important_ish = downloads > 2000;
@@ -204,7 +204,7 @@ impl CrateDb {
 
             let (categories, had_explicit_categories) = {
                 let keywords = insert_keyword.keywords.iter().map(|(k,_)| k.to_string());
-                self.extract_crate_categories(&tx, c, keywords, score, is_important_ish)?
+                self.extract_crate_categories(&tx, c, keywords, is_important_ish)?
             };
 
             if !had_explicit_categories {
@@ -238,7 +238,7 @@ impl CrateDb {
     /// (rank-relevance, relevance, slug)
     ///
     /// Rank relevance is normalized and biased towards one top category
-    fn extract_crate_categories(&self, conn: &Connection, c: &RichCrateVersion, keywords: impl Iterator<Item=String>, score: f64, is_important_ish: bool) -> FResult<(Vec<(f64, f64, String)>, bool)> {
+    fn extract_crate_categories(&self, conn: &Connection, c: &RichCrateVersion, keywords: impl Iterator<Item=String>, is_important_ish: bool) -> FResult<(Vec<(f64, f64, String)>, bool)> {
         let (explicit_categories, invalid_categories): (Vec<_>, Vec<_>) = c.category_slugs(Include::AuthoritativeOnly)
             .map(|k| k.to_string())
             .partition(|slug| {
@@ -280,8 +280,7 @@ impl CrateDb {
             .into_iter()
             .map(|(relevance_weight, slug)| {
                 let rank_weight = relevance_weight/max_weight
-                * if relevance_weight >= max_weight*0.99 {1.} else {0.4} // a crate is only in 1 category
-                * (0.5 + score * 0.5); // so far the score is a bit dodgy, so apply it lightly
+                    * if relevance_weight >= max_weight*0.99 {1.} else {0.4}; // a crate is only in 1 category
                 (rank_weight, relevance_weight, slug)
             })
             .collect();
@@ -412,7 +411,7 @@ impl CrateDb {
     }
 
     /// Update download counts of the crate
-    pub fn index_versions(&self, all: &RichCrate, downloads_recent: Option<usize>) -> FResult<()> {
+    pub fn index_versions(&self, all: &RichCrate, score: f64, downloads_recent: Option<usize>) -> FResult<()> {
         self.with_tx(|tx| {
             let mut get_crate_id = tx.prepare_cached("SELECT id FROM crates WHERE origin = ?1")?;
             let mut insert_version = tx.prepare_cached("INSERT OR IGNORE INTO crate_versions (crate_id, version, created) VALUES (?1, ?2, ?3)")?;
@@ -423,8 +422,9 @@ impl CrateDb {
 
             if let Some(recent) = downloads_recent {
                 let recent = recent as u32;
-                let mut update_recent = tx.prepare_cached("UPDATE crates SET recent_downloads = ?1 WHERE id = ?2")?;
-                update_recent.execute(&[&recent, &crate_id]).context("update recent")?;
+                let mut update_recent = tx.prepare_cached("UPDATE crates SET recent_downloads = ?1, ranking = ?2 WHERE id = ?3")?;
+                let args: &[&dyn ToSql] = &[&recent, &score, &crate_id];
+                update_recent.execute(args).context("update recent")?;
             }
 
             for ver in all.versions() {
@@ -670,7 +670,7 @@ impl CrateDb {
             // sort by relevance to the category, downrank for being crappy (later also downranked for being removed from crates)
             // low number of downloads is mostly by rank, rather than downloads
             let mut query = conn.prepare_cached(
-            "SELECT k.origin, k.recent_downloads, ((k.recent_downloads + 2000) * c.rank_weight) as w
+            "SELECT k.origin, k.recent_downloads, ((k.recent_downloads + 2000) * k.ranking * c.rank_weight) as w
                 FROM categories c
                 JOIN crates k on c.crate_id = k.id
                 WHERE c.slug = ?1
@@ -693,7 +693,8 @@ impl CrateDb {
     pub fn recently_updated_crates_in_category(&self, slug: &str) -> FResult<Vec<Origin>> {
         self.with_connection(|conn| {
             let mut query = conn.prepare_cached(r#"
-                select max(created), k.origin
+                select max(created) + 3600*24*7 * rank_weight * k.ranking, -- week*rank ~= best this week
+                    k.origin
                     from categories c
                     join crate_versions v using (crate_id)
                     join crates k on v.crate_id = k.id

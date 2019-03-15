@@ -858,7 +858,7 @@ impl KitchenSink {
     }
 
     /// Maintenance: add crate to local db index
-    pub fn index_crate(&self, k: &RichCrate) -> CResult<()> {
+    pub fn index_crate(&self, k: &RichCrate, score: f64) -> CResult<()> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
         let (res1, res2) = rayon::join(|| -> CResult<()> {
             let origin = k.origin();
@@ -870,7 +870,7 @@ impl KitchenSink {
                 _ => {},
             }
             Ok(())
-        }, || self.crate_db.index_versions(k, self.downloads_recent(k.origin())?));
+        }, || self.crate_db.index_versions(k, score, self.downloads_recent(k.origin())?));
         res1?;
         res2?;
         Ok(())

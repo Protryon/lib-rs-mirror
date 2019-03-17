@@ -1352,7 +1352,11 @@ impl KitchenSink {
         Ok(match cache.entry(slug.to_owned()) {
             Occupied(e) => Arc::clone(e.get()),
             Vacant(e) => {
-                let crates = self.crate_db.top_crates_in_category_partially_ranked(slug, wanted_num)?;
+                let crates = if slug == "uncategorized" {
+                    self.crate_db.top_crates_uncategorized(wanted_num)?
+                } else {
+                    self.crate_db.top_crates_in_category_partially_ranked(slug, wanted_num)?
+                };
                 let crates: Vec<_> = crates.into_iter().map(|(o, r, _)| (o, r)).take(wanted_num as usize).collect();
                 let res = Arc::new(crates);
                 e.insert(Arc::clone(&res));
@@ -1386,6 +1390,9 @@ impl KitchenSink {
     }
 
     pub fn category_crate_count(&self, slug: &str) -> Result<u32, KitchenSinkErr> {
+        if slug == "uncategorized" {
+            return Ok(100);
+        }
         self.category_crate_counts
             .get(|| match self.crate_db.category_crate_counts() {
                 Ok(res) => Some(res),

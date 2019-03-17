@@ -708,3 +708,12 @@ Crates to communicate over the WebSocket protocol.\
 """
 short-description = """
 Communicate over the WebSocket protocol."""
+
+# [uncategorized]
+# name = "Uncategorized"
+# title = "Miscellaneous crates"
+# description = """
+# Crates that don't have enough metadata to be assigned to any category. Please fix them!
+# """
+# short-description = """
+# Everything else goes here."""

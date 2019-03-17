@@ -203,6 +203,8 @@ lazy_static! {
             &[("science::math", 1.25, 0.3), ("algorithms", 1.2, 0.1), ("database", 0.8, 0.), ("web-programming::http-client", 0.9, 0.), ("config", 0.8, 0.), ("rendering::graphics-api", 0.8, 0.), ("games", 0.5, 0.), ("os", 0.8, 0.),("game-engines", 0.75, 0.), ("command-line-utilities", 0.8, 0.), ("command-line-interface", 0.4, 0.)]),
         (Cond::Any(&["polynomial", "gaussian", "mathematics", "voronoi", "bignum", "prime", "primes", "linear-algebra", "algebra", "euler", "bijective"]),
             &[("science::math", 1.25, 0.3), ("algorithms", 1.2, 0.1), ("web-programming::http-client", 0.9, 0.), ("rendering::graphics-api", 0.8, 0.), ("games", 0.5, 0.), ("os", 0.8, 0.),("game-engines", 0.75, 0.), ("command-line-utilities", 0.8, 0.), ("command-line-interface", 0.4, 0.)]),
+        (Cond::Any(&["arithmetic", "arithmetics"]),
+            &[("science::math", 1.25, 0.1), ("algorithms", 1.2, 0.)]),
         (Cond::Any(&["optimization", "floating-point"]),
             &[("science::math", 0.8, 0.), ("science::ml", 0.9, 0.), ("science", 0.9, 0.), ("algorithms", 1.2, 0.1)]),
         (Cond::Any(&["physics", "ncollide"]),
@@ -236,8 +238,7 @@ lazy_static! {
         (Cond::Any(&["cryptography", "cryptographic", "sponge", "ecdsa", "ed25519","argon2", "pbkdf2"]),
             &[("cryptography", 1.4, 0.3), ("algorithms", 0.9, 0.), ("no-std", 0.95, 0.), ("command-line-utilities", 0.75, 0.), ("development-tools", 0.8, 0.), ("development-tools::testing", 0.8, 0.)]),
 
-        (Cond::NotAny(&["ethereum", "ethcore", "bitcoin", "monero", "coinbase", "litecoin", "bitfinex", "parity", "ledger",
-            "nanocurrency", "stellar", "coin", "wallet", "bitstamp"]),
+        (Cond::NotAny(&["ethereum", "ethcore", "bitcoin", "monero", "coinbase", "litecoin", "bitfinex", "ledger", "nanocurrency", "stellar", "coin", "wallet", "bitstamp"]),
             &[("cryptography::cryptocurrencies", 0.6, 0.)]),
         (Cond::Any(&["ethereum", "ethcore", "bitcoin", "monero"]),
             &[("cryptography::cryptocurrencies", 1.7, 0.8), ("science::math", 0.8, 0.), ("data-structures", 0.7, 0.), ("cryptography", 0.6, 0.), ("database-implementations", 0.7, 0.),
@@ -253,6 +254,13 @@ lazy_static! {
             ("command-line-utilities", 0.8, 0.), ("development-tools::testing", 0.7, 0.), ("development-tools", 0.6, 0.), ("date-and-time", 0.4, 0.)]),
         (Cond::Any(&["parity", "stellar", "coin", "wallet", "bitstamp"]),
             &[("cryptography::cryptocurrencies", 1.3, 0.1), ("science::math", 0.8, 0.)]),
+        (Cond::Any(&["uint"]), &[("rust-patterns", 1.2, 0.), ("cryptography::cryptocurrencies", 0.8, 0.)]),
+        (Cond::All(&["integer", "types"]), &[("rust-patterns", 1.1, 0.), ("cryptography::cryptocurrencies", 0.6, 0.)]),
+        (Cond::All(&["primitive", "integer"]), &[("rust-patterns", 1.1, 0.), ("cryptography::cryptocurrencies", 0.6, 0.)]),
+        (Cond::All(&["unsigned", "integers"]), &[("data-structures", 1.1, 0.), ("cryptography::cryptocurrencies", 0.9, 0.)]),
+        (Cond::Any(&["fixed-size", "fixed-size-integers"]), &[("data-structures", 1.1, 0.), ("algorithms", 1.1, 0.), ("rust-patterns", 1.1, 0.), ("cryptography::cryptocurrencies", 0.5, 0.)]),
+        (Cond::Any(&["fixed-size-integers"]), &[("data-structures", 1.2, 0.), ("cryptography::cryptocurrencies", 0.5, 0.)]),
+
         // diesel's troll:
         (Cond::All(&["blockchain", "sql"]), &[("cryptography::cryptocurrencies", 0.3, 0.), ("database", 1.2, 0.1)]),
         (Cond::All(&["blockchain", "orm"]), &[("cryptography::cryptocurrencies", 0.3, 0.), ("database", 1.2, 0.1)]),
@@ -445,7 +453,7 @@ lazy_static! {
 
         (Cond::Any(&["oauth", "authentication", "authorization", "credentials"]),
             &[("authentication", 1.4, 0.2), ("command-line-utilities", 0.6, 0.), ("hardware-support", 0.7, 0.), ("config", 0.9, 0.), ("web-programming::http-client", 0.8, 0.), ("parsing", 0.7, 0.)]),
-        (Cond::Any(&["authorize",  "2fa", "oauth2", "totp"]),
+        (Cond::Any(&["authorize", "authenticate", "2fa", "oauth2", "totp", "u2f"]),
             &[("authentication", 1.4, 0.2), ("command-line-utilities", 0.9, 0.), ("hardware-support", 0.8, 0.), ("config", 0.8, 0.), ("web-programming::http-client", 0.8, 0.), ("parsing", 0.7, 0.)]),
 
         (Cond::NotAny(&["database", "db", "databases", "datastore", "queryable", "indexed", "columnar", "persistent", "relational", "dbms", "migrations", "key-value", "kv", "kvs", "sql", "nosql", "geoip", "key-value", "orm", "schema", "lmdb", "odbc", "transactions", "transactional",
@@ -636,7 +644,7 @@ lazy_static! {
             &[("cryptography", 0.8, 0.)]),
         (Cond::Any(&["crypto", "nonce", "zero-knowledge", "entropy", "pem", "cert", "certificate", "certificates", "pki", "cryptohash"]),
             &[("cryptography", 1.2, 0.2), ("algorithms", 0.9, 0.), ("no-std", 0.9, 0.), ("development-tools::cargo-plugins", 0.9, 0.), ("filesystem", 0.8, 0.), ("command-line-utilities", 0.6, 0.)]),
-        (Cond::Any(&["secure", "keyfile", "key", "encrypt", "totp"]), &[("cryptography", 1.2, 0.), ("cryptography::cryptocurrencies", 0.9, 0.), ("development-tools::ffi", 0.6, 0.)]),
+        (Cond::Any(&["secure", "keyfile", "key", "encrypt"]), &[("cryptography", 1.2, 0.), ("cryptography::cryptocurrencies", 0.9, 0.), ("development-tools::ffi", 0.6, 0.)]),
         (Cond::All(&["elliptic", "curve"]), &[("cryptography", 1.3, 0.1)]),
 
         (Cond::Any(&["command-line-tool"]), &[("command-line-utilities", 1.2, 0.4), ("algorithms", 0.8, 0.), ("data-structures", 0.8, 0.), ("no-std", 0.7, 0.)]),

@@ -36,6 +36,7 @@ searching, and more.\
 short-description = """
 Core algorithms such as hashing, sorting and searching.
 """
+siblings = ["data-structures"]
 
 # [api-bindings]
 # name = "API bindings"
@@ -300,6 +301,7 @@ Encoding and/or decoding data from one data format to another.\
 """
 short-description = """
 Encoding and/or decoding data from one data format to another."""
+siblings = ["parser-implementations"]
 
 # [external-ffi-bindings]
 # name = "External FFI bindings"
@@ -572,6 +574,7 @@ Rust.\
 """
 short-description = """
 Shared solutions for particular situations specific to programming in Rust."""
+siblings = ["no-std"]
 
 [science]
 name = "Science"

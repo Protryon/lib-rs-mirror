@@ -62,6 +62,9 @@ impl<'a> HomePage<'a> {
     /// A crate can be in multiple categories, so `seen` ensures every crate is shown only once
     /// across all categories.
     fn make_all_categories(&self, root: &'static CategoryMap, seen: &mut HashSet<Origin>) -> Vec<HomeCategory> {
+        if root.is_empty() {
+            return Vec::new();
+        }
         let mut c: Vec<_> = root
             .iter()
             .take_while(|_| !stopped())
@@ -106,8 +109,43 @@ impl<'a> HomePage<'a> {
             cat.dl = dl.max(cat.dl);
         }
 
-        c.sort_by(|a, b| (b.dl * b.pop).cmp(&(a.dl * a.pop)));
-        c
+        let mut ranked = c.into_iter().map(|c| (c.cat.slug.as_str(), (c.dl * c.pop, c))).collect::<HashMap<_,_>>();
+
+        // this is artificially inflated by popularity of syn/quote in serde
+        if let Some(pmh) = ranked.get_mut("development-tools::procedural-macro-helpers") {
+            pmh.0 /= 32;
+        }
+
+        // move cryptocurrencies out of cryptography for the homepage, so that cryptocurrencies are sorted by their own popularity
+        if let Some(cryptocurrencies) = ranked.get_mut("cryptography").and_then(|(_,c)| c.sub.pop()) {
+            ranked.insert(cryptocurrencies.cat.slug.as_str(), (cryptocurrencies.dl * cryptocurrencies.pop, cryptocurrencies));
+        }
+
+        // these categories are easily confusable, so keep them together
+        Self::avg_pair(&mut ranked, "hardware-support", "embedded");
+        Self::avg_pair(&mut ranked, "parser-implementations", "parsing");
+        Self::avg_pair(&mut ranked, "games", "game-engines");
+        Self::avg_pair(&mut ranked, "web-programming", "wasm");
+        Self::avg_pair(&mut ranked, "asynchronous", "concurrency");
+        Self::avg_pair(&mut ranked, "rendering", "multimedia");
+        Self::avg_pair(&mut ranked, "emulators", "simulation");
+        Self::avg_pair(&mut ranked, "value-formatting", "template-engine");
+        Self::avg_pair(&mut ranked, "database-implementations", "database");
+        Self::avg_pair(&mut ranked, "command-line-interface", "command-line-utilities");
+
+        let mut c = ranked.into_iter().map(|(_,v)| v).collect::<Vec<_>>();
+        c.sort_by(|a, b| b.0.cmp(&a.0));
+
+        c.into_iter().map(|(_,c)| c).collect()
+    }
+
+    fn avg_pair(ranked: &mut HashMap<&str, (usize, HomeCategory)>, a: &str, b: &str) {
+        if let Some(&(a_rank, _)) = ranked.get(a) {
+            let b_rank = ranked.get(b).expect("sibling category").0;
+            ranked.get_mut(a).unwrap().0 = (a_rank * 17 + b_rank * 15) / 32;
+            ranked.get_mut(b).unwrap().0 = (a_rank * 15 + b_rank * 17) / 32;
+            println!("averaged {} {} {} {}", a, a_rank, b, b_rank);
+        }
     }
 
     pub fn page(&self) -> Page {

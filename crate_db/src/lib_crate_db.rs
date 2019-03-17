@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use rusqlite::types::ToSql;
 use rusqlite::NO_PARAMS;
 use categories;
@@ -169,12 +170,13 @@ impl CrateDb {
             insert_keyword.add(&format!("dep:{}", dep), (weight / 2.0).into(), false);
         }
 
-        print!("{}: ", origin);
+        let mut out = String::with_capacity(200);
+        write!(&mut out, "{}: ", origin)?;
 
         {
             let mut tmp = insert_keyword.keywords.iter().collect::<Vec<_>>();
             tmp.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
-            print!("#{} ", tmp.into_iter().map(|(k, _)| k.to_string()).collect::<Vec<_>>().join(" #"));
+            write!(&mut out, "#{} ", tmp.into_iter().map(|(k, _)| k.to_string()).collect::<Vec<_>>().join(" #"))?;
         }
 
         self.with_tx(|tx| {
@@ -206,10 +208,10 @@ impl CrateDb {
             };
 
             if !had_explicit_categories {
-                print!(">??? ");
+                write!(&mut out, ">??? ")?;
             }
             for (rank, rel, slug) in categories {
-                print!(">{}, ", slug);
+                write!(&mut out, ">{}, ", slug)?;
                 let args: &[&dyn ToSql] = &[&crate_id, &slug, &rank, &rel];
                 insert_category.execute(args).context("insert cat")?;
                 if had_explicit_categories {
@@ -218,7 +220,7 @@ impl CrateDb {
             }
 
             for (i, k) in c.authors().iter().filter_map(|a| a.email.as_ref().or(a.name.as_ref())).enumerate() {
-                print!("by:{}, ", k);
+                write!(&mut out, "by:{}, ", k)?;
                 let w: f64 = 50. / (100 + i) as f64;
                 insert_keyword.add(&k, w, false);
             }
@@ -228,7 +230,7 @@ impl CrateDb {
                 insert_keyword.add(&format!("repo:{}", url), 1., false); // crates in monorepo probably belong together
             }
             insert_keyword.commit(&tx, crate_id)?;
-            println!();
+            println!("{}", out);
             Ok(())
         })
     }

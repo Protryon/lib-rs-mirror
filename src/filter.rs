@@ -5,7 +5,8 @@ use std::path::PathBuf;
 /// Callbacks for every image URL in the document
 pub trait ImageFilter: Send + Sync + 'static {
     /// Ability to change the image URL
-    fn filter_url<'a>(&self, url: &'a str) -> Cow<'a, str>;
+    /// Returns 1x image and 2x image
+    fn filter_url<'a>(&self, url: &'a str) -> (Cow<'a, str>, Option<Cow<'a, str>>);
 
     /// Given the URL, get image size in CSS pixels
     ///
@@ -14,8 +15,8 @@ pub trait ImageFilter: Send + Sync + 'static {
 }
 
 impl ImageFilter for () {
-    fn filter_url<'a>(&self, url: &'a str) -> Cow<'a, str> {
-        url.into()
+    fn filter_url<'a>(&self, url: &'a str) -> (Cow<'a, str>, Option<Cow<'a, str>>) {
+        (url.into(), None)
     }
 
     fn image_size(&self, _url: &str) -> Option<(u32, u32)> {
@@ -33,6 +34,7 @@ struct ImageOptimImageMeta {
 pub struct ImageOptimAPIFilter {
     /// Get one from https://imageoptim.com/api/register
     img_prefix: String,
+    img2x_prefix: String,
     meta_prefix: String,
     cache: TempCache<ImageOptimImageMeta>,
 }
@@ -41,6 +43,7 @@ impl ImageOptimAPIFilter {
     pub fn new(api_id: &str, cache_path: impl Into<PathBuf>) -> Result<Self, Error> {
         Ok(Self {
             img_prefix: format!("https://img.gs/{}/full/", api_id),
+            img2x_prefix: format!("https://img.gs/{}/full,2x/", api_id),
             meta_prefix: format!("https://img.gs/{}/meta,timeout=90/", api_id),
             cache: TempCache::new(cache_path)?,
         })
@@ -48,12 +51,15 @@ impl ImageOptimAPIFilter {
 }
 
 impl ImageFilter for ImageOptimAPIFilter {
-    fn filter_url<'a>(&self, url: &'a str) -> Cow<'a, str> {
-        format!("{}{}", self.img_prefix, url).into()
+    fn filter_url<'a>(&self, url: &'a str) -> (Cow<'a, str>, Option<Cow<'a, str>>) {
+        (
+            format!("{}{}", self.img_prefix, url).into(),
+            Some(format!("{}{} 2x", self.img2x_prefix, url).into())
+        )
     }
 
     fn image_size(&self, image_url: &str) -> Option<(u32, u32)> {
-        let image_url = image_url.trim_start_matches(&self.img_prefix);
+        let image_url = image_url.trim_start_matches(&self.img_prefix).trim_start_matches(&self.img2x_prefix);
         let api_url = format!("{}{}", self.meta_prefix, image_url);
         self.cache
             .get_json(image_url, api_url, |f| f)

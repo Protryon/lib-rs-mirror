@@ -3,9 +3,13 @@ CACHE_FILES=data/crate_data.db data/users.db data/2019.rmpz
 
 all: website
 
-website: download-caches data/index/1 styles
+website: download-caches data/index/1 styles Cargo.lock
 	cd front_end && cargo run --release --bin website
 	cd style && npm start
+
+Cargo.lock: Cargo.toml
+	rm Cargo.lock; git submodule update --init --recursive
+	cargo update
 
 download-caches: $(CACHE_FILES)
 

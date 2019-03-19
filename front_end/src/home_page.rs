@@ -1,4 +1,5 @@
 #![allow(unused_imports)]
+use kitchen_sink::CrateAuthor;
 use crate::Page;
 use categories::Category;
 use categories::CategoryMap;
@@ -8,6 +9,7 @@ use kitchen_sink::stopped;
 use kitchen_sink::{CrateData, KitchenSink};
 use rayon::prelude::*;
 use rich_crate::Origin;
+use rich_crate::RichCrate;
 use rich_crate::RichCrateVersion;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -144,8 +146,28 @@ impl<'a> HomePage<'a> {
             let b_rank = ranked.get(b).expect("sibling category").0;
             ranked.get_mut(a).unwrap().0 = (a_rank * 17 + b_rank * 15) / 32;
             ranked.get_mut(b).unwrap().0 = (a_rank * 15 + b_rank * 17) / 32;
-            println!("averaged {} {} {} {}", a, a_rank, b, b_rank);
         }
+    }
+
+    pub fn last_modified<'b>(&self, allver: &'b RichCrate) -> &'b str {
+        &allver.versions().iter().max_by(|a, b| a.created_at.cmp(&b.created_at)).expect("no versions?").created_at
+    }
+
+    pub fn now(&self) -> String {
+        chrono::Utc::now().to_string()
+    }
+
+    pub fn all_contributors<'c>(&self, krate: &'c RichCrateVersion) -> Option<Vec<CrateAuthor<'c>>> {
+        self.crates.all_contributors(krate).map(|(mut a,mut o,..)| {
+            a.append(&mut o);
+            a
+        }).ok()
+    }
+
+    pub fn recently_updated_crates<'z>(&'z self) -> impl Iterator<Item = (RichCrate, RichCrateVersion)> + 'z {
+        self.crates.recently_updated_crates().expect("recent crates").into_iter().map(move |o| {
+            (self.crates.rich_crate(&o).unwrap(), self.crates.rich_crate_version(&o, CrateData::Full).unwrap())
+        })
     }
 
     pub fn page(&self) -> Page {
@@ -156,8 +178,9 @@ impl<'a> HomePage<'a> {
             item_description: None,
             keywords: None,
             created: None,
-            alternate: None,
-            canonical: None,
+            alternate: Some("https://crates.rs/atom.xml".to_string()),
+            alternate_type: Some("application/atom+xml"),
+            canonical: Some("https://crates.rs".to_string()),
             noindex: false,
             search_meta: true,
             critical_css_data: Some(include_str!("../../style/public/home.css")),

@@ -693,7 +693,7 @@ impl CrateDb {
     pub fn recently_updated_crates_in_category(&self, slug: &str) -> FResult<Vec<Origin>> {
         self.with_connection(|conn| {
             let mut query = conn.prepare_cached(r#"
-                select max(created) + 3600*24*7 * rank_weight * k.ranking, -- week*rank ~= best this week
+                select max(created) + 3600*24*7 * c.rank_weight * k.ranking, -- week*rank ~= best this week
                     k.origin
                     from categories c
                     join crate_versions v using (crate_id)
@@ -705,6 +705,30 @@ impl CrateDb {
                     limit 20
             "#)?;
             let q = query.query_map(&[&slug], |row| {
+                let s: String = row.get(1);
+                Origin::from_str(s)
+            })?;
+            let q = q.filter_map(|r| r.ok());
+            Ok(q.collect())
+        })
+    }
+
+    /// Newly added or updated crates in any category
+    ///
+    /// Returns `origin` strings
+    pub fn recently_updated_crates(&self) -> FResult<Vec<Origin>> {
+        self.with_connection(|conn| {
+            let mut query = conn.prepare_cached(r#"
+                select max(created) + 3600*24*7 * k.ranking, -- week*rank ~= best this week
+                    k.origin
+                    from crate_versions v
+                    join crates k on v.crate_id = k.id
+                    group by v.crate_id
+                    having count(*) > 1 -- so these are updates, not new releases
+                    order by 1 desc
+                    limit 50
+            "#)?;
+            let q = query.query_map(NO_PARAMS, |row| {
                 let s: String = row.get(1);
                 Origin::from_str(s)
             })?;

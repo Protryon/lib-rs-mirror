@@ -60,6 +60,7 @@ impl SearchPage<'_> {
             keywords: None,
             created: None,
             alternate: None,
+            alternate_type: None,
             canonical: None,
             noindex: true,
             search_meta: true,

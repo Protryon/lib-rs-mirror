@@ -9,3 +9,4 @@ data/staging
 *.db-journal
 *.rmp
 *.rmpz
+front_end/public/atom.xml

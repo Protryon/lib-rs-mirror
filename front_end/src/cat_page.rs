@@ -109,6 +109,7 @@ impl<'a> CatPage<'a> {
             keywords: Some(self.keywords.join(", ")),
             created: None,
             alternate: None,
+            alternate_type: None,
             canonical: None,
             noindex: false,
             search_meta: true,

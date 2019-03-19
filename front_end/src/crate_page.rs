@@ -109,6 +109,7 @@ impl<'a> CratePage<'a> {
             item_name: Some(self.ver.short_name().to_string()),
             item_description: self.ver.description().map(|d| d.to_string()),
             alternate: self.ver.crates_io_url(),
+            alternate_type: None,
             canonical: Some(url.krate(&self.ver)),
             noindex: self.ver.is_yanked(),
             search_meta: false,

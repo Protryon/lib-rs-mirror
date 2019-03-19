@@ -1366,6 +1366,10 @@ impl KitchenSink {
         Ok(self.crate_db.recently_updated_crates_in_category(slug)?)
     }
 
+    pub fn recently_updated_crates(&self) -> CResult<Vec<Origin>> {
+        Ok(self.crate_db.recently_updated_crates()?)
+    }
+
     pub fn category_crate_count(&self, slug: &str) -> Result<u32, KitchenSinkErr> {
         self.category_crate_counts
             .get(|| match self.crate_db.category_crate_counts() {

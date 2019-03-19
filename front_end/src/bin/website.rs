@@ -37,6 +37,7 @@ fn main() {
 
 fn run() -> Result<(), failure::Error> {
     let mut out = BufWriter::new(File::create("public/index.html").context("write to public/index.html")?);
+    let mut feed = BufWriter::new(File::create("public/atom.xml").context("write to public/index.html")?);
     let crates = KitchenSink::new_default().context("init caches, data, etc.")?;
     let done_pages = Mutex::new(HashSet::with_capacity(5000));
     let image_filter = Arc::new(ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_dir().join("images.db"))?);
@@ -44,7 +45,7 @@ fn run() -> Result<(), failure::Error> {
 
     println!("Generating homepage and category pages…");
     let (res1, res2) = rayon::join(
-        || front_end::render_homepage(&mut out, &crates).context("Failed rendering homepage"),
+        || front_end::render_homepage(&mut out, &crates).context("Failed rendering homepage").and_then(|_| front_end::render_feed(&mut feed, &crates).context("Failed rendering homepage")),
         || {
             let _ = fs::create_dir_all("public/crates");
             render_categories(&categories::CATEGORIES.root, Path::new("public"), &crates, &done_pages, &markup).context("Failed rendering categories")

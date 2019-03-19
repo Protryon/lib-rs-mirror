@@ -39,6 +39,7 @@ pub struct Page {
     keywords: Option<String>,
     created: Option<String>,
     alternate: Option<String>,
+    alternate_type: Option<&'static str>,
     canonical: Option<String>,
     noindex: bool,
     search_meta: bool,
@@ -68,6 +69,13 @@ pub fn render_category(out: &mut dyn Write, cat: &Category, crates: &KitchenSink
 pub fn render_homepage(out: &mut dyn Write, crates: &KitchenSink) -> Result<(), failure::Error> {
     let urler = Urler::new();
     templates::homepage(out, &home_page::HomePage::new(crates)?, &urler)?;
+    Ok(())
+}
+
+/// See `atom.rs.html`
+pub fn render_feed(out: &mut dyn Write, crates: &KitchenSink) -> Result<(), failure::Error> {
+    let urler = Urler::new();
+    templates::atom(out, &home_page::HomePage::new(crates)?, &urler)?;
     Ok(())
 }
 

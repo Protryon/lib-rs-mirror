@@ -1,0 +1,47 @@
+@use crate::home_page::HomePage;
+@use crate::Urler;
+@use rich_crate::Include;
+
+@(home: &HomePage, url: &Urler)
+
+<feed xmlns="http://www.w3.org/2005/Atom">
+    <title>Crates.rs</title>
+    <subtitle>Recently published Rust libraries and applications</subtitle>
+    <link href="https://crates.rs"/>
+    <link rel="self" href="https://crates.rs/atom.xml"/>
+    <updated>@home.now()</updated>
+    <author>
+      <name>crates.rs (@"@"kornelski)</name>
+      <uri>https://github.com/kornelski</uri>
+    </author>
+    <icon>https://crates.rs/crates-logo.png</icon>
+    <id>https://crates.rs</id>
+    <generator uri="https://gitlab.com/crates.rs"/>
+
+    @for (all, ver) in home.recently_updated_crates() {
+        <entry>
+          <title>@ver.capitalized_name()</title>
+          <link href="https://crates.rs@url.krate(&ver)"/>
+          <id>https://crates.rs@url.krate(&ver)/@ver.version()</id>
+          <updated>@home.last_modified(&all)</updated>
+          @if let Some(d) = ver.description() {
+              <summary type="text">@d</summary>
+          }
+          @for slug in ver.category_slugs(Include::Cleaned) {
+            <category term="@slug" />
+          }
+          @if let Some(lic) = ver.license() {
+            <rights>@lic</rights>
+          }
+          @if let Some(authors) = home.all_contributors(&ver) {
+            @for o in authors.into_iter().take(10) {
+              @if o.owner {
+                <author><name>@o.name()</name>@if let Some(link) = url.author(&o) {<uri>@link</uri>}</author>
+              } else {
+                <contributor><name>@o.name()</name>@if let Some(link) = url.author(&o) {<uri>@link</uri>}</contributor>
+              }
+            }
+          }
+        </entry>
+    }
+</feed>

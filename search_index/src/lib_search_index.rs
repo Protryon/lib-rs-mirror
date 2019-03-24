@@ -69,12 +69,11 @@ impl CrateSearchIndex {
         let text_options = TextOptions::default().set_indexing_options(text_field_indexing);
         let readme_field = schema_builder.add_text_field("readme", text_options);
         let crate_version = schema_builder.add_text_field("crate_version", STRING | STORED);
-        let monthly_downloads = schema_builder.add_u64_field("monthly_downloads", INT_STORED);
-        let crate_score = schema_builder.add_u64_field("crate_score", INT_STORED);
+        let monthly_downloads = schema_builder.add_u64_field("monthly_downloads", STORED);
+        let crate_score = schema_builder.add_u64_field("crate_score", STORED);
 
         let schema = schema_builder.build();
         let tantivy_index = Index::create_in_dir(index_dir, schema)?;
-        tantivy_index.load_searchers()?;
 
         Ok(Self { tantivy_index, crate_name_field, keywords_field, description_field, readme_field, monthly_downloads, crate_version, crate_score })
     }
@@ -94,7 +93,8 @@ impl CrateSearchIndex {
                 query_parser.parse_query(mangled_query.trim())
             })?;
 
-        let searcher = self.tantivy_index.searcher();
+        let reader = self.tantivy_index.reader()?;
+        let searcher = reader.searcher();
         let top_docs = searcher.search(&*query, &TopDocs::with_limit(limit+limit/3))?;
 
         let mut docs = top_docs.into_iter().enumerate().map(|(i, (score, doc_address))| {
@@ -174,7 +174,6 @@ impl Indexer {
 
     pub fn commit(&mut self) -> tantivy::Result<()> {
         self.writer.commit()?;
-        self.index.tantivy_index.load_searchers()?;
         Ok(())
     }
 

@@ -22,7 +22,7 @@
     }
 
     @if let Some(ref alt) = props.alternate {
-      <link rel="alternate" href="@alt">
+      <link rel="alternate" href="@alt" @if let Some(ty) = props.alternate_type { type="@ty" }>
       <link rel="og:see_also" href="@alt">
     }
     @if let Some(ref item_name) = props.item_name {

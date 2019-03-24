@@ -20,7 +20,7 @@
 
     @for (all, ver) in home.recently_updated_crates() {
         <entry>
-          <title>@ver.capitalized_name()</title>
+          <title>@ver.capitalized_name() (@ver.version())</title>
           <link href="https://crates.rs@url.krate(&ver)"/>
           <id>https://crates.rs@url.krate(&ver)/@ver.version()</id>
           <updated>@home.last_modified(&all)</updated>

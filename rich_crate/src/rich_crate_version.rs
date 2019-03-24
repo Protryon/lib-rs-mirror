@@ -273,30 +273,7 @@ impl RichCrateVersion {
 
     pub fn lib_file_markdown(&self) -> Option<Markup> {
         self.lib_file.as_ref().and_then(|code| {
-            let mut out = String::with_capacity(code.len() / 2);
-            let mut is_in_block_mode = false;
-            for l in code.lines() {
-                let l = l.trim_start();
-                if is_in_block_mode {
-                    if let Some(offset) = l.find("*/") {
-                        is_in_block_mode = false;
-                        out.push_str(&l[0..offset]);
-                    } else {
-                        out.push_str(l);
-                    }
-                    out.push('\n');
-                } else if l.starts_with("/*!") && !l.contains("*/") {
-                    is_in_block_mode = true;
-                    let rest = &l[3..];
-                    out.push_str(rest);
-                    if !rest.trim().is_empty() {
-                        out.push('\n');
-                    }
-                } else if l.starts_with("//!") {
-                    out.push_str(&l[3..]);
-                    out.push('\n');
-                }
-            }
+            let out = extract_doc_comments(code);
             if !out.trim_start().is_empty() {
                 Some(Markup::Markdown(out))
             } else {
@@ -571,4 +548,37 @@ pub struct Derived {
     pub crate_compressed_size: u32,
     pub crate_decompressed_size: u32,
     pub is_nightly: bool,
+}
+
+fn extract_doc_comments(code: &str) -> String {
+    let mut out = String::with_capacity(code.len() / 2);
+    let mut is_in_block_mode = false;
+    for l in code.lines() {
+        let l = l.trim_start();
+        if is_in_block_mode {
+            if let Some(offset) = l.find("*/") {
+                is_in_block_mode = false;
+                out.push_str(&l[0..offset]);
+            } else {
+                out.push_str(l);
+            }
+            out.push('\n');
+        } else if l.starts_with("/*!") && !l.contains("*/") {
+            is_in_block_mode = true;
+            let rest = &l[3..];
+            out.push_str(rest);
+            if !rest.trim().is_empty() {
+                out.push('\n');
+            }
+        } else if l.starts_with("//!") {
+            out.push_str(&l[3..]);
+            out.push('\n');
+        }
+    }
+    out
+}
+
+#[test]
+fn parse() {
+    assert_eq!("hello\nworld", extract_doc_comments("/*!\nhello\nworld */").trim());
 }

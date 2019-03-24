@@ -787,11 +787,6 @@ impl ReleaseCounts {
 }
 
 #[test]
-fn parse() {
-    assert_eq!("hello\nworld", extract_doc_comments("/*!\nhello\nworld */").trim());
-}
-
-#[test]
 fn pie() {
     assert_eq!("M 10.00 5.00 A 5 5 0 0 1 5.00 10.00 L 5 5", CratePage::svg_path_for_slice(1, 1, 4, 10));
     assert_eq!("M 28.00 0.00 A 28 28 0 1 1 28.00 0.00 L 28 28", CratePage::svg_path_for_slice(0, 10, 10, 56));

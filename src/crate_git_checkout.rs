@@ -2,7 +2,6 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use crate::iter::HistoryIter;
 use cargo_toml::{Manifest, Package};
-use either::Either;
 use failure;
 use git2;
 use git2::build::RepoBuilder;
@@ -250,29 +249,6 @@ pub fn find_dependency_changes(repo: &Repository, mut cb: impl FnMut(HashSet<Str
 }
 
 
-/// Returns (manifest, timestamp)
-pub fn find_all_manifests_history(repo: &Repository) -> impl Iterator<Item=Result<(Manifest, i64), failure::Error>> + '_ {
-    let commits = repo.head().and_then(|head| {
-        commit_history_iter(&repo, &head)
-    });
-    match commits {
-        Ok(commits) => {
-            Either::Left(commits.map(|c| c.commit).take(10000).flat_map(move |commit| {
-                let time = commit.time().seconds();
-                let manifests = commit.tree().map_err(failure::Error::from)
-                .and_then(|tree| find_manifests_in_tree(&repo, &tree))
-                .map(|res| res.0);
-                match manifests {
-                    Ok(manifests) => Either::Left(manifests.into_iter().map(move |(_, manifest)| {
-                        Ok((manifest, time))
-                    })),
-                    Err(err) => Either::Right(std::iter::once(Err(err))),
-                }
-            }))
-        },
-        Err(err) => Either::Right(std::iter::once(Err(failure::Error::from(err)))),
-    }
-}
 
 pub fn find_readme(repo: &Repository, package: &Package) -> Result<Option<Readme>, failure::Error> {
     let head = repo.head()?;
@@ -344,8 +320,3 @@ fn git_fs() {
     assert_eq!(0, manif.bin.len());
 }
 
-#[test]
-fn old_manifests() {
-    let repo = Repository::open(".git").expect("own git repo");
-    assert!(find_all_manifests_history(&repo).filter_map(|t| t.ok()).filter_map(|(m, _)| m.package).any(|p| p.version == "0.2.0"));
-}

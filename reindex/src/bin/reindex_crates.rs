@@ -1,12 +1,14 @@
 use ranking::CrateTemporalInputs;
 use ranking::CrateVersionInputs;
 use kitchen_sink::RichCrate;
-use render_readme::Renderer;
+use render_readme::{Renderer, Markup};
 use either::*;
+use search_index::*;
 use failure;
-use kitchen_sink::{self, stopped, CrateData, KitchenSink, Origin, RichCrateVersion};
+use kitchen_sink::{self, stopped, CrateData, KitchenSink, Origin, RichCrateVersion, Include};
 use rand::{seq::SliceRandom, thread_rng};
 use rayon;
+use std::sync::mpsc;
 use std::{
     collections::HashSet,
     sync::{Arc, Mutex},
@@ -25,6 +27,29 @@ fn main() {
     let everything = std::env::args().nth(1).map_or(false, |a| a == "--all");
     let repos = !everything;
 
+    let mut indexer = Indexer::new(CrateSearchIndex::new(crates.main_cache_dir()).expect("init search")).expect("init search indexer");
+
+    let (tx, rx) = mpsc::sync_channel(64);
+    let index_thread = std::thread::spawn({
+        move || -> Result<(), failure::Error> {
+            let mut n = 0;
+            let mut next_n = 100;
+            while let Ok((ver, downloads_per_month, score)) = rx.recv() {
+                if stopped() {break;}
+                index_search(&mut indexer, &ver, downloads_per_month, score)?;
+                n += 1;
+                if n == next_n {
+                    next_n *= 2;
+                    println!("savepoint…");
+                    indexer.commit()?;
+                }
+            }
+            indexer.commit()?;
+            let _ = indexer.bye()?;
+            Ok(())
+        }
+    });
+
     let seen_repos = &Mutex::new(HashSet::new());
     rayon::scope(move |s1| {
         let c = if everything {
@@ -40,12 +65,13 @@ fn main() {
             }
             let crates = Arc::clone(&crates);
             let renderer = Arc::clone(&renderer);
+            let tx = tx.clone();
             s1.spawn(move |s2| {
                 if stopped() {
                     return;
                 }
                 print!("{} ", i);
-                match index_crate(&crates, &k, &renderer) {
+                match index_crate(&crates, &k, &renderer, &tx) {
                     Ok(v) => {
                         if repos {
                             s2.spawn(move |_| {
@@ -68,20 +94,44 @@ fn main() {
                 }
             });
         }
+        drop(tx);
     });
+
+    index_thread.join().unwrap().unwrap();
 }
 
-fn index_crate(crates: &KitchenSink, c: &Origin, renderer: &Renderer) -> Result<RichCrateVersion, failure::Error> {
+fn index_crate(crates: &KitchenSink, c: &Origin, renderer: &Renderer, search_sender: &mpsc::SyncSender<(RichCrateVersion, usize, f64)>) -> Result<RichCrateVersion, failure::Error> {
     let v = crates.rich_crate_version(c, CrateData::FullNoDerived)?;
     let k = crates.rich_crate(c)?;
-    let score = crate_overall_score(crates, &k, &v, renderer);
+    let (downloads_per_month, score) = crate_overall_score(crates, &k, &v, renderer);
     crates.index_crate_highest_version(&v, score)?;
     crates.index_crate(&k, score)?;
+    search_sender.send((v.clone(), downloads_per_month, score))?;
     Ok(v)
 }
 
 
-fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) -> f64 {
+fn index_search(indexer: &mut Indexer, k: &RichCrateVersion, downloads_per_month: usize, score: f64) -> Result<(), failure::Error> {
+    let keywords: Vec<_> = k.keywords(Include::Cleaned).collect();
+
+    let mut lib_tmp = None;
+    let readme = k.readme().ok().and_then(|r| r).map(|readme| &readme.markup).or_else(|| {
+        lib_tmp = k.lib_file_markdown();
+        lib_tmp.as_ref()
+    }).map(|markup| {
+        match markup {
+            Markup::Markdown(ref s) | Markup::Rst(ref s) => s.as_str(),
+        }
+    });
+    let version = k.version();
+
+    indexer.add(k.short_name(), version, k.description().unwrap_or(""), &keywords, readme, downloads_per_month as u64, score);
+    Ok(())
+}
+
+
+
+fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) -> (usize, f64) {
     let readme = k.readme().ok().and_then(|r| r).map(|readme| {
         renderer.page_node(&readme.markup, None, false)
     });
@@ -116,10 +166,11 @@ fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersi
 
     let mut temp_inp = CrateTemporalInputs {
         versions: all.versions(),
-        downloads_per_month,
-        downloads_per_month_minus_most_downloaded_user: downloads_per_month,
         is_app: k.is_app(),
         has_docs_rs: crates.has_docs_rs(k.short_name(), k.version()),
+        is_nightly: k.is_nightly(),
+        downloads_per_month,
+        downloads_per_month_minus_most_downloaded_user: downloads_per_month,
         number_of_direct_reverse_deps: 0,
         number_of_indirect_reverse_deps: 0,
         number_of_indirect_reverse_optional_deps: 0,
@@ -174,7 +225,7 @@ fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersi
         score *= 0.001;
     }
 
-    score
+    (downloads_per_month as usize, score)
 }
 
 fn is_deprecated(k: &RichCrateVersion) -> bool {

@@ -179,9 +179,12 @@ impl CrateDb {
             tmp.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
             write!(&mut out, "#{} ", tmp.into_iter().map(|(k, _)| k.to_string()).collect::<Vec<_>>().join(" #"))?;
         }
+        let next_timestamp = (Utc::now().timestamp() + 3600*24*31) as u32;
+
 
         self.with_tx(|tx| {
             let mut insert_crate = tx.prepare_cached("INSERT OR IGNORE INTO crates (origin, recent_downloads, ranking) VALUES (?1, ?2, ?3)")?;
+            let mut mark_updated = tx.prepare_cached("UPDATE crates SET next_update = ?2 WHERE id = ?1")?;
             let mut insert_repo = tx.prepare_cached("INSERT OR REPLACE INTO crate_repos (crate_id, repo) VALUES (?1, ?2)")?;
             let mut delete_repo = tx.prepare_cached("DELETE FROM crate_repos WHERE crate_id = ?1")?;
             let mut clear_categories = tx.prepare_cached("DELETE FROM categories WHERE crate_id = ?1")?;
@@ -231,6 +234,8 @@ impl CrateDb {
                 insert_keyword.add(&format!("repo:{}", url), 1., false); // crates in monorepo probably belong together
             }
             insert_keyword.commit(&tx, crate_id)?;
+
+            mark_updated.execute(&[&crate_id, &next_timestamp]).context("mark updated crate")?;
             println!("{}", out);
             Ok(())
         })

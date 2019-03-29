@@ -42,12 +42,8 @@ impl Score {
     pub fn score_f(&mut self, for_what: &'static str, max_score: f64, n: impl Into<f64>) -> ScoreAdj<'_> {
         let n = n.into();
         self.total += max_score;
-        if n > 0. {
-            self.scores.push((n, max_score, for_what));
-            ScoreAdj { score: self.scores.last_mut().map(|(s, ..)| s) }
-        } else {
-            ScoreAdj::default()
-        }
+        self.scores.push((n.max(0.), max_score, for_what));
+        ScoreAdj { score: self.scores.last_mut().map(|(s, ..)| s) }
     }
 
     /// Start a new group of scores, and `max_score` is the max total score of the group

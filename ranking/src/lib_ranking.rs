@@ -48,25 +48,30 @@ pub struct CrateVersionInputs<'a> {
 }
 
 /// Changes over time, but doesn't depend on crate's own ranking
-pub struct CrateTemporalInputs {
-    /// 1.0 fresh, 0.0 totally outdated and deprecated
-    pub dependency_freshness: Vec<f32>,
-    pub recent_downloads: u32,
-    pub recent_downloads_minus_most_downloaded_user: u32,
+pub struct CrateTemporalInputs<'a> {
+    pub versions: &'a [CrateVersion],
+    // 1.0 fresh, 0.0 totally outdated and deprecated
+    // pub dependency_freshness: Vec<f32>,
+    pub downloads_per_month: u32,
+    /// Looking at downloads of direct dependencies.
+    /// This way internal derive/impl/core crates that have one big user get 0 here.
+    pub downloads_per_month_minus_most_downloaded_user: u32,
+    pub is_app: bool,
     pub has_docs_rs: bool,
+    pub is_nightly: bool,
 
     // low priority, because it's unranked! it'll be re-evaluated later
-    pub number_of_reverse_deps: u32,
+    pub number_of_direct_reverse_deps: u32,
+    /// use max(runtime, dev, build), because the crate is going to be one of these kinds
+    pub number_of_indirect_reverse_deps: u32,
+    /// Includes non-optional (i.e. it's the upper bound, not just the optional ones)
+    pub number_of_indirect_reverse_optional_deps: u32,
 
     // most recent commit
     // avg time issues are left unanswered?
-}
-
-/// Crate's own base ranking influences these rankings
-pub struct CrateContextInputs {
-    pub crate_score_context_free: f64,
-    pub owner_pageranks: Vec<f32>,
-    pub reverse_deps_rankings: Vec<f32>,
+    // pub crate_score_context_free: f64,
+    // pub owner_pageranks: Vec<f32>,
+    // pub reverse_deps_rankings: Vec<f32>,
 }
 
 pub struct Env {
@@ -296,11 +301,56 @@ pub fn crate_score_version(cr: &CrateVersionInputs) -> Score {
     score
 }
 
-// pub fn crate_score_temporal(inputs: &CrateTemporalInputs) -> Score {
-//     let mut score = Score::new();
+pub fn crate_score_temporal(cr: &CrateTemporalInputs) -> Score {
+    let mut score = Score::new();
 
-//     score
-// }
+    let newest = cr.versions.iter().max_by_key(|v| &v.created_at).expect("at least 1 ver?");
+    let freshness_score = match newest.created_at.parse::<DateTime<Utc>>() {
+        Ok(latest_date) => {
+            // Assume higher versions, and especially patch versions, mean the crate is more mature
+            // and needs fewer updates
+            let version_stability_interval = match SemVer::parse(&newest.num) {
+                Ok(ref ver) if ver.patch > 3 && ver.major > 0 => 500,
+                Ok(ref ver) if ver.patch > 3 => 350,
+                Ok(ref ver) if ver.patch > 0 => 250,
+                Ok(ref ver) if ver.major > 0 => 200,
+                Ok(ref ver) if ver.minor > 3 => 150,
+                _ => 80,
+            };
+            let expected_update_interval = version_stability_interval.min(cr.versions.len() as i64 * 50) / if cr.is_nightly {2} else {1};
+            let age = (Utc::now() - latest_date).num_days();
+            let days_past_expiration_date = (age - expected_update_interval).max(0);
+            // score decays for a ~year after the crate should have been updated
+            let decay_days = if cr.is_nightly {60} else {200} + expected_update_interval/2;
+            (decay_days - days_past_expiration_date).max(0) as f64 / (decay_days as f64)
+        },
+        Err(e) => {
+            eprintln!("Release time parse error: {}", e);
+            0.
+        }
+    };
+    score.frac("Freshness of latest release", 8, freshness_score);
+
+    // Low numbers are just bots/noise.
+    let downloads = (cr.downloads_per_month as f64 - 100.).max(0.) + 100.;
+    let downloads_cleaned = (cr.downloads_per_month_minus_most_downloaded_user as f64 - 50.).max(0.) + 50.;
+    // distribution of downloads follows power law.
+    // apps have much harder to get high download numbers.
+    let pop = (downloads.log2() - 6.6) / (if cr.is_app {1.0} else {2.0});
+    let pop_cleaned = (downloads_cleaned.log2() - 5.6) / (if cr.is_app {1.0} else {2.0});
+    assert!(pop > 0.);
+    assert!(pop_cleaned > 0.);
+    // FIXME: max should be based on the most downloaded crate?
+    score.score_f("Downloads", 8., pop/2.);
+    score.score_f("Downloads (cleaned)", 18., pop_cleaned);
+
+    score.score_f("Direct rev deps", 10., (cr.number_of_direct_reverse_deps as f64).sqrt());
+    let indirect = 1. + cr.number_of_indirect_reverse_optional_deps as f64 / 3.;
+    score.score_f("Indirect rev deps", 10., indirect.log2());
+
+    score.has("docs.rs", 1, cr.has_docs_rs);
+    score
+}
 
 // pub fn crate_score_contextual(inputs: &CrateContextInputs) -> Score {
 //     let mut score = Score::new();

@@ -354,6 +354,12 @@ impl KitchenSink {
         }
     }
 
+    /// Fudge-factor score proprtional to how many times a crate has been removed from some project
+    pub fn crate_removals(&self, origin: &Origin) -> Option<f64> {
+        self.removals
+            .get(|| self.crate_db.removals().expect("fetch crate removals"))
+            .get(origin).cloned()
+    }
 
     pub fn downloads_per_month(&self, origin: &Origin) -> CResult<Option<usize>> {
         self.downloads_recent(origin).map(|dl| dl.map(|n| n/3))
@@ -1331,13 +1337,7 @@ impl KitchenSink {
         Ok(match cache.entry(slug.to_owned()) {
             Occupied(e) => Arc::clone(e.get()),
             Vacant(e) => {
-                let some_extra_for_removals = 30 + wanted_num/10;
-                let mut crates = self.crate_db.top_crates_in_category_partially_ranked(slug, wanted_num + some_extra_for_removals)?;
-                let removals = self.removals.get(|| self.crate_db.removals().unwrap());
-                for c in &mut crates {
-                    c.2 /= 300. + removals.get(&c.0).cloned().unwrap_or(2.);
-                }
-                crates.sort_by(|a, b| b.2.partial_cmp(&a.2).expect("nan?"));
+                let crates = self.crate_db.top_crates_in_category_partially_ranked(slug, wanted_num)?;
                 let crates: Vec<_> = crates.into_iter().map(|(o, r, _)| (o, r)).take(wanted_num as usize).collect();
                 let res = Arc::new(crates);
                 e.insert(Arc::clone(&res));

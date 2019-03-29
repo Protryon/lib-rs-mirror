@@ -1,3 +1,4 @@
+use ranking::CrateTemporalInputs;
 use ranking::CrateVersionInputs;
 use kitchen_sink::RichCrate;
 use render_readme::Renderer;
@@ -73,18 +74,18 @@ fn main() {
 fn index_crate(crates: &KitchenSink, c: &Origin, renderer: &Renderer) -> Result<RichCrateVersion, failure::Error> {
     let v = crates.rich_crate_version(c, CrateData::FullNoDerived)?;
     let k = crates.rich_crate(c)?;
-    let score = crate_base_score(&k, &v, renderer);
+    let score = crate_overall_score(crates, &k, &v, renderer);
     crates.index_crate_highest_version(&v, score)?;
     crates.index_crate(&k, score)?;
     Ok(v)
 }
 
 
-fn crate_base_score(all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) -> f64 {
+fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) -> f64 {
     let readme = k.readme().ok().and_then(|r| r).map(|readme| {
         renderer.page_node(&readme.markup, None, false)
     });
-    let mut score = ranking::crate_score_version(&CrateVersionInputs {
+    let base_score = ranking::crate_score_version(&CrateVersionInputs {
         versions: all.versions(),
         description: k.description().unwrap_or(""),
         readme: readme.as_ref(),
@@ -111,6 +112,53 @@ fn crate_base_score(all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) 
         is_nightly: k.is_nightly(),
     }).total();
 
+    let downloads_per_month = crates.downloads_per_month_or_equivalent(all.origin()).expect("dl numbers").unwrap_or(0) as u32;
+
+    let mut temp_inp = CrateTemporalInputs {
+        versions: all.versions(),
+        downloads_per_month,
+        downloads_per_month_minus_most_downloaded_user: downloads_per_month,
+        is_app: k.is_app(),
+        has_docs_rs: crates.has_docs_rs(k.short_name(), k.version()),
+        number_of_direct_reverse_deps: 0,
+        number_of_indirect_reverse_deps: 0,
+        number_of_indirect_reverse_optional_deps: 0,
+    };
+
+    let mut direct_rev_deps = 0;
+    let mut indirect_reverse_optional_deps = 0;
+    if let Some(deps) = crates.dependents_stats_of_crates_io_crate(k.short_name()) {
+        direct_rev_deps = deps.direct as u32;
+        indirect_reverse_optional_deps = (deps.runtime.def as u32 + deps.runtime.opt as u32)
+            .max(deps.dev as u32)
+            .max(deps.build.def as u32 + deps.build.opt as u32);
+
+        temp_inp.number_of_direct_reverse_deps = direct_rev_deps;
+        temp_inp.number_of_indirect_reverse_deps = deps.runtime.def.max(deps.build.def).into();
+        temp_inp.number_of_indirect_reverse_optional_deps = indirect_reverse_optional_deps;
+        let biggest = deps.rev_dep_names.iter()
+            .filter_map(|name| crates.downloads_per_month(&Origin::from_crates_io_name(name)).ok().and_then(|x| x))
+            .max().unwrap_or(0);
+        temp_inp.downloads_per_month_minus_most_downloaded_user = downloads_per_month.saturating_sub(biggest as u32);
+    }
+
+    let removals_divisor = if let Some(removals_weighed) = crates.crate_removals(k.origin()) {
+
+        // count some indirect/optional deps in case removals have been due to moving the crate behind another facade
+        // +20 is a fudge factor to smooth out nosiy data for rarely used crates.
+        // We don't care about small amount of removals, only mass exodus from big dead crates.
+        let effective_rev_deps = 20. + (direct_rev_deps as f64).max(indirect_reverse_optional_deps as f64 / 5.);
+        let removals_ratio = removals_weighed / (effective_rev_deps * 3.);
+        // if it's used more than removed, ratio < 1 is fine.
+        removals_ratio.max(1.).min(3.)
+    } else {
+        1.
+    };
+
+    let temp_score = ranking::crate_score_temporal(&temp_inp);
+    let temp_score = temp_score.total();
+
+    let mut score = (base_score + temp_score) * 0.5 / removals_divisor;
 
     // there's usually a non-macro/non-sys sibling
     if k.is_proc_macro() || k.is_sys() {

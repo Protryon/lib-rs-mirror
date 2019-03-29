@@ -161,8 +161,8 @@ impl<'a> CratePage<'a> {
 
     pub fn dependents_stats(&self) -> Option<(u32, u32)> {
         self.kitchen_sink.dependents_stats_of(self.ver).map(|d| (
-            d.runtime.0 as u32 + d.runtime.1 as u32 +
-            d.build.0 as u32  + d.build.1 as u32 +
+            d.runtime.def as u32 + d.runtime.opt as u32 +
+            d.build.def as u32  + d.build.opt as u32 +
             d.dev as u32, d.direct as u32))
         .filter(|d| d.0 > 0)
     }

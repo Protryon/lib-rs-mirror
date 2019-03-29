@@ -657,8 +657,8 @@ impl KitchenSink {
     pub fn is_build_or_dev(&self, k: &RichCrateVersion) -> (bool, bool) {
         self.dependents_stats_of(k)
         .map(|d| {
-            let is_build = d.build.0 > 3 * (d.runtime.0 + d.runtime.1 + 5);
-            let is_dev = !is_build && d.dev > (3 * d.runtime.0 + d.runtime.1 + 3 * d.build.0 + d.build.1 + 5);
+            let is_build = d.build.def > 3 * (d.runtime.def + d.runtime.opt + 5);
+            let is_dev = !is_build && d.dev > (3 * d.runtime.def + d.runtime.opt + 3 * d.build.def + d.build.opt + 5);
             (is_build, is_dev)
         })
         .unwrap_or((false, false))
@@ -945,7 +945,7 @@ impl KitchenSink {
         for (deps, overall_weight) in all_deps.iter() {
             for dep in deps {
                 if let Some(rev) = deps_stats.counts.get(dep.package.as_str()) {
-                    let right_popularity = rev.direct > 1 && rev.direct < 150 && rev.runtime.0 < 500 && rev.runtime.1 < 800;
+                    let right_popularity = rev.direct > 1 && rev.direct < 150 && rev.runtime.def < 500 && rev.runtime.opt < 800;
                     if Self::dep_interesting_for_index(dep.package.as_str()).unwrap_or(right_popularity) {
                         let weight = overall_weight / (1 + rev.direct) as f32;
                         weighed_deps.push((dep.package.as_str(), weight));

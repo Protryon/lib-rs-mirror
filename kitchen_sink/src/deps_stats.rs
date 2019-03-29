@@ -13,10 +13,16 @@ pub struct DepsStats {
 }
 
 #[derive(Debug, Clone, Default)]
+pub struct RevDepCount {
+    pub def: u16,
+    pub opt: u16,
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct RevDependencies {
     /// Default, optional
-    pub runtime: (u16, u16),
-    pub build: (u16, u16),
+    pub runtime: RevDepCount,
+    pub build: RevDepCount,
     pub dev: u16,
     pub direct: u16,
     pub versions: FxHashMap<MiniVer, u16>,
@@ -149,16 +155,16 @@ impl Index {
                 match depinf.ty {
                     DepTy::Runtime => {
                         if depinf.default {
-                            n.runtime.0 = n.runtime.0.checked_add(1).expect("overflow");
+                            n.runtime.def = n.runtime.def.checked_add(1).expect("overflow");
                         } else {
-                            n.runtime.1 = n.runtime.1.checked_add(1).expect("overflow");
+                            n.runtime.opt = n.runtime.opt.checked_add(1).expect("overflow");
                         }
                     },
                     DepTy::Build => {
                         if depinf.default {
-                            n.build.0 = n.build.0.checked_add(1).expect("overflow");
+                            n.build.def = n.build.def.checked_add(1).expect("overflow");
                         } else {
-                            n.build.1 = n.build.1.checked_add(1).expect("overflow");
+                            n.build.opt = n.build.opt.checked_add(1).expect("overflow");
                         }
                     },
                     DepTy::Dev => {

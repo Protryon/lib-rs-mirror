@@ -649,10 +649,20 @@ impl CrateDb {
     }
 
     /// Crate & total weighed removals (when dependency was removed from a crate)
+    /// Roughly weighed by ranking of crates that did the removing.
+    ///
+    /// TODO: there should be a time decay, otherwise old crates will get penalized for churn
     pub fn removals(&self) -> FResult<HashMap<Origin, f64>> {
         self.with_connection(|conn| {
-            let mut query = conn.prepare("SELECT crate_name, sum(weight) as w
-                FROM repo_changes
+            let mut query = conn.prepare("
+                SELECT crate_name, sum(weight * (0.5+ranking/2)) AS w
+                FROM (
+                    SELECT max(ranking) as ranking, repo
+                    FROM crate_repos cr
+                    JOIN crates k ON cr.crate_id = k.id
+                    GROUP BY cr.repo
+                ) AS r
+                JOIN repo_changes USING(repo)
                 WHERE replacement IS NULL
                 GROUP BY crate_name")?;
             let q = query.query_map(NO_PARAMS, |row| {

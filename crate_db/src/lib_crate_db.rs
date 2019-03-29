@@ -101,6 +101,7 @@ impl CrateDb {
     }
 
     /// Add data of the latest version of a crate to the index
+    /// Score is a ranking of a crate (0 = bad, 1 = great)
     pub fn index_latest(&self, c: &RichCrateVersion, deps_stats: &[(&str, f32)], score: f64, (is_build, is_dev): (bool, bool)) -> FResult<()> {
         let origin = c.origin().to_str();
 
@@ -190,7 +191,7 @@ impl CrateDb {
             let args: &[&dyn ToSql] = &[&origin, &0, &score];
             insert_crate.execute(args).context("insert crate")?;
             let (crate_id, downloads): (u32, u32) = get_crate_id.query_row(&[&origin], |row| (row.get(0), row.get(1))).context("crate_id")?;
-            let is_important_ish = downloads > 2000;
+            let is_important_ish = downloads > 2000 || score > 0.8;
 
             if let Some(repo) = c.repository() {
                 let url = repo.canonical_git_url();
@@ -670,7 +671,7 @@ impl CrateDb {
             // sort by relevance to the category, downrank for being crappy (later also downranked for being removed from crates)
             // low number of downloads is mostly by rank, rather than downloads
             let mut query = conn.prepare_cached(
-            "SELECT k.origin, k.recent_downloads, ((k.recent_downloads + 2000) * k.ranking * c.rank_weight) as w
+            "SELECT k.origin, k.recent_downloads, (k.ranking * c.rank_weight) as w
                 FROM categories c
                 JOIN crates k on c.crate_id = k.id
                 WHERE c.slug = ?1
@@ -678,6 +679,28 @@ impl CrateDb {
                 LIMIT ?2"
             )?;
             let args: &[&dyn ToSql] = &[&slug, &limit];
+            let q = query.query_map(args, |row| {
+                let s: String = row.get(0);
+                (Origin::from_str(s), row.get(1), row.get(2))
+            })?;
+            let q = q.filter_map(|r| r.ok());
+            Ok(q.collect())
+        })
+    }
+
+    pub fn top_crates_uncategorized(&self, limit: u32) -> FResult<Vec<(Origin, u32, f64)>> {
+        self.with_connection(|conn| {
+            // sort by relevance to the category, downrank for being crappy (later also downranked for being removed from crates)
+            // low number of downloads is mostly by rank, rather than downloads
+            let mut query = conn.prepare_cached(
+            "SELECT k.origin, k.recent_downloads, k.ranking as w
+                FROM crates k
+                LEFT JOIN categories c on c.crate_id = k.id
+                WHERE c.slug IS NULL
+                ORDER by w desc
+                LIMIT ?1"
+            )?;
+            let args: &[&dyn ToSql] = &[&limit];
             let q = query.query_map(args, |row| {
                 let s: String = row.get(0);
                 (Origin::from_str(s), row.get(1), row.get(2))
@@ -754,7 +777,7 @@ impl CrateDb {
         if let Some(s) = c.description() {
             if let Some(more) = c.alternative_description() {
                 return Some((1., format!("{}{}", s, more).into()));
-            }
+        }
             return Some((1., s.into()));
         }
         if let Ok(Some(r)) = c.readme() {
@@ -764,10 +787,10 @@ impl CrateDb {
             let end = sub.char_indices().skip(200).map(|(i,_)|i).next().unwrap_or(sub.len());
             let sub = sub[0..end].trim_end_matches(|c:char| c.is_alphanumeric());//half-word
             return Some((0.5, sub.into()));
-        }
+                }
         None
-    }
-}
+                }
+        }
 
 pub enum RepoChange {
     Removed { crate_name: String, weight: f64 },

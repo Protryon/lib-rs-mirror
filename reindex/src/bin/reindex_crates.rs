@@ -165,12 +165,28 @@ fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersi
         score *= 0.9;
     }
 
+    if is_deprecated(&k) {
+        score *= 0.2;
+    }
+
     // k bye
     if k.is_yanked() {
         score *= 0.001;
     }
 
     score
+}
+
+fn is_deprecated(k: &RichCrateVersion) -> bool {
+    if kitchen_sink::is_deprecated(k.short_name()) {
+        return true;
+    }
+    if let Some(desc) = k.description() {
+        let desc = desc.trim_matches(|c: char| !c.is_ascii_alphabetic()).to_ascii_lowercase();
+        return desc.starts_with("deprecated") || desc.starts_with("unsafe and deprecated") ||
+            desc.ends_with("deprecated") || desc.contains("deprecated in favor") || desc.contains("project is deprecated");
+    }
+    false
 }
 
 

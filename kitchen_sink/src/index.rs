@@ -321,7 +321,7 @@ impl fmt::Debug for Dep {
 
 /// TODO: check if the repo is rust-lang-deprecated.
 /// Note: the repo URL in the crate is outdated, and it may be a redirect to the deprecated
-fn is_deprecated(name: &str) -> bool {
+pub fn is_deprecated(name: &str) -> bool {
     match name {
         "rustc-serialize" | "gcc" | "rustc-benchmarks" | "time" |
         "flate2-crc" | "complex" | "simple_stats" | "concurrent" | "feed" |

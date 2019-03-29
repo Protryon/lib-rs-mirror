@@ -26,6 +26,7 @@ pub struct RevDependencies {
     pub dev: u16,
     pub direct: u16,
     pub versions: FxHashMap<MiniVer, u16>,
+    pub rev_dep_names: CompactStringSet,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -151,6 +152,7 @@ impl Index {
                 *t = t.checked_add(1).expect("overflow");
                 if depinf.direct {
                     n.direct = n.direct.checked_add(1).expect("overflow");
+                    n.rev_dep_names.push(&name);
                 }
                 match depinf.ty {
                     DepTy::Runtime => {
@@ -200,4 +202,21 @@ fn flatten_set(depset: &ArcDepSet, depinf: DepInf, collected: &mut FxHashMap<Sym
             .or_insert((depinf, dep.semver.clone()));
         vis.recurse(dep, depinf, |vis, dep, depinf| flatten_set(dep, depinf, collected, vis));
     })
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct CompactStringSet(String);
+
+impl CompactStringSet {
+    pub fn push(&mut self, s: &str) {
+        if !self.0.is_empty() {
+            self.0.reserve(1 + s.len());
+            self.0.push('\0');
+        }
+        self.0.push_str(s);
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &str> {
+        self.0.split('\0')
+    }
 }

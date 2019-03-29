@@ -522,7 +522,7 @@ Write or generate parsers of binary and text formats. \
 Format-specific parsers belong in other, more specific categories.
 """
 short-description = """
-Parsing tools and parser generators."""
+Low-level tools and parser generators."""
 siblings = ["parser-implementations"]
 
 [rendering]

@@ -503,7 +503,7 @@ impl CrateDb {
         self.with_connection(|conn| {
             let mut query = conn.prepare_cached(r#"
             select top, keyword from (
-                select count(*) as total, sum(case when oc.recent_downloads >= c.recent_downloads then 1 else 0 end) as top, k.keyword from crates c
+                select count(*) as total, sum(case when oc.ranking >= c.ranking then 1 else 0 end) as top, k.keyword from crates c
                         join crate_keywords ck on ck.crate_id = c.id
                         join crate_keywords ock on ock.keyword_id = ck.keyword_id
                         join crates oc on ock.crate_id = oc.id

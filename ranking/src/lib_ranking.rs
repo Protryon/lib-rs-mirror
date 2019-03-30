@@ -237,16 +237,17 @@ fn fill_props(node: &Handle, props: &mut MarkupProps, mut in_code: bool) {
     }
 }
 
-fn readme_score(readme: Option<&Handle>) -> Score {
+fn readme_score(readme: Option<&Handle>, is_app: bool) -> Score {
     let mut s = Score::new();
     let mut props = Default::default();
     if let Some(readme) = readme {
         fill_props(readme, &mut props, false);
     }
     s.frac("text length", 75, (props.text_len as f64 /3000.).min(1.0));
-    s.frac("code length", 100, (props.code_len as f64 /2000.).min(1.0));
-    s.has("has code", 30, props.code_len > 150 && props.pre_blocks > 0); // people really like seeing a code example
-    s.n("code blocks", 25, props.pre_blocks * 5);
+    // code examples are not expected for apps
+    s.frac("code length", if is_app {25} else {100}, (props.code_len as f64 /2000.).min(1.0));
+    s.n("code blocks", if is_app {15} else {25}, props.pre_blocks * 5);
+    s.has("has code", if is_app {10} else {30}, props.code_len > 150 && props.pre_blocks > 0); // people really like seeing a code example
     s.n("images", 35, props.images * 25); // I like pages with logos
     s.n("sections", 30, props.sections * 4);
     s.n("list or table rows", 25, props.list_or_table_rows * 2);
@@ -294,7 +295,7 @@ pub fn crate_score_version(cr: &CrateVersionInputs) -> Score {
     let mut score = Score::new();
 
     score.group("Cargo.toml", 2, cargo_toml_score(cr));
-    score.group("README", 4, readme_score(cr.readme));
+    score.group("README", 4, readme_score(cr.readme, cr.is_app));
     score.group("Versions", 4, versions_score(cr.versions));
     score.group("Authors/Owners", 3, authors_score(cr.authors, cr.owners));
 
@@ -321,7 +322,7 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs) -> Score {
             let age = (Utc::now() - latest_date).num_days();
             let days_past_expiration_date = (age - expected_update_interval).max(0);
             // score decays for a ~year after the crate should have been updated
-            let decay_days = if cr.is_nightly {60} else {200} + expected_update_interval/2;
+            let decay_days = expected_update_interval/2 + if cr.is_nightly {60} else if cr.is_app {360} else {200};
             (decay_days - days_past_expiration_date).max(0) as f64 / (decay_days as f64)
         },
         Err(e) => {
@@ -333,22 +334,27 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs) -> Score {
 
     // Low numbers are just bots/noise.
     let downloads = (cr.downloads_per_month as f64 - 100.).max(0.) + 100.;
-    let downloads_cleaned = (cr.downloads_per_month_minus_most_downloaded_user as f64 - 50.).max(0.) + 50.;
+    let downloads_cleaned = (cr.downloads_per_month_minus_most_downloaded_user as f64 / if cr.is_app {1.} else {2.} - 50.).max(0.) + 50.;
     // distribution of downloads follows power law.
     // apps have much harder to get high download numbers.
-    let pop = (downloads.log2() - 6.6) / (if cr.is_app {1.0} else {2.0});
-    let pop_cleaned = (downloads_cleaned.log2() - 5.6) / (if cr.is_app {1.0} else {2.0});
+    let pop = (downloads.log2() - 6.6) / (if cr.is_app {1.} else {2.});
+    let pop_cleaned = downloads_cleaned.log2() - 5.6;
     assert!(pop > 0.);
     assert!(pop_cleaned > 0.);
     // FIXME: max should be based on the most downloaded crate?
     score.score_f("Downloads", 8., pop/2.);
     score.score_f("Downloads (cleaned)", 18., pop_cleaned);
 
-    score.score_f("Direct rev deps", 10., (cr.number_of_direct_reverse_deps as f64).sqrt());
-    let indirect = 1. + cr.number_of_indirect_reverse_optional_deps as f64 / 3.;
-    score.score_f("Indirect rev deps", 10., indirect.log2());
+    // Don't expect apps to have rev deps (omitting these entirely proprtionally increases importance of other factors)
+    if !cr.is_app || cr.number_of_direct_reverse_deps > 1 {
+        score.score_f("Direct rev deps", 10., (cr.number_of_direct_reverse_deps as f64).sqrt());
+        let indirect = 1. + cr.number_of_indirect_reverse_optional_deps as f64 / 3.;
+        score.score_f("Indirect rev deps", 10., indirect.log2());
+    }
 
-    score.has("docs.rs", 1, cr.has_docs_rs);
+    if !cr.is_app || cr.has_docs_rs {
+        score.has("docs.rs", 1, cr.has_docs_rs);
+    }
     score
 }
 

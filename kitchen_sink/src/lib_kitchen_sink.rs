@@ -960,13 +960,18 @@ impl KitchenSink {
     // deps that are closely related to crates in some category
     fn dep_interesting_for_index(name: &str) -> Option<bool> {
         match name {
-            "futures" | "actix-web" | "rocket_codegen" | "iron" | "rusoto_core" | "rocket" | "router" |
-            "piston2d-graphics" | "amethyst_core" | "amethyst" | "specs" | "piston" |
-            "proc-macro2" | "cargo" |
-            "hound" |
-            "cargo_metadata" | "syntect" | "stdweb" => Some(true),
+            "futures" | "tokio" | "actix-web" | "rocket_codegen" | "iron" | "rusoto_core" | "rocket" | "router" |
+            "quoted_printable" | "mime" | "rustls" | "websocket" |
+            "piston2d-graphics" | "amethyst_core" | "amethyst" | "specs" | "piston" | "allegro" | "minifb" |
+            "rgb" | "imgref" |
+            "core-foundation" |
+            "proc-macro2" | "cargo" | "cargo_metadata" | "git2" |
+            "hound" | "lopdf" |
+            "nom" | "lalrpop" | "combine" |
+            "clap" | "structopt" |
+            "syntect" | "stdweb" | "parity-wasm" => Some(true),
             /////////
-            "threadpool" | "rayon" | "md5" | "arrayref" | "memmmap" | "xml" | "crossbeam" |
+            "threadpool" | "rayon" | "md5" | "arrayref" | "memmmap" | "xml" | "crossbeam" | "pyo3" |
             "rustc_version" | "crossbeam-channel" | "cmake" | "errno" | "zip" | "enum_primitive" | "pretty_env_logger" |
             "skeptic" | "crc" | "hmac" | "sha1" | "serde_macros" | "serde_codegen" | "derive_builder" |
             "derive_more" | "ron" | "fxhash" | "simple-logger" | "chan" | "stderrlog" => Some(false),

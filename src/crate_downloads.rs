@@ -19,7 +19,6 @@ pub struct CrateDownloadsExtra {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateVersionDailyDownload {
-    id: usize,
     pub version: usize,
     pub downloads: usize,
     pub date: String,

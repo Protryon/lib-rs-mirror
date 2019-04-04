@@ -660,11 +660,12 @@ impl CrateDb {
     pub fn removals(&self) -> FResult<HashMap<Origin, f64>> {
         self.with_connection(|conn| {
             let mut query = conn.prepare("
-                SELECT crate_name, sum(weight * (0.5+ranking/2)) AS w
+                SELECT crate_name, sum(weight * (0.5+r.ranking/2)) AS w
                 FROM (
-                    SELECT max(ranking) as ranking, repo
+                    SELECT max(k.ranking) as ranking, repo
                     FROM crate_repos cr
                     JOIN crates k ON cr.crate_id = k.id
+                    WHERE k.ranking IS NOT NULL
                     GROUP BY cr.repo
                 ) AS r
                 JOIN repo_changes USING(repo)

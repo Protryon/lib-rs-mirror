@@ -171,8 +171,12 @@
                   <p class="top-n">#<b>@top</b> in <a href="@url.keyword(&keyword)">#@keyword</a></p>
                 }
               }
-              @if let Some(g) = c.download_graph(182, 56) {
-                @:downloads(&g)
+              @if let Some(dl) = c.downloads_per_month() {
+                @if dl > 50 {
+                  @if let Some(g) = c.download_graph(182, 56) {
+                    @:downloads(&g)
+                  }
+                }
               }
               <p>
                 @if let Some(dl) = c.downloads_per_month() {<b>@c.format_number(dl)</b> downloads per month}

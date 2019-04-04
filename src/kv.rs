@@ -97,6 +97,8 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
         Ok(match kw.data.get(key) {
             Some(gz) => Some(Self::ungz(gz).map_err(|e| {
                 eprintln!("ungz of {} failed", key);
+                drop(kw);
+                let _ = self.delete(key);
                 e
             })?),
             None => None,

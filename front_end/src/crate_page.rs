@@ -105,7 +105,7 @@ impl<'a> CratePage<'a> {
             title: self.page_title(),
             keywords: if keywords != "" { Some(keywords) } else { None },
             created: Some(self.date_created()),
-            description: self.ver.description().map(|d| format!("{} | Rust package at Crates.rs", d)),
+            description: self.ver.description().map(|d| format!("{} | Cargo package at Crates.rs", d)),
             item_name: Some(self.ver.short_name().to_string()),
             item_description: self.ver.description().map(|d| d.to_string()),
             alternate: self.ver.crates_io_url(),

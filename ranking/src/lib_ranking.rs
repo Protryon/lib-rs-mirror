@@ -322,7 +322,7 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs) -> Score {
             let age = (Utc::now() - latest_date).num_days();
             let days_past_expiration_date = (age - expected_update_interval).max(0);
             // score decays for a ~year after the crate should have been updated
-            let decay_days = expected_update_interval/2 + if cr.is_nightly {60} else if cr.is_app {360} else {200};
+            let decay_days = expected_update_interval/2 + if cr.is_nightly {60} else if cr.is_app {300} else {200};
             (decay_days - days_past_expiration_date).max(0) as f64 / (decay_days as f64)
         },
         Err(e) => {
@@ -337,12 +337,12 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs) -> Score {
     let downloads_cleaned = (cr.downloads_per_month_minus_most_downloaded_user as f64 / if cr.is_app {1.} else {2.} - 50.).max(0.) + 50.;
     // distribution of downloads follows power law.
     // apps have much harder to get high download numbers.
-    let pop = (downloads.log2() - 6.6) / (if cr.is_app {1.} else {2.});
+    let pop = (downloads.log2() - 6.6) / (if cr.is_app {3.} else {5.});
     let pop_cleaned = downloads_cleaned.log2() - 5.6;
     assert!(pop > 0.);
     assert!(pop_cleaned > 0.);
     // FIXME: max should be based on the most downloaded crate?
-    score.score_f("Downloads", 8., pop/2.);
+    score.score_f("Downloads", 6., pop);
     score.score_f("Downloads (cleaned)", 18., pop_cleaned);
 
     // Don't expect apps to have rev deps (omitting these entirely proprtionally increases importance of other factors)

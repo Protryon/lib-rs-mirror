@@ -966,7 +966,7 @@ impl KitchenSink {
             "piston2d-graphics" | "amethyst_core" | "amethyst" | "specs" | "piston" | "allegro" | "minifb" |
             "rgb" | "imgref" |
             "core-foundation" |
-            "proc-macro2" | "cargo" | "cargo_metadata" | "git2" |
+            "proc-macro2" | "cargo" | "cargo_metadata" | "git2" | "dbus" |
             "hound" | "lopdf" |
             "nom" | "lalrpop" | "combine" |
             "clap" | "structopt" |

@@ -36,7 +36,7 @@ searching, and more.\
 short-description = """
 Core algorithms such as hashing, sorting and searching.
 """
-siblings = ["data-structures"]
+siblings = ["data-structures", "compression"]
 
 # [api-bindings]
 # name = "API bindings"
@@ -518,8 +518,7 @@ siblings = ["parsing"]
 name = "Parsing tools"
 title = "Parser tooling"
 description = """
-Write or generate parsers of binary and text formats. \
-Format-specific parsers belong in other, more specific categories.
+Low-level, file-format-independent libraries for writing or generating parsers.
 """
 short-description = """
 Low-level tools and parser generators."""
@@ -574,7 +573,7 @@ Rust.\
 """
 short-description = """
 Shared solutions for particular situations specific to programming in Rust."""
-siblings = ["no-std"]
+siblings = ["no-std", "memory-management"]
 
 [science]
 name = "Science"
@@ -643,6 +642,7 @@ in textual form.\
 """
 short-description = """
 Deal with the complexities of human language when expressed in textual form."""
+siblings = ["value-formatting", "template-engine"]
 
 [value-formatting]
 name = "Value formatting"

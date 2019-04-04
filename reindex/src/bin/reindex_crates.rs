@@ -5,7 +5,7 @@ use render_readme::{Renderer, Markup};
 use either::*;
 use search_index::*;
 use failure;
-use kitchen_sink::{self, stopped, CrateData, KitchenSink, Origin, RichCrateVersion, Include};
+use kitchen_sink::{self, stopped, MaintenanceStatus, CrateData, KitchenSink, Origin, RichCrateVersion, Include};
 use rand::{seq::SliceRandom, thread_rng};
 use rayon;
 use std::sync::mpsc;
@@ -229,7 +229,10 @@ fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersi
 }
 
 fn is_deprecated(k: &RichCrateVersion) -> bool {
-    if kitchen_sink::is_deprecated(k.short_name()) {
+    if k.version().contains("deprecated") || kitchen_sink::is_deprecated(k.short_name()) {
+        return true;
+    }
+    if k.maintenance() == MaintenanceStatus::Deprecated {
         return true;
     }
     if let Some(desc) = k.description() {

@@ -49,6 +49,7 @@ pub use rich_crate::Edition;
 pub use rich_crate::RichCrate;
 pub use rich_crate::RichCrateVersion;
 pub use rich_crate::RichDep;
+pub use rich_crate::MaintenanceStatus;
 pub use rich_crate::{Cfg, Target};
 
 use fxhash::FxHashMap;

@@ -36,7 +36,7 @@ macro_rules! cioopt {
 }
 
 lazy_static! {
-    static ref THROTTLE: Mutex<Throttle<()>> = Mutex::new(Throttle::new_tps_throttle(1.));
+    static ref THROTTLE: Mutex<Throttle<()>> = Mutex::new(Throttle::new_tps_throttle(8.));
 }
 
 #[derive(Debug)]

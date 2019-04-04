@@ -1,5 +1,5 @@
 [package]
-version = "0.6.1"
+version = "0.6.2"
 edition = "2018"
 name = "crates_io_client"
 authors = ["Kornel <kornel@geekhood.net>"]

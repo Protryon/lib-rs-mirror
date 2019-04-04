@@ -63,9 +63,9 @@ impl CratesIoClient {
         self.crates.get_cached((&newkey, version), &url)
     }
 
-    pub fn krate(&self, crate_name: &str, cache_buster: &str) -> Result<Option<CratesIoCrate>, Error> {
+    pub fn krate(&self, crate_name: &str, cache_buster: &str, refresh: bool) -> Result<Option<CratesIoCrate>, Error> {
         let mut meta = cioopt!(self.crate_meta(crate_name, cache_buster)?);
-        let downloads = cioopt!(self.crate_downloads(crate_name, cache_buster)?);
+        let downloads = cioopt!(self.crate_downloads(crate_name, cache_buster, refresh)?);
         if !self.cache.cache_only && !Self::are_downloads_consistent(&meta, &downloads) {
             eprintln!("Meta is missing versions {}@{}", crate_name, cache_buster);
             let _ = self.cache.delete(crate_name);
@@ -91,11 +91,11 @@ impl CratesIoClient {
         self.get_json((crate_name, as_of_version), crate_name)
     }
 
-    pub fn crate_downloads(&self, crate_name: &str, as_of_version: &str) -> Result<Option<CrateDownloadsFile>, Error> {
+    pub fn crate_downloads(&self, crate_name: &str, as_of_version: &str, refresh: bool) -> Result<Option<CrateDownloadsFile>, Error> {
         let url = format!("{}/downloads", crate_name);
         let new_key = (url.as_str(), as_of_version);
         let data: CrateDownloadsFile = cioopt!(self.get_json(new_key, &url)?);
-        if !self.cache.cache_only && data.is_stale() {
+        if refresh && !self.cache.cache_only && data.is_stale() {
             eprintln!("downloads expired {}@{}", crate_name, as_of_version);
             let _ = self.cache.delete(new_key.0);
             let fresh: CrateDownloadsFile = cioopt!(self.get_json(new_key, &url)?);

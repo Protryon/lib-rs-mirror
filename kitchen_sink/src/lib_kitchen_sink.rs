@@ -330,7 +330,7 @@ impl KitchenSink {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
         match origin {
             Origin::CratesIo(_) => {
-                let meta = self.crates_io_meta(origin)?;
+                let meta = self.crates_io_meta(origin, false)?;
                 let versions = meta.meta.versions().map(|c| CrateVersion {
                     num: c.num,
                     updated_at: c.updated_at,
@@ -388,23 +388,23 @@ impl KitchenSink {
     fn downloads_recent(&self, origin: &Origin) -> CResult<Option<usize>> {
         Ok(match origin {
             Origin::CratesIo(_) => {
-                let meta = self.crates_io_meta(origin)?;
+                let meta = self.crates_io_meta(origin, true)?;
                 meta.meta.krate.recent_downloads
             },
             _ => None,
         })
     }
 
-    fn crates_io_meta(&self, origin: &Origin) -> CResult<CratesIoCrate> {
+    fn crates_io_meta(&self, origin: &Origin, refresh: bool) -> CResult<CratesIoCrate> {
         let krate = self.index.crates_io_crate_by_name(origin).context("rich_crate")?;
         let name = krate.name();
         let latest_in_index = krate.latest_version().version(); // most recently published version
-        let meta = self.crates_io.krate(name, latest_in_index)
+        let meta = self.crates_io.krate(name, latest_in_index, refresh)
             .with_context(|_| format!("crates.io meta for {} {}", name, latest_in_index))?;
         let mut meta = meta.ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?;
         if !meta.meta.versions.iter().any(|v| v.num == latest_in_index) {
             eprintln!("Crate data missing latest version {:?}@{}", origin, latest_in_index);
-            meta = self.crates_io.krate(name, &format!("{}-try-again", latest_in_index))?
+            meta = self.crates_io.krate(name, &format!("{}-try-again", latest_in_index), true)?
                 .ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?;
             if !meta.meta.versions.iter().any(|v| v.num == latest_in_index) {
                 eprintln!("Error: crate data is borked {:?}@{}. Has only: {:?}", origin, latest_in_index, meta.meta.versions.iter().map(|v| &v.num).collect::<Vec<_>>());
@@ -524,7 +524,7 @@ impl KitchenSink {
 
         ///// Fixing and faking the data /////
 
-        let crates_io_meta = self.crates_io_meta(&origin)?.meta.krate;
+        let crates_io_meta = self.crates_io_meta(&origin, fetch_type == CrateData::FullNoDerived)?.meta.krate;
 
         // it may contain data from nowhere! https://github.com/rust-lang/crates.io/issues/1624
         if package.homepage.is_none() {
@@ -874,7 +874,7 @@ impl KitchenSink {
             let origin = k.origin();
             match origin {
                 Origin::CratesIo(name) => {
-                    let meta = self.crates_io_meta(origin)?;
+                    let meta = self.crates_io_meta(origin, true)?;
                     self.index_crate_downloads(name, &meta)?;
                 },
                 _ => {},

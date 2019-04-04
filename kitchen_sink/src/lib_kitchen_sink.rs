@@ -309,7 +309,7 @@ impl KitchenSink {
         let all: Vec<_> = self.index.all_crates().collect();
         let res: Vec<RichCrate> = all.into_par_iter()
         .filter_map(move |o| {
-            self.rich_crate(o).ok()
+            self.rich_crate(o).map_err(|e| eprintln!("{:?}: {}", o, e)).ok()
         })
         .filter(move |k| {
             let latest = k.versions().iter().map(|v| v.created_at.as_str()).max().unwrap_or("");

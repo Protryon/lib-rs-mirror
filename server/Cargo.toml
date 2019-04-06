@@ -1,6 +1,6 @@
 [package]
 name = "crates-server"
-version = "0.1.10"
+version = "0.1.11"
 authors = ["Kornel <kornel@geekhood.net>"]
 edition = "2018"
 description = "Crates.rs web server"
@@ -23,3 +23,4 @@ search_index = { path = "../search_index" }
 kitchen_sink = { path = "../kitchen_sink", version = "0.7.3" }
 front_end = { path = "../front_end", version = "0.3.2" }
 urlencoding = "1.0.0"
+failure = "0.1.5"

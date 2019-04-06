@@ -19,7 +19,8 @@ use std::alloc::System;
 static A: System = System;
 
 struct ServerState {
-    pool: CpuPool,
+    render_pool: CpuPool,
+    search_pool: CpuPool,
     markup: Renderer,
     index: CrateSearchIndex,
     crates: KitchenSink,
@@ -50,7 +51,8 @@ fn main() {
     let index = CrateSearchIndex::new(data_dir).expect("data directory");
 
     let state = Arc::new(ServerState {
-        pool: CpuPool::new_num_cpus(),
+        render_pool: CpuPool::new_num_cpus(),
+        search_pool: CpuPool::new_num_cpus(),
         markup,
         index,
         crates,
@@ -88,12 +90,12 @@ fn handle_404(_req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
 fn handle_home(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
     let state = req.state();
     let state2 = Arc::clone(state);
-    state.pool.spawn_fn(move || {
+    state.render_pool.spawn_fn(move || -> Result<_, failure::Error> {
         let mut page: Vec<u8> = Vec::with_capacity(50000);
-        front_end::render_homepage(&mut page, &state2.crates).unwrap();
-        Ok::<_,()>(page)
+        front_end::render_homepage(&mut page, &state2.crates)?;
+        Ok(page)
     })
-    .map_err(|_| unreachable!())
+    .from_err()
     .and_then(|page| {
         future::ok(HttpResponse::Ok()
             .content_type("text/html;charset=UTF-8")
@@ -108,17 +110,17 @@ fn handle_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse>
     println!("rendering {:?}", kw);
     let state = req.state();
     let state2 = Arc::clone(state);
-    state.pool.spawn_fn(move || {
+    state.render_pool.spawn_fn(move || -> Result<_, failure::Error> {
         assert!(is_alnum(&kw));
         let origin = Origin::from_crates_io_name(&kw);
-        let all = state2.crates.rich_crate(&origin).expect("get crate");
-        let ver = state2.crates.rich_crate_version(&origin, CrateData::Full).expect("get crate");
+        let all = state2.crates.rich_crate(&origin)?;
+        let ver = state2.crates.rich_crate_version(&origin, CrateData::Full)?;
         let mut page: Vec<u8> = Vec::with_capacity(50000);
-        front_end::render_crate_page(&mut page, &all, &ver, &state2.crates, &state2.markup).expect("page render");
-        std::fs::write(state2.public_crates_dir.join(format!("{}.html", kw)), &page).expect("save page");
-        Ok::<_,()>(page)
+        front_end::render_crate_page(&mut page, &all, &ver, &state2.crates, &state2.markup)?;
+        std::fs::write(state2.public_crates_dir.join(format!("{}.html", kw)), &page)?;
+        Ok(page)
     })
-    .map_err(|_| unreachable!())
+     .from_err()
     .and_then(|page| {
         future::ok(HttpResponse::Ok()
             .content_type("text/html;charset=UTF-8")
@@ -136,21 +138,21 @@ fn handle_keyword(req: &HttpRequest<AServerState>) -> FutureResponse<HttpRespons
             let query = q.to_owned();
             let state = req.state();
             let state2 = Arc::clone(state);
-            state.pool.spawn_fn(move || {
+            state.search_pool.spawn_fn(move || -> Result<_, failure::Error> {
                 if !is_alnum(&query) {
                     return Ok((query, None));
                 }
                 let mut page: Vec<u8> = Vec::with_capacity(50000);
                 let keyword_query = format!("keywords:\"{}\"", query);
-                let results = state2.index.search(&keyword_query, 100).unwrap();
+                let results = state2.index.search(&keyword_query, 100)?;
                 if !results.is_empty() {
-                    front_end::render_keyword_page(&mut page, &query, &results, &state2.markup).unwrap();
-                    Ok::<_,()>((query, Some(page)))
+                    front_end::render_keyword_page(&mut page, &query, &results, &state2.markup)?;
+                    Ok((query, Some(page)))
                 } else {
                     Ok((query, None))
                 }
             })
-            .map_err(|_| unreachable!())
+            .from_err()
             .and_then(|(query, page)| {
                 future::ok(if let Some(page) = page {
                     HttpResponse::Ok()
@@ -187,13 +189,13 @@ fn handle_search(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse
             let query = q.to_owned();
             let state = req.state();
             let state2 = Arc::clone(state);
-            state.pool.spawn_fn(move || {
+            state.search_pool.spawn_fn(move || -> Result<_, failure::Error> {
                 let mut page: Vec<u8> = Vec::with_capacity(50000);
-                let results = state2.index.search(&query, 50).unwrap();
-                front_end::render_serp_page(&mut page, &query, &results, &state2.markup).unwrap();
-                Ok::<_,()>(page)
+                let results = state2.index.search(&query, 50)?;
+                front_end::render_serp_page(&mut page, &query, &results, &state2.markup)?;
+                Ok(page)
             })
-            .map_err(|_| unreachable!())
+            .from_err()
             .and_then(|page| {
                 future::ok(HttpResponse::Ok()
                     .content_type("text/html;charset=UTF-8")

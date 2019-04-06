@@ -367,7 +367,7 @@ impl KitchenSink {
     }
 
     pub fn downloads_per_month_or_equivalent(&self, origin: &Origin) -> CResult<Option<usize>> {
-        if let Some(dl) = self.downloads_recent(origin)? {
+        if let Some(dl) = self.downloads_per_month(origin)? {
             return Ok(Some(dl));
         }
 

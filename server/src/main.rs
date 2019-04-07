@@ -103,6 +103,7 @@ fn handle_home(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> 
     .and_then(|page| {
         future::ok(HttpResponse::Ok()
             .content_type("text/html;charset=UTF-8")
+            .header("Cache-Control", "public, s-maxage=600, max-age=43200, stale-while-revalidate=259200, stale-if-error=72000")
             .content_length(page.len() as u64)
             .body(page))
     })
@@ -130,7 +131,7 @@ fn handle_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse>
     .and_then(|page| {
         future::ok(HttpResponse::Ok()
             .content_type("text/html;charset=UTF-8")
-            .header("Cache-Control", "max-age=172800, stale-while-revalidate=604800")
+            .header("Cache-Control", "public, s-maxage=3600, max-age=172800, stale-while-revalidate=604800, stale-if-error=72000")
             .content_length(page.len() as u64)
             .body(page))
     })
@@ -165,7 +166,7 @@ fn handle_keyword(req: &HttpRequest<AServerState>) -> FutureResponse<HttpRespons
                 future::ok(if let Some(page) = page {
                     HttpResponse::Ok()
                         .content_type("text/html;charset=UTF-8")
-                        .header("Cache-Control", "max-age=604800, stale-while-revalidate=604800, stale-if-error=86400")
+                        .header("Cache-Control", "public, s-maxage=3600, max-age=604800, stale-while-revalidate=604800, stale-if-error=86400")
                         .content_length(page.len() as u64)
                         .body(page)
                 } else {
@@ -178,9 +179,8 @@ fn handle_keyword(req: &HttpRequest<AServerState>) -> FutureResponse<HttpRespons
             .responder()
         },
         _ => {
-            future::ok(HttpResponse::TemporaryRedirect()
+            future::ok(HttpResponse::PermanentRedirect()
                 .header("Location", "/")
-                .header("Cache-Control", "max-age=172800, stale-while-revalidate=604800, stale-if-error=86400")
                 .finish())
                 .responder()
         },
@@ -219,6 +219,7 @@ fn handle_search(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse
             .and_then(|page| {
                 future::ok(HttpResponse::Ok()
                     .content_type("text/html;charset=UTF-8")
+                    .header("Cache-Control", "public, s-maxage=60, max-age=43200, stale-while-revalidate=259200, stale-if-error=72000")
                     .content_length(page.len() as u64)
                     .body(page))
             })

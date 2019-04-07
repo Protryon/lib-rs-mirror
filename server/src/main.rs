@@ -1,3 +1,4 @@
+use tokio::prelude::FutureExt;
 use std::path::PathBuf;
 use actix_web::*;
 use actix_web::http::*;
@@ -13,6 +14,7 @@ use kitchen_sink::CrateData;
 use front_end;
 use search_index::CrateSearchIndex;
 use render_readme::{Highlighter, Renderer, ImageOptimAPIFilter};
+use std::time::Duration;
 
 use std::alloc::System;
 #[global_allocator]
@@ -33,7 +35,6 @@ fn main() {
     env_logger::init();
     kitchen_sink::dont_hijack_ctrlc();
     let sys = actix::System::new("crates-server");
-
 
     let public_styles_dir: PathBuf = env::var_os("DOCUMENT_ROOT").map(From::from).unwrap_or_else(|| "../style/public".into());
     let public_crates_dir: PathBuf = env::var_os("CRATE_HTML_ROOT").map(From::from).unwrap_or_else(|| "/www/crates.rs/public/crates".into());
@@ -62,6 +63,7 @@ fn main() {
     let state2 = Arc::clone(&state);
     let _ = std::thread::spawn(move || {
         state2.crates.prewarm();
+        println!("Async startup finished");
     });
 
     server::new(move || {
@@ -76,10 +78,10 @@ fn main() {
     })
     .bind("127.0.0.1:32531")
     .expect("Can not bind to 127.0.0.1:32531")
-    .shutdown_timeout(0) // <- Set shutdown timeout to 0 seconds (default 60s)
+    .shutdown_timeout(1)
     .start();
 
-    println!("Starting HTTP server on http://127.0.0.1:32531");
+    println!("Started HTTP server on http://127.0.0.1:32531");
     let _ = sys.run();
 }
 
@@ -95,6 +97,8 @@ fn handle_home(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> 
         front_end::render_homepage(&mut page, &state2.crates)?;
         Ok(page)
     })
+    .timeout(Duration::from_secs(300))
+    .map_err(map_err)
     .from_err()
     .and_then(|page| {
         future::ok(HttpResponse::Ok()
@@ -120,7 +124,9 @@ fn handle_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse>
         std::fs::write(state2.public_crates_dir.join(format!("{}.html", kw)), &page)?;
         Ok(page)
     })
-     .from_err()
+    .timeout(Duration::from_secs(8))
+    .map_err(map_err)
+    .from_err()
     .and_then(|page| {
         future::ok(HttpResponse::Ok()
             .content_type("text/html;charset=UTF-8")
@@ -152,6 +158,8 @@ fn handle_keyword(req: &HttpRequest<AServerState>) -> FutureResponse<HttpRespons
                     Ok((query, None))
                 }
             })
+            .timeout(Duration::from_secs(2))
+            .map_err(map_err)
             .from_err()
             .and_then(|(query, page)| {
                 future::ok(if let Some(page) = page {
@@ -179,6 +187,16 @@ fn handle_keyword(req: &HttpRequest<AServerState>) -> FutureResponse<HttpRespons
     }
 }
 
+fn map_err(err: tokio_timer::timeout::Error<failure::Error>) -> failure::Error {
+    match err.into_inner() {
+        Some(e) => e,
+        None => {
+            eprintln!("Page render timed out");
+            failure::err_msg("timed out")
+        },
+    }
+}
+
 fn is_alnum(q: &str) -> bool {
     q.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
@@ -195,6 +213,8 @@ fn handle_search(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse
                 front_end::render_serp_page(&mut page, &query, &results, &state2.markup)?;
                 Ok(page)
             })
+            .timeout(Duration::from_secs(2))
+            .map_err(map_err)
             .from_err()
             .and_then(|page| {
                 future::ok(HttpResponse::Ok()

@@ -4,7 +4,7 @@ use crate::index::*;
 use crate::KitchenSinkErr;
 use crates_index::Crate;
 use rayon::prelude::*;
-use std::sync::Mutex;
+use parking_lot::Mutex;
 use string_interner::Sym;
 
 pub struct DepsStats {
@@ -57,7 +57,7 @@ impl DepVisitor {
     pub fn visit(&mut self, depset: &ArcDepSet, depinf: DepInf, mut cb: impl FnMut(&mut Self, &DepName, &Dep)) {
         let target_addr: &Mutex<FxHashMap<DepName, Dep>> = &*depset;
         if self.node_visited.insert((depinf, target_addr as *const _)) {
-            if let Ok(depset) = depset.try_lock() {
+            if let Some(depset) = depset.try_lock() {
                 for (name, dep) in depset.iter() {
                     cb(self, name, dep);
                 }

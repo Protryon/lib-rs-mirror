@@ -3,7 +3,7 @@ use simple_cache::TempCache;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry::*;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use parking_lot::Mutex;
 use std::fmt;
 
 /// Downloads each day of the year
@@ -38,7 +38,7 @@ impl AllDownloads {
 
     /// Crates.io crate name
     pub fn get_crate_year(&self, crate_name: &str, year: u16) -> Result<Option<VersionMap>, simple_cache::Error> {
-        let mut t = self.by_year.lock().unwrap();
+        let mut t = self.by_year.lock();
         let cache = match t.entry(year) {
             Occupied(e) => e.into_mut(),
             Vacant(e) => {
@@ -54,7 +54,7 @@ impl AllDownloads {
                 .filter(|&(dl, _)| dl > 0)
                 .all(|(_, is_set)| is_set));
         }
-        let mut t = self.by_year.lock().unwrap();
+        let mut t = self.by_year.lock();
         let cache = match t.entry(year) {
             Occupied(e) => e.into_mut(),
             Vacant(e) => {

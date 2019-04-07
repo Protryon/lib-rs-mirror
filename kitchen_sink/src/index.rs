@@ -14,7 +14,8 @@ use semver::VersionReq;
 use std::iter;
 use std::path::Path;
 use std::sync::RwLock;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use parking_lot::Mutex;
 use fxhash::{FxHashMap, FxHashSet};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -250,7 +251,7 @@ impl Index {
             }))
         }).collect();
 
-        *result.lock().unwrap() = set?;
+        *result.lock() = set?;
         Ok(result)
     }
 
@@ -315,7 +316,7 @@ impl Index {
 use std::fmt;
 impl fmt::Debug for Dep {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Dep {{ {}, runtime: x{}, build: x{} }}", self.semver, self.runtime.lock().unwrap().len(), self.build.lock().unwrap().len())
+        write!(f, "Dep {{ {}, runtime: x{}, build: x{} }}", self.semver, self.runtime.lock().len(), self.build.lock().len())
     }
 }
 

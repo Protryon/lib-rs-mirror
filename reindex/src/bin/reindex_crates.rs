@@ -9,10 +9,9 @@ use kitchen_sink::{self, stopped, MaintenanceStatus, CrateData, KitchenSink, Ori
 use rand::{seq::SliceRandom, thread_rng};
 use rayon;
 use std::sync::mpsc;
-use std::{
-    collections::HashSet,
-    sync::{Arc, Mutex},
-};
+use std::collections::HashSet;
+use std::sync::Arc;
+use parking_lot::Mutex;
 
 fn main() {
     let crates = Arc::new(match kitchen_sink::KitchenSink::new_default() {
@@ -77,7 +76,7 @@ fn main() {
                             s2.spawn(move |_| {
                                 if let Some(ref repo) = v.repository() {
                                     {
-                                        let mut s = seen_repos.lock().unwrap();
+                                        let mut s = seen_repos.lock();
                                         let url = repo.canonical_git_url().to_string();
                                         if s.contains(&url) {
                                             return;

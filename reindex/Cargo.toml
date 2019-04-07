@@ -17,3 +17,4 @@ search_index = { path = "../search_index" }
 render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git" }
 ranking = { path = "../ranking" }
 either = "1.5.0"
+parking_lot = "0.7.1"

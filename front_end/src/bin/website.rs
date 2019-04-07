@@ -20,7 +20,8 @@ use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
+use parking_lot::Mutex;
 
 ///
 /// See home_page.rs for interesting bits
@@ -73,7 +74,7 @@ fn render_categories(
             let render_crate = |origin: &Origin| {
                 running()?;
                 {
-                    let mut s = done_pages.lock().unwrap();
+                    let mut s = done_pages.lock();
                     if s.get(origin).is_some() {
                         return Ok(());
                     }

@@ -1067,6 +1067,12 @@ impl KitchenSink {
         Ok(self.gh.user_by_login(github_login)?) // errs on 404
     }
 
+    /// List of all notable crates
+    /// Returns origin, rank, last updated unix timestamp
+    pub fn sitemap_crates(&self) -> CResult<Vec<(Origin, f64, i64)>> {
+        Ok(self.crate_db.sitemap_crates()?)
+    }
+
     /// If given crate is a sub-crate, return crate that owns it.
     /// The relationship is based on directory layout of monorepos.
     pub fn parent_crate(&self, child: &RichCrateVersion) -> Option<RichCrateVersion> {

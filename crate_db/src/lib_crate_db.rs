@@ -776,6 +776,25 @@ impl CrateDb {
         })
     }
 
+    /// List of all notable crates
+    /// Returns origin, rank, last updated unix timestamp
+    pub fn sitemap_crates(&self) -> FResult<Vec<(Origin, f64, i64)>> {
+        self.with_connection(|conn| {
+            let mut q = conn.prepare(r#"
+                SELECT origin, ranking, max(created) as last_update
+                FROM crates c
+                JOIN crate_versions v ON c.id = v.crate_id
+                WHERE ranking > 0.15
+                GROUP BY c.id
+            "#)?;
+            let q = q.query_map(NO_PARAMS, |row| -> (Origin, f64, i64) {
+                let s: String = row.get(0);
+                (Origin::from_str(s), row.get(1), row.get(2))
+            }).context("sitemap")?.filter_map(|r| r.ok());
+            Ok(q.collect())
+        })
+    }
+
     /// Number of crates in every category
     pub fn category_crate_counts(&self) -> FResult<HashMap<String, u32>> {
         self.with_connection(|conn| {

@@ -189,19 +189,18 @@ impl GitHub {
         let callback = |client: &client::Github| {
             client.get().custom_endpoint(&path).execute()
         };
-        match self.get_cached(&self.contribs, key, callback, id) {
-            Err(Error::TryAgainLater) => {
-                thread::sleep(Duration::from_secs(1));
-                match self.get_cached(&self.contribs, key, callback, id) {
-                    Err(Error::TryAgainLater) => {
-                        thread::sleep(Duration::from_secs(4));
-                        self.get_cached(&self.contribs, key, callback, id)
-                    },
-                    res => res,
-                }
-            },
-            Err(e) => Err(e.context("contributors")),
-            res => res,
+        let mut retries = 5;
+        let mut delay = 1;
+        loop {
+            match self.get_cached(&self.contribs, key, callback, id) {
+                Err(Error::TryAgainLater) if retries > 0 => {
+                    thread::sleep(Duration::from_secs(delay));
+                    retries -= 1;
+                    delay *= 2;
+                },
+                Err(e) => return Err(e.context("contributors")),
+                res => return res,
+            }
         }
     }
 

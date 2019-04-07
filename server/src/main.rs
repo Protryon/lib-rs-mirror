@@ -46,6 +46,7 @@ fn main() {
     assert!(data_dir.exists(), "CRATE_DATA_DIR {} does not exist", data_dir.display());
 
     let crates = KitchenSink::new(&data_dir, &github_token).unwrap();
+    crates.prewarm();
     let image_filter = Arc::new(ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_dir().join("images.db")).unwrap());
     let markup = Renderer::new_filter(Some(Highlighter::new()), image_filter);
 
@@ -58,12 +59,6 @@ fn main() {
         index,
         crates,
         public_crates_dir,
-    });
-
-    let state2 = Arc::clone(&state);
-    let _ = std::thread::spawn(move || {
-        state2.crates.prewarm();
-        println!("Async startup finished");
     });
 
     server::new(move || {
@@ -92,7 +87,7 @@ fn handle_404(_req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
 fn handle_home(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
     let state = req.state();
     let state2 = Arc::clone(state);
-    state.render_pool.spawn_fn(move || -> Result<_, failure::Error> {
+    state.render_pool.spawn_fn(move || {
         let mut page: Vec<u8> = Vec::with_capacity(50000);
         front_end::render_homepage(&mut page, &state2.crates)?;
         Ok(page)
@@ -115,7 +110,7 @@ fn handle_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse>
     println!("rendering {:?}", kw);
     let state = req.state();
     let state2 = Arc::clone(state);
-    state.render_pool.spawn_fn(move || -> Result<_, failure::Error> {
+    state.render_pool.spawn_fn(move || {
         assert!(is_alnum(&kw));
         let origin = Origin::from_crates_io_name(&kw);
         let all = state2.crates.rich_crate(&origin)?;
@@ -145,7 +140,7 @@ fn handle_keyword(req: &HttpRequest<AServerState>) -> FutureResponse<HttpRespons
             let query = q.to_owned();
             let state = req.state();
             let state2 = Arc::clone(state);
-            state.search_pool.spawn_fn(move || -> Result<_, failure::Error> {
+            state.search_pool.spawn_fn(move || {
                 if !is_alnum(&query) {
                     return Ok((query, None));
                 }
@@ -207,7 +202,7 @@ fn handle_search(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse
             let query = q.to_owned();
             let state = req.state();
             let state2 = Arc::clone(state);
-            state.search_pool.spawn_fn(move || -> Result<_, failure::Error> {
+            state.search_pool.spawn_fn(move || {
                 let mut page: Vec<u8> = Vec::with_capacity(50000);
                 let results = state2.index.search(&query, 50)?;
                 front_end::render_serp_page(&mut page, &query, &results, &state2.markup)?;

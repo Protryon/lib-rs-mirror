@@ -40,9 +40,9 @@ pub struct RichCrateVersion {
     bin: Vec<Product>,
     features: FeatureSet,
     target: TargetDepsSet,
-    dependencies: DepsSet,
-    build_dependencies: DepsSet,
-    dev_dependencies: DepsSet,
+    direct_dependencies: DepsSet,
+    direct_build_dependencies: DepsSet,
+    direct_dev_dependencies: DepsSet,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -80,9 +80,9 @@ impl RichCrateVersion {
             maintenance: manifest.badges.maintenance.status,
             features: manifest.features,
             target: manifest.target,
-            dependencies: manifest.dependencies,
-            build_dependencies: manifest.build_dependencies,
-            dev_dependencies: manifest.dev_dependencies,
+            direct_dependencies: manifest.dependencies,
+            direct_build_dependencies: manifest.build_dependencies,
+            direct_dev_dependencies: manifest.dev_dependencies,
         };
         s.fake_categories();
         s
@@ -369,7 +369,7 @@ impl RichCrateVersion {
     }
 
     pub fn has_runtime_deps(&self) -> bool {
-        !self.dependencies.is_empty() || self.target.values().any(|target| !target.dependencies.is_empty())
+        !self.direct_dependencies.is_empty() || self.target.values().any(|target| !target.dependencies.is_empty())
     }
 
     pub fn features(&self) -> &BTreeMap<String, Vec<String>> {
@@ -377,7 +377,7 @@ impl RichCrateVersion {
     }
 
     /// Runtime, dev, build
-    pub fn dependencies(&self) -> Result<(Vec<RichDep>, Vec<RichDep>, Vec<RichDep>), CfgErr> {
+    pub fn direct_dependencies(&self) -> Result<(Vec<RichDep>, Vec<RichDep>, Vec<RichDep>), CfgErr> {
         fn to_dep((name, dep): (&String, &Dependency)) -> (String, RichDep) {
             let package = dep.package().unwrap_or(&name).to_owned();
             (package.clone(), RichDep {
@@ -388,9 +388,9 @@ impl RichCrateVersion {
                 with_features: Vec::new(),
             })
         }
-        let mut normal: BTreeMap<String, RichDep> = self.dependencies.iter().map(to_dep).collect();
-        let mut build: BTreeMap<String, RichDep> = self.build_dependencies.iter().map(to_dep).collect();
-        let mut dev: BTreeMap<String, RichDep> = self.dev_dependencies.iter().map(to_dep).collect();
+        let mut normal: BTreeMap<String, RichDep> = self.direct_dependencies.iter().map(to_dep).collect();
+        let mut build: BTreeMap<String, RichDep> = self.direct_build_dependencies.iter().map(to_dep).collect();
+        let mut dev: BTreeMap<String, RichDep> = self.direct_dev_dependencies.iter().map(to_dep).collect();
 
         fn add_targets(dest: &mut BTreeMap<String, RichDep>, src: &DepsSet, target: &str) -> Result<(), CfgErr> {
             for (name, dep) in src {
@@ -471,7 +471,7 @@ impl RichCrateVersion {
                 *cat = "internationalization".to_string();
             }
             if cat == "parsers" {
-                if self.dependencies.keys().any(|k| k == "nom" || k == "peresil" || k == "combine") {
+                if self.direct_dependencies.keys().any(|k| k == "nom" || k == "peresil" || k == "combine") {
                     *cat = "parser-implementations".into();
                 }
             }

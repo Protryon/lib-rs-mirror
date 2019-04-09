@@ -940,7 +940,7 @@ impl KitchenSink {
         // but we're taking only niche deps to group similar niche crates together
         let deps_stats = self.index.deps_stats();
         let mut weighed_deps = Vec::<(&str, f32)>::new();
-        let all_deps = v.dependencies()?;
+        let all_deps = v.direct_dependencies()?;
         let all_deps = [(all_deps.0, 1.0), (all_deps.2, 0.33)];
         // runtime and (lesser) build-time deps
         for (deps, overall_weight) in all_deps.iter() {

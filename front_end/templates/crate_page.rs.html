@@ -274,7 +274,7 @@
           }
         </div>
         <section id="deps">
-          @if let Some((normal, dev, build)) = c.dependencies() {
+          @if let Some((normal, dev, build)) = c.direct_dependencies() {
             @if c.has_runtime_deps() || c.ver.links().is_some() {
               <h4><a href="@url.deps(&c.ver)">Dependencies</a></h4>
             } else {

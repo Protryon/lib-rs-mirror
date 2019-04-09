@@ -19,7 +19,7 @@ crate_files = { path = "../crate_files", version = "0.2" }
 user_db = { path = "../user_db", version = "0.3" }
 crate_db = { path = "../crate_db", version = "0.4.0" }
 categories = { path = "../categories" }
-rich_crate = { path = "../rich_crate", version = "0.4.2" }
+rich_crate = { path = "../rich_crate", version = "0.4.4" }
 simple_cache = { git = "https://gitlab.com/crates.rs/simple_cache.git", version = "0.7.0" }
 lazyonce = "0.3.0"
 repo_url = { git = "https://gitlab.com/crates.rs/repo_url.git", version = "0.3.0" }
@@ -35,7 +35,7 @@ failure = "0.1.2"
 lazycell = "1.2.1"
 rayon = "1.0.3"
 reqwest = "0.9"
-tokio = "0.1.18"
+tokio = "=0.1.11"
 itertools = "0.8"
 semver-parser = "0.9.0"
 chrono = "0.4.5"

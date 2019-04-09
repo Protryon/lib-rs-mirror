@@ -284,7 +284,7 @@ fn get_crate_pr<'a>(crates: &KitchenSink, crates_io_crates: &'a FxHashMap<Origin
         let mut next_pass = FxHashMap::with_capacity_and_hasher(prev_pass.len(), Default::default());
         for k in crates_io_crates.values() {
             if let Some(this_crate_pr) = prev_pass.get(k.name()).cloned() {
-                let deps = k.latest_version().dependencies();
+                let deps = k.latest_version().direct_dependencies();
                 if deps.is_empty() {
                     // this is a sink, so pretend it has *all* other crates as deps
                     pool.authors_perspective += this_crate_pr.authors_perspective * damping_factor;

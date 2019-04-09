@@ -267,8 +267,8 @@ impl<'a> CratePage<'a> {
         date.format("%b %Y").to_string()
     }
 
-    pub fn dependencies(&self) -> Option<(Vec<RichDep>, Vec<RichDep>, Vec<RichDep>)> {
-        self.ver.dependencies().ok()
+    pub fn direct_dependencies(&self) -> Option<(Vec<RichDep>, Vec<RichDep>, Vec<RichDep>)> {
+        self.ver.direct_dependencies().ok()
     }
 
     pub fn up_to_date_class(&self, richdep: &RichDep) -> &str {

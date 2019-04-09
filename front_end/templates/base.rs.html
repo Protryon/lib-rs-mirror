@@ -43,6 +43,7 @@
     }
     @if let Some(ref url) = props.canonical {
       <meta property="og:url" content="@url">
+      <meta rel="canonical" content="@url">
     }
     <meta name="twitter:card" content="summary">
     <meta name="twitter:site" content="@props.site_twitter_handle()" />

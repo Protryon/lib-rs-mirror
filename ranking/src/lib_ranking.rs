@@ -17,6 +17,7 @@ pub struct CrateVersionInputs<'a> {
     pub readme: Option<&'a Handle>,
     pub owners: &'a [CrateOwner],
     pub authors: &'a [Author],
+    pub contributors: Option<u32>, // based on source history
     pub edition: Edition,
     pub is_app: bool,
     pub has_build_rs: bool,
@@ -37,6 +38,11 @@ pub struct CrateVersionInputs<'a> {
     pub has_badges: bool,
     pub maintenance: MaintenanceStatus,
     pub is_nightly: bool,
+
+    pub total_code_lines: u32,
+    pub rust_comment_lines: u32,
+    pub rust_code_lines: u32,
+
 
     // (relative) weight of dependencies?
 
@@ -113,10 +119,8 @@ fn cargo_toml_score(cr: &CrateVersionInputs) -> Score {
     // it's the best practice, may help building old versions of the project
     // s.has("has_lockfile", 5, cr.has_lockfile);
     // assume it's CI, which helps improve quality
-    s.has("has_badges", 20, cr.has_badges);
-
-    // not official
-    // s.has("has_changelog", 5, cr.has_changelog);
+    // TODO: detect travis, etc. without badges
+    s.has("has_badges", 15, cr.has_badges);
 
     s.n("maintenance status", 30, match cr.maintenance {
         MaintenanceStatus::ActivelyDeveloped => 30,
@@ -285,11 +289,23 @@ fn versions_score(ver: &[CrateVersion]) -> Score {
     s
 }
 
-fn authors_score(authors: &[Author], owners: &[CrateOwner]) -> Score {
+fn authors_score(authors: &[Author], owners: &[CrateOwner], contributors: Option<u32>) -> Score {
     let mut s = Score::new();
-    s.n("bus factor", 5, owners.len() as u32);
-    s.n("more than one owner", 8, owners.len() > 1);
+    s.n("more than one owner", 3, owners.len() > 1);
+    s.n("bus factor", 4, owners.len() as u32);
     s.n("authors", 5, authors.len() as u32);
+    if let Some(contributors) = contributors {
+        s.frac("contributors", 7, (contributors as f64 / 7.).min(1.));
+    }
+    s
+}
+
+fn code_score(cr: &CrateVersionInputs) -> Score {
+    let mut s = Score::new();
+    s.has("Non-trivial", 1, cr.total_code_lines > 700); // usually trivial/toy programs
+    s.has("Non-giant", 1, cr.total_code_lines < 80000); // these should be split into crates
+    s.frac("Rust LoC", 2, (cr.rust_code_lines as f64 / 5000.).min(1.)); // prefer substantial projects (and ignore vendored non-Rust code)
+    s.frac("Comments", 2, (10. * cr.rust_comment_lines as f64 / (3000. + cr.rust_code_lines as f64)).min(1.)); // it's easier to keep small project commented
     s
 }
 
@@ -298,8 +314,9 @@ pub fn crate_score_version(cr: &CrateVersionInputs) -> Score {
 
     score.group("Cargo.toml", 2, cargo_toml_score(cr));
     score.group("README", 4, readme_score(cr.readme, cr.is_app));
+    score.group("Code", 1, code_score(cr));
     score.group("Versions", 4, versions_score(cr.versions));
-    score.group("Authors/Owners", 3, authors_score(cr.authors, cr.owners));
+    score.group("Authors/Owners", 3, authors_score(cr.authors, cr.owners, cr.contributors));
 
     score
 }
@@ -346,6 +363,10 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs) -> Score {
     // FIXME: max should be based on the most downloaded crate?
     score.score_f("Downloads", 6., pop);
     score.score_f("Downloads (cleaned)", 18., pop_cleaned);
+
+    // if it's new, it doesn't have to have many downloads.
+    // if it's aging, it'd better have more users
+    score.has("Any traction", 2, (cr.downloads_per_month as f64 * freshness_score) > 1000.);
 
     // Don't expect apps to have rev deps (omitting these entirely proprtionally increases importance of other factors)
     if !cr.is_app || cr.number_of_direct_reverse_deps > 1 {

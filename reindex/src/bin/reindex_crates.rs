@@ -134,13 +134,21 @@ fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersi
     let readme = k.readme().ok().and_then(|r| r).map(|readme| {
         renderer.page_node(&readme.markup, None, false)
     });
+    let contributors = crates.all_contributors(k).map_err(|e| eprintln!("{}", e)).ok().map(|(_,_,_, c)| c as u32);
+    let langs = k.language_stats();
+    let (rust_code_lines, rust_comment_lines) = langs.langs.get(&udedokei::Language::Rust).map(|rs| (rs.code, rs.comments)).unwrap_or_default();
+    let total_code_lines = langs.langs.iter().filter(|(k,_)| k.is_code()).map(|(_,l)| l.code).sum::<u32>();
     let base_score = ranking::crate_score_version(&CrateVersionInputs {
         versions: all.versions(),
         description: k.description().unwrap_or(""),
         readme: readme.as_ref(),
         owners: all.owners(),
         authors: k.authors(),
+        contributors,
         edition: k.edition(),
+        total_code_lines,
+        rust_code_lines,
+        rust_comment_lines,
         is_app: k.is_app(),
         has_build_rs: k.has_buildrs(),
         has_links: k.links().is_some(),
@@ -216,6 +224,10 @@ fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersi
         score *= 0.9;
     }
 
+    if is_autopublished(&k) {
+        score *= 0.8;
+    }
+
     if is_deprecated(&k) {
         score *= 0.2;
     }
@@ -226,6 +238,10 @@ fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersi
     }
 
     (downloads_per_month as usize, score)
+}
+
+fn is_autopublished(k: &RichCrateVersion) -> bool {
+    k.description().map_or(false, |d| d.starts_with("Automatically published "))
 }
 
 fn is_deprecated(k: &RichCrateVersion) -> bool {

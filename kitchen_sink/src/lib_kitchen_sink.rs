@@ -161,6 +161,7 @@ struct RichCrateVersionCacheData {
     lib_file: Option<String>,
     path_in_repo: Option<String>,
     has_buildrs: bool,
+    has_code_of_conduct: bool,
 }
 
 impl KitchenSink {
@@ -471,7 +472,7 @@ impl KitchenSink {
             }
             (d, warn)
         };
-        Ok((RichCrateVersion::new(krate.clone(), d.manifest, d.derived, d.readme, d.lib_file.map(|s| s.into()), d.path_in_repo, d.has_buildrs), warn))
+        Ok((RichCrateVersion::new(krate.clone(), d.manifest, d.derived, d.readme, d.lib_file.map(|s| s.into()), d.path_in_repo, d.has_buildrs, d.has_code_of_conduct), warn))
     }
 
     pub fn changelog_url(&self, k: &RichCrateVersion) -> Option<String> {
@@ -498,6 +499,7 @@ impl KitchenSink {
         drop(crate_tarball);
 
         let has_buildrs = meta.has("build.rs");
+        let has_code_of_conduct = meta.has("CODE_OF_CONDUCT.md") || meta.has("docs/CODE_OF_CONDUCT.md") || meta.has(".github/CODE_OF_CONDUCT.md");
 
         let mut derived = Derived::default();
         mem::swap(&mut derived.language_stats, &mut meta.language_stats); // move
@@ -628,6 +630,7 @@ impl KitchenSink {
         Ok((RichCrateVersionCacheData {
             derived,
             has_buildrs,
+            has_code_of_conduct,
             manifest: meta.manifest,
             readme: meta.readme.map_err(|_| ()),
             lib_file: meta.lib_file.map(|s| s.into()),

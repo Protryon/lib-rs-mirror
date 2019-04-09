@@ -20,6 +20,7 @@ pub struct CrateVersionInputs<'a> {
     pub edition: Edition,
     pub is_app: bool,
     pub has_build_rs: bool,
+    pub has_code_of_conduct: bool,
     pub has_links: bool,
     pub has_documentation_link: bool,
     pub has_homepage_link: bool,
@@ -91,6 +92,7 @@ fn cargo_toml_score(cr: &CrateVersionInputs) -> Score {
     s.has("has_examples", 50, cr.has_examples);
     // probably less buggy than if winging it
     s.has("has_tests", 50, cr.has_tests);
+    s.has("has_code_of_conduct", 15, cr.has_code_of_conduct);
     // probably optimized
     s.has("has_benches", 10, cr.has_benches);
 

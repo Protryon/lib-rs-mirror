@@ -151,6 +151,7 @@ fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersi
         has_categories: k.has_own_categories(),
         has_features: !k.features().is_empty(),
         has_examples: k.has_examples(),
+        has_code_of_conduct: k.has_code_of_conduct(),
         has_benches: k.has_benches(),
         has_tests: k.has_tests(),
         // has_lockfile: k.has_lockfile(),

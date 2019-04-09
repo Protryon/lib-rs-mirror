@@ -28,6 +28,7 @@ pub struct RichCrateVersion {
     repo: Option<Repo>,
     path_in_repo: Option<String>,
     has_buildrs: bool,
+    has_code_of_conduct: bool,
     has_examples: bool,
     has_tests: bool,
     has_benches: bool,
@@ -57,7 +58,7 @@ pub enum Include {
 /// Crates.rs uses this only for the latest version of a crate.
 impl RichCrateVersion {
     pub fn new(index: Version, mut manifest: Manifest, derived: Derived, readme: Result<Option<Readme>, ()>,
-        lib_file: Option<String>, path_in_repo: Option<String>, has_buildrs: bool) -> Self
+        lib_file: Option<String>, path_in_repo: Option<String>, has_buildrs: bool, has_code_of_conduct: bool) -> Self
     {
         let package = manifest.package.take().unwrap();
         let mut s = Self {
@@ -68,6 +69,7 @@ impl RichCrateVersion {
             package,
             readme,
             has_buildrs,
+            has_code_of_conduct,
             derived,
             path_in_repo,
             lib_file,
@@ -284,6 +286,10 @@ impl RichCrateVersion {
 
     pub fn has_buildrs(&self) -> bool {
         self.has_buildrs || self.package.build.is_some()
+    }
+
+    pub fn has_code_of_conduct(&self) -> bool {
+        self.has_code_of_conduct
     }
 
     pub fn has_examples(&self) -> bool {

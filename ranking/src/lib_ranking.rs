@@ -58,7 +58,7 @@ pub struct CrateVersionInputs<'a> {
 pub struct CrateTemporalInputs<'a> {
     pub versions: &'a [CrateVersion],
     // 1.0 fresh, 0.0 totally outdated and deprecated
-    // pub dependency_freshness: Vec<f32>,
+    pub dependency_freshness: Vec<f32>,
     pub downloads_per_month: u32,
     /// Looking at downloads of direct dependencies.
     /// This way internal derive/impl/core crates that have one big user get 0 here.
@@ -350,6 +350,9 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs) -> Score {
         }
     };
     score.frac("Freshness of latest release", 8, freshness_score);
+    score.frac("Freshness of deps", 8, cr.dependency_freshness.iter()
+        .map(|d| 0.2 + d * 0.8) // one bad dep shouldn't totally kill the score
+        .product::<f32>());
 
     // Low numbers are just bots/noise.
     let downloads = (cr.downloads_per_month as f64 - 100.).max(0.) + 100.;

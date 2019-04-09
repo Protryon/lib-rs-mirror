@@ -532,6 +532,10 @@ impl RichDep {
         &self.only_for_features
     }
 
+    pub fn is_optional(&self) -> bool {
+        !self.only_for_features.is_empty()
+    }
+
     pub fn add_target(&mut self, target: &str) -> Result<(), CfgErr> {
         self.only_for_targets.push(
             target.parse().unwrap_or_else(|_| {

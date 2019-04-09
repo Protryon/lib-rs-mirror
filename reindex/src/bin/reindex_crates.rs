@@ -171,6 +171,20 @@ fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersi
     }).total();
 
     let downloads_per_month = crates.downloads_per_month_or_equivalent(all.origin()).expect("dl numbers").unwrap_or(0) as u32;
+    let dependency_freshness = if let Ok((runtime, _, build)) = k.direct_dependencies() {
+        // outdated dev deps don't matter
+        runtime.iter().chain(&build).filter_map(|richdep| {
+            richdep.dep.req().parse().ok().map(|req| (richdep.is_optional(), crates.version_popularity(&richdep.package, &req)))
+        })
+        .map(|(is_optional, (is_latest, popularity))| {
+            if is_latest {1.0} // don't penalize pioneers
+            else if is_optional {0.8 + popularity * 0.2} // not a big deal when it's off
+            else {popularity}
+        })
+        .collect()
+    } else {
+        Vec::new()
+    };
 
     let mut temp_inp = CrateTemporalInputs {
         versions: all.versions(),
@@ -182,6 +196,7 @@ fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersi
         number_of_direct_reverse_deps: 0,
         number_of_indirect_reverse_deps: 0,
         number_of_indirect_reverse_optional_deps: 0,
+        dependency_freshness,
     };
 
     let mut direct_rev_deps = 0;

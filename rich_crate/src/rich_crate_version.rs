@@ -86,7 +86,7 @@ impl RichCrateVersion {
             direct_build_dependencies: manifest.build_dependencies,
             direct_dev_dependencies: manifest.dev_dependencies,
         };
-        s.fake_categories();
+        s.override_bad_categories();
         s
     }
 
@@ -470,14 +470,17 @@ impl RichCrateVersion {
         Ok((convsort(normal), convsort(dev), convsort(build)))
     }
 
-    fn fake_categories(&mut self) {
+    fn override_bad_categories(&mut self) {
         for cat in &mut self.package.categories {
             if cat == "localization" {
                 // nobody knows the difference
                 *cat = "internationalization".to_string();
             }
             if cat == "parsers" {
-                if self.direct_dependencies.keys().any(|k| k == "nom" || k == "peresil" || k == "combine") {
+                if self.direct_dependencies.keys().any(|k| k == "nom" || k == "peresil" || k == "combine") ||
+                    self.package.keywords.iter().any(|k| match k.to_ascii_lowercase().as_ref() {
+                        "asn1" | "tls" | "idl" | "crawler" | "xml" | "nom" | "json" | "logs" | "elf" | "uri" | "html" | "protocol" | "semver" | "ecma" | "chess" | "vcard" | "exe" | "fasta" => true, _ => false
+                    }) {
                     *cat = "parser-implementations".into();
                 }
             }

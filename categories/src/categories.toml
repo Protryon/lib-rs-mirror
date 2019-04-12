@@ -515,8 +515,8 @@ Parse data formats or languages."""
 siblings = ["parsing"]
 
 [parsing]
-name = "Parsing tools"
-title = "Parser tooling"
+name = "Parser tooling"
+title = "Parser"
 description = """
 Low-level, file-format-independent libraries for writing or generating parsers.
 """

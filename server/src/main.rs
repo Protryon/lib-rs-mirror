@@ -62,6 +62,13 @@ fn main() {
         public_crates_dir,
     });
 
+    std::thread::spawn({
+        let state = state.clone();
+        move || {
+            state.crates.prewarm();
+        }
+    });
+
     server::new(move || {
         App::with_state(state.clone())
             .middleware(middleware::Logger::default())
@@ -158,7 +165,7 @@ fn handle_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse>
         std::fs::write(state2.public_crates_dir.join(format!("{}.html", kw)), &page)?;
         Ok(page)
     })
-    .timeout(Duration::from_secs(8))
+    .timeout(Duration::from_secs(12))
     .map_err(map_err)
     .from_err()
     .and_then(|page| {

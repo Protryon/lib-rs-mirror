@@ -4,9 +4,9 @@ use toml;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate quick_error;
 
-use toml::value::{Value, Table};
-use std::collections::BTreeMap;
 use std::borrow::Cow;
+use std::collections::BTreeMap;
+use toml::value::{Table, Value};
 
 mod tuning;
 pub use crate::tuning::*;

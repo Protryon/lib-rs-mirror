@@ -1,18 +1,18 @@
-pub use cargo_toml::{Edition, FeatureSet, TargetDepsSet, DepsSet, MaintenanceStatus};
-use cargo_toml::{Dependency, Package, Product, Manifest};
+use crate::Author;
+use crate::Markup;
+use crate::Origin;
+use crate::Readme;
+use cargo_toml::{Dependency, Manifest, Package, Product};
+pub use cargo_toml::{DepsSet, Edition, FeatureSet, MaintenanceStatus, TargetDepsSet};
 use categories::Categories;
 use crates_index::Version;
 use repo_url::Repo;
 use semver;
-use udedokei;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use crate::Author;
-use crate::Origin;
-use crate::Readme;
-use crate::Markup;
+use udedokei;
 
 pub use parse_cfg::ParseError as CfgErr;
 pub use parse_cfg::{Cfg, Target};
@@ -78,7 +78,12 @@ impl RichCrateVersion {
             has_examples: !manifest.example.is_empty(),
             has_tests: !manifest.test.is_empty(),
             has_benches: !manifest.bench.is_empty(),
-            has_badges: manifest.badges.appveyor.is_some() || manifest.badges.circle_ci.is_some() || manifest.badges.gitlab.is_some() || manifest.badges.travis_ci.is_some() || manifest.badges.codecov.is_some() || manifest.badges.coveralls.is_some(),
+            has_badges: manifest.badges.appveyor.is_some() ||
+                manifest.badges.circle_ci.is_some() ||
+                manifest.badges.gitlab.is_some() ||
+                manifest.badges.travis_ci.is_some() ||
+                manifest.badges.codecov.is_some() ||
+                manifest.badges.coveralls.is_some(),
             maintenance: manifest.badges.maintenance.status,
             features: manifest.features,
             target: manifest.target,
@@ -178,8 +183,9 @@ impl RichCrateVersion {
             Include::RawCargoTomlOnly => {
                 let tmp: Vec<_> = self.package.categories.iter().map(From::from).collect();
                 tmp
-            }
-        }.into_iter()
+            },
+        }
+        .into_iter()
     }
 
     pub fn license(&self) -> Option<&str> {
@@ -210,7 +216,8 @@ impl RichCrateVersion {
             },
             Include::Cleaned => self.derived.keywords.as_ref().unwrap_or(&self.package.keywords),
         }
-        .iter().map(|s| s.as_str())
+        .iter()
+        .map(|s| s.as_str())
     }
 
     /// Globally unique URL-like string identifying source & the crate within that source
@@ -364,14 +371,15 @@ impl RichCrateVersion {
 
     pub fn is_sys(&self) -> bool {
         !self.has_bin() &&
-        self.has_buildrs() &&
-        !self.is_proc_macro() &&
-        (self.links().is_some() || (
-            self.short_name().ends_with("-sys") ||
-            self.short_name().ends_with("_sys") ||
-            self.category_slugs(Include::RawCargoTomlOnly).any(|c| c == "external-ffi-bindings")
-            // _dll suffix is a false positive
-        ))
+            self.has_buildrs() &&
+            !self.is_proc_macro() &&
+            (self.links().is_some() ||
+                (
+                    self.short_name().ends_with("-sys") ||
+                        self.short_name().ends_with("_sys") ||
+                        self.category_slugs(Include::RawCargoTomlOnly).any(|c| c == "external-ffi-bindings")
+                    // _dll suffix is a false positive
+                ))
     }
 
     pub fn has_runtime_deps(&self) -> bool {
@@ -422,7 +430,6 @@ impl RichCrateVersion {
             add_targets(&mut build, &plat.build_dependencies, target)?;
             add_targets(&mut dev, &plat.dev_dependencies, target)?;
         }
-
 
         // Don't display deps twice if they're required anyway
         for dep in normal.keys() {
@@ -479,8 +486,11 @@ impl RichCrateVersion {
             if cat == "parsers" {
                 if self.direct_dependencies.keys().any(|k| k == "nom" || k == "peresil" || k == "combine") ||
                     self.package.keywords.iter().any(|k| match k.to_ascii_lowercase().as_ref() {
-                        "asn1" | "tls" | "idl" | "crawler" | "xml" | "nom" | "json" | "logs" | "elf" | "uri" | "html" | "protocol" | "semver" | "ecma" | "chess" | "vcard" | "exe" | "fasta" => true, _ => false
-                    }) {
+                        "asn1" | "tls" | "idl" | "crawler" | "xml" | "nom" | "json" | "logs" | "elf" | "uri" | "html" | "protocol" | "semver" | "ecma" |
+                        "chess" | "vcard" | "exe" | "fasta" => true,
+                        _ => false,
+                    })
+                {
                     *cat = "parser-implementations".into();
                 }
             }

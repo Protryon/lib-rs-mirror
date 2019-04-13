@@ -1,22 +1,22 @@
-use string_interner::StringInterner;
-use string_interner::Sym;
 use crate::deps_stats::DepsStats;
+use crate::git_crates_index::*;
 use crate::KitchenSink;
 use crate::KitchenSinkErr;
-use crate::git_crates_index::*;
 use crates_index;
 use crates_index::Crate;
 use crates_index::Version;
+use fxhash::{FxHashMap, FxHashSet};
 use lazyonce::LazyOnce;
+use parking_lot::Mutex;
 use rich_crate::Origin;
 use semver::Version as SemVer;
 use semver::VersionReq;
 use std::iter;
 use std::path::Path;
-use std::sync::RwLock;
 use std::sync::Arc;
-use parking_lot::Mutex;
-use fxhash::{FxHashMap, FxHashSet};
+use std::sync::RwLock;
+use string_interner::StringInterner;
+use string_interner::Sym;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct MiniVer {
@@ -34,7 +34,7 @@ impl MiniVer {
             minor: self.minor.into(),
             patch: self.patch.into(),
             pre: self.pre.clone().into(),
-            build: if self.build > 0 {vec![semver::Identifier::Numeric(self.build.into())]} else {Vec::new()},
+            build: if self.build > 0 { vec![semver::Identifier::Numeric(self.build.into())] } else { Vec::new() },
         }
     }
 }
@@ -333,8 +333,7 @@ pub fn is_deprecated(name: &str) -> bool {
 }
 
 fn semver_parse(ver: &str) -> SemVer {
-    SemVer::parse(ver)
-        .unwrap_or_else(|_| SemVer::parse("0.0.0").expect("must parse"))
+    SemVer::parse(ver).unwrap_or_else(|_| SemVer::parse("0.0.0").expect("must parse"))
 }
 
 impl From<SemVer> for MiniVer {

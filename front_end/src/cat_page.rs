@@ -53,7 +53,7 @@ impl<'a> CatPage<'a> {
         !self.cat.sub.is_empty() || !self.cat.siblings.is_empty()
     }
 
-    pub fn subcategories_and_siblings(&self) -> impl Iterator<Item=&Category> {
+    pub fn subcategories_and_siblings(&self) -> impl Iterator<Item = &Category> {
         self.cat.sub.values().chain(self.cat.siblings.iter().flat_map(|slug| CATEGORIES.from_slug(slug)))
     }
 

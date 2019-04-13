@@ -1,14 +1,14 @@
 mod scorer;
+pub use self::scorer::*;
+use cargo_toml::MaintenanceStatus;
+use chrono::prelude::*;
 use render_readme::Handle;
 use render_readme::NodeData;
-use rich_crate::Edition;
 use rich_crate::Author;
-use rich_crate::CrateVersion;
-use cargo_toml::MaintenanceStatus;
 use rich_crate::CrateOwner;
+use rich_crate::CrateVersion;
+use rich_crate::Edition;
 use semver::Version as SemVer;
-pub use self::scorer::*;
-use chrono::prelude::*;
 
 /// Only changes when a new version is released
 pub struct CrateVersionInputs<'a> {
@@ -42,8 +42,6 @@ pub struct CrateVersionInputs<'a> {
     pub total_code_lines: u32,
     pub rust_comment_lines: u32,
     pub rust_code_lines: u32,
-
-
     // (relative) weight of dependencies?
 
     // rust loc
@@ -73,7 +71,6 @@ pub struct CrateTemporalInputs<'a> {
     pub number_of_indirect_reverse_deps: u32,
     /// Includes non-optional (i.e. it's the upper bound, not just the optional ones)
     pub number_of_indirect_reverse_optional_deps: u32,
-
     // most recent commit
     // avg time issues are left unanswered?
     // pub crate_score_context_free: f64,
@@ -169,30 +166,30 @@ fn is_badge_url(url: &str) -> bool {
         .trim_start_matches("ci.")
         .trim_start_matches("build.");
     url.starts_with("appveyor.com") ||
-    url.starts_with("badge.") ||
-    url.starts_with("badgen.") ||
-    url.starts_with("badges.") ||
-    url.starts_with("codecov.io") ||
-    url.starts_with("coveralls.io") ||
-    url.starts_with("docs.rs") ||
-    url.starts_with("gitlab.com") ||
-    url.starts_with("isitmaintained.com") ||
-    url.starts_with("meritbadge") ||
-    url.starts_with("microbadger") ||
-    url.starts_with("ohloh.net") ||
-    url.starts_with("openhub.net") ||
-    url.starts_with("repostatus.org") ||
-    url.starts_with("shields.io") ||
-    url.starts_with("snapcraft.io") ||
-    url.starts_with("spearow.io") ||
-    url.starts_with("travis-ci.") ||
-    url.starts_with("zenodo.org") ||
-    url.ends_with("?branch=master") ||
-    url.ends_with("/pipeline.svg") ||
-    url.ends_with("/coverage.svg") ||
-    url.ends_with("/build.svg") ||
-    url.ends_with("badge.svg") ||
-    url.ends_with("badge.png")
+        url.starts_with("badge.") ||
+        url.starts_with("badgen.") ||
+        url.starts_with("badges.") ||
+        url.starts_with("codecov.io") ||
+        url.starts_with("coveralls.io") ||
+        url.starts_with("docs.rs") ||
+        url.starts_with("gitlab.com") ||
+        url.starts_with("isitmaintained.com") ||
+        url.starts_with("meritbadge") ||
+        url.starts_with("microbadger") ||
+        url.starts_with("ohloh.net") ||
+        url.starts_with("openhub.net") ||
+        url.starts_with("repostatus.org") ||
+        url.starts_with("shields.io") ||
+        url.starts_with("snapcraft.io") ||
+        url.starts_with("spearow.io") ||
+        url.starts_with("travis-ci.") ||
+        url.starts_with("zenodo.org") ||
+        url.ends_with("?branch=master") ||
+        url.ends_with("/pipeline.svg") ||
+        url.ends_with("/coverage.svg") ||
+        url.ends_with("/build.svg") ||
+        url.ends_with("badge.svg") ||
+        url.ends_with("badge.png")
 }
 
 fn fill_props(node: &Handle, props: &mut MarkupProps, mut in_code: bool) {
@@ -347,7 +344,7 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs) -> Score {
         Err(e) => {
             eprintln!("Release time parse error: {}", e);
             0.
-        }
+        },
     };
     score.frac("Freshness of latest release", 8, freshness_score);
     score.frac("Freshness of deps", 8, cr.dependency_freshness.iter()

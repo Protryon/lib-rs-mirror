@@ -1,8 +1,8 @@
 use crate::templates;
 use crate::Page;
 use crate::Urler;
-use std::io::Write;
 use render_readme::Renderer;
+use std::io::Write;
 
 pub enum SearchKind<'a> {
     Query(&'a str),

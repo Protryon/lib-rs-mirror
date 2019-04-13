@@ -1,11 +1,11 @@
 #![allow(unused_imports)]
-use kitchen_sink::CrateAuthor;
 use crate::Page;
 use categories::Category;
 use categories::CategoryMap;
 use categories::CATEGORIES;
 use failure;
 use kitchen_sink::stopped;
+use kitchen_sink::CrateAuthor;
 use kitchen_sink::{CrateData, KitchenSink};
 use rayon::prelude::*;
 use rich_crate::Origin;

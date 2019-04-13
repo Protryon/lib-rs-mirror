@@ -1,6 +1,6 @@
+use crate::Origin;
 pub use crates_io_client::CrateOwner;
 pub use crates_io_client::DownloadWeek;
-use crate::Origin;
 
 /// Struct representing all versions of the crate
 /// (metadata that is version-independent or for all versions).
@@ -24,7 +24,6 @@ pub struct CrateVersion {
     // pub features: HashMap<String, Vec<String>>,
     pub yanked: bool,
     // pub license: Option<String>, // "MIT",
-
 }
 
 impl RichCrate {

@@ -1,8 +1,8 @@
-use kitchen_sink::RichCrate;
 use front_end;
 use kitchen_sink;
-use rayon;
+use kitchen_sink::RichCrate;
 use kitchen_sink::{stopped, CrateData, KitchenSink, Origin};
+use rayon;
 use render_readme::{Highlighter, ImageOptimAPIFilter, Renderer};
 use rich_crate::RichCrateVersion;
 use std::fs;
@@ -40,7 +40,6 @@ fn is_useful2(c: &RichCrateVersion) -> bool {
 }
 
 fn render(origin: &Origin, crates: &KitchenSink, path: &PathBuf, markup: &Renderer, always: bool) -> Result<(), failure::Error> {
-
     let allver = crates.rich_crate(origin)?;
     if !always && !is_useful1(&allver) {
         return Ok(());

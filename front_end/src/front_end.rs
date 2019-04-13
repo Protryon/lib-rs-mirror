@@ -12,8 +12,8 @@ mod cat_page;
 mod crate_page;
 mod download_graph;
 mod home_page;
-mod search_page;
 mod iter;
+mod search_page;
 mod urler;
 pub use crate::search_page::*;
 

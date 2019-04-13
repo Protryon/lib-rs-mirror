@@ -1,8 +1,8 @@
-use std::path::Path;
 use std::collections::HashMap;
+use std::path::Path;
 
-use tokei;
 use serde_derive::*;
+use tokei;
 
 use tokei::LanguageType as LT;
 
@@ -568,7 +568,7 @@ impl Language {
             LT::CppHeader => Language::CppHeader,
             LT::Crystal => Language::Crystal,
             LT::Css => Language::Css,
-            LT::D => Language::            D,
+            LT::D => Language::D,
             LT::Dart => Language::Dart,
             LT::DeviceTree => Language::DeviceTree,
             LT::Dockerfile => Language::Dockerfile,
@@ -644,7 +644,7 @@ impl Language {
             LT::Python => Language::Python,
             LT::Qcl => Language::Qcl,
             LT::Qml => Language::Qml,
-            LT::R => Language::            R,
+            LT::R => Language::R,
             LT::Racket => Language::Racket,
             LT::Rakefile => Language::Rakefile,
             LT::Razor => Language::Razor,
@@ -732,7 +732,7 @@ impl Collect {
 
     fn rust_code_stats(&mut self, file_content: &str) {
         for line in file_content.lines().take(10000) {
-             // half-assed effort to remove comments
+            // half-assed effort to remove comments
             let line = line.find("//").map(|pos| &line[0..pos]).unwrap_or(line);
 
             if !self.stats.has_old_try {

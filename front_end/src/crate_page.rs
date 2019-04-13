@@ -573,7 +573,6 @@ impl<'a> CratePage<'a> {
         Some(DownloadsGraph::new(self.kitchen_sink.weekly_downloads(self.all, 16).ok()?, self.ver.has_bin(), width, height))
     }
 
-
     pub fn downloads_per_month(&self) -> Option<usize> {
         self.kitchen_sink.downloads_per_month(self.all.origin()).ok().and_then(|x| x)
     }

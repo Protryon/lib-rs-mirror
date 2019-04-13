@@ -11,6 +11,7 @@ use categories::CategoryMap;
 use failure::ResultExt;
 use kitchen_sink::running;
 use kitchen_sink::{CrateData, KitchenSink, Origin};
+use parking_lot::Mutex;
 use rayon::prelude::*;
 use render_readme::ImageOptimAPIFilter;
 use render_readme::{Highlighter, Renderer};
@@ -20,8 +21,7 @@ use std::fs::File;
 use std::io::BufWriter;
 use std::path::Path;
 use std::path::PathBuf;
-use std::sync::{Arc};
-use parking_lot::Mutex;
+use std::sync::Arc;
 
 ///
 /// See home_page.rs for interesting bits

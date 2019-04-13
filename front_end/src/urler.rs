@@ -1,9 +1,9 @@
 use categories::Category;
 use kitchen_sink::CrateAuthor;
 use kitchen_sink::UserType;
+use rich_crate::Origin;
 use rich_crate::RichCrateVersion;
 use rich_crate::RichDep;
-use rich_crate::Origin;
 use urlencoding::encode;
 
 /// One thing responsible for link URL scheme on the site.

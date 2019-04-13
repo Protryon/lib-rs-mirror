@@ -1,10 +1,9 @@
-
-use simple_cache::TempCache;
-use std::collections::HashMap;
-use std::collections::hash_map::Entry::*;
-use std::path::PathBuf;
 use parking_lot::Mutex;
+use simple_cache::TempCache;
+use std::collections::hash_map::Entry::*;
+use std::collections::HashMap;
 use std::fmt;
+use std::path::PathBuf;
 
 /// Downloads each day of the year
 #[derive(Serialize, Deserialize, Clone)]
@@ -76,8 +75,8 @@ impl Default for VersionMap {
 }
 
 // Serde workaround
-use serde::ser::{Serializer, SerializeTuple};
-use serde::de::{Deserializer, Visitor, SeqAccess, Error};
+use serde::de::{Deserializer, Error, SeqAccess, Visitor};
+use serde::ser::{SerializeTuple, Serializer};
 
 trait BigArray<'de>: Sized {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

@@ -11,16 +11,16 @@ use simple_cache;
 
 use std::path::Path;
 
-use urlencoding::encode;
-use repo_url::SimpleRepo;
 use github_rs::client;
-use github_rs::{HeaderMap, StatusCode};
 use github_rs::client::Executor;
-use std::time::{SystemTime, UNIX_EPOCH};
-use std::time::Duration;
-use std::thread;
-use simple_cache::TempCache;
 use github_rs::headers::{rate_limit_remaining, rate_limit_reset};
+use github_rs::{HeaderMap, StatusCode};
+use repo_url::SimpleRepo;
+use simple_cache::TempCache;
+use std::thread;
+use std::time::Duration;
+use std::time::{SystemTime, UNIX_EPOCH};
+use urlencoding::encode;
 
 mod model;
 pub use crate::model::*;
@@ -264,7 +264,7 @@ impl GitHub {
                 }
                 Ok(None)
             },
-            Err(err) => Err(err)?
+            Err(err) => Err(err)?,
         }
     }
 }

@@ -1,10 +1,10 @@
-use fxhash::FxHashSet;
-use fxhash::FxHashMap;
 use crate::index::*;
 use crate::KitchenSinkErr;
 use crates_index::Crate;
-use rayon::prelude::*;
+use fxhash::FxHashMap;
+use fxhash::FxHashSet;
 use parking_lot::Mutex;
+use rayon::prelude::*;
 use string_interner::Sym;
 
 pub struct DepsStats {

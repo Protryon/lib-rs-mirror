@@ -1,7 +1,7 @@
-use std::fmt::Write;
+use categories;
 use rusqlite::types::ToSql;
 use rusqlite::NO_PARAMS;
-use categories;
+use std::fmt::Write;
 
 use rusqlite;
 #[macro_use]
@@ -20,12 +20,12 @@ use rich_crate::Repo;
 use rich_crate::RichCrate;
 use rich_crate::RichCrateVersion;
 use rusqlite::*;
-use std::fs;
-use std::sync::Mutex;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::fs;
 use std::path::Path;
+use std::sync::Mutex;
 use thread_local::ThreadLocal;
 type FResult<T> = std::result::Result<T, failure::Error>;
 
@@ -687,12 +687,12 @@ impl CrateDb {
             // sort by relevance to the category, downrank for being crappy (later also downranked for being removed from crates)
             // low number of downloads is mostly by rank, rather than downloads
             let mut query = conn.prepare_cached(
-            "SELECT k.origin, (k.ranking * c.rank_weight) as w
+                "SELECT k.origin, (k.ranking * c.rank_weight) as w
                 FROM categories c
                 JOIN crates k on c.crate_id = k.id
                 WHERE c.slug = ?1
                 ORDER by w desc
-                LIMIT ?2"
+                LIMIT ?2",
             )?;
             let args: &[&dyn ToSql] = &[&slug, &limit];
             let q = query.query_map(args, |row| {
@@ -709,12 +709,12 @@ impl CrateDb {
             // sort by relevance to the category, downrank for being crappy (later also downranked for being removed from crates)
             // low number of downloads is mostly by rank, rather than downloads
             let mut query = conn.prepare_cached(
-            "SELECT k.origin, k.ranking as w
+                "SELECT k.origin, k.ranking as w
                 FROM crates k
                 LEFT JOIN categories c on c.crate_id = k.id
                 WHERE c.slug IS NULL
                 ORDER by w desc
-                LIMIT ?1"
+                LIMIT ?1",
             )?;
             let args: &[&dyn ToSql] = &[&limit];
             let q = query.query_map(args, |row| {
@@ -812,7 +812,7 @@ impl CrateDb {
         if let Some(s) = c.description() {
             if let Some(more) = c.alternative_description() {
                 return Some((1., format!("{}{}", s, more).into()));
-        }
+            }
             return Some((1., s.into()));
         }
         if let Ok(Some(r)) = c.readme() {
@@ -824,8 +824,8 @@ impl CrateDb {
             return Some((0.5, sub.into()));
                 }
         None
-                }
-        }
+    }
+}
 
 pub enum RepoChange {
     Removed { crate_name: String, weight: f64 },

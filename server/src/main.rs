@@ -1,22 +1,22 @@
-use tokio::prelude::FutureExt;
-use std::path::PathBuf;
-use actix_web::*;
 use actix_web::http::*;
-use env_logger;
-use futures::future::{self, Future};
-use futures_cpupool::CpuPool;
-use std::sync::Arc;
-use std::env;
-use kitchen_sink;
+use actix_web::*;
 use categories::Category;
 use categories::CATEGORIES;
+use env_logger;
+use front_end;
+use futures::future::{self, Future};
+use futures_cpupool::CpuPool;
+use kitchen_sink;
+use kitchen_sink::CrateData;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::Origin;
-use kitchen_sink::CrateData;
-use front_end;
+use render_readme::{Highlighter, ImageOptimAPIFilter, Renderer};
 use search_index::CrateSearchIndex;
-use render_readme::{Highlighter, Renderer, ImageOptimAPIFilter};
+use std::env;
+use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::prelude::FutureExt;
 
 use std::alloc::System;
 #[global_allocator]
@@ -121,32 +121,36 @@ fn handle_category(req: &HttpRequest<AServerState>, cat: &Category) -> Result<Ht
     state.crates.prewarm();
     front_end::render_category(&mut page, cat, &state.crates, &state.markup).unwrap();
     Ok(HttpResponse::Ok()
-            .content_type("text/html;charset=UTF-8")
-            .header("Cache-Control", "public, s-maxage=600, max-age=43200, stale-while-revalidate=259200, stale-if-error=72000")
-            .content_length(page.len() as u64)
-            .body(page))
+        .content_type("text/html;charset=UTF-8")
+        .header("Cache-Control", "public, s-maxage=600, max-age=43200, stale-while-revalidate=259200, stale-if-error=72000")
+        .content_length(page.len() as u64)
+        .body(page))
 }
 
 fn handle_home(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
     let state = req.state();
     let state2 = Arc::clone(state);
-    state.render_pool.spawn_fn(move || {
-        state2.crates.prewarm();
-        let mut page: Vec<u8> = Vec::with_capacity(50000);
-        front_end::render_homepage(&mut page, &state2.crates)?;
-        Ok(page)
-    })
-    .timeout(Duration::from_secs(300))
-    .map_err(map_err)
-    .from_err()
-    .and_then(|page| {
-        future::ok(HttpResponse::Ok()
-            .content_type("text/html;charset=UTF-8")
-            .header("Cache-Control", "public, s-maxage=600, max-age=43200, stale-while-revalidate=259200, stale-if-error=72000")
-            .content_length(page.len() as u64)
-            .body(page))
-    })
-    .responder()
+    state
+        .render_pool
+        .spawn_fn(move || {
+            state2.crates.prewarm();
+            let mut page: Vec<u8> = Vec::with_capacity(50000);
+            front_end::render_homepage(&mut page, &state2.crates)?;
+            Ok(page)
+        })
+        .timeout(Duration::from_secs(300))
+        .map_err(map_err)
+        .from_err()
+        .and_then(|page| {
+            future::ok(
+                HttpResponse::Ok()
+                    .content_type("text/html;charset=UTF-8")
+                    .header("Cache-Control", "public, s-maxage=600, max-age=43200, stale-while-revalidate=259200, stale-if-error=72000")
+                    .content_length(page.len() as u64)
+                    .body(page),
+            )
+        })
+        .responder()
 }
 
 fn handle_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
@@ -154,28 +158,32 @@ fn handle_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse>
     println!("rendering {:?}", kw);
     let state = req.state();
     let state2 = Arc::clone(state);
-    state.render_pool.spawn_fn(move || {
-        assert!(is_alnum(&kw));
-        state2.crates.prewarm();
-        let origin = Origin::from_crates_io_name(&kw);
-        let all = state2.crates.rich_crate(&origin)?;
-        let ver = state2.crates.rich_crate_version(&origin, CrateData::Full)?;
-        let mut page: Vec<u8> = Vec::with_capacity(50000);
-        front_end::render_crate_page(&mut page, &all, &ver, &state2.crates, &state2.markup)?;
-        std::fs::write(state2.public_crates_dir.join(format!("{}.html", kw)), &page)?;
-        Ok(page)
-    })
-    .timeout(Duration::from_secs(12))
-    .map_err(map_err)
-    .from_err()
-    .and_then(|page| {
-        future::ok(HttpResponse::Ok()
-            .content_type("text/html;charset=UTF-8")
-            .header("Cache-Control", "public, s-maxage=3600, max-age=172800, stale-while-revalidate=604800, stale-if-error=72000")
-            .content_length(page.len() as u64)
-            .body(page))
-    })
-    .responder()
+    state
+        .render_pool
+        .spawn_fn(move || {
+            assert!(is_alnum(&kw));
+            state2.crates.prewarm();
+            let origin = Origin::from_crates_io_name(&kw);
+            let all = state2.crates.rich_crate(&origin)?;
+            let ver = state2.crates.rich_crate_version(&origin, CrateData::Full)?;
+            let mut page: Vec<u8> = Vec::with_capacity(50000);
+            front_end::render_crate_page(&mut page, &all, &ver, &state2.crates, &state2.markup)?;
+            std::fs::write(state2.public_crates_dir.join(format!("{}.html", kw)), &page)?;
+            Ok(page)
+        })
+        .timeout(Duration::from_secs(12))
+        .map_err(map_err)
+        .from_err()
+        .and_then(|page| {
+            future::ok(
+                HttpResponse::Ok()
+                    .content_type("text/html;charset=UTF-8")
+                    .header("Cache-Control", "public, s-maxage=3600, max-age=172800, stale-while-revalidate=604800, stale-if-error=72000")
+                    .content_length(page.len() as u64)
+                    .body(page),
+            )
+        })
+        .responder()
 }
 
 fn handle_keyword(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
@@ -185,45 +193,40 @@ fn handle_keyword(req: &HttpRequest<AServerState>) -> FutureResponse<HttpRespons
             let query = q.to_owned();
             let state = req.state();
             let state2 = Arc::clone(state);
-            state.search_pool.spawn_fn(move || {
-                if !is_alnum(&query) {
-                    return Ok((query, None));
-                }
-                let mut page: Vec<u8> = Vec::with_capacity(50000);
-                let keyword_query = format!("keywords:\"{}\"", query);
-                let results = state2.index.search(&keyword_query, 100)?;
-                if !results.is_empty() {
-                    front_end::render_keyword_page(&mut page, &query, &results, &state2.markup)?;
-                    Ok((query, Some(page)))
-                } else {
-                    Ok((query, None))
-                }
-            })
-            .timeout(Duration::from_secs(2))
-            .map_err(map_err)
-            .from_err()
-            .and_then(|(query, page)| {
-                future::ok(if let Some(page) = page {
-                    HttpResponse::Ok()
-                        .content_type("text/html;charset=UTF-8")
-                        .header("Cache-Control", "public, s-maxage=3600, max-age=604800, stale-while-revalidate=604800, stale-if-error=86400")
-                        .content_length(page.len() as u64)
-                        .body(page)
-                } else {
-                    HttpResponse::TemporaryRedirect()
-                        .header("Location", format!("/search?q={}", urlencoding::encode(&query)))
-                        .finish()
-
-                }).responder()
-            })
-            .responder()
-        },
-        _ => {
-            future::ok(HttpResponse::PermanentRedirect()
-                .header("Location", "/")
-                .finish())
+            state
+                .search_pool
+                .spawn_fn(move || {
+                    if !is_alnum(&query) {
+                        return Ok((query, None));
+                    }
+                    let mut page: Vec<u8> = Vec::with_capacity(50000);
+                    let keyword_query = format!("keywords:\"{}\"", query);
+                    let results = state2.index.search(&keyword_query, 100)?;
+                    if !results.is_empty() {
+                        front_end::render_keyword_page(&mut page, &query, &results, &state2.markup)?;
+                        Ok((query, Some(page)))
+                    } else {
+                        Ok((query, None))
+                    }
+                })
+                .timeout(Duration::from_secs(2))
+                .map_err(map_err)
+                .from_err()
+                .and_then(|(query, page)| {
+                    future::ok(if let Some(page) = page {
+                        HttpResponse::Ok()
+                            .content_type("text/html;charset=UTF-8")
+                            .header("Cache-Control", "public, s-maxage=3600, max-age=604800, stale-while-revalidate=604800, stale-if-error=86400")
+                            .content_length(page.len() as u64)
+                            .body(page)
+                    } else {
+                        HttpResponse::TemporaryRedirect().header("Location", format!("/search?q={}", urlencoding::encode(&query))).finish()
+                    })
+                    .responder()
+                })
                 .responder()
         },
+        _ => future::ok(HttpResponse::PermanentRedirect().header("Location", "/").finish()).responder(),
     }
 }
 
@@ -247,29 +250,28 @@ fn handle_search(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse
             let query = q.to_owned();
             let state = req.state();
             let state2 = Arc::clone(state);
-            state.search_pool.spawn_fn(move || {
-                let mut page: Vec<u8> = Vec::with_capacity(50000);
-                let results = state2.index.search(&query, 50)?;
-                front_end::render_serp_page(&mut page, &query, &results, &state2.markup)?;
-                Ok(page)
-            })
-            .timeout(Duration::from_secs(2))
-            .map_err(map_err)
-            .from_err()
-            .and_then(|page| {
-                future::ok(HttpResponse::Ok()
-                    .content_type("text/html;charset=UTF-8")
-                    .header("Cache-Control", "public, s-maxage=60, max-age=43200, stale-while-revalidate=259200, stale-if-error=72000")
-                    .content_length(page.len() as u64)
-                    .body(page))
-            })
-            .responder()
-        },
-        _ => {
-            future::ok(HttpResponse::TemporaryRedirect()
-                .header("Location", "/")
-                .finish())
+            state
+                .search_pool
+                .spawn_fn(move || {
+                    let mut page: Vec<u8> = Vec::with_capacity(50000);
+                    let results = state2.index.search(&query, 50)?;
+                    front_end::render_serp_page(&mut page, &query, &results, &state2.markup)?;
+                    Ok(page)
+                })
+                .timeout(Duration::from_secs(2))
+                .map_err(map_err)
+                .from_err()
+                .and_then(|page| {
+                    future::ok(
+                        HttpResponse::Ok()
+                            .content_type("text/html;charset=UTF-8")
+                            .header("Cache-Control", "public, s-maxage=60, max-age=43200, stale-while-revalidate=259200, stale-if-error=72000")
+                            .content_length(page.len() as u64)
+                            .body(page),
+                    )
+                })
                 .responder()
         },
+        _ => future::ok(HttpResponse::TemporaryRedirect().header("Location", "/").finish()).responder(),
     }
 }

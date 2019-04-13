@@ -1,10 +1,10 @@
-use fxhash::FxHashSet;
-use crate::Origin;
 use crate::KitchenSinkErr;
-use std::path::Path;
-use std::path::PathBuf;
+use crate::Origin;
+use fxhash::FxHashSet;
 use std::fs::File;
 use std::io::BufReader;
+use std::path::Path;
+use std::path::PathBuf;
 
 pub struct GitIndex {
     #[allow(unused)]

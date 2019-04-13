@@ -1,17 +1,17 @@
+use either::*;
+use failure;
+use kitchen_sink::RichCrate;
+use kitchen_sink::{self, stopped, CrateData, Include, KitchenSink, MaintenanceStatus, Origin, RichCrateVersion};
+use parking_lot::Mutex;
+use rand::{seq::SliceRandom, thread_rng};
 use ranking::CrateTemporalInputs;
 use ranking::CrateVersionInputs;
-use kitchen_sink::RichCrate;
-use render_readme::{Renderer, Markup};
-use either::*;
-use search_index::*;
-use failure;
-use kitchen_sink::{self, stopped, MaintenanceStatus, CrateData, KitchenSink, Origin, RichCrateVersion, Include};
-use rand::{seq::SliceRandom, thread_rng};
 use rayon;
-use std::sync::mpsc;
+use render_readme::{Markup, Renderer};
+use search_index::*;
 use std::collections::HashSet;
+use std::sync::mpsc;
 use std::sync::Arc;
-use parking_lot::Mutex;
 
 fn main() {
     let crates = Arc::new(match kitchen_sink::KitchenSink::new_default() {
@@ -116,7 +116,6 @@ fn index_crate(crates: &KitchenSink, c: &Origin, renderer: &Renderer, search_sen
     Ok(v)
 }
 
-
 fn index_search(indexer: &mut Indexer, k: &RichCrateVersion, downloads_per_month: usize, score: f64) -> Result<(), failure::Error> {
     let keywords: Vec<_> = k.keywords(Include::Cleaned).collect();
 
@@ -174,7 +173,8 @@ fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersi
         has_badges: k.has_badges(),
         maintenance: k.maintenance(),
         is_nightly: k.is_nightly(),
-    }).total();
+    })
+    .total();
 
     let downloads_per_month = crates.downloads_per_month_or_equivalent(all.origin()).expect("dl numbers").unwrap_or(0) as u32;
     let dependency_freshness = if let Ok((runtime, _, build)) = k.direct_dependencies() {
@@ -223,7 +223,6 @@ fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersi
     }
 
     let removals_divisor = if let Some(removals_weighed) = crates.crate_removals(k.origin()) {
-
         // count some indirect/optional deps in case removals have been due to moving the crate behind another facade
         // +20 is a fudge factor to smooth out nosiy data for rarely used crates.
         // We don't care about small amount of removals, only mass exodus from big dead crates.
@@ -279,7 +278,6 @@ fn is_deprecated(k: &RichCrateVersion) -> bool {
     }
     false
 }
-
 
 fn print_res<T>(res: Result<T, failure::Error>) {
     if let Err(e) = res {

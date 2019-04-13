@@ -1,15 +1,15 @@
+use crate::is_readme_filename;
+use crate::readme_from_repo;
+use crate::{CrateFile, Result, UnarchiverError};
 use cargo_toml::Manifest;
 use libflate::gzip::Decoder;
 use render_readme::Markup;
+use std::collections::HashSet;
 use std::io;
 use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
-use std::collections::HashSet;
 use tar::Archive;
-use crate::readme_from_repo;
-use crate::is_readme_filename;
-use crate::{Result, UnarchiverError, CrateFile};
 use udedokei;
 
 enum ReadAs {
@@ -57,14 +57,16 @@ pub fn read_archive(archive: impl Read, prefix: &Path) -> Result<CrateFile> {
                         ReadAs::ReadmeMarkdown(path_prefix)
                     }
                 },
-                p => if let Some(lang) = is_source_code_file(p) {
-                    if lang.is_code() {
-                        ReadAs::GetStatsOfFile(lang)
+                p => {
+                    if let Some(lang) = is_source_code_file(p) {
+                        if lang.is_code() {
+                            ReadAs::GetStatsOfFile(lang)
+                        } else {
+                            continue;
+                        }
                     } else {
                         continue;
                     }
-                } else {
-                    continue;
                 },
             }
         };

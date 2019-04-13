@@ -1,5 +1,5 @@
-use std::{fs, path::Path};
 use std::cmp::Ordering;
+use std::{fs, path::Path};
 use tantivy::{self, collector::TopDocs, query::QueryParser, schema::*, Index, IndexWriter};
 
 const CRATE_SCORE_MAX: f64 = 1000000.0;

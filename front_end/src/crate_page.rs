@@ -597,12 +597,13 @@ impl<'a> CratePage<'a> {
             if biggest.0 != Language::Rust || biggest.1.code < total * 9 / 10 {
                 let mut remaining_px = width_px;
                 let mut remaining_lines = total;
+                let min_width = 3;
                 Some(
                     res.into_iter()
                         .map(|(lang, lines)| {
-                            let width = (lines.code * remaining_px / remaining_lines.max(1)).max(1);
+                            let width = (lines.code * remaining_px / remaining_lines.max(1)).max(min_width);
                             let xpos = width_px - remaining_px;
-                            remaining_px -= width;
+                            remaining_px = remaining_px.saturating_sub(width);
                             remaining_lines -= lines.code;
                             (lang, lines, (xpos, width))
                         })

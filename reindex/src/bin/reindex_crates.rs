@@ -102,7 +102,14 @@ fn main() {
 fn index_crate(crates: &KitchenSink, c: &Origin, renderer: &Renderer, search_sender: &mpsc::SyncSender<(RichCrateVersion, usize, f64)>) -> Result<RichCrateVersion, failure::Error> {
     let v = crates.rich_crate_version(c, CrateData::FullNoDerived)?;
     let k = crates.rich_crate(c)?;
-    let (downloads_per_month, score) = crate_overall_score(crates, &k, &v, renderer);
+    let contrib_info = crates.all_contributors(k).map_err(|e| eprintln!("{}", e)).ok();
+    let contributors_count = if let Some((authors, _owner_only, _, extra_contributors)) = &contrib_info {
+        (authors.len() + extra_contributors) as u32
+    } else {
+        k.owners().len() as u32
+    };
+
+    let (downloads_per_month, score) = crate_overall_score(crates, &k, &v, renderer, contributors_count);
     crates.index_crate_highest_version(&v, score)?;
     crates.index_crate(&k, score)?;
     search_sender.send((v.clone(), downloads_per_month, score))?;
@@ -130,11 +137,10 @@ fn index_search(indexer: &mut Indexer, k: &RichCrateVersion, downloads_per_month
 
 
 
-fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) -> (usize, f64) {
+fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer, contributors_count: u32) -> (usize, f64) {
     let readme = k.readme().ok().and_then(|r| r).map(|readme| {
         renderer.page_node(&readme.markup, None, false)
     });
-    let contributors = crates.all_contributors(k).map_err(|e| eprintln!("{}", e)).ok().map(|(_,_,_, c)| c as u32);
     let langs = k.language_stats();
     let (rust_code_lines, rust_comment_lines) = langs.langs.get(&udedokei::Language::Rust).map(|rs| (rs.code, rs.comments)).unwrap_or_default();
     let total_code_lines = langs.langs.iter().filter(|(k,_)| k.is_code()).map(|(_,l)| l.code).sum::<u32>();
@@ -144,7 +150,7 @@ fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersi
         readme: readme.as_ref(),
         owners: all.owners(),
         authors: k.authors(),
-        contributors,
+        contributors: contributors_count,
         edition: k.edition(),
         total_code_lines,
         rust_code_lines,

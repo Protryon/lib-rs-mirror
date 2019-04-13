@@ -102,7 +102,7 @@ fn main() {
 fn index_crate(crates: &KitchenSink, c: &Origin, renderer: &Renderer, search_sender: &mpsc::SyncSender<(RichCrateVersion, usize, f64)>) -> Result<RichCrateVersion, failure::Error> {
     let v = crates.rich_crate_version(c, CrateData::FullNoDerived)?;
     let k = crates.rich_crate(c)?;
-    let contrib_info = crates.all_contributors(k).map_err(|e| eprintln!("{}", e)).ok();
+    let contrib_info = crates.all_contributors(&v).map_err(|e| eprintln!("{}", e)).ok();
     let contributors_count = if let Some((authors, _owner_only, _, extra_contributors)) = &contrib_info {
         (authors.len() + extra_contributors) as u32
     } else {
@@ -150,7 +150,7 @@ fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersi
         readme: readme.as_ref(),
         owners: all.owners(),
         authors: k.authors(),
-        contributors: contributors_count,
+        contributors: Some(contributors_count),
         edition: k.edition(),
         total_code_lines,
         rust_code_lines,

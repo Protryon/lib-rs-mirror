@@ -102,7 +102,7 @@ fn render_categories(
                 .par_iter()
                 .take(75)
                 .with_max_len(1)
-                .map(|(c, _)| {
+                .map(|c| {
                     let msg = format!("Failed rendering crate {} from category {}", c.to_str(), slug);
                     render_crate(c).context(msg)
                 })

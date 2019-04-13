@@ -1,7 +1,7 @@
 [package]
 edition = "2018"
 name = "crate_files"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["Kornel <kornel@geekhood.net>"]
 
 [dependencies]

@@ -60,7 +60,6 @@ impl<'repo> Iterator for HistoryIter<'repo> {
     }
 }
 
-
 impl<'repo> PartialEq for Generation<'repo> {
     fn eq(&self, other: &Generation<'_>) -> bool {
         other.num == self.num && self.nth == other.nth

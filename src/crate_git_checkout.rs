@@ -1,11 +1,10 @@
-use std::sync::Arc;
-use std::sync::Mutex;
 use crate::iter::HistoryIter;
 use cargo_toml::{Manifest, Package};
 use failure;
 use git2;
 use git2::build::RepoBuilder;
 use git2::{Blob, ObjectType, Reference, Repository, Tree};
+use lazy_static::lazy_static;
 use render_readme;
 use render_readme::{Markup, Readme};
 use repo_url::Repo;
@@ -15,8 +14,9 @@ use std::fs;
 use std::io;
 use std::path::Path;
 use std::process::Command;
+use std::sync::Arc;
+use std::sync::Mutex;
 use urlencoding;
-use lazy_static::lazy_static;
 
 mod iter;
 
@@ -129,13 +129,13 @@ struct GitFS<'a, 'b> {
     tree: &'b Tree<'a>,
 }
 
-impl cargo_toml::AbstractFilesystem for GitFS<'_,'_> {
+impl cargo_toml::AbstractFilesystem for GitFS<'_, '_> {
     fn file_names_in(&self, dir_path: &str) -> Result<HashSet<Box<str>>, io::Error> {
         self.file_names_in_tree(&self.tree, Some(dir_path))
     }
 }
 
-impl GitFS<'_,'_> {
+impl GitFS<'_, '_> {
     fn file_names_in_tree(&self, curr_dir: &Tree<'_>, dir_path: Option<&str>) -> Result<HashSet<Box<str>>, io::Error> {
         if let Some(dir_path) = dir_path {
             let mut parts = dir_path.splitn(2, '/');
@@ -236,7 +236,7 @@ pub fn find_dependency_changes(repo: &Repository, mut cb: impl FnMut(HashSet<Str
             if let Vacant(e) = newer_deps.entry(dep) {
                 if age > 0 {
                     removed.insert(e.key().clone());
-                    e.insert(State {since: None, until: Some(age)});
+                    e.insert(State { since: None, until: Some(age) });
                 } else {
                     e.insert(State::default());
                 }

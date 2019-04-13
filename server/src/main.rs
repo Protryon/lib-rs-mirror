@@ -8,6 +8,8 @@ use futures_cpupool::CpuPool;
 use std::sync::Arc;
 use std::env;
 use kitchen_sink;
+use categories::Category;
+use categories::CATEGORIES;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::Origin;
 use kitchen_sink::CrateData;
@@ -68,8 +70,8 @@ fn main() {
             .resource("/search", |r| r.method(Method::GET).f(handle_search))
             .resource("/keywords/{keyword}", |r| r.method(Method::GET).f(handle_keyword))
             .resource("/crates/{crate}", |r| r.method(Method::GET).f(handle_crate))
-            .handler("/", fs::StaticFiles::new(&public_styles_dir).expect("public directory"))
-            .default_resource(|r| r.f(handle_404))
+            .handler("/", fs::StaticFiles::new(&public_styles_dir).expect("public directory")
+                .default_handler(default_handler))
     })
     .bind("127.0.0.1:32531")
     .expect("Can not bind to 127.0.0.1:32531")
@@ -80,8 +82,42 @@ fn main() {
     let _ = sys.run();
 }
 
-fn handle_404(_req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
+fn find_category<'a>(slugs: impl Iterator<Item=&'a str>) -> Option<&'static Category> {
+    let mut found = None;
+    let mut current_sub = &CATEGORIES.root;
+    for slug in slugs {
+        if let Some(cat) = current_sub.get(slug) {
+            found = Some(cat);
+            current_sub = &cat.sub;
+        } else {
+            return None;
+        }
+    }
+    found
+}
+
+fn default_handler(req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
+    let path = req.uri().path();
+    assert!(path.starts_with('/'));
+    if path.ends_with('/') {
+        return Ok(HttpResponse::PermanentRedirect().header("Location", path.trim_end_matches('/')).body(""));
+    }
+    if let Some(cat) = find_category(path.split('/').skip(1)) {
+        return handle_category(req, cat);
+    }
+
     Ok(HttpResponse::NotFound().content_type("text/plain;charset=UTF-8").body("404\n"))
+}
+
+fn handle_category(req: &HttpRequest<AServerState>, cat: &Category) -> Result<HttpResponse> {
+    let mut page: Vec<u8> = Vec::with_capacity(150000);
+    let state = req.state();
+    front_end::render_category(&mut page, cat, &state.crates, &state.markup).unwrap();
+    Ok(HttpResponse::Ok()
+            .content_type("text/html;charset=UTF-8")
+            .header("Cache-Control", "public, s-maxage=600, max-age=43200, stale-while-revalidate=259200, stale-if-error=72000")
+            .content_length(page.len() as u64)
+            .body(page))
 }
 
 fn handle_home(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {

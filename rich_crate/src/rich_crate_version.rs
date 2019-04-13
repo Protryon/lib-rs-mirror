@@ -494,8 +494,8 @@ impl RichCrateVersion {
                     *cat = "parser-implementations".into();
                 }
             }
-            if cat == "cryptography" || cat == "database" {
-                if self.package.keywords.iter().any(|k| k == "bitcoin" || k == "ethereum" || k == "exonum" || k == "blockchain") {
+            if cat == "cryptography" || cat == "database" || cat == "rust-patterns" || cat == "development-tools" {
+                if self.package.keywords.iter().any(|k| k == "bitcoin" || k == "ethereum" || k == "ledger" || k == "exonum" || k == "blockchain") {
                     *cat = "cryptography::cryptocurrencies".into();
                 }
             }

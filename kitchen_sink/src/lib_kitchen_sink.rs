@@ -147,7 +147,7 @@ pub struct KitchenSink {
     loaded_rich_crate_version_cache: RwLock<FxHashMap<Box<str>, RichCrateVersion>>,
     category_crate_counts: LazyOnce<Option<HashMap<String, u32>>>,
     removals: LazyOnce<HashMap<Origin, f64>>,
-    top_crates_cached: RwLock<FxHashMap<String, Arc<Vec<(Origin, u32)>>>>,
+    top_crates_cached: RwLock<FxHashMap<String, Arc<Vec<Origin>>>>,
     git_checkout_path: PathBuf,
     main_cache_dir: PathBuf,
     yearly: AllDownloads,
@@ -827,7 +827,7 @@ impl KitchenSink {
         .filter_map(|slug| {
             self.top_crates_in_category(&slug).ok()
             .and_then(|cat| {
-                cat.iter().position(|(o, _)| o == crate_origin).map(|pos| {
+                cat.iter().position(|o| o == crate_origin).map(|pos| {
                     (pos as u32 +1, slug)
                 })
             })
@@ -1337,8 +1337,8 @@ impl KitchenSink {
         Ok(self.crates_io.crate_owners(crate_name, version).context("crate_owners")?.unwrap_or_default())
     }
 
-    // Sorted from the top, returns `(origin, recent_downloads)`
-    pub fn top_crates_in_category(&self, slug: &str) -> CResult<Arc<Vec<(Origin, u32)>>> {
+    // Sorted from the top, returns origins
+    pub fn top_crates_in_category(&self, slug: &str) -> CResult<Arc<Vec<Origin>>> {
         {
             let cache = self.top_crates_cached.read().expect("poison");
             if let Some(category) = cache.get(slug) {
@@ -1357,7 +1357,7 @@ impl KitchenSink {
                 } else {
                     self.crate_db.top_crates_in_category_partially_ranked(slug, wanted_num)?
                 };
-                let crates: Vec<_> = crates.into_iter().map(|(o, r, _)| (o, r)).take(wanted_num as usize).collect();
+                let crates: Vec<_> = crates.into_iter().map(|(o, _)| o).take(wanted_num as usize).collect();
                 let res = Arc::new(crates);
                 e.insert(Arc::clone(&res));
                 res

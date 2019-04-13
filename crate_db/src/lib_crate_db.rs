@@ -681,13 +681,13 @@ impl CrateDb {
     }
 
     /// Most popular crates in the category
-    /// Returns recent_downloads and weight/importance as well
-    pub fn top_crates_in_category_partially_ranked(&self, slug: &str, limit: u32) -> FResult<Vec<(Origin, u32, f64)>> {
+    /// Returns weight/importance as well
+    pub fn top_crates_in_category_partially_ranked(&self, slug: &str, limit: u32) -> FResult<Vec<(Origin, f64)>> {
         self.with_connection(|conn| {
             // sort by relevance to the category, downrank for being crappy (later also downranked for being removed from crates)
             // low number of downloads is mostly by rank, rather than downloads
             let mut query = conn.prepare_cached(
-            "SELECT k.origin, k.recent_downloads, (k.ranking * c.rank_weight) as w
+            "SELECT k.origin, (k.ranking * c.rank_weight) as w
                 FROM categories c
                 JOIN crates k on c.crate_id = k.id
                 WHERE c.slug = ?1
@@ -697,19 +697,19 @@ impl CrateDb {
             let args: &[&dyn ToSql] = &[&slug, &limit];
             let q = query.query_map(args, |row| {
                 let s: String = row.get(0);
-                (Origin::from_str(s), row.get(1), row.get(2))
+                (Origin::from_str(s), row.get(1))
             })?;
             let q = q.filter_map(|r| r.ok());
             Ok(q.collect())
         })
     }
 
-    pub fn top_crates_uncategorized(&self, limit: u32) -> FResult<Vec<(Origin, u32, f64)>> {
+    pub fn top_crates_uncategorized(&self, limit: u32) -> FResult<Vec<(Origin, f64)>> {
         self.with_connection(|conn| {
             // sort by relevance to the category, downrank for being crappy (later also downranked for being removed from crates)
             // low number of downloads is mostly by rank, rather than downloads
             let mut query = conn.prepare_cached(
-            "SELECT k.origin, k.recent_downloads, k.ranking as w
+            "SELECT k.origin, k.ranking as w
                 FROM crates k
                 LEFT JOIN categories c on c.crate_id = k.id
                 WHERE c.slug IS NULL
@@ -719,7 +719,7 @@ impl CrateDb {
             let args: &[&dyn ToSql] = &[&limit];
             let q = query.query_map(args, |row| {
                 let s: String = row.get(0);
-                (Origin::from_str(s), row.get(1), row.get(2))
+                (Origin::from_str(s), row.get(1))
             })?;
             let q = q.filter_map(|r| r.ok());
             Ok(q.collect())

@@ -96,12 +96,13 @@ impl<'a> HomePage<'a> {
                 .unwrap()
                 .iter()
                 .take(35)
-                .filter(|(c, _)| seen.get(c).is_none())
+                .filter(|c| seen.get(c).is_none())
                 .take(7)
                 .cloned()
-                .map(|(c, d)| {
-                    dl += d as usize;
-                    c
+                .inspect(|c| {
+                    if let Ok(Some(d)) = self.crates.downloads_per_month_or_equivalent(c) {
+                        dl += d;
+                    }
                 })
                 .collect();
             cat.top.par_extend(top.into_par_iter().with_max_len(1).filter_map(|c| self.crates.rich_crate_version(&c, CrateData::Full).ok()));

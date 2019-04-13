@@ -29,14 +29,18 @@ impl<'a> CatPage<'a> {
                 .top_crates_in_category(&cat.slug)?
                 .par_iter()
                 .with_max_len(1)
-                .filter_map(|&(ref c, d)| {
-                    let c = match crates.rich_crate_version(&c, CrateData::Full) {
+                .filter_map(|o| {
+                    let c = match crates.rich_crate_version(&o, CrateData::Full) {
                         Ok(c) => c,
                         Err(e) => return Some(Err(e)),
                     };
                     if c.is_yanked() {
                         return None;
                     }
+                    let d = match crates.downloads_per_month_or_equivalent(&o) {
+                        Ok(d) => d.unwrap_or(0) as u32,
+                        Err(e) => return Some(Err(e)),
+                    };
                     Some(Ok((c, d)))
                 })
                 .collect::<Result<Vec<_>, Error>>()?,

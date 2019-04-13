@@ -93,6 +93,9 @@ fn get_repo(repo: &Repo, base_path: &Path) -> Result<Repository, git2::Error> {
                 return Err(err);
             }
             if err.code() == git2::ErrorCode::Exists {
+                if let Ok(repo) = Repository::open(&repo_path) {
+                    return Ok(repo)
+                }
                 let _ = fs::remove_dir_all(&repo_path);
             }
             if shallow {

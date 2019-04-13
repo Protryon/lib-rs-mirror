@@ -50,7 +50,7 @@
         @if p.good_results.is_empty() {
             <p class=notfound>Nothing found :(</p>
             @if let SearchKind::Query(query) = p.query {
-                <p class=tryalso>Try <a href="@url.search_ddg(query)">searching with duckduckgo</a> or <a href="@url.search_crates_io(query)">on crates.io</a>.</p>
+                <p class=tryalso>Try <a href="@url.search_ddg(query)">searching with DuckDuckGo</a> or <a href="@url.search_crates_io(query)">on crates.io</a>.</p>
             }
         } else {
             <ol>
@@ -69,9 +69,12 @@
                 </li>
                 @if i == p.good_results.len() {
                     @if let SearchKind::Query(query) = p.query {
-                        <p class=tryalso>Try <a href="@url.search_ddg(query)">searching with duckduckgo</a> or <a href="@url.search_crates_io(query)">on crates.io</a>.</p>
+                        <p class=tryalso><a href="https://forms.gle/HfbvBSryNk19exUm7">Report poor search results</a>. Try <a href="@url.search_ddg(query)">searching with DuckDuckGo</a> or <a href="@url.search_crates_io(query)">on crates.io</a>.</p>
                     }
                 }
+            }
+            @if let SearchKind::Keyword(_) = p.query {
+                <p class=tryalso><a href="https://forms.gle/SFntxLhGJB7xzFy19">Feedback on crate ranking</a></p>
             }
             </ol>
         }

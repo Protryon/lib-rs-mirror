@@ -48,7 +48,6 @@ fn main() {
     assert!(data_dir.exists(), "CRATE_DATA_DIR {} does not exist", data_dir.display());
 
     let crates = KitchenSink::new(&data_dir, &github_token).unwrap();
-    crates.prewarm();
     let image_filter = Arc::new(ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_dir().join("images.db")).unwrap());
     let markup = Renderer::new_filter(Some(Highlighter::new()), image_filter);
 
@@ -112,6 +111,7 @@ fn default_handler(req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
 fn handle_category(req: &HttpRequest<AServerState>, cat: &Category) -> Result<HttpResponse> {
     let mut page: Vec<u8> = Vec::with_capacity(150000);
     let state = req.state();
+    state.crates.prewarm();
     front_end::render_category(&mut page, cat, &state.crates, &state.markup).unwrap();
     Ok(HttpResponse::Ok()
             .content_type("text/html;charset=UTF-8")
@@ -124,6 +124,7 @@ fn handle_home(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> 
     let state = req.state();
     let state2 = Arc::clone(state);
     state.render_pool.spawn_fn(move || {
+        state2.crates.prewarm();
         let mut page: Vec<u8> = Vec::with_capacity(50000);
         front_end::render_homepage(&mut page, &state2.crates)?;
         Ok(page)
@@ -148,6 +149,7 @@ fn handle_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse>
     let state2 = Arc::clone(state);
     state.render_pool.spawn_fn(move || {
         assert!(is_alnum(&kw));
+        state2.crates.prewarm();
         let origin = Origin::from_crates_io_name(&kw);
         let all = state2.crates.rich_crate(&origin)?;
         let ver = state2.crates.rich_crate_version(&origin, CrateData::Full)?;

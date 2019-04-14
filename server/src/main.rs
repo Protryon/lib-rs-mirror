@@ -47,8 +47,8 @@ fn main() {
     assert!(public_styles_dir.exists(), "DOCUMENT_ROOT {} does not exist", public_styles_dir.display());
     assert!(data_dir.exists(), "CRATE_DATA_DIR {} does not exist", data_dir.display());
 
-    let crates = KitchenSink::new(&data_dir, &github_token).unwrap();
-    let image_filter = Arc::new(ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_dir().join("images.db")).unwrap());
+    let crates = KitchenSink::new(&data_dir, &github_token).expect("init");
+    let image_filter = Arc::new(ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_dir().join("images.db")).expect("images.db"));
     let markup = Renderer::new_filter(Some(Highlighter::new()), image_filter);
 
     let index = CrateSearchIndex::new(data_dir).expect("data directory");
@@ -119,7 +119,7 @@ fn handle_category(req: &HttpRequest<AServerState>, cat: &Category) -> Result<Ht
     let mut page: Vec<u8> = Vec::with_capacity(150000);
     let state = req.state();
     state.crates.prewarm();
-    front_end::render_category(&mut page, cat, &state.crates, &state.markup).unwrap();
+    front_end::render_category(&mut page, cat, &state.crates, &state.markup).expect("render");
     Ok(HttpResponse::Ok()
         .content_type("text/html;charset=UTF-8")
         .header("Cache-Control", "public, s-maxage=600, max-age=43200, stale-while-revalidate=259200, stale-if-error=72000")
@@ -154,7 +154,7 @@ fn handle_home(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> 
 }
 
 fn handle_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
-    let kw: String = req.match_info().query("crate").unwrap();
+    let kw: String = req.match_info().query("crate").expect("arg");
     println!("rendering {:?}", kw);
     let state = req.state();
     let state2 = Arc::clone(state);

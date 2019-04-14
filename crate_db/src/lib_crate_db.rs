@@ -25,7 +25,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
-use std::sync::Mutex;
+use parking_lot::Mutex;
 use thread_local::ThreadLocal;
 type FResult<T> = std::result::Result<T, failure::Error>;
 
@@ -74,7 +74,7 @@ impl CrateDb {
 
     #[inline]
     fn with_tx<F, T>(&self, cb: F) -> FResult<T> where F: FnOnce(&Connection) -> FResult<T> {
-        let mut conn = self.exclusive_conn.lock().unwrap();
+        let mut conn = self.exclusive_conn.lock();
         let conn = conn.get_or_insert_with(|| self.connect().unwrap());
 
         let tx = conn.transaction()?;

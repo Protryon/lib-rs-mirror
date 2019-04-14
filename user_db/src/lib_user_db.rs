@@ -5,7 +5,7 @@ use github_info::User;
 use github_info::UserType;
 use rusqlite::*;
 use std::path::Path;
-use std::sync::Mutex;
+use parking_lot::Mutex;
 type Result<T> = std::result::Result<T, failure::Error>;
 
 mod schema;
@@ -26,13 +26,13 @@ impl UserDb {
     }
 
     pub fn email_has_github(&self, email: &str) -> Result<bool> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock();
         let mut get_email = conn.prepare_cached("SELECT 1 FROM github_emails WHERE email = ?1 LIMIT 1")?;
         Ok(get_email.exists(&[&email.to_ascii_lowercase()])?)
     }
 
     pub fn user_by_github_login(&self, login: &str) -> Result<Option<User>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock();
         let mut get_user = conn.prepare_cached(r"SELECT
                 u.id,
                 u.login,
@@ -67,7 +67,7 @@ impl UserDb {
     }
 
     pub fn user_by_email(&self, email: &str) -> Result<Option<User>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock();
         let mut get_user = conn.prepare_cached(r"SELECT
                 u.id,
                 u.login,
@@ -104,7 +104,7 @@ impl UserDb {
 
 
     pub fn index_user(&self, user: &User, email: Option<&str>, name: Option<&str>) -> Result<()> {
-        let mut conn = self.conn.lock().unwrap();
+        let mut conn = self.conn.lock();
         let tx = conn.transaction()?;
         {
             let mut insert_user = tx.prepare_cached("INSERT OR IGNORE INTO github_users (

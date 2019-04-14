@@ -1,7 +1,7 @@
 [package]
 edition = "2018"
 name = "user_db"
-version = "0.3.3"
+version = "0.3.4"
 authors = ["Kornel <kornel@geekhood.net>"]
 description = "Stores mapping between Cargo crate authors and GitHub users"
 
@@ -14,3 +14,4 @@ rusqlite = "0.16"
 github_info = { path = "../github_info", version = "0.8.0" }
 repo_url = { git = "https://gitlab.com/crates.rs/repo_url.git" }
 failure = "0.1.1"
+parking_lot = "0.7.1"

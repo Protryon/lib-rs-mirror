@@ -702,8 +702,8 @@ impl Collect {
                             .git_global(false).git_ignore(false).git_exclude(false)
                             .build()
                             .next()
-                            .unwrap()
-                            .unwrap();
+                            .expect("tokei")
+                            .expect("tokei");
         Self {
             dummy_dir_entry,
             stats: Stats::default(),

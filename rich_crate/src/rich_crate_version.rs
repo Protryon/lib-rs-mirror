@@ -60,7 +60,7 @@ impl RichCrateVersion {
     pub fn new(index: Version, mut manifest: Manifest, derived: Derived, readme: Result<Option<Readme>, ()>,
         lib_file: Option<String>, path_in_repo: Option<String>, has_buildrs: bool, has_code_of_conduct: bool) -> Self
     {
-        let package = manifest.package.take().unwrap();
+        let package = manifest.package.take().expect("package");
         let mut s = Self {
             origin: Origin::from_crates_io_name(index.name()),
             repo: package.repository.as_ref().and_then(|r| Repo::new(r).ok()),

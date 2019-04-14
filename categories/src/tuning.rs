@@ -982,7 +982,7 @@ pub fn adjusted_relevance(mut candidates: HashMap<String, f64>, keywords: HashSe
 
     let max_score = candidates.iter()
         .map(|(_, v)| *v)
-        .max_by(|a, b| a.partial_cmp(&b).unwrap())
+        .max_by(|a, b| a.partial_cmp(&b).expect("nan"))
         .unwrap_or(0.);
 
     let min_category_match_threshold = min_category_match_threshold.max(max_score * 0.951);
@@ -993,7 +993,7 @@ pub fn adjusted_relevance(mut candidates: HashMap<String, f64>, keywords: HashSe
         .take(max_num_categories)
         .map(|(k, v)| (v, k))
         .collect();
-    res.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+    res.sort_by(|a, b| b.0.partial_cmp(&a.0).expect("nan"));
     res
 }
 

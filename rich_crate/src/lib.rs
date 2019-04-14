@@ -41,12 +41,12 @@ impl Origin {
         let mut n = s.splitn(2, ':');
         let host = n.next().unwrap();
         match host {
-            "crates.io" => Self::from_crates_io_name(n.next().unwrap()),
+            "crates.io" => Self::from_crates_io_name(n.next().expect("parse")),
             "github" => {
-                let mut n = n.next().unwrap().splitn(3, "/");
-                let owner = n.next().unwrap().into();
-                let repo = n.next().unwrap().into();
-                let package = n.next().unwrap();
+                let mut n = n.next().expect("parse").splitn(3, "/");
+                let owner = n.next().expect("parse").into();
+                let repo = n.next().expect("parse").into();
+                let package = n.next().expect("parse");
                 Self::from_github(SimpleRepo {owner, repo}, package)
             },
             _ => panic!("bad str {}", s),

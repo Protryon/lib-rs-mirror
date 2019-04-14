@@ -1,0 +1,65 @@
+@use crate::templates::base;
+@use crate::Urler;
+@use crate::NotFoundPage;
+
+@(p: &NotFoundPage, url: &Urler)
+
+@:base(&p.page(), {
+
+<header id="serp">
+    <div class="inner-col">
+        <div class="breadcrumbs">
+            <h1><a href="/">Crates.rs</a></h1>
+            ›
+            404
+        </div>
+        <form role="search" id=search method="get" action="/search">
+            <input placeholder="name, keywords, description" autocapitalize="off" autocorrect="off" autocomplete="off" tabindex="1" type=search value="@p.query" name=q><button type=submit>Search</button>
+        </form>
+        <nav>
+            <ul>
+                <li class=active>Error</li>
+                @if !p.results.is_empty() {
+                    <li><a href="@url.search_crates_rs(&p.query)">Search</a>
+                }
+                <li><a href="@url.search_ddg(&p.query)">I'm feeling ducky</a></li>
+            </ul>
+        </nav>
+    </div>
+</header>
+<main id="results">
+    <div class="inner-col">
+        <p class=notfound>Page not found</p>
+        @if !p.results.is_empty() {
+            <p class=tryalso>Here are some crates that mention “@p.query”. You can also try <a href="@url.search_ddg(&p.query)">searching with DuckDuckGo</a>.</p>
+            <ol>
+            @for c in p.results.iter() {
+                <li>
+                    <a href="@url.krate_by_name(&c.crate_name)"><div class=h>
+                        <h4>@c.crate_name</h4>
+                        <p class=desc>@p.render_markdown_str(&c.description)</p>
+                    </div>
+                    <div class=meta>
+                        <span class="version @p.version_class(&c.version)"><span>v</span>@c.version</span>
+                        @if c.monthly_downloads >= 100 {
+                            <span class=downloads title="c.monthly_downloads recent downloads">@if let Some((num,unit)) = Some(p.downloads(c.monthly_downloads)) {@num<b>@unit</b>}</span>
+                        }
+                    </div></a>
+                </li>
+            }
+            </ol>
+            <p><a href="@url.search_crates_rs(&p.query)">See more results</a> or <a href="/">browse all categories</a>.</p>
+        } else {
+            <p>The URL you've followed is invalid, and there is no crate or category named “@p.query”.</p>
+            <p><a href="/">Browse categories instead</a>.</p>
+        }
+    </div>
+</main>
+
+<footer>
+    <div class="inner-col">
+        <p>Search powered by <a href="https://crates.rs/crates/tantivy">tantivy</a>.</p>
+        <p>Browse <a href="/">all categories</a>.
+    </div>
+</footer>
+})

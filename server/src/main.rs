@@ -115,20 +115,32 @@ fn find_category<'a>(slugs: impl Iterator<Item=&'a str>) -> Option<&'static Cate
 
 fn default_handler(req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
     let path = req.uri().path();
+    let state = req.state();
     assert!(path.starts_with('/'));
     if path.ends_with('/') {
         return Ok(HttpResponse::PermanentRedirect().header("Location", path.trim_end_matches('/')).body(""));
     }
+
     if let Some(cat) = find_category(path.split('/').skip(1)) {
         return handle_category(req, cat);
     }
-    if let Some(name) = path.split('/').skip(1).next() {
-        if let Ok(_) = req.state().crates.rich_crate(&Origin::from_crates_io_name(name)) {
-            return Ok(HttpResponse::PermanentRedirect().header("Location", format!("/crates/{}", name)).body(""));
-        }
+
+    let name = path.trim_matches('/');
+    if let Ok(_) = state.crates.rich_crate(&Origin::from_crates_io_name(name)) {
+        return Ok(HttpResponse::PermanentRedirect().header("Location", format!("/crates/{}", name)).body(""));
     }
 
-    Ok(HttpResponse::NotFound().content_type("text/plain;charset=UTF-8").body("404\n"))
+    let query = path.chars().map(|c| if c.is_alphanumeric() {c} else {' '}).take(100).collect::<String>();
+    let query = query.trim();
+    let results = state.index.search(query, 5).unwrap_or_default();
+    let mut page: Vec<u8> = Vec::with_capacity(50000);
+    front_end::render_404_page(&mut page, query, &results, &state.markup)?;
+
+    Ok(HttpResponse::NotFound()
+        .content_type("text/html;charset=UTF-8")
+        .content_length(page.len() as u64)
+        .header("Cache-Control", "public, s-maxage=20, max-age=300, stale-while-revalidate=3600, stale-if-error=3600")
+        .body(page))
 }
 
 fn handle_category(req: &HttpRequest<AServerState>, cat: &Category) -> Result<HttpResponse> {
@@ -215,10 +227,10 @@ fn handle_keyword(req: &HttpRequest<AServerState>) -> FutureResponse<HttpRespons
                     if !is_alnum(&query) {
                         return Ok((query, None));
                     }
-                    let mut page: Vec<u8> = Vec::with_capacity(50000);
                     let keyword_query = format!("keywords:\"{}\"", query);
                     let results = state2.index.search(&keyword_query, 100)?;
                     if !results.is_empty() {
+                        let mut page: Vec<u8> = Vec::with_capacity(50000);
                         front_end::render_keyword_page(&mut page, &query, &results, &state2.markup)?;
                         Ok((query, Some(page)))
                     } else {
@@ -269,8 +281,8 @@ fn handle_search(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse
             state
                 .search_pool
                 .spawn_fn(move || {
-                    let mut page: Vec<u8> = Vec::with_capacity(50000);
                     let results = state2.index.search(&query, 50)?;
+                    let mut page: Vec<u8> = Vec::with_capacity(50000);
                     front_end::render_serp_page(&mut page, &query, &results, &state2.markup)?;
                     Ok(page)
                 })

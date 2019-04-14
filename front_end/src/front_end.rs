@@ -12,10 +12,12 @@ mod cat_page;
 mod crate_page;
 mod download_graph;
 mod home_page;
+mod not_found_page;
 mod iter;
 mod search_page;
 mod urler;
 pub use crate::search_page::*;
+pub use crate::not_found_page::*;
 
 use crate::crate_page::*;
 use crate::urler::Urler;

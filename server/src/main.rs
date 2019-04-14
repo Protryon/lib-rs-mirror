@@ -200,7 +200,7 @@ fn handle_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse>
             std::fs::write(state2.public_crates_dir.join(format!("{}.html", kw)), &page)?;
             Ok(page)
         })
-        .timeout(Duration::from_secs(12))
+        .timeout(Duration::from_secs(30))
         .map_err(map_err)
         .from_err()
         .and_then(|page| {
@@ -238,7 +238,7 @@ fn handle_keyword(req: &HttpRequest<AServerState>) -> FutureResponse<HttpRespons
                         Ok((query, None))
                     }
                 })
-                .timeout(Duration::from_secs(2))
+                .timeout(Duration::from_secs(3))
                 .map_err(map_err)
                 .from_err()
                 .and_then(|(query, page)| {
@@ -287,7 +287,7 @@ fn handle_search(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse
                     front_end::render_serp_page(&mut page, &query, &results, &state2.markup)?;
                     Ok(page)
                 })
-                .timeout(Duration::from_secs(2))
+                .timeout(Duration::from_secs(3))
                 .map_err(map_err)
                 .from_err()
                 .and_then(|page| {

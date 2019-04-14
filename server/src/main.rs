@@ -111,6 +111,11 @@ fn default_handler(req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
     if let Some(cat) = find_category(path.split('/').skip(1)) {
         return handle_category(req, cat);
     }
+    if let Some(name) = path.split('/').skip(1).next() {
+        if let Ok(_) = req.state().crates.rich_crate(&Origin::from_crates_io_name(name)) {
+            return Ok(HttpResponse::PermanentRedirect().header("Location", format!("/crates/{}", name)).body(""));
+        }
+    }
 
     Ok(HttpResponse::NotFound().content_type("text/plain;charset=UTF-8").body("404\n"))
 }

@@ -1,25 +1,25 @@
 use serde;
 
 #[macro_use] extern crate serde_derive;
+use chrono::{Date, TimeZone, Utc};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Mutex;
-use chrono::{Date, TimeZone, Utc};
 
-mod crate_meta;
 mod crate_deps;
-mod crate_owners;
 mod crate_downloads;
-pub use crate::crate_meta::*;
+mod crate_meta;
+mod crate_owners;
 pub use crate::crate_deps::*;
-pub use crate::crate_owners::*;
 pub use crate::crate_downloads::*;
+pub use crate::crate_meta::*;
+pub use crate::crate_owners::*;
+use lazy_static::lazy_static;
+use mysteriouspants_throttle::Throttle;
 pub use simple_cache::Error;
 use simple_cache::SimpleCache;
 use simple_cache::TempCache;
-use lazy_static::lazy_static;
-use mysteriouspants_throttle::Throttle;
 
 pub struct CratesIoClient {
     cache: TempCache<(String, Payload)>,
@@ -128,9 +128,8 @@ impl CratesIoClient {
             }
             let wants = semver::Version::parse(key.1);
             let has = semver::Version::parse(&ver);
-            if wants.and_then(|wants| has.map(|has| (wants,has)))
-                .ok().map_or(false, |(wants,has)| has > wants) {
-                eprintln!("Cache regression: {}@{} vs {}" , key.0, ver, key.1);
+            if wants.and_then(|wants| has.map(|has| (wants, has))).ok().map_or(false, |(wants, has)| has > wants) {
+                eprintln!("Cache regression: {}@{} vs {}", key.0, ver, key.1);
             }
         }
 

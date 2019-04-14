@@ -46,7 +46,7 @@ impl CrateOwner {
             OwnerKind::User => Some(&self.login),
             OwnerKind::Team => {
                 let mut w = self.login.split(':');
-                match w.next().unwrap() {
+                match w.next().expect("team parse") {
                     "github" => w.next(),
                     _ => None,
                 }

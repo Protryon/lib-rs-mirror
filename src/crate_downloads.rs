@@ -1,9 +1,9 @@
-use rand;
 use crate::parse_date;
+use chrono::prelude::*;
+use chrono::Duration;
+use rand;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
-use chrono::Duration;
-use chrono::prelude::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateDownloadsFile {
@@ -77,14 +77,13 @@ impl CrateDownloadsFile {
         }
 
         // Btreemap guarantees sorted order
-        by_week.into_iter().map(|(weeksago, downloads)| {
-            let date = latest_date - Duration::weeks(-weeksago);
-            DownloadWeek {
-                date,
-                total: downloads.values().sum(),
-                downloads,
-            }
-        }).collect()
+        by_week
+            .into_iter()
+            .map(|(weeksago, downloads)| {
+                let date = latest_date - Duration::weeks(-weeksago);
+                DownloadWeek { date, total: downloads.values().sum(), downloads }
+            })
+            .collect()
     }
 }
 

@@ -5,6 +5,7 @@ use chrono::{Date, TimeZone, Utc};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::Path;
+use rayon::prelude::*;
 
 mod crate_deps;
 mod crate_downloads;
@@ -64,15 +65,21 @@ impl CratesIoClient {
     }
 
     pub fn krate(&self, crate_name: &str, cache_buster: &str, refresh: bool) -> Result<Option<CratesIoCrate>, Error> {
-        let mut meta = cioopt!(self.crate_meta(crate_name, cache_buster)?);
-        let downloads = cioopt!(self.crate_downloads(crate_name, cache_buster, refresh)?);
+        let (meta, (downloads, owners)) = rayon::join(
+                || self.crate_meta(crate_name, cache_buster),
+                || rayon::join(
+                    || self.crate_downloads(crate_name, cache_buster, refresh),
+                    || self.crate_owners(crate_name, cache_buster)));
+        let mut meta = cioopt!(meta?);
+        let downloads = cioopt!(downloads?);
+        let owners = cioopt!(owners?);
+
         if !self.cache.cache_only && !Self::are_downloads_consistent(&meta, &downloads) {
             eprintln!("Meta is missing versions {}@{}", crate_name, cache_buster);
             let _ = self.cache.delete(crate_name);
             meta = cioopt!(self.crate_meta(crate_name, cache_buster)?);
             assert!(Self::are_downloads_consistent(&meta, &downloads));
         }
-        let owners = cioopt!(self.crate_owners(crate_name, cache_buster)?);
         Ok(Some(CratesIoCrate {
             meta,
             downloads,

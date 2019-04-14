@@ -183,9 +183,9 @@
                 @if let Some((deps, direct)) = c.dependents_stats() {
                   <br>
                     @if deps != direct {
-                      Used in <strong>@c.format_number(deps)</strong> crate@if deps != 1 {s} (<a href="@url.reverse_deps(&c.ver)">@c.format_number(direct)&nbsp;directly</a>)
+                      Used in <b>@c.format_number(deps)</b> crate@if deps != 1 {s} (<a href="@url.reverse_deps(&c.ver)">@c.format_number(direct)&nbsp;directly</a>)
                     } else {
-                      Used in <a href="@url.reverse_deps(&c.ver)"><strong>@c.format_number(deps)</strong>&nbsp;crate@if deps != 1 {s}</a>
+                      Used in <a href="@url.reverse_deps(&c.ver)"><b>@c.format_number(deps)</b>&nbsp;crate@if deps != 1 {s}</a>
                     }
                 }
               </p>
@@ -334,7 +334,7 @@
           </div>
         }
       }
-      <aside role="contentinfo"><p><a href="/"><strong>Crates.rs</strong></a> is an unofficial list of Rust/Cargo packages. It's <a href="https://gitlab.com/crates.rs?sort=stars_desc">open-source</a>, created by <a href="https://github.com/kornelski">kornelski</a>. This page was generated on @date_now().</p><p>If something is missing or incorrect, please <a href="https://gitlab.com/crates.rs/crates.rs/issues/new">file a bug</a>.</p></aside>
+      <aside role="contentinfo"><p><a href="/"><b>Crates.rs</b></a> is an unofficial list of Rust/Cargo packages. It's <a href="https://gitlab.com/crates.rs?sort=stars_desc">open-source</a>, created by <a href="https://github.com/kornelski">kornelski</a>. This page was generated on @date_now().</p><p>If something is missing or incorrect, please <a href="https://gitlab.com/crates.rs/crates.rs/issues/new">file a bug</a>.</p></aside>
     </div>
   </footer>
 })

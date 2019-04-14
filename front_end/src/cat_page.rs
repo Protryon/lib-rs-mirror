@@ -32,18 +32,24 @@ impl<'a> CatPage<'a> {
                 .filter_map(|o| {
                     let c = match crates.rich_crate_version(&o, CrateData::Full) {
                         Ok(c) => c,
-                        Err(e) => return Some(Err(e)),
+                        Err(e) => {
+                            eprintln!("Skipping {:?} because {}", o, e);
+                            return None;
+                        },
                     };
                     if c.is_yanked() {
                         return None;
                     }
                     let d = match crates.downloads_per_month_or_equivalent(&o) {
                         Ok(d) => d.unwrap_or(0) as u32,
-                        Err(e) => return Some(Err(e)),
+                        Err(e) => {
+                            eprintln!("Skipping {:?} because dl {}", o, e);
+                            return None;
+                        },
                     };
-                    Some(Ok((c, d)))
+                    Some((c, d))
                 })
-                .collect::<Result<Vec<_>, Error>>()?,
+                .collect::<Vec<_>>(),
             cat,
             markup,
         })

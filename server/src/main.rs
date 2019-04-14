@@ -1,3 +1,4 @@
+use failure::ResultExt;
 use actix_web::http::*;
 use actix_web::*;
 use categories::Category;
@@ -34,6 +35,15 @@ struct ServerState {
 type AServerState = Arc<ServerState>;
 
 fn main() {
+    if let Err(e) = run_server() {
+        for c in e.iter_chain() {
+            eprintln!("Error: {}", c);
+        }
+        std::process::exit(1);
+    }
+}
+
+fn run_server() -> Result<(), failure::Error> {
     env_logger::init();
     kitchen_sink::dont_hijack_ctrlc();
     let sys = actix::System::new("crates-server");
@@ -41,17 +51,17 @@ fn main() {
     let public_styles_dir: PathBuf = env::var_os("DOCUMENT_ROOT").map(From::from).unwrap_or_else(|| "../style/public".into());
     let public_crates_dir: PathBuf = env::var_os("CRATE_HTML_ROOT").map(From::from).unwrap_or_else(|| "/www/crates.rs/public/crates".into());
     let data_dir: PathBuf = env::var_os("CRATE_DATA_DIR").map(From::from).unwrap_or_else(|| "../data".into());
-    let github_token = env::var("GITHUB_TOKEN").expect("GITHUB_TOKEN missing");
+    let github_token = env::var("GITHUB_TOKEN").context("GITHUB_TOKEN missing")?;
 
     assert!(public_crates_dir.exists(), "CRATE_HTML_ROOT {} does not exist", public_crates_dir.display());
     assert!(public_styles_dir.exists(), "DOCUMENT_ROOT {} does not exist", public_styles_dir.display());
     assert!(data_dir.exists(), "CRATE_DATA_DIR {} does not exist", data_dir.display());
 
-    let crates = KitchenSink::new(&data_dir, &github_token).expect("init");
-    let image_filter = Arc::new(ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_dir().join("images.db")).expect("images.db"));
+    let crates = KitchenSink::new(&data_dir, &github_token)?;
+    let image_filter = Arc::new(ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_dir().join("images.db"))?);
     let markup = Renderer::new_filter(Some(Highlighter::new()), image_filter);
 
-    let index = CrateSearchIndex::new(data_dir).expect("data directory");
+    let index = CrateSearchIndex::new(data_dir)?;
 
     let state = Arc::new(ServerState {
         render_pool: CpuPool::new_num_cpus(),
@@ -86,6 +96,7 @@ fn main() {
 
     println!("Started HTTP server on http://127.0.0.1:32531");
     let _ = sys.run();
+    Ok(())
 }
 
 fn find_category<'a>(slugs: impl Iterator<Item=&'a str>) -> Option<&'static Category> {

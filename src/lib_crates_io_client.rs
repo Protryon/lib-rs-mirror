@@ -1,11 +1,15 @@
-use serde;
-
 #[macro_use] extern crate serde_derive;
+use serde;
 use chrono::{Date, TimeZone, Utc};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::Path;
 use rayon::prelude::*;
+use mysteriouspants_throttle::Throttle;
+pub use simple_cache::Error;
+use simple_cache::SimpleCache;
+use simple_cache::TempCache;
+use parking_lot::Mutex;
 
 mod crate_deps;
 mod crate_downloads;
@@ -15,11 +19,6 @@ pub use crate::crate_deps::*;
 pub use crate::crate_downloads::*;
 pub use crate::crate_meta::*;
 pub use crate::crate_owners::*;
-use mysteriouspants_throttle::Throttle;
-pub use simple_cache::Error;
-use simple_cache::SimpleCache;
-use simple_cache::TempCache;
-use parking_lot::Mutex;
 
 pub struct CratesIoClient {
     cache: TempCache<(String, Payload)>,

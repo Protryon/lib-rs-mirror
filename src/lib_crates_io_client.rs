@@ -59,7 +59,13 @@ impl CratesIoClient {
     pub fn crate_data(&self, crate_name: &str, version: &str) -> Result<Option<Vec<u8>>, Error> {
         let newkey = format!("{}.crate", crate_name);
         let url = format!("https://crates.io/api/v1/crates/{}/{}/download", crate_name, version);
-        self.crates.get_cached((&newkey, version), &url)
+        let res = self.crates.get_cached((&newkey, version), &url)?;
+        if let Some(data) = &res {
+            if data.len() < 10 || data[0] != 31 || data[1] != 139 {
+                return Err(Error::Other("Not tarball".into()));
+            }
+        }
+        Ok(res)
     }
 
     pub fn krate(&self, crate_name: &str, cache_buster: &str, refresh: bool) -> Result<Option<CratesIoCrate>, Error> {

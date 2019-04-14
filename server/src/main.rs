@@ -81,6 +81,7 @@ fn run_server() -> Result<(), failure::Error> {
 
     server::new(move || {
         App::with_state(state.clone())
+            .middleware(StandardHeaders)
             .middleware(middleware::Logger::default())
             .resource("/", |r| r.method(Method::GET).f(handle_home))
             .resource("/search", |r| r.method(Method::GET).f(handle_search))
@@ -301,5 +302,16 @@ fn handle_search(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse
                 .responder()
         },
         _ => future::ok(HttpResponse::TemporaryRedirect().header("Location", "/").finish()).responder(),
+    }
+}
+
+use header::HeaderValue;
+use actix_web::middleware::{Middleware, Response};
+struct StandardHeaders;
+
+impl<S> Middleware<S> for StandardHeaders {
+    fn response(&self, _req: &HttpRequest<S>, mut resp: HttpResponse) -> Result<Response> {
+        resp.headers_mut().insert("Server", HeaderValue::from_static(concat!("actix-web/0.7 crates.rs/", env!("CARGO_PKG_VERSION"))));
+        Ok(Response::Done(resp))
     }
 }

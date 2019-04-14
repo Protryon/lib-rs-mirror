@@ -490,9 +490,14 @@ impl KitchenSink {
 
         let name = latest.name();
         let ver = latest.version();
+        let origin = Origin::from_crates_io_name(name);
 
-        let crate_tarball = self.crates_io.crate_data(name, ver).context("crate_file")?
-            .ok_or_else(|| KitchenSinkErr::DataNotFound(format!("{}-{}", name, ver)))?;
+        let (crate_tarball, crates_io_meta) = rayon::join(
+            || self.crates_io.crate_data(name, ver).context("crate_file"),
+            || self.crates_io_meta(&origin, fetch_type == CrateData::FullNoDerived));
+
+        let crates_io_meta = crates_io_meta?.meta.krate;
+        let crate_tarball = crate_tarball?.ok_or_else(|| KitchenSinkErr::DataNotFound(format!("{}-{}", name, ver)))?;
         let crate_compressed_size = crate_tarball.len();
         let mut meta = crate_files::read_archive(&crate_tarball[..], name, ver)?;
         drop(crate_tarball);
@@ -507,12 +512,8 @@ impl KitchenSink {
         derived.crate_decompressed_size = meta.decompressed_size.max(crate_compressed_size) as u32;
         derived.is_nightly = meta.is_nightly;
 
-        let origin = Origin::from_crates_io_name(name);
-
         let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
-
         let maybe_repo = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
-
         let path_in_repo = match maybe_repo.as_ref() {
             Some(repo) => if fetch_type != CrateData::Minimal {
                 self.crate_db.path_in_repo(repo, name)?
@@ -523,8 +524,6 @@ impl KitchenSink {
         };
 
         ///// Fixing and faking the data /////
-
-        let crates_io_meta = self.crates_io_meta(&origin, fetch_type == CrateData::FullNoDerived)?.meta.krate;
 
         // it may contain data from nowhere! https://github.com/rust-lang/crates.io/issues/1624
         if package.homepage.is_none() {

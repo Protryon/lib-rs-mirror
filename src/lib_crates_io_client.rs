@@ -5,7 +5,6 @@ use chrono::{Date, TimeZone, Utc};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::Path;
-use std::sync::Mutex;
 
 mod crate_deps;
 mod crate_downloads;
@@ -15,15 +14,16 @@ pub use crate::crate_deps::*;
 pub use crate::crate_downloads::*;
 pub use crate::crate_meta::*;
 pub use crate::crate_owners::*;
-use lazy_static::lazy_static;
 use mysteriouspants_throttle::Throttle;
 pub use simple_cache::Error;
 use simple_cache::SimpleCache;
 use simple_cache::TempCache;
+use parking_lot::Mutex;
 
 pub struct CratesIoClient {
     cache: TempCache<(String, Payload)>,
     crates: SimpleCache,
+    throttle: Mutex<Throttle<()>>,
 }
 
 macro_rules! cioopt {
@@ -35,10 +35,6 @@ macro_rules! cioopt {
     };
 }
 
-lazy_static! {
-    static ref THROTTLE: Mutex<Throttle<()>> = Mutex::new(Throttle::new_tps_throttle(8.));
-}
-
 #[derive(Debug)]
 pub struct CratesIoCrate {
     pub meta: CrateMetaFile,
@@ -47,10 +43,11 @@ pub struct CratesIoCrate {
 }
 
 impl CratesIoClient {
-    pub fn new(cache_base_path: &Path) -> Result<Self, Error> {
+    pub fn new(cache_base_path: &Path, tps: f32) -> Result<Self, Error> {
         Ok(Self {
             cache: TempCache::new(&cache_base_path.join("cratesio.bin"))?,
             crates: SimpleCache::new(&cache_base_path.join("crates.db"))?,
+            throttle: Mutex::new(Throttle::new_tps_throttle(tps)),
         })
     }
 
@@ -139,10 +136,9 @@ impl CratesIoClient {
 
         self.cache.delete(key.0)?; // out of date
 
-        let mut throttle = THROTTLE.lock().unwrap(); // enforce one req at a time
+        self.throttle.lock().acquire(());  // enforce one req per second
         let url = format!("https://crates.io/api/v1/crates/{}", path.as_ref());
         let res = self.cache.get_json(key.0, url, |raw: B| {
-            throttle.acquire(()); // enforce one req per second
             Some((key.1.to_string(), raw.to()))
         })?;
         Ok(res.map(|(_, res)| B::from(res)))
@@ -221,12 +217,12 @@ pub(crate) fn parse_date(date: &str) -> Date<Utc> {
 
 #[test]
 fn cratesioclient() {
-    let client = CratesIoClient::new(Path::new("../data")).expect("new");
+    let client = CratesIoClient::new(Path::new("../data"), 1.).expect("new");
 
     client.crate_meta("capi", "0.0.1").expect("cargo-deb");
     let owners = client.crate_owners("cargo-deb", "1.10.0").expect("crate_owners").expect("found some");
     assert_eq!(2, owners.len(), "that will fail when metadata updates");
-    match CratesIoClient::new(Path::new("../data")).expect("new").cache_only(true).crate_data("fail404", "999").unwrap() {
+    match CratesIoClient::new(Path::new("../data"), 1.).expect("new").cache_only(true).crate_data("fail404", "999").unwrap() {
         None => {},
         Some(e) => panic!("{:?}", e),
     }

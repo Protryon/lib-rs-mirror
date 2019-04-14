@@ -4,7 +4,6 @@ use chrono::{Date, TimeZone, Utc};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::Path;
-use rayon::prelude::*;
 use mysteriouspants_throttle::Throttle;
 pub use simple_cache::Error;
 use simple_cache::SimpleCache;
@@ -112,11 +111,14 @@ impl CratesIoClient {
     }
 
     pub fn crate_owners(&self, crate_name: &str, as_of_version: &str) -> Result<Option<Vec<CrateOwner>>, Error> {
-        let url = format!("{}/owner_user", crate_name);
-        let u: CrateOwnersFile = cioopt!(self.get_json((&url, as_of_version), &url)?);
+        let url1 = format!("{}/owner_user", crate_name);
+        let url2 = format!("{}/owner_team", crate_name);
+        let (res1, res2) = rayon::join(
+            || self.get_json((&url1, as_of_version), &url1),
+            || self.get_json((&url2, as_of_version), &url2));
 
-        let url = format!("{}/owner_team", crate_name);
-        let mut t: CrateTeamsFile = cioopt!(self.get_json((&url, as_of_version), &url)?);
+        let u: CrateOwnersFile = cioopt!(res1?);
+        let mut t: CrateTeamsFile = cioopt!(res2?);
         let mut out = u.users;
         out.append(&mut t.teams);
         Ok(Some(out))

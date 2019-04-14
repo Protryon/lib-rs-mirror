@@ -774,7 +774,7 @@ impl KitchenSink {
         }
     }
 
-    pub fn all_dependencies_flattened(&self, origin: &Origin) -> Result<FxHashMap<Box<str>, (DepInf, MiniVer)>, KitchenSinkErr> {
+    pub fn all_dependencies_flattened(&self, origin: &Origin) -> Result<DepInfMap, KitchenSinkErr> {
         self.index.all_dependencies_flattened(self.index.crates_io_crate_by_name(origin)?)
     }
 

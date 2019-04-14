@@ -7,6 +7,8 @@ use parking_lot::Mutex;
 use rayon::prelude::*;
 use string_interner::Sym;
 
+pub type DepInfMap = FxHashMap<Box<str>, (DepInf, MiniVer)>;
+
 pub struct DepsStats {
     pub total: usize,
     pub counts: FxHashMap<Box<str>, RevDependencies>,
@@ -84,7 +86,7 @@ impl DepVisitor {
 }
 
 impl Index {
-    pub fn all_dependencies_flattened(&self, c: &Crate) -> Result<FxHashMap<Box<str>, (DepInf, MiniVer)>, KitchenSinkErr> {
+    pub fn all_dependencies_flattened(&self, c: &Crate) -> Result<DepInfMap, KitchenSinkErr> {
         let mut collected = FxHashMap::with_capacity_and_hasher(120, Default::default());
         let mut visitor = DepVisitor::new();
 

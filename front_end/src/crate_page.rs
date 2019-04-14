@@ -8,6 +8,7 @@ use chrono::prelude::*;
 use chrono::Duration;
 use kitchen_sink::CResult;
 use kitchen_sink::CrateAuthor;
+use kitchen_sink::DepInfMap;
 use kitchen_sink::{CrateData, DepTy, KitchenSink, Origin};
 use locale::Numeric;
 use rayon::prelude::*;
@@ -81,9 +82,14 @@ pub(crate) struct Contributors<'a> {
 
 impl<'a> CratePage<'a> {
     pub fn new(all: &'a RichCrate, ver: &'a RichCrateVersion, kitchen_sink: &'a KitchenSink, markup: &'a Renderer) -> CResult<Self> {
+        let (top_keyword, (all_contributors, deps)) = rayon::join(
+            || kitchen_sink.top_keyword(all),
+            || rayon::join(
+                || kitchen_sink.all_contributors(ver),
+                || kitchen_sink.all_dependencies_flattened(ver.origin())));
         let mut page = Self {
-            top_keyword: kitchen_sink.top_keyword(all)?,
-            all_contributors: kitchen_sink.all_contributors(ver)?,
+            top_keyword: top_keyword?,
+            all_contributors: all_contributors?,
             all,
             ver,
             kitchen_sink,
@@ -91,7 +97,7 @@ impl<'a> CratePage<'a> {
             sizes: None,
             lang_stats: None,
         };
-        let (own_size, deps_size_minimal, deps_size_typical, lang_stats) = page.crate_size()?;
+        let (own_size, deps_size_minimal, deps_size_typical, lang_stats) = page.crate_size(deps?)?;
         page.sizes = Some((own_size, deps_size_minimal, deps_size_typical));
 
         let total = lang_stats.langs.iter().filter(|(lang, _)| lang.is_code()).map(|(_, lines)| lines.code).sum::<u32>();
@@ -636,9 +642,7 @@ impl<'a> CratePage<'a> {
         )
     }
 
-    fn crate_size(&self) -> CResult<((usize, usize), DepsSize, DepsSize, Stats)> {
-        let deps = self.kitchen_sink.all_dependencies_flattened(self.ver.origin())?;
-
+    fn crate_size(&self, deps: DepInfMap) -> CResult<((usize, usize), DepsSize, DepsSize, Stats)> {
         let tmp: Vec<_> = deps
             .into_par_iter()
             .filter_map(|(name, (depinf, semver))| {

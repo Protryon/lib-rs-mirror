@@ -57,7 +57,7 @@ fn run_server() -> Result<(), failure::Error> {
     assert!(public_styles_dir.exists(), "DOCUMENT_ROOT {} does not exist", public_styles_dir.display());
     assert!(data_dir.exists(), "CRATE_DATA_DIR {} does not exist", data_dir.display());
 
-    let crates = KitchenSink::new(&data_dir, &github_token)?;
+    let crates = KitchenSink::new(&data_dir, &github_token, 20.)?;
     let image_filter = Arc::new(ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_dir().join("images.db"))?);
     let markup = Renderer::new_filter(Some(Highlighter::new()), image_filter);
 

@@ -175,14 +175,14 @@ impl KitchenSink {
             },
         };
         let data_path = Self::data_path()?;
-        Self::new(&data_path, &github_token)
+        Self::new(&data_path, &github_token, 1.)
     }
 
-    pub fn new(data_path: &Path, github_token: &str) -> CResult<Self> {
+    pub fn new(data_path: &Path, github_token: &str, crates_io_tps: f32) -> CResult<Self> {
         let main_cache_dir = data_path.to_owned();
 
         let ((crates_io, gh), (index, crate_derived_cache)) = rayon::join(|| rayon::join(
-                || crates_io_client::CratesIoClient::new(data_path),
+                || crates_io_client::CratesIoClient::new(data_path, crates_io_tps),
                 || github_info::GitHub::new(&data_path.join("github.db"), github_token)),
             || rayon::join(
                 || Index::new(data_path),

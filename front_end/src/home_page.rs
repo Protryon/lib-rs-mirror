@@ -26,7 +26,7 @@ pub struct HomeCategory {
     dl: usize,
 }
 
-/// Computes data used on the home page on https://crates.rs/
+/// Computes data used on the home page on https://lib.rs/
 pub struct HomePage<'a> {
     crates: &'a KitchenSink,
 }
@@ -179,9 +179,9 @@ impl<'a> HomePage<'a> {
             item_description: None,
             keywords: None,
             created: None,
-            alternate: Some("https://crates.rs/atom.xml".to_string()),
+            alternate: Some("https://lib.rs/atom.xml".to_string()),
             alternate_type: Some("application/atom+xml"),
-            canonical: Some("https://crates.rs".to_string()),
+            canonical: Some("https://lib.rs".to_string()),
             noindex: false,
             search_meta: true,
             critical_css_data: Some(include_str!("../../style/public/home.css")),

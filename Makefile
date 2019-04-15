@@ -15,7 +15,7 @@ download-caches: $(CACHE_FILES)
 
 $(CACHE_FILES):
 	if [ ! -d data/data.tar.xz -a -f data.tar.xz ]; then mv data.tar.xz data/; fi
-	if [ ! -f data/data.tar.xz ]; then curl --fail --output data/data.tar.xz https://crates.rs/data/data.tar.xz; fi
+	if [ ! -f data/data.tar.xz ]; then curl --fail --output data/data.tar.xz https://lib.rs/data/data.tar.xz; fi
 
 	cd data; unxz < data.tar.xz | tar xv
 	touch $@

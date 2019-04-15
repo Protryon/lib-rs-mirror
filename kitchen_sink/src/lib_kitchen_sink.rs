@@ -120,7 +120,7 @@ pub enum KitchenSinkErr {
     NoVersions,
     #[fail(display = "Environment variable CRATES_DATA_DIR is not set.\nChoose a dir where it's OK to store lots of data, and export it like CRATES_DATA_DIR=/var/lib/crates.rs")]
     CratesDataDirEnvVarMissing,
-    #[fail(display = "{} does not exist\nPlease get data files from https://crates.rs/data and put them in that directory, or set CRATES_DATA_DIR to their location.", _0)]
+    #[fail(display = "{} does not exist\nPlease get data files from https://lib.rs/data and put them in that directory, or set CRATES_DATA_DIR to their location.", _0)]
     CacheDbMissing(String),
     #[fail(display = "Error when parsing verison")]
     SemverParsingError,
@@ -722,7 +722,7 @@ impl KitchenSink {
             package.documentation = None;
         }
 
-        if package.homepage.as_ref().map_or(false, |d| Self::is_docs_rs_link(d) || d.starts_with("https://crates.rs/") || d.starts_with("https://crates.io/")) {
+        if package.homepage.as_ref().map_or(false, |d| Self::is_docs_rs_link(d) || d.starts_with("https://lib.rs/") || d.starts_with("https://crates.io/")) {
             package.homepage = None;
         }
 

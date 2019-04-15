@@ -1,4 +1,4 @@
-# Crates.rs: user database
+# Lib.rs: user database
 
 Maintains an sqlite index of author emails, names and their GitHub usernames.
 

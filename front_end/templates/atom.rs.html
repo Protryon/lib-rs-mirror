@@ -5,23 +5,23 @@
 @(home: &HomePage, url: &Urler)
 
 <feed xmlns="http://www.w3.org/2005/Atom">
-    <title>Crates.rs</title>
+    <title>Lib.rs</title>
     <subtitle>Recently published Rust libraries and applications</subtitle>
-    <link href="https://crates.rs"/>
-    <link rel="self" href="https://crates.rs/atom.xml"/>
+    <link href="https://lib.rs"/>
+    <link rel="self" href="https://lib.rs/atom.xml"/>
     <updated>@home.now()</updated>
     <author>
-      <name>crates.rs (@"@"kornelski)</name>
+      <name>lib.rs (@"@"kornelski)</name>
       <uri>https://github.com/kornelski</uri>
     </author>
-    <icon>https://crates.rs/crates-logo.png</icon>
+    <icon>https://lib.rs/crates-logo.png</icon>
     <id>https://crates.rs</id>
     <generator uri="https://gitlab.com/crates.rs"/>
 
     @for (all, ver) in home.recently_updated_crates() {
         <entry>
           <title>@ver.capitalized_name() (@ver.version())</title>
-          <link href="https://crates.rs@url.krate(&ver)"/>
+          <link href="https://lib.rs@url.krate(&ver)"/>
           <id>https://crates.rs@url.krate(&ver)/@ver.version()</id>
           <updated>@home.last_modified(&all)</updated>
           @if let Some(d) = ver.description() {

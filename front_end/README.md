@@ -1,6 +1,6 @@
-# HTML of crates.rs
+# HTML of lib.rs
 
-This is a static site generator and [ructe](https://crates.rs/crates/ructe) templates for the crates.rs website.
+This is a static site generator and [ructe](https://lib.rs/crates/ructe) templates for the lib.rs website.
 
 ## Usage
 

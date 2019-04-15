@@ -1,6 +1,6 @@
-# Crates.rs
+# Lib.rs (Crates.rs)
 
-[Crates.rs](https://crates.rs) is a fast, lightweight way to browse information about all applications and libraries written in [Rust](https://www.rust-lang.org/).
+[Crates.rs](https://lib.rs) is a fast, lightweight way to browse information about all applications and libraries written in [Rust](https://www.rust-lang.org/).
 
 Crates [published](https://doc.rust-lang.org/cargo/reference/publishing.html) to crates.**io** will automatically show up on crates.**rs**. Crates.rs is not a registry on its own, and it's not affiliated with crates.io or the Rust project.
 
@@ -39,7 +39,7 @@ If you'd like to help improve it:
 
 ## Building step-by-step
 
- 1. [Get the initial data files](https://crates.rs/data) for the site (about 2GB).
+ 1. [Get the initial data files](https://lib.rs/data) for the site (about 2GB).
 
  2. Extract the data files in `.xz` format using [7zip](https://www.7-zip.org/download.html), [The Unarchiver (Mac)](https://theunarchiver.com/) or `unxz data/*.xz`.
     * Put them all (`cache.db`, `crates.db`, `github.db`, `users.db`, `crate_data.db`) in the `data/` subdirectory of crates.rs checkout.

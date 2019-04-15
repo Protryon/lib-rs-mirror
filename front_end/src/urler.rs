@@ -92,7 +92,7 @@ impl Urler {
     }
 
     pub fn search_crates_rs(&self, query: &str) -> String {
-        format!("https://crates.rs/search?q={}", encode(query))
+        format!("https://lib.rs/search?q={}", encode(query))
     }
 
     pub fn search_ddg(&self, query: &str) -> String {

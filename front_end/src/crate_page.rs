@@ -116,7 +116,7 @@ impl<'a> CratePage<'a> {
             item_description: self.ver.description().map(|d| d.to_string()),
             alternate: self.ver.crates_io_url(),
             alternate_type: None,
-            canonical: Some(format!("https://crates.rs{}", url.krate(&self.ver))),
+            canonical: Some(format!("https://lib.rs{}", url.krate(&self.ver))),
             noindex: self.ver.is_yanked(),
             search_meta: false,
             critical_css_data: None,

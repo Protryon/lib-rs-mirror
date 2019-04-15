@@ -8,7 +8,7 @@ Requires `cache.db`, `crates.db` and `github.db` data files.
 To run:
 
 0. [Install Rust](https://www.rust-lang.org/install.html)
-1. [Obtain data files](https://crates.rs/data)
+1. [Obtain data files](https://lib.rs/data)
 2. Set environmental variables (`export` on Unix, `set` on Windows)
   * `GITHUB_TOKEN` with [GitHub token](https://blog.github.com/2013-05-16-personal-api-tokens/) from [here](https://github.com/settings/tokens). It doesn't need any additional permissions.
   * `CRATES_DATA_DIR` data with path to the directory that contains the data files.

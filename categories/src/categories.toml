@@ -325,8 +325,8 @@ short-description = """
 Crates for dealing with files and filesystems."""
 
 [game-engines]
-name = "Game engines"
-title = "Rust game engine"
+name = "Game development"
+title = "Rust game dev"
 description = """
 Crates for creating games.\
 """

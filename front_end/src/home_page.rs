@@ -173,7 +173,7 @@ impl<'a> HomePage<'a> {
 
     pub fn page(&self) -> Page {
         Page {
-            title: "Crates.rs — home for Rust crates".to_owned(),
+            title: "Lib.rs — home for Rust crates".to_owned(),
             description: Some("List of Rust libraries and applications. An unofficial experimental opinionated alternative to crates.io".to_owned()),
             item_name: None,
             item_description: None,

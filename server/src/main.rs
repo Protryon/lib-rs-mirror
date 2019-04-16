@@ -151,7 +151,7 @@ fn handle_category(req: &HttpRequest<AServerState>, cat: &Category) -> Result<Ht
     front_end::render_category(&mut page, cat, &state.crates, &state.markup).expect("render");
     Ok(HttpResponse::Ok()
         .content_type("text/html;charset=UTF-8")
-        .header("Cache-Control", "public, max-age=3600, stale-while-revalidate=259200, stale-if-error=72000")
+        .header("Cache-Control", "public, max-age=7200, stale-while-revalidate=259200, stale-if-error=72000")
         .content_length(page.len() as u64)
         .body(page))
 }
@@ -174,7 +174,7 @@ fn handle_home(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> 
             future::ok(
                 HttpResponse::Ok()
                     .content_type("text/html;charset=UTF-8")
-                    .header("Cache-Control", "public, max-age=28800, stale-while-revalidate=259200, stale-if-error=72000")
+                    .header("Cache-Control", "public, max-age=14400, stale-while-revalidate=259200, stale-if-error=72000")
                     .content_length(page.len() as u64)
                     .body(page),
             )
@@ -207,7 +207,7 @@ fn handle_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse>
             future::ok(
                 HttpResponse::Ok()
                     .content_type("text/html;charset=UTF-8")
-                    .header("Cache-Control", "public, max-age=3600, max-age=172800, stale-while-revalidate=604800, stale-if-error=72000")
+                    .header("Cache-Control", "public, max-age=7200, stale-while-revalidate=604800, stale-if-error=72000")
                     .content_length(page.len() as u64)
                     .body(page),
             )

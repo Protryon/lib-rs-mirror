@@ -100,6 +100,8 @@ lazy_static! {
         ("social", Some(&["media"])),
         ("codegen", Some(&["backend"])),
         ("game", Some(&["simulator", "simulation"])),
+        ("vkontakte", Some(&["vk"])),
+        ("vulkan", Some(&["vk"])),
         ("2d", Some(&["path", "paths"])),
         ("video", Some(&["audio"])), // have to pick one…
         ("sound", Some(&["3d", "windows"])),

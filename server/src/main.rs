@@ -130,6 +130,10 @@ fn default_handler(req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
     if let Ok(_) = state.crates.rich_crate(&Origin::from_crates_io_name(name)) {
         return Ok(HttpResponse::PermanentRedirect().header("Location", format!("/crates/{}", name)).body(""));
     }
+    let inverted_hyphens: String = name.chars().map(|c| if c == '-' {'_'} else if c == '_' {'-'} else {c}).collect();
+    if let Ok(_) = state.crates.rich_crate(&Origin::from_crates_io_name(&inverted_hyphens)) {
+        return Ok(HttpResponse::PermanentRedirect().header("Location", format!("/crates/{}", inverted_hyphens)).body(""));
+    }
 
     let query = path.chars().map(|c| if c.is_alphanumeric() {c} else {' '}).take(100).collect::<String>();
     let query = query.trim();

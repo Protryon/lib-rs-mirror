@@ -78,7 +78,8 @@ impl CrateSearchIndex {
         Ok(Self { tantivy_index, crate_name_field, keywords_field, description_field, readme_field, monthly_downloads, crate_version, crate_score })
     }
 
-    pub fn search(&self, query_text: &str, limit: usize) -> tantivy::Result<Vec<CrateFound>> {
+    /// if sort_by_query_relevance is false, sorts by internal crate score (relevance is still used to select the crates)
+    pub fn search(&self, query_text: &str, limit: usize, sort_by_query_relevance: bool) -> tantivy::Result<Vec<CrateFound>> {
         let query_text = query_text.trim();
         let mut query_parser = QueryParser::for_index(&self.tantivy_index, vec![
             self.crate_name_field, self.keywords_field, self.description_field, self.readme_field,
@@ -95,21 +96,25 @@ impl CrateSearchIndex {
 
         let reader = self.tantivy_index.reader()?;
         let searcher = reader.searcher();
-        let top_docs = searcher.search(&*query, &TopDocs::with_limit(limit+limit/3))?;
+        let top_docs = searcher.search(&*query, &TopDocs::with_limit(limit+10+limit/3))?;
 
-        let mut docs = top_docs.into_iter().enumerate().map(|(i, (score, doc_address))| {
+        let mut docs = top_docs.into_iter().enumerate().map(|(i, (relevance_score, doc_address))| {
             let retrieved_doc = searcher.doc(doc_address)?;
             let mut doc = self.tantivy_index.schema().to_named_doc(&retrieved_doc).0;
-            let mut base_score = take_int(doc.get("crate_score")) as f64;
-            // first few crates can be ordered by tantivy's relevance
-            let position_bonus = if i < 4 {CRATE_SCORE_MAX / 8.} else {0.};
+            let mut crate_base_score = take_int(doc.get("crate_score")) as f64;
             let crate_name = take_string(doc.remove("crate_name"));
-            // bonus for exact match
-            if crate_name == query_text {
-                base_score += CRATE_SCORE_MAX/10.;
-            }
             Ok(CrateFound {
-                score: (score as f64 * (base_score + position_bonus)) as f32,
+                score: if sort_by_query_relevance {
+                    // first few crates can be ordered by tantivy's relevance
+                    let position_bonus = if i < 4 {CRATE_SCORE_MAX / (i as f64 + 8.)} else {0.};
+                    // bonus for exact match
+                    if crate_name == query_text {
+                        crate_base_score += CRATE_SCORE_MAX / 8.;
+                    }
+                    (relevance_score as f64 * (crate_base_score + position_bonus)) as f32
+                } else {
+                    crate_base_score as f32
+                },
                 crate_name,
                 description: take_string(doc.remove("description")),
                 keywords: take_string(doc.remove("keywords")),

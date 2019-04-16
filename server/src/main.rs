@@ -133,7 +133,7 @@ fn default_handler(req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
 
     let query = path.chars().map(|c| if c.is_alphanumeric() {c} else {' '}).take(100).collect::<String>();
     let query = query.trim();
-    let results = state.index.search(query, 5).unwrap_or_default();
+    let results = state.index.search(query, 5, false).unwrap_or_default();
     let mut page: Vec<u8> = Vec::with_capacity(50000);
     front_end::render_404_page(&mut page, query, &results, &state.markup)?;
 
@@ -229,7 +229,7 @@ fn handle_keyword(req: &HttpRequest<AServerState>) -> FutureResponse<HttpRespons
                         return Ok((query, None));
                     }
                     let keyword_query = format!("keywords:\"{}\"", query);
-                    let results = state2.index.search(&keyword_query, 100)?;
+                    let results = state2.index.search(&keyword_query, 150, false)?;
                     if !results.is_empty() {
                         let mut page: Vec<u8> = Vec::with_capacity(50000);
                         front_end::render_keyword_page(&mut page, &query, &results, &state2.markup)?;
@@ -282,7 +282,7 @@ fn handle_search(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse
             state
                 .search_pool
                 .spawn_fn(move || {
-                    let results = state2.index.search(&query, 50)?;
+                    let results = state2.index.search(&query, 50, true)?;
                     let mut page: Vec<u8> = Vec::with_capacity(50000);
                     front_end::render_serp_page(&mut page, &query, &results, &state2.markup)?;
                     Ok(page)

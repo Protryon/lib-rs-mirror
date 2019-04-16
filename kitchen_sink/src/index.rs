@@ -15,6 +15,7 @@ use std::iter;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::RwLock;
+use std::time::Duration;
 use string_interner::StringInterner;
 use string_interner::Sym;
 
@@ -82,10 +83,10 @@ impl Index {
     }
 
     pub fn deps_stats(&self) -> &DepsStats {
-        let (_, res) = rayon::join(||{}, || self.deps_stats.get(|| {
-            self.get_deps_stats()
-        }));
-        res
+        match self.deps_stats.try_get_for(Duration::from_secs(3), || self.get_deps_stats()) {
+            Some(res) => res,
+            None => panic!("rayon deadlock"),
+        }
     }
 
     pub fn crates_io_crate_by_name(&self, name: &Origin) -> Result<&Crate, KitchenSinkErr> {

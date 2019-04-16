@@ -21,7 +21,7 @@ crate_db = { path = "../crate_db", version = "0.4.0" }
 categories = { path = "../categories" }
 rich_crate = { path = "../rich_crate", version = "0.4.4" }
 simple_cache = { git = "https://gitlab.com/crates.rs/simple_cache.git", version = "0.7.0" }
-lazyonce = "0.3.0"
+lazyonce = "1.0.0"
 repo_url = { git = "https://gitlab.com/crates.rs/repo_url.git", version = "0.3.0" }
 cargo_toml = "0.6.5"
 serde = "1.0.43"

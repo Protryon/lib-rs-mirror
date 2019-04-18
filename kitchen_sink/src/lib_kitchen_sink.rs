@@ -1367,6 +1367,11 @@ impl KitchenSink {
         Ok(self.crate_db.top_keywords_in_category(slug)?)
     }
 
+    /// true if it's useful as a keyword page
+    pub fn is_it_a_keyword(&self, k: &str) -> bool {
+        self.crate_db.crates_with_keyword(k).map(|n| n >= 5).unwrap_or(false)
+    }
+
     /// True if there are multiple crates with that keyword. Populated first.
     pub fn keywords_populated(&self, krate: &RichCrateVersion) -> Vec<(String, bool)> {
         let mut keywords: Vec<_> = krate.keywords(Include::Cleaned)

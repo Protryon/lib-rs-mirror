@@ -18,6 +18,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::prelude::FutureExt;
+use urlencoding::encode;
 
 use std::alloc::System;
 #[global_allocator]
@@ -85,6 +86,7 @@ fn run_server() -> Result<(), failure::Error> {
             .middleware(middleware::Logger::default())
             .resource("/", |r| r.method(Method::GET).f(handle_home))
             .resource("/search", |r| r.method(Method::GET).f(handle_search))
+            .resource("/index", |r| r.method(Method::GET).f(handle_search)) // old crates.rs/index url
             .resource("/keywords/{keyword}", |r| r.method(Method::GET).f(handle_keyword))
             .resource("/crates/{crate}", |r| r.method(Method::GET).f(handle_crate))
             .handler("/", fs::StaticFiles::new(&public_styles_dir).expect("public directory")
@@ -127,12 +129,15 @@ fn default_handler(req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
     }
 
     let name = path.trim_matches('/');
-    if let Ok(_) = state.crates.rich_crate(&Origin::from_crates_io_name(name)) {
-        return Ok(HttpResponse::PermanentRedirect().header("Location", format!("/crates/{}", name)).body(""));
+    if let Ok(k) = state.crates.rich_crate(&Origin::from_crates_io_name(name)) {
+        return Ok(HttpResponse::PermanentRedirect().header("Location", format!("/crates/{}", encode(k.name()))).body(""));
     }
-    let inverted_hyphens: String = name.chars().map(|c| if c == '-' {'_'} else if c == '_' {'-'} else {c}).collect();
-    if let Ok(_) = state.crates.rich_crate(&Origin::from_crates_io_name(&inverted_hyphens)) {
-        return Ok(HttpResponse::PermanentRedirect().header("Location", format!("/crates/{}", inverted_hyphens)).body(""));
+    let inverted_hyphens: String = name.chars().map(|c| if c == '-' {'_'} else if c == '_' {'-'} else {c.to_ascii_lowercase()}).collect();
+    if let Ok(k) = state.crates.rich_crate(&Origin::from_crates_io_name(&inverted_hyphens)) {
+        return Ok(HttpResponse::TemporaryRedirect().header("Location", format!("/crates/{}", encode(k.name()))).body(""));
+    }
+    if state.crates.is_it_a_keyword(&inverted_hyphens) {
+        return Ok(HttpResponse::TemporaryRedirect().header("Location", format!("/keywords/{}", encode(&inverted_hyphens))).body(""));
     }
 
     let query = path.chars().map(|c| if c.is_alphanumeric() {c} else {' '}).take(100).collect::<String>();
@@ -305,7 +310,7 @@ fn handle_search(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse
                 })
                 .responder()
         },
-        _ => future::ok(HttpResponse::TemporaryRedirect().header("Location", "/").finish()).responder(),
+        _ => future::ok(HttpResponse::PermanentRedirect().header("Location", "/").finish()).responder(),
     }
 }
 

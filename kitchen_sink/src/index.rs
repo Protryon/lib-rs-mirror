@@ -83,7 +83,7 @@ impl Index {
     }
 
     pub fn deps_stats(&self) -> &DepsStats {
-        match self.deps_stats.try_get_for(Duration::from_secs(3), || self.get_deps_stats()) {
+        match self.deps_stats.try_get_for(Duration::from_secs(10), || self.get_deps_stats()) {
             Some(res) => res,
             None => panic!("rayon deadlock"),
         }

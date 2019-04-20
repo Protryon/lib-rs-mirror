@@ -90,6 +90,7 @@ fn run_server() -> Result<(), failure::Error> {
             .resource("/keywords/{keyword}", |r| r.method(Method::GET).f(handle_keyword))
             .resource("/crates/{crate}", |r| r.method(Method::GET).f(handle_crate))
             .resource("/atom.xml", |r| r.method(Method::GET).f(handle_feed))
+            .resource("/sitemap.xml", |r| r.method(Method::GET).f(handle_sitemap))
             .handler("/", fs::StaticFiles::new(&public_styles_dir).expect("public directory")
                 .default_handler(default_handler))
     })
@@ -313,6 +314,25 @@ fn handle_search(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse
         },
         _ => future::ok(HttpResponse::PermanentRedirect().header("Location", "/").finish()).responder(),
     }
+}
+
+fn handle_sitemap(req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
+    let (w, page) = writer();
+    let state = Arc::clone(req.state());
+
+    rayon::spawn(move || {
+        let mut w = std::io::BufWriter::with_capacity(16000, w);
+        if let Err(e) = front_end::render_sitemap(&mut w, &state.crates) {
+            if let Ok(mut w) = w.into_inner() {
+                w.fail(e.into());
+            }
+        }
+    });
+
+    Ok(HttpResponse::Ok()
+            .content_type("application/xml;charset=UTF-8")
+            .header("Cache-Control", "public, max-age=259200, stale-while-revalidate=72000, stale-if-error=72000")
+            .body(Body::Streaming(Box::new(page))))
 }
 
 fn handle_feed(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {

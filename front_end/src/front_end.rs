@@ -5,8 +5,6 @@
 //! because the template engine Ructe doesn't support
 //! complex expressions in the templates.
 
-use chrono;
-use failure;
 
 mod cat_page;
 mod crate_page;
@@ -19,10 +17,12 @@ mod urler;
 pub use crate::search_page::*;
 pub use crate::not_found_page::*;
 
+use categories::Category;
+use chrono::prelude::*;
 use crate::crate_page::*;
 use crate::urler::Urler;
-use categories::Category;
 use failure::ResultExt;
+use failure;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::{stopped, KitchenSinkErr};
 use render_readme::Renderer;
@@ -81,6 +81,34 @@ pub fn render_feed(out: &mut dyn Write, crates: &KitchenSink) -> Result<(), fail
     Ok(())
 }
 
+pub fn render_sitemap(sitemap: &mut impl Write, crates: &KitchenSink) -> Result<(), failure::Error> {
+    let all_crates = crates.sitemap_crates()?;
+
+    sitemap.write_all(br#"<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">"#)?;
+
+    let now = Utc::now().timestamp();
+    for (origin, rank, lastmod) in all_crates {
+        let age = now - lastmod;
+        write!(
+            sitemap,
+            r#"
+<url><changefreq>{freq}</changefreq><priority>{pri:0.1}</priority><lastmod>{date}</lastmod><loc>https://lib.rs/crates/{name}</loc></url>"#,
+            name = origin.short_crate_name(),
+            date = Utc.timestamp(lastmod, 0).to_rfc3339(),
+            pri = (rank * 2.).min(1.),
+            freq = match age {
+                x if x > 3600 * 24 * 30 * 18 => "yearly",
+                x if x > 3600 * 24 * 60 => "monthly",
+                x if x > 3600 * 24 * 7 => "weekly",
+                _ => "daily",
+            },
+        )?;
+    }
+
+    sitemap.write_all(b"\n</urlset>\n")?;
+    Ok(())
+}
+
 /// See `crate_page.rs.html`
 pub fn render_crate_page(out: &mut dyn Write, all: &RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, markup: &Renderer) -> Result<String, failure::Error> {
     if stopped() {
@@ -105,5 +133,5 @@ impl<S: AsRef<str>> MyAsStr for Option<S> {
 }
 
 pub(crate) fn date_now() -> String {
-    chrono::Utc::now().format("%Y-%m-%d").to_string()
+    Utc::now().format("%Y-%m-%d").to_string()
 }

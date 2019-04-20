@@ -70,7 +70,7 @@ impl Urler {
     pub fn author(&self, author: &CrateAuthor<'_>) -> Option<String> {
         if let Some(ref gh) = author.github {
             Some(match gh.user_type {
-                UserType::User => format!("https://crates.io/users/{}", encode(&gh.login)),
+                UserType::User => format!("https://docs.rs/releases/{}", encode(&gh.login)),
                 UserType::Org | UserType::Bot => format!("https://github.com/{}", encode(&gh.login)),
             })
         } else if let Some(ref info) = author.info {

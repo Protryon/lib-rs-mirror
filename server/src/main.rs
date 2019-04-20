@@ -20,6 +20,9 @@ use std::time::Duration;
 use tokio::prelude::FutureExt;
 use urlencoding::encode;
 
+mod writer;
+use crate::writer::*;
+
 use std::alloc::System;
 #[global_allocator]
 static A: System = System;
@@ -284,35 +287,30 @@ fn is_alnum(q: &str) -> bool {
     q.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
 
-fn handle_search(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
+fn handle_search(req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
     match req.query().get("q") {
         Some(q) if !q.is_empty() => {
             let query = q.to_owned();
-            let state = req.state();
-            let state2 = Arc::clone(state);
-            state
-                .search_pool
-                .spawn_fn(move || {
-                    let results = state2.index.search(&query, 50, true)?;
-                    let mut page: Vec<u8> = Vec::with_capacity(50000);
-                    front_end::render_serp_page(&mut page, &query, &results, &state2.markup)?;
-                    Ok(page)
-                })
-                .timeout(Duration::from_secs(3))
-                .map_err(map_err)
-                .from_err()
-                .and_then(|page| {
-                    future::ok(
-                        HttpResponse::Ok()
-                            .content_type("text/html;charset=UTF-8")
-                            .header("Cache-Control", "public, max-age=600, stale-while-revalidate=259200, stale-if-error=72000")
-                            .content_length(page.len() as u64)
-                            .body(page),
-                    )
-                })
-                .responder()
+            let state = Arc::clone(req.state());
+
+            let (mut w, page) = writer();
+            rayon::spawn(move || {
+                let res = state.index.search(&query, 50, true)
+                .map_err(From::from)
+                .and_then(|results| {
+                    front_end::render_serp_page(&mut w, &query, &results, &state.markup)
+                });
+                if let Err(e) = res {
+                    w.fail(e.into());
+                }
+            });
+
+            Ok(HttpResponse::Ok()
+                    .content_type("text/html;charset=UTF-8")
+                    .header("Cache-Control", "public, max-age=600, stale-while-revalidate=259200, stale-if-error=72000")
+                    .body(Body::Streaming(Box::new(page))))
         },
-        _ => future::ok(HttpResponse::PermanentRedirect().header("Location", "/").finish()).responder(),
+        _ => Ok(HttpResponse::PermanentRedirect().header("Location", "/").finish()),
     }
 }
 

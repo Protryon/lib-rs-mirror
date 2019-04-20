@@ -26,3 +26,4 @@ failure = "0.1.5"
 tokio = "0.1.11"
 tokio-timer = "0.2.10"
 categories = { path = "../categories" }
+rayon = "1.0.3"

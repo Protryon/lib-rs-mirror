@@ -89,6 +89,7 @@ fn run_server() -> Result<(), failure::Error> {
             .resource("/index", |r| r.method(Method::GET).f(handle_search)) // old crates.rs/index url
             .resource("/keywords/{keyword}", |r| r.method(Method::GET).f(handle_keyword))
             .resource("/crates/{crate}", |r| r.method(Method::GET).f(handle_crate))
+            .resource("/atom.xml", |r| r.method(Method::GET).f(handle_feed))
             .handler("/", fs::StaticFiles::new(&public_styles_dir).expect("public directory")
                 .default_handler(default_handler))
     })
@@ -312,6 +313,32 @@ fn handle_search(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse
         },
         _ => future::ok(HttpResponse::PermanentRedirect().header("Location", "/").finish()).responder(),
     }
+}
+
+fn handle_feed(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
+    let state = req.state();
+    let state2 = Arc::clone(state);
+    state
+        .render_pool
+        .spawn_fn(move || {
+            state2.crates.prewarm();
+            let mut page: Vec<u8> = Vec::with_capacity(50000);
+            front_end::render_feed(&mut page, &state2.crates)?;
+            Ok(page)
+        })
+        .timeout(Duration::from_secs(60))
+        .map_err(map_err)
+        .from_err()
+        .and_then(|page| {
+            future::ok(
+                HttpResponse::Ok()
+                    .content_type("text/html;charset=UTF-8")
+                    .header("Cache-Control", "public, max-age=10800, stale-while-revalidate=259200, stale-if-error=72000")
+                    .content_length(page.len() as u64)
+                    .body(page),
+            )
+        })
+        .responder()
 }
 
 use header::HeaderValue;

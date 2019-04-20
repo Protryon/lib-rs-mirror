@@ -350,7 +350,7 @@ fn handle_feed(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> 
         .and_then(|page| {
             future::ok(
                 HttpResponse::Ok()
-                    .content_type("text/html;charset=UTF-8")
+                    .content_type("application/atom+xml;charset=UTF-8")
                     .header("Cache-Control", "public, max-age=10800, stale-while-revalidate=259200, stale-if-error=72000")
                     .content_length(page.len() as u64)
                     .body(page),

@@ -96,6 +96,6 @@ impl Urler {
     }
 
     pub fn search_ddg(&self, query: &str) -> String {
-        format!("https://duckduckgo.com/?q=site%3Acrates.rs+{}", encode(query))
+        format!("https://duckduckgo.com/?q=site%3Alib.rs+{}", encode(query))
     }
 }

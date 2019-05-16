@@ -654,9 +654,9 @@ impl CrateDb {
                     join keywords kk on kk.id = k.keyword_id
                     where explicit and c.slug = ?1
                     group by k.keyword_id
-                    having sum(k.weight) > 11 and count(*) >= 4
+                    having sum(k.weight) > 7 and count(*) >= 4
                     order by 1 desc
-                    limit 10
+                    limit 12
             "#)?;
             let q = query.query_map(&[&slug], |row| row.get(1)).context("top keywords")?;
             let q = q.filter_map(|r| r.ok());

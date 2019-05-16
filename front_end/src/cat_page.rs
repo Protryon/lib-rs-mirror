@@ -23,7 +23,7 @@ impl<'a> CatPage<'a> {
     pub fn new(cat: &'a Category, crates: &'a KitchenSink, markup: &'a Renderer) -> Result<Self, Error> {
         Ok(Self {
             count: crates.category_crate_count(&cat.slug)? as usize,
-            keywords: crates.top_keywords_in_category(&cat.slug)?,
+            keywords: crates.top_keywords_in_category(cat)?,
             related: crates.related_categories(&cat.slug)?,
             crates: crates
                 .top_crates_in_category(&cat.slug)?

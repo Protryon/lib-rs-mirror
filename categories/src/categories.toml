@@ -28,15 +28,20 @@
 
 [algorithms]
 name = "Algorithms"
+# string to use in page titles
 title = "Rust implementation"
 description = """
 Rust implementations of core algorithms such as hashing, sorting, \
 searching, and more.\
 """
+# used on the homepage
 short-description = """
 Core algorithms such as hashing, sorting and searching.
 """
+# linked together with subcategories
 siblings = ["data-structures", "compression"]
+# tags typical for this category that don't differentiate crates in the category
+obvious-keywords = ["algorithms", "algorithm"]
 
 # [api-bindings]
 # name = "API bindings"
@@ -58,6 +63,7 @@ flow, using techniques like futures, promises, waiting, or eventing.\
 """
 short-description = """
 Async program flow using techniques like futures, promises, waiting, or eventing."""
+obvious-keywords = ["asynchronous", "async"]
 
 [authentication]
 name = "Authentication"
@@ -67,6 +73,7 @@ Crates to help with the process of confirming identities.\
 """
 short-description = """
 Help with the process of confirming identities."""
+obvious-keywords = ["authentication", "auth", "authorization"]
 
 [caching]
 name = "Caching"
@@ -77,6 +84,7 @@ the results.\
 """
 short-description = """
 Store the results of previous computations."""
+obvious-keywords = ["cache", "caching"]
 
 [command-line-interface]
 name = "Command-line interface"
@@ -87,6 +95,7 @@ parsers, line-editing, or output coloring and formatting.\
 """
 short-description = """
 Argument parsers, line-editing, or output coloring and formatting."""
+obvious-keywords = ["cli", "command-line"]
 
 [command-line-utilities]
 name = "Command line utilities"
@@ -96,6 +105,7 @@ Applications to run at the command line.\
 """
 short-description = """
 Applications to run at the command line."""
+obvious-keywords = ["cli", "command-line", "command-line-tool", "command-line-utility"]
 
 [compression]
 name = "Compression"
@@ -105,6 +115,7 @@ Algorithms for making data smaller.\
 """
 short-description = """
 Algorithms for making data smaller."""
+obvious-keywords = ["compression", "decompression"]
 
 [config]
 name = "Configuration"
@@ -114,6 +125,7 @@ Crates to facilitate configuration management for applications.\
 """
 short-description = """
 Configuration management for applications."""
+obvious-keywords = ["config", "configuration"]
 
 [concurrency]
 name = "Concurrency"
@@ -123,6 +135,7 @@ Crates for implementing concurrent and parallel computation.\
 """
 short-description = """
 Implementing concurrent and parallel computation."""
+obvious-keywords = ["concurrency", "parallel"]
 
 [cryptography]
 name = "Cryptography"
@@ -132,6 +145,7 @@ Algorithms intended for securing data.\
 """
 short-description = """
 Algorithms intended for securing data."""
+obvious-keywords = ["cryptography", "crypto"]
 
 [cryptography.categories.cryptocurrencies]
 # fake, like the money
@@ -141,6 +155,7 @@ description = """
 Libraries and tools for digital currencies, and distributed ledgers.\
 """
 short-description = "Coins, blockchains and wallets."
+obvious-keywords = ["cryptography", "crypto", "cryptocurrency"]
 
 [database]
 name = "Database interfaces"
@@ -151,6 +166,7 @@ Crates to interface with database management systems.\
 short-description = """
 Interface with database management systems."""
 siblings = ["database-implementations"]
+obvious-keywords = ["database", "db"]
 
 [database-implementations]
 name = "Database implementations"
@@ -163,6 +179,7 @@ implemented in Rust.\
 short-description = """
 Database management systems implemented in Rust."""
 siblings = ["database"]
+obvious-keywords = ["database", "db"]
 
 [data-structures]
 name = "Data structures"
@@ -173,6 +190,7 @@ specific purposes.\
 """
 short-description = """
 Rust implementations of data structures for specific purposes."""
+obvious-keywords = ["data-structures", "data-structure"]
 
 [date-and-time]
 name = "Date and time"
@@ -193,6 +211,7 @@ linting, performance profiling, autocompletion, formatting, and more.\
 """
 short-description = """
 Testing, debugging, linting, performance profiling, autocompletion, formatting, and more."""
+obvious-keywords = ["development-tools"]
 
 [development-tools.categories.build-utils]
 name = "Build Utils"
@@ -202,6 +221,7 @@ Utilities for build scripts and other build time steps.\
 """
 short-description = """
 Utilities for build scripts and other build time steps."""
+obvious-keywords = ["build-utils", "build", "build-dependencies"]
 
 [development-tools.categories.cargo-plugins]
 name = "Cargo plugins"
@@ -211,6 +231,7 @@ Subcommands that extend the capabilities of Cargo.\
 """
 short-description = """
 Subcommands that extend the capabilities of Cargo."""
+obvious-keywords = ["cargo", "cargo-subcommand", "subcommand", "cli", "plugin"]
 
 [development-tools.categories.debugging]
 name = "Debugging"
@@ -231,6 +252,7 @@ includes binding generators and helpful language constructs.\
 """
 short-description = """
 Interface with other languages. Includes binding generators and helpful language constructs."""
+obvious-keywords = ["ffi"]
 
 [development-tools.categories.procedural-macro-helpers]
 name = "Procedural macro helpers"
@@ -241,6 +263,7 @@ Crates to help you write procedural macros in Rust.
 short-description = """
 Extend Rust language with procedural macros.
 """
+obvious-keywords = ["proc-macro", "macro", "macros"]
 
 [development-tools.categories.profiling]
 name = "Profiling"
@@ -250,6 +273,7 @@ Crates to help you figure out the performance of your code.\
 """
 short-description = """
 Figure out the performance of your code."""
+obvious-keywords = ["profiling", "profiler"]
 
 [development-tools.categories.testing]
 name = "Testing"
@@ -259,6 +283,7 @@ Crates to help you verify the correctness of your code.\
 """
 short-description = """
 Verify the correctness of your code."""
+obvious-keywords = ["testing", "test", "tests"]
 
 [email]
 name = "Email"
@@ -268,6 +293,7 @@ Crates to help with Sending, receiving, formatting, and parsing email.\
 """
 short-description = """
 Sending, receiving, formatting, and parsing email."""
+obvious-keywords = ["email"]
 
 [embedded]
 name = "Embedded development"
@@ -280,6 +306,7 @@ short-description = """
 For embedded devices or devices without an operating system.
 """
 siblings = ["hardware-support", "no-std"]
+obvious-keywords = ["embedded"]
 
 [emulators]
 name = "Emulators"
@@ -291,6 +318,7 @@ computer. Video game systems are commonly emulated.\
 """
 short-description = """
 Run software or games not available natively on the host computer."""
+obvious-keywords = ["emulator", "emulators"]
 
 [encoding]
 name = "Encoding"
@@ -302,6 +330,7 @@ Encoding and/or decoding data from one data format to another.\
 short-description = """
 Encoding and/or decoding data from one data format to another."""
 siblings = ["parser-implementations"]
+obvious-keywords = ["encoding", "serialization", "encode", "decode"]
 
 # [external-ffi-bindings]
 # name = "External FFI bindings"
@@ -323,6 +352,7 @@ Crates for dealing with files and filesystems.\
 """
 short-description = """
 Crates for dealing with files and filesystems."""
+obvious-keywords = ["filesystem", "file", "fs"]
 
 [game-engines]
 name = "Game development"
@@ -332,6 +362,7 @@ Crates for creating games.\
 """
 short-description = """
 Crates for creating games."""
+obvious-keywords = ["engine", "gamedev", "game-dev", "game", "game-engine"]
 
 [games]
 name = "Games"
@@ -344,6 +375,7 @@ Game engines category.\
 """
 short-description = """
 Fun and entertainment. Games implemented in the Rust programming language."""
+obvious-keywords = ["game", "games", "play"]
 
 [gui]
 name = "GUI"
@@ -353,6 +385,7 @@ Crates to help you create a graphical user interface.\
 """
 short-description = """
 Create a graphical user interface."""
+obvious-keywords = ["gui", "ui", "interface"]
 
 [hardware-support]
 name = "Hardware support"
@@ -363,6 +396,7 @@ Crates to interface with specific CPU or other hardware features.\
 short-description = """
 Interface with specific CPU or other hardware features."""
 siblings = ["embedded"]
+obvious-keywords = ["hardware", "hw"]
 
 [internationalization]
 name = "Internationalization (i18n)"
@@ -373,6 +407,7 @@ languages and regions. Including localization (L10n) software.\
 """
 short-description = """
 and localization (l10n). Develop software for various languages and regions."""
+obvious-keywords = ["localization", "i18n", "internationalization", "l10n", "text"]
 
 # merged into internationalization
 # [localization]
@@ -394,6 +429,7 @@ reference counting, or interfaces to foreign memory managers.\
 """
 short-description = """
 Allocation, memory mapping, garbage collection, reference counting, or interfaces to foreign memory managers."""
+obvious-keywords = ["memory", "memory-allocator", "memory-management"]
 
 [multimedia]
 name = "Multimedia"
@@ -404,6 +440,7 @@ engines.\
 """
 short-description = """
 Audio, video, and image processing or rendering engines."""
+obvious-keywords = ["multimedia", "media"]
 
 [multimedia.categories.audio]
 name = "Audio"
@@ -414,6 +451,7 @@ Crates that record, output, or process audio.
 short-description = """
 Record, output, or process audio.
 """
+obvious-keywords = ["audio", "media"]
 
 [multimedia.categories.video]
 name = "Video"
@@ -424,6 +462,7 @@ Crates that record, output, or process video.
 short-description = """
 Record, output, or process video.
 """
+obvious-keywords = ["video"]
 
 [multimedia.categories.images]
 name = "Images"
@@ -434,6 +473,7 @@ Crates that process or build images.
 short-description = """
 Process or build images.
 """
+obvious-keywords = ["image", "images"]
 
 [multimedia.categories.encoding]
 name = "Encoding"
@@ -445,6 +485,7 @@ Crates that encode or decode binary data in multimedia formats.
 short-description = """
 Encode or decode binary data in multimedia formats.
 """
+obvious-keywords = ["codec", "encoding"]
 
 [network-programming]
 name = "Network programming"
@@ -456,6 +497,7 @@ or SSH, or lower-level network protocols such as TCP or UDP.\
 short-description = """
 Network protocols such as FTP, HTTP, or SSH, or lower-level TCP or UDP."""
 siblings = ["authentication", "email"]
+obvious-keywords = ["network", "networking"]
 
 [no-std]
 name = "No standard library"
@@ -467,6 +509,7 @@ short-description = """
 Libraries that function without the Rust standard library.
 """
 siblings = ["embedded"]
+obvious-keywords = ["no_std", "no-std"]
 
 [os]
 name = "Operating systems"
@@ -476,6 +519,7 @@ Bindings to operating system-specific APIs.\
 """
 short-description = """
 Bindings to operating system-specific APIs."""
+obvious-keywords = ["os", "system", "platform"]
 
 [os.categories.macos-apis]
 name = "macOS APIs"
@@ -494,6 +538,7 @@ Bindings to Unix-specific APIs.\
 """
 short-description = """
 Bindings to Unix-specific APIs."""
+obvious-keywords = ["unix", "system"]
 
 [os.categories.windows-apis]
 name = "Windows APIs"
@@ -503,6 +548,7 @@ Bindings to Windows-specific APIs.\
 """
 short-description = """
 Bindings to Windows-specific APIs."""
+obvious-keywords = ["windows", "win32", "winapi"]
 
 [parser-implementations]
 name = "Parser implementations"
@@ -513,6 +559,7 @@ Parsers implemented for particular formats or languages.\
 short-description = """
 Parse data formats or languages."""
 siblings = ["parsing"]
+obvious-keywords = ["parser", "parsing", "parse", "file"]
 
 [parsing]
 name = "Parser tooling"
@@ -523,6 +570,7 @@ Low-level, file-format-independent libraries for writing or generating parsers.
 short-description = """
 Low-level tools and parser generators."""
 siblings = ["parser-implementations"]
+obvious-keywords = ["parser", "parsing", "parse"]
 
 [rendering]
 name = "Rendering"
@@ -533,6 +581,7 @@ usually with the help of a graphics card.\
 """
 short-description = """
 Real-time or offline rendering of 2D or 3D graphics, usually on a GPU."""
+obvious-keywords = ["rendering", "graphics"]
 
 [rendering.categories.engine]
 name = "Rendering engine"
@@ -542,6 +591,7 @@ High-level solutions for rendering on the screen.\
 """
 short-description = """
 High-level solutions for rendering on the screen."""
+obvious-keywords = ["engine", "engines", "rendering"]
 
 [rendering.categories.graphics-api]
 name = "Graphics APIs"
@@ -552,6 +602,7 @@ system's rendering capabilities.\
 """
 short-description = """
 Direct access to the hardware's or the operating system's rendering capabilities."""
+obvious-keywords = ["graphics", "api"]
 
 [rendering.categories.data-formats]
 name = "Data formats"
@@ -574,6 +625,7 @@ Rust.\
 short-description = """
 Shared solutions for particular situations specific to programming in Rust."""
 siblings = ["no-std", "memory-management"]
+obvious-keywords = ["rust"]
 
 [science]
 name = "Science"
@@ -594,6 +646,7 @@ Crates related to solving mathematical problems.\
 """
 short-description = """
 Solving problems involving math and logic."""
+obvious-keywords = ["math", "mathematics", "science"]
 
 [science.categories.ml]
 # fake
@@ -603,6 +656,7 @@ description = """
 Artificial intelligence, neural networks, deep learning, recommendation systems, and statistics.\
 """
 short-description = """AI, ML, NN, etc."""
+obvious-keywords = ["ml", "machine-learning", "ai"]
 
 [simulation]
 name = "Simulation"
@@ -623,6 +677,7 @@ documents, usually with an emphasis on processing text.\
 """
 short-description = """
 Combine templates with data to produce documents, usually with an emphasis on processing text."""
+obvious-keywords = ["template", "templating"]
 
 [text-editors]
 name = "Text editors"
@@ -632,6 +687,7 @@ Applications for editing text.\
 """
 short-description = """
 Applications for editing text."""
+obvious-keywords = ["text", "editor"]
 
 [text-processing]
 name = "Text processing"
@@ -643,6 +699,7 @@ in textual form.\
 short-description = """
 Deal with the complexities of human language when expressed in textual form."""
 siblings = ["value-formatting", "template-engine"]
+obvious-keywords = ["text", "processing", "string"]
 
 [value-formatting]
 name = "Value formatting"
@@ -653,6 +710,7 @@ potentially adapting the display to various languages and regions.\
 """
 short-description = """
 Format values for display to a user, potentially adapting the display to various languages and regions."""
+obvious-keywords = ["formatting", "format", "string"]
 
 [visualization]
 name = "Visualization"
@@ -662,6 +720,7 @@ Ways to view data, such as plotting or graphing.\
 """
 short-description = """
 Ways to view data, such as plotting or graphing."""
+obvious-keywords = ["visualization"]
 
 [wasm]
 name = "WebAssembly"
@@ -671,6 +730,7 @@ Crates for use when targeting WebAssembly, or for manipulating WebAssembly.\
 """
 short-description = """
 Targeting or manipulating WebAssembly."""
+obvious-keywords = ["web", "wasm", "webassembly", "web-assembly", "webasm"]
 
 [web-programming]
 name = "Web programming"
@@ -681,6 +741,7 @@ Crates to create applications for the web.\
 short-description = """
 Create applications for the Web."""
 siblings = ["wasm"]
+obvious-keywords = ["web", "http", "wasm", "webasm"]
 
 [web-programming.categories.http-client]
 name = "HTTP client"
@@ -690,6 +751,7 @@ Crates to make HTTP network requests.\
 """
 short-description = """
 Make HTTP network requests."""
+obvious-keywords = ["web", "http", "client", "http-client"]
 
 [web-programming.categories.http-server]
 name = "HTTP server"
@@ -699,6 +761,7 @@ Crates to serve data over HTTP.\
 """
 short-description = """
 Serve data over HTTP."""
+obvious-keywords = ["web", "http", "server", "http-server"]
 
 [web-programming.categories.websocket]
 name = "WebSocket"
@@ -708,6 +771,7 @@ Crates to communicate over the WebSocket protocol.\
 """
 short-description = """
 Communicate over the WebSocket protocol."""
+obvious-keywords = ["websocket", "websockets", "web"]
 
 # [uncategorized]
 # name = "Uncategorized"

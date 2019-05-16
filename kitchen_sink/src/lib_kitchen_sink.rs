@@ -37,6 +37,7 @@ pub use semver::Version as SemVer;
 
 use cargo_toml::Manifest;
 use cargo_toml::Package;
+use categories::Category;
 use chrono::DateTime;
 use chrono::prelude::*;
 use crate_db::{CrateDb, RepoChange};
@@ -1352,8 +1353,11 @@ impl KitchenSink {
         })
     }
 
-    pub fn top_keywords_in_category(&self, slug: &str) -> CResult<Vec<String>> {
-        Ok(self.crate_db.top_keywords_in_category(slug)?)
+    pub fn top_keywords_in_category(&self, cat: &Category) -> CResult<Vec<String>> {
+        let mut keywords = self.crate_db.top_keywords_in_category(&cat.slug)?;
+        keywords.retain(|k| !cat.obvious_keywords.contains(k));
+        keywords.truncate(10);
+        Ok(keywords)
     }
 
     /// true if it's useful as a keyword page

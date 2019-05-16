@@ -1,28 +1,12 @@
 #[macro_use] extern crate failure;
 
-use chrono::prelude::*;
-use crate_files;
-use crate_git_checkout;
-use crates_index;
-use crates_io_client;
-use docs_rs_client;
-use github_info;
-use github_info::GitHubRepo;
-use rich_crate::DownloadWeek;
-
 #[macro_use]
 extern crate serde_derive;
-
-use rayon;
-use reqwest;
-use user_db;
 
 mod index;
 pub use crate::index::*;
 mod yearly;
 pub use crate::yearly::*;
-pub use github_info::UserOrg;
-use rayon::prelude::*;
 mod deps_stats;
 pub use crate::deps_stats::*;
 
@@ -32,16 +16,14 @@ mod ctrlcbreak;
 pub use crate::ctrlcbreak::*;
 
 pub use crates_index::Crate as CratesIndexCrate;
-use crates_index::Version;
-pub use crates_io_client::CrateDepKind;
 pub use crates_io_client::CrateDependency;
+pub use crates_io_client::CrateDepKind;
 pub use crates_io_client::CrateMetaVersion;
-use crates_io_client::CrateOwner;
 pub use crates_io_client::CratesIoCrate;
 pub use crates_io_client::OwnerKind;
 pub use github_info::User;
+pub use github_info::UserOrg;
 pub use github_info::UserType;
-use rich_crate::CrateVersion;
 pub use rich_crate::Edition;
 pub use rich_crate::Include;
 pub use rich_crate::MaintenanceStatus;
@@ -51,24 +33,31 @@ pub use rich_crate::RichCrate;
 pub use rich_crate::RichCrateVersion;
 pub use rich_crate::RichDep;
 pub use rich_crate::{Cfg, Target};
+pub use semver::Version as SemVer;
 
 use cargo_toml::Manifest;
 use cargo_toml::Package;
 use chrono::DateTime;
+use chrono::prelude::*;
 use crate_db::{CrateDb, RepoChange};
 use crate_files::CrateFile;
+use crates_index::Version;
+use crates_io_client::CrateOwner;
 use failure::ResultExt;
 use fxhash::FxHashMap;
 use github_info::GitCommitAuthor;
+use github_info::GitHubRepo;
 use itertools::Itertools;
 use lazyonce::LazyOnce;
+use rayon::prelude::*;
 use repo_url::Repo;
 use repo_url::RepoHost;
 use repo_url::SimpleRepo;
 use rich_crate::Author;
+use rich_crate::CrateVersion;
 use rich_crate::Derived;
+use rich_crate::DownloadWeek;
 use rich_crate::Readme;
-pub use semver::Version as SemVer;
 use semver::VersionReq;
 use simple_cache::TempCache;
 use std::borrow::Cow;

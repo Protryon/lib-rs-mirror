@@ -110,7 +110,7 @@
       @if let Some(related) = Some(p.related_categories()) {
       @if !related.is_empty() {
         <div class=seealso>
-        <div class="inner-col" role="navigaton" aria-label="See also">
+        <nav class="inner-col" aria-label="See also">
           See also:
             @for (last, cat) in related.iter().identify_last() {
             @for (last, subcat) in cat.iter().identify_last() {
@@ -119,7 +119,7 @@
             }
             @if !last {|}
           }
-        </div>
+        </nav>
         </div>
       }
       }

@@ -297,7 +297,7 @@
                 </p>
               }
             }
-            <div role="navigation" aria-label="Dependencies">
+            <nav aria-label="Dependencies">
             <ul class="@if normal.len() > 4 {long}">
               @:deps_list(c, url, &normal, "")
               @if let Some(links) = c.ver.links() {
@@ -311,7 +311,7 @@
               @:deps_list(c, url, &build, "build")
               @:deps_list(c, url, &dev, "dev")
             </ul>
-            </div>
+            </nav>
           } else {
             <p class="error">Dependencies unknown</p>
           }
@@ -326,12 +326,12 @@
     <div class="inner-col">
       @if let Some(crates) = c.related_crates() {
         @if !crates.is_empty() {
-          <div class=seealso role="navigaton" aria-label="See also">
+          <nav class=seealso aria-label="See also">
             See also:
             @for (last, cra) in crates.into_iter().identify_last() {
               <a href="@url.krate_by_origin(&cra)">@cra.short_crate_name()</a>@if !last {,}
             }
-          </div>
+          </nav>
         }
       }
       <aside role="contentinfo"><p><a href="/"><b>Lib.rs</b></a> is an unofficial list of Rust/Cargo crates. It's <a href="https://gitlab.com/crates.rs?sort=stars_desc">open-source</a>, created by <a href="https://github.com/kornelski">kornelski</a>. This page was generated on @date_now().</p><p>If something is missing or incorrect, please <a href="https://gitlab.com/crates.rs/crates.rs/issues/new">file a bug</a>.</p></aside>

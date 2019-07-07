@@ -1,3 +1,5 @@
+use futures::future::FutureResult;
+use futures::future::IntoFuture;
 use failure::ResultExt;
 use actix_web::http::*;
 use actix_web::*;
@@ -16,7 +18,7 @@ use search_index::CrateSearchIndex;
 use std::env;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 use tokio::prelude::FutureExt;
 use urlencoding::encode;
 
@@ -171,62 +173,85 @@ fn handle_category(req: &HttpRequest<AServerState>, cat: &Category) -> Result<Ht
 }
 
 fn handle_home(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
-    let state = req.state();
-    let state2 = Arc::clone(state);
-    state
-        .render_pool
-        .spawn_fn(move || {
-            state2.crates.prewarm();
-            let mut page: Vec<u8> = Vec::with_capacity(50000);
-            front_end::render_homepage(&mut page, &state2.crates)?;
-            Ok(page)
-        })
-        .timeout(Duration::from_secs(300))
-        .map_err(map_err)
-        .from_err()
-        .and_then(|page| {
-            future::ok(
-                HttpResponse::Ok()
-                    .content_type("text/html;charset=UTF-8")
-                    .header("Cache-Control", "public, max-age=14400, stale-while-revalidate=259200, stale-if-error=72000")
-                    .content_length(page.len() as u64)
-                    .body(page),
-            )
-        })
-        .responder()
+    let state = Arc::clone(req.state());
+    let cache_file = state.public_crates_dir.join("../index.html");
+    with_file_cache(cache_file, 14400, move || {
+        state
+            .render_pool
+            .spawn_fn({
+                let state = state.clone();
+                move || {
+                    state.crates.prewarm();
+                    let mut page: Vec<u8> = Vec::with_capacity(50000);
+                    front_end::render_homepage(&mut page, &state.crates)?;
+                    Ok(page)
+                }
+            })
+            .timeout(Duration::from_secs(300))
+            .map_err(map_err)
+    })
+    .from_err()
+    .and_then(serve_cached)
+    .responder()
 }
 
 fn handle_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
-    let kw: String = req.match_info().query("crate").expect("arg");
-    println!("rendering {:?}", kw);
-    let state = req.state();
+    let crate_name: String = req.match_info().query("crate").expect("arg");
+    println!("crate page for {:?}", crate_name);
+    assert!(is_alnum(&crate_name));
+    let state = Arc::clone(req.state());
+    let cache_file = state.public_crates_dir.join(format!("{}.html", crate_name));
+    with_file_cache(cache_file, 7200, move || {
+        render_crate_page(&state, crate_name)
+            .timeout(Duration::from_secs(30))
+            .map_err(map_err)})
+    .from_err()
+    .and_then(serve_cached)
+    .responder()
+}
+
+/// takes path to storage, freshness in seconds, and a function to call on cache miss
+/// returns (page, fresh in seconds)
+fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: impl FnOnce() -> F) -> impl Future<Item=(Vec<u8>, u32), Error=failure::Error>
+    where F: Future<Item=Vec<u8>, Error=failure::Error> {
+    let modified = std::fs::metadata(&cache_file).and_then(|m| m.modified()).ok();
+    let now = SystemTime::now();
+
+    let is_acceptable = modified.map_or(false, |modified| {
+        let ok = now - Duration::from_secs((cache_time/2).into());
+        modified > ok
+    });
+
+    if is_acceptable {
+        let age_secs = modified.and_then(|modified| now.duration_since(modified).ok()).map(|age| age.as_secs() as u32).unwrap_or(0);
+        let cache_time_remaining = cache_time.saturating_sub(age_secs);
+
+        println!("Using cached page {} {}s", cache_file.display(), cache_time_remaining);
+        Either::A(std::fs::read(&cache_file).map(|page| (page, cache_time_remaining)).into_future().from_err())
+    } else {
+        println!("Cache miss {}", cache_file.display());
+        Either::B(generate().map(move |page| {
+            if let Err(e) = std::fs::write(&cache_file, &page) {
+                eprintln!("warning: Failed writing to {}: {}", cache_file.display(), e);
+            }
+            (page, cache_time)
+        }))
+    }
+}
+
+fn render_crate_page(state: &AServerState, crate_name: String) -> impl Future<Item=Vec<u8>, Error=failure::Error> {
     let state2 = Arc::clone(state);
     state
         .render_pool
         .spawn_fn(move || {
-            assert!(is_alnum(&kw));
             state2.crates.prewarm();
-            let origin = Origin::from_crates_io_name(&kw);
+            let origin = Origin::from_crates_io_name(&crate_name);
             let all = state2.crates.rich_crate(&origin)?;
             let ver = state2.crates.rich_crate_version(&origin, CrateData::Full)?;
             let mut page: Vec<u8> = Vec::with_capacity(50000);
             front_end::render_crate_page(&mut page, &all, &ver, &state2.crates, &state2.markup)?;
-            std::fs::write(state2.public_crates_dir.join(format!("{}.html", kw)), &page)?;
             Ok(page)
         })
-        .timeout(Duration::from_secs(30))
-        .map_err(map_err)
-        .from_err()
-        .and_then(|page| {
-            future::ok(
-                HttpResponse::Ok()
-                    .content_type("text/html;charset=UTF-8")
-                    .header("Cache-Control", "public, max-age=7200, stale-while-revalidate=604800, stale-if-error=72000")
-                    .content_length(page.len() as u64)
-                    .body(page),
-            )
-        })
-        .responder()
 }
 
 fn handle_keyword(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
@@ -271,6 +296,14 @@ fn handle_keyword(req: &HttpRequest<AServerState>) -> FutureResponse<HttpRespons
         },
         _ => future::ok(HttpResponse::PermanentRedirect().header("Location", "/").finish()).responder(),
     }
+}
+
+fn serve_cached<T>((page, cache_time): (Vec<u8>, u32)) -> FutureResult<HttpResponse, T> {
+    future::ok(HttpResponse::Ok()
+        .content_type("text/html;charset=UTF-8")
+        .header("Cache-Control", format!("public, max-age={}, stale-while-revalidate=259200, stale-if-error=72000", cache_time))
+        .content_length(page.len() as u64)
+        .body(page))
 }
 
 fn map_err(err: tokio_timer::timeout::Error<failure::Error>) -> failure::Error {

@@ -161,9 +161,9 @@ fn default_handler(req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
 }
 
 fn handle_category(req: &HttpRequest<AServerState>, cat: &Category) -> Result<HttpResponse> {
-    let mut page: Vec<u8> = Vec::with_capacity(150000);
     let state = req.state();
     state.crates.prewarm();
+    let mut page: Vec<u8> = Vec::with_capacity(150000);
     front_end::render_category(&mut page, cat, &state.crates, &state.markup).expect("render");
     Ok(HttpResponse::Ok()
         .content_type("text/html;charset=UTF-8")
@@ -175,7 +175,7 @@ fn handle_category(req: &HttpRequest<AServerState>, cat: &Category) -> Result<Ht
 fn handle_home(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
     let state = Arc::clone(req.state());
     let cache_file = state.public_crates_dir.join("../index.html");
-    with_file_cache(cache_file, 14400, move || {
+    with_file_cache(cache_file, 3600, move || {
         state
             .render_pool
             .spawn_fn({
@@ -201,7 +201,7 @@ fn handle_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse>
     assert!(is_alnum(&crate_name));
     let state = Arc::clone(req.state());
     let cache_file = state.public_crates_dir.join(format!("{}.html", crate_name));
-    with_file_cache(cache_file, 7200, move || {
+    with_file_cache(cache_file, 1800, move || {
         render_crate_page(&state, crate_name)
             .timeout(Duration::from_secs(30))
             .map_err(map_err)})
@@ -218,12 +218,12 @@ fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: impl FnOnc
     let now = SystemTime::now();
 
     let is_fresh = modified.map_or(false, |modified| {
-        let ok = now - Duration::from_secs((cache_time/30+5).into());
+        let ok = now - Duration::from_secs((cache_time/20+5).into());
         modified > ok
     });
 
     let is_acceptable = modified.map_or(false, |modified| {
-        let ok = now - Duration::from_secs((cache_time*2).into());
+        let ok = now - Duration::from_secs((cache_time*10).into());
         modified > ok
     });
 
@@ -233,7 +233,7 @@ fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: impl FnOnc
         let cache_time_remaining = cache_time.saturating_sub(age_secs);
 
         println!("Using cached page {} {}s fresh={:?}", cache_file.display(), cache_time_remaining, is_fresh);
-        let page_cached = std::fs::read(&cache_file).map(|page| (page, cache_time_remaining.max(5)));
+        let page_cached = std::fs::read(&cache_file).map(|page| (page, if !is_fresh {cache_time_remaining/4} else {cache_time_remaining}.max(5)));
 
         if !is_fresh {
             actix::spawn(generate()

@@ -1,17 +1,17 @@
-use rusqlite::types::ToSql;
 use crate::error::Error;
 use reqwest;
 use rusqlite;
-use serde;
-use serde_json;
+use rusqlite::types::ToSql;
 use rusqlite::Connection;
 use rusqlite::Error::SqliteFailure;
 use rusqlite::ErrorCode::DatabaseLocked;
+use serde;
+use serde_json;
+use std::panic;
 use std::path::Path;
-use thread_local::ThreadLocal;
 use std::thread;
 use std::time::Duration;
-use std::panic;
+use thread_local::ThreadLocal;
 
 #[derive(Debug)]
 pub struct SimpleCache {
@@ -31,11 +31,13 @@ impl SimpleCache {
 
     fn connect(&self) -> Result<Connection, rusqlite::Error> {
         let conn = Connection::open(&self.url)?;
-        conn.execute_batch("
+        conn.execute_batch(
+            "
             CREATE TABLE IF NOT EXISTS cache2 (key TEXT NOT NULL PRIMARY KEY, ver TEXT NOT NULL, data BLOB NOT NULL);
             PRAGMA synchronous = 0;
             PRAGMA JOURNAL_MODE = OFF;
-            PRAGMA read_uncommitted;")?;
+            PRAGMA read_uncommitted;",
+        )?;
         Ok(conn)
     }
 

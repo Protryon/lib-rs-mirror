@@ -1,21 +1,21 @@
-use std::borrow::Borrow;
-use std::sync::RwLock;
-use serde::de::DeserializeOwned;
 use crate::error::Error;
-use serde::*;
+use crate::SimpleCache;
+use flate2::read::DeflateDecoder;
+use flate2::write::DeflateEncoder;
+use flate2::Compression;
+use fxhash::FxHashMap;
 use rmp_serde;
+use serde::de::DeserializeOwned;
+use serde::*;
 use serde_json;
+use std::borrow::Borrow;
+use std::fs::File;
+use std::io::BufReader;
+use std::io::BufWriter;
 use std::marker::PhantomData;
 use std::path::PathBuf;
-use std::fs::File;
+use std::sync::RwLock;
 use tempfile::NamedTempFile;
-use std::io::BufWriter;
-use std::io::BufReader;
-use crate::SimpleCache;
-use flate2::Compression;
-use flate2::write::DeflateEncoder;
-use flate2::read::DeflateDecoder;
-use fxhash::FxHashMap;
 
 struct Inner {
     data: FxHashMap<Box<str>, Box<[u8]>>,
@@ -65,7 +65,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
         rmp_serde::encode::write_named(&mut e, value)?;
         let compr = e.finish()?;
 
-        let _ =Self::ungz(&compr)?; // sanity check
+        let _ = Self::ungz(&compr)?; // sanity check
 
         let mut w = self.data.write().map_err(|_| Error::KvPoison)?;
         w.writes += 1;
@@ -111,7 +111,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
     }
 
     pub fn save(&self) -> Result<(), Error> {
-        let tmp_path = NamedTempFile::new_in(self.path.parent().unwrap())?;
+        let tmp_path = NamedTempFile::new_in(self.path.parent().expect("tmp"))?;
         let mut file = BufWriter::new(File::create(&tmp_path)?);
         let d = self.data.read().map_err(|_| Error::KvPoison)?;
         rmp_serde::encode::write(&mut file, &d.data)?;

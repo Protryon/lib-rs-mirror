@@ -13,7 +13,7 @@ render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git", versio
 categories = { path = "../categories" }
 udedokei = { path = "../udedokei" }
 cargo_author = "1.0.0"
-cargo_toml = "0.6.5"
+cargo_toml = "0.7.0"
 repo_url = { git = "https://gitlab.com/crates.rs/repo_url.git" }
 semver = "0.9.0"
 parse_cfg = "2.0.0"

@@ -1,5 +1,4 @@
 use futures::future::FutureResult;
-use futures::future::IntoFuture;
 use failure::ResultExt;
 use actix_web::http::*;
 use actix_web::*;
@@ -212,48 +211,45 @@ fn handle_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse>
 
 /// takes path to storage, freshness in seconds, and a function to call on cache miss
 /// returns (page, fresh in seconds)
-fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: impl FnOnce() -> F) -> impl Future<Item=(Vec<u8>, u32), Error=failure::Error>
+fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: impl FnOnce() -> F) -> impl Future<Item=(Vec<u8>, u32, bool), Error=failure::Error>
     where F: Future<Item=Vec<u8>, Error=failure::Error> + 'static {
-    let modified = std::fs::metadata(&cache_file).and_then(|m| m.modified()).ok();
-    let now = SystemTime::now();
+    if let Ok(modified) = std::fs::metadata(&cache_file).and_then(|m| m.modified()) {
+        let now = SystemTime::now();
+        let is_fresh = modified > (now - Duration::from_secs((cache_time/20+5).into()));
+        let is_acceptable = modified > (now - Duration::from_secs((cache_time*5).into()));
 
-    let is_fresh = modified.map_or(false, |modified| {
-        let ok = now - Duration::from_secs((cache_time/20+5).into());
-        modified > ok
-    });
+        let age_secs = now.duration_since(modified).ok().map(|age| age.as_secs() as u32).unwrap_or(0);
 
-    let is_acceptable = modified.map_or(false, |modified| {
-        let ok = now - Duration::from_secs((cache_time*10).into());
-        modified > ok
-    });
+        if let Ok(page_cached) = std::fs::read(&cache_file) {
+            let cache_time_remaining = cache_time.saturating_sub(age_secs);
 
-    let age_secs = modified.and_then(|modified| now.duration_since(modified).ok()).map(|age| age.as_secs() as u32).unwrap_or(0);
+            println!("Using cached page {} {}s fresh={:?} acc={:?}", cache_file.display(), cache_time_remaining, is_fresh, is_acceptable);
 
-    if is_acceptable {
-        let cache_time_remaining = cache_time.saturating_sub(age_secs);
-
-        println!("Using cached page {} {}s fresh={:?}", cache_file.display(), cache_time_remaining, is_fresh);
-        let page_cached = std::fs::read(&cache_file).map(|page| (page, if !is_fresh {cache_time_remaining/4} else {cache_time_remaining}.max(5)));
-
-        if !is_fresh {
-            actix::spawn(generate()
-                .map(move |page| {
-                    if let Err(e) = std::fs::write(&cache_file, &page) {
-                        eprintln!("warning: Failed writing to {}: {}", cache_file.display(), e);
-                    }
-                })
-                .map_err(move |e| {eprintln!("Cache pre-warm: {}", e);}))
-        }
-        Either::A(page_cached.into_future().from_err())
-    } else {
-        println!("Cache miss {} {}", cache_file.display(), age_secs);
-        Either::B(generate().map(move |page| {
-            if let Err(e) = std::fs::write(&cache_file, &page) {
-                eprintln!("warning: Failed writing to {}: {}", cache_file.display(), e);
+            if !is_fresh {
+                actix::spawn(generate()
+                    .map(move |page| {
+                        if let Err(e) = std::fs::write(&cache_file, &page) {
+                            eprintln!("warning: Failed writing to {}: {}", cache_file.display(), e);
+                        }
+                    })
+                    .map_err(move |e| {eprintln!("Cache pre-warm: {}", e);}))
             }
-            (page, cache_time)
-        }))
+            return Either::A(future::ok(
+                (page_cached, if !is_fresh {cache_time_remaining/4} else {cache_time_remaining}.max(2), !is_acceptable)
+            ));
+        }
+
+        println!("Cache miss {} {}", cache_file.display(), age_secs);
+    } else {
+        println!("Cache miss {} no file", cache_file.display());
     }
+
+    Either::B(generate().map(move |page| {
+        if let Err(e) = std::fs::write(&cache_file, &page) {
+            eprintln!("warning: Failed writing to {}: {}", cache_file.display(), e);
+        }
+        (page, cache_time, false)
+    }))
 }
 
 fn render_crate_page(state: &AServerState, crate_name: String) -> impl Future<Item=Vec<u8>, Error=failure::Error> {
@@ -315,10 +311,11 @@ fn handle_keyword(req: &HttpRequest<AServerState>) -> FutureResponse<HttpRespons
     }
 }
 
-fn serve_cached<T>((page, cache_time): (Vec<u8>, u32)) -> FutureResult<HttpResponse, T> {
+fn serve_cached<T>((page, cache_time, refresh): (Vec<u8>, u32, bool)) -> FutureResult<HttpResponse, T> {
     future::ok(HttpResponse::Ok()
         .content_type("text/html;charset=UTF-8")
         .header("Cache-Control", format!("public, max-age={}, stale-while-revalidate={}, stale-if-error={}", cache_time, cache_time*4, cache_time*10))
+        .if_true(refresh, |h| {h.header("Refresh", "4");})
         .content_length(page.len() as u64)
         .body(page))
 }

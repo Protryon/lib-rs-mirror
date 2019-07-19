@@ -1,6 +1,6 @@
+use std::borrow::Cow;
 use url;
 use url::Url;
-use std::borrow::Cow;
 
 pub type GResult<T> = Result<T, GitError>;
 
@@ -76,13 +76,11 @@ impl Repo {
 
     /// True if the URL may be a well-known git repository URL
     pub fn looks_like_repo_url(url: &str) -> bool {
-        Url::parse(url).ok().map_or(false, |url| {
-            match url.host_str() {
-                Some("github.com") | Some("www.github.com") => true,
-                Some("gitlab.com") | Some("www.gitlab.com") => true,
-                Some("bitbucket.org") => true,
-                _ => false,
-            }
+        Url::parse(url).ok().map_or(false, |url| match url.host_str() {
+            Some("github.com") | Some("www.github.com") => true,
+            Some("gitlab.com") | Some("www.gitlab.com") => true,
+            Some("bitbucket.org") => true,
+            _ => false,
         })
     }
 

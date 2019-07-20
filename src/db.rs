@@ -86,9 +86,7 @@ impl SimpleCache {
             let mut q = conn.prepare_cached("SELECT data FROM cache2 WHERE key = ?1 AND ver = ?2")?;
             let row: Result<Vec<u8>, _> = q.query_row(&[&key.0, &key.1], |r| r.get(0));
             match row {
-                Ok(row) => {
-                    Ok(Some(row))
-                },
+                Ok(row) => Ok(Some(row)),
                 Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
                 Err(err) => Err(err)?,
             }

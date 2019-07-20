@@ -10,7 +10,7 @@ name = "kitchen_sink"
 path = "src/lib_kitchen_sink.rs"
 
 [dependencies]
-crates-index = "0.12.0"
+crates-index = "0.13.1"
 crates_io_client = { git = "https://gitlab.com/crates.rs/crates_io_client.git", version = "0.7.0" }
 docs_rs_client = { git = "https://gitlab.com/crates.rs/docs_rs_client.git", version = "0.4.0" }
 github_info = { path = "../github_info", version = "0.8.0" }

@@ -12,7 +12,7 @@ path = "src/categories.rs"
 
 [dependencies]
 serde = "1.0.66"
-toml = "0.4.6"
+toml = "0.5"
 serde_derive = "1.0.66"
 lazy_static = "1.0.1"
 quick-error = "1.2.2"

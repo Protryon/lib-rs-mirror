@@ -5,7 +5,7 @@ version = "0.1.0"
 authors = ["Kornel <kornel@geekhood.net>"]
 
 [dependencies]
-tokei = "8.0.1"
+tokei = "10.0.1"
 ignore = "0.4.3"
 serde = "1.0.76"
 serde_derive = "1.0.76"

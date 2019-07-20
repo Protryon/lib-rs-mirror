@@ -11,6 +11,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use tar::Archive;
 use udedokei;
+use udedokei::LanguageExt;
 
 enum ReadAs {
     Toml,
@@ -78,7 +79,7 @@ pub fn read_archive(archive: impl Read, prefix: &Path) -> Result<CrateFile> {
 
         match path_match {
             ReadAs::Lib => {
-                stats.add_to_stats(udedokei::Language::from_path("lib.rs").unwrap(), &data);
+                stats.add_to_stats(udedokei::from_path("lib.rs").unwrap(), &data);
                 if check_if_uses_nightly_features(&data) {
                     is_nightly = true;
                 }
@@ -150,5 +151,5 @@ fn is_source_code_file(path: &Path) -> Option<udedokei::Language> {
     } else {
         return None;
     }
-    udedokei::Language::from_path(path)
+    udedokei::from_path(path)
 }

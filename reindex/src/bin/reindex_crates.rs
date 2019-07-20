@@ -12,6 +12,7 @@ use search_index::*;
 use std::collections::HashSet;
 use std::sync::mpsc;
 use std::sync::Arc;
+use udedokei::LanguageExt;
 
 fn main() {
     let crates = Arc::new(match kitchen_sink::KitchenSink::new_default() {

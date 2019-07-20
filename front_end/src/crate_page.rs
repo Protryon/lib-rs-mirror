@@ -28,6 +28,7 @@ use std::f64::consts::PI;
 use std::fmt::Display;
 use std::hash::Hash;
 use udedokei::{Language, Lines, Stats};
+use udedokei::LanguageExt;
 use url::Url;
 
 /// Data sources used in `crate_page.rs.html`

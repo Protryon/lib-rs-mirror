@@ -216,7 +216,7 @@ fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: impl FnOnc
     if let Ok(modified) = std::fs::metadata(&cache_file).and_then(|m| m.modified()) {
         let now = SystemTime::now();
         let is_fresh = modified > (now - Duration::from_secs((cache_time/20+5).into()));
-        let is_acceptable = modified > (now - Duration::from_secs(3600*24*7 + (cache_time*5).into()));
+        let is_acceptable = modified > (now - Duration::from_secs((3600*24*7 + cache_time*5).into()));
 
         let age_secs = now.duration_since(modified).ok().map(|age| age.as_secs() as u32).unwrap_or(0);
 

@@ -44,20 +44,20 @@ impl UserDb {
             FROM github_users u
             WHERE login = ?1 LIMIT 1")?;
         let mut res = get_user.query_map(&[&login.to_lowercase()], |row| {
-            User {
-                id: row.get(0),
-                login: row.get(1),
-                name: row.get(2),
-                avatar_url: row.get(3),
-                gravatar_id: row.get(4),
-                html_url: row.get(5),
+            Ok(User {
+                id: row.get_unwrap(0),
+                login: row.get_unwrap(1),
+                name: row.get_unwrap(2),
+                avatar_url: row.get_unwrap(3),
+                gravatar_id: row.get_unwrap(4),
+                html_url: row.get_unwrap(5),
                 blog: None,
-                user_type: match (||  -> String {row.get(6)})().as_str() {
+                user_type: match row.get_raw(6).as_str().unwrap() {
                     "org" => UserType::Org,
                     "bot" => UserType::Bot,
                     _ => UserType::User,
                 },
-            }
+            })
         })?;
         Ok(if let Some(res) = res.next() {
             Some(res?)
@@ -80,20 +80,20 @@ impl UserDb {
             JOIN github_users u ON e.github_id = u.id
             WHERE email = ?1 LIMIT 1")?;
         let mut res = get_user.query_map(&[&email.to_ascii_lowercase()], |row| {
-            User {
-                id: row.get(0),
-                login: row.get(1),
-                name: row.get(2),
-                avatar_url: row.get(3),
-                gravatar_id: row.get(4),
-                html_url: row.get(5),
+            Ok(User {
+                id: row.get_unwrap(0),
+                login: row.get_unwrap(1),
+                name: row.get_unwrap(2),
+                avatar_url: row.get_unwrap(3),
+                gravatar_id: row.get_unwrap(4),
+                html_url: row.get_unwrap(5),
                 blog: None,
-                user_type: match (||  -> String {row.get(6)})().as_str() {
+                user_type: match row.get_raw(6).as_str().unwrap() {
                     "org" => UserType::Org,
                     "bot" => UserType::Bot,
                     _ => UserType::User,
                 },
-            }
+            })
         })?;
         Ok(if let Some(res) = res.next() {
             Some(res?)

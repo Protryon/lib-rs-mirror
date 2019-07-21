@@ -204,7 +204,7 @@ impl CrateDb {
 
             let args: &[&dyn ToSql] = &[&origin, &0, &score];
             insert_crate.execute(args).context("insert crate")?;
-            let (crate_id, downloads): (u32, u32) = get_crate_id.query_row(&[&origin], |row| (row.get(0), row.get(1))).context("crate_id")?;
+            let (crate_id, downloads): (u32, u32) = get_crate_id.query_row(&[&origin], |row| Ok((row.get_unwrap(0), row.get_unwrap(1)))).context("crate_id")?;
             let is_important_ish = downloads > 2000 || score > 0.8;
 
             if let Some(repo) = c.repository() {
@@ -340,7 +340,7 @@ impl CrateDb {
                 ORDER BY path, crate_name LIMIT 10
             ")?;
             let q = q.query_map(&[&repo.canonical_git_url()], |r| {
-                let n: String = r.get(0); n
+                let n: Result<String> = r.get(0); n
             })?.filter_map(|r| r.ok());
             Ok(q.collect())
         })
@@ -351,7 +351,7 @@ impl CrateDb {
         self.with_connection(|conn| {
             let mut paths = conn.prepare_cached("SELECT path, crate_name FROM repo_crates WHERE repo = ?1 LIMIT 100")?;
             let mut paths: HashMap<String, String> = paths
-                .query_map(&[&repo.canonical_git_url()], |r| (r.get(0), r.get(1)))?
+                .query_map(&[&repo.canonical_git_url()], |r| Ok((r.get_unwrap(0), r.get_unwrap(1))))?
                 .collect::<std::result::Result<_, _>>()?;
 
             if paths.len() < 2 {
@@ -477,7 +477,7 @@ impl CrateDb {
                 WHERE k.origin = ?1
                 ORDER by relevance_weight desc
             "#)?;
-            let res = query.query_map(&[&origin.to_str()], |row| (row.get(0), row.get(1))).context("crate_categories")?;
+            let res = query.query_map(&[&origin.to_str()], |row| Ok((row.get_unwrap(0), row.get_unwrap(1)))).context("crate_categories")?;
             Ok(res.collect::<std::result::Result<_,_>>()?)
         })
     }
@@ -506,7 +506,7 @@ impl CrateDb {
         group by slug
         order by 2 desc
         limit 10"#).context("categories")?;
-        let candidates = query.query_map(&[&origin.to_str()], |row| (row.get(0), row.get(1))).context("categories q")?;
+        let candidates = query.query_map(&[&origin.to_str()], |row| Ok((row.get_unwrap(0), row.get_unwrap(1)))).context("categories q")?;
         let candidates = candidates.collect::<std::result::Result<_, _>>()?;
 
         Ok(categories::adjusted_relevance(candidates, keywords, threshold, 2))
@@ -533,7 +533,7 @@ impl CrateDb {
                 ) as tmp
             order by top + (top+30.0)/total
             "#)?;
-            Ok(none_rows(query.query_row(&[&origin.to_str()], |row| (row.get(0), row.get(1))))?)
+            Ok(none_rows(query.query_row(&[&origin.to_str()], |row| Ok((row.get_unwrap(0), row.get_unwrap(1)))))?)
         })
     }
 
@@ -602,8 +602,7 @@ impl CrateDb {
             "#)?;
             let args: &[&dyn ToSql] = &[&origin.to_str(), &min_recent_downloads];
             let res = query.query_map(args, |row| {
-                let s: String = row.get(1);
-                Origin::from_str(s)
+                Ok(Origin::from_str(row.get_raw(1).as_str().unwrap()))
             }).context("related_crates")?;
             Ok(res.collect::<std::result::Result<_,_>>()?)
         })
@@ -632,7 +631,7 @@ impl CrateDb {
                 order by 1 desc
                 limit 10
                 "#)?;
-            let res: Vec<(f64, String)> = query.query_map(&[&origin.to_str()], |row| (row.get(0), row.get(1)))?
+            let res: Vec<(f64, String)> = query.query_map(&[&origin.to_str()], |row| Ok((row.get_unwrap(0), row.get_unwrap(1))))?
                 .collect::<std::result::Result<_,_>>()?;
             let min_score = res.get(0).map_or(0., |(rel,_)|rel/20.);
             Ok(res.into_iter().filter_map(|(rel,k)|{
@@ -683,8 +682,8 @@ impl CrateDb {
                 WHERE replacement IS NULL
                 GROUP BY crate_name")?;
             let q = query.query_map(NO_PARAMS, |row| {
-                let s: String = row.get(0);
-                (Origin::from_crates_io_name(&s), row.get(1))
+                let s = row.get_raw(0).as_str().unwrap();
+                Ok((Origin::from_crates_io_name(s), row.get_unwrap(1)))
             })?;
             let q = q.filter_map(|r| r.ok());
             Ok(q.collect())
@@ -707,8 +706,7 @@ impl CrateDb {
             )?;
             let args: &[&dyn ToSql] = &[&slug, &limit];
             let q = query.query_map(args, |row| {
-                let s: String = row.get(0);
-                (Origin::from_str(s), row.get(1))
+                Ok((Origin::from_str(row.get_raw(0).as_str().unwrap()), row.get_unwrap(1)))
             })?;
             let q = q.filter_map(|r| r.ok());
             Ok(q.collect())
@@ -729,8 +727,7 @@ impl CrateDb {
             )?;
             let args: &[&dyn ToSql] = &[&limit];
             let q = query.query_map(args, |row| {
-                let s: String = row.get(0);
-                (Origin::from_str(s), row.get(1))
+                Ok((Origin::from_str(row.get_raw(0).as_str().unwrap()), row.get_unwrap(1)))
             })?;
             let q = q.filter_map(|r| r.ok());
             Ok(q.collect())
@@ -755,8 +752,7 @@ impl CrateDb {
                     limit 20
             "#)?;
             let q = query.query_map(&[&slug], |row| {
-                let s: String = row.get(1);
-                Origin::from_str(s)
+                Ok(Origin::from_str(row.get_raw(1).as_str().unwrap()))
             })?;
             let q = q.filter_map(|r| r.ok());
             Ok(q.collect())
@@ -779,8 +775,7 @@ impl CrateDb {
                     limit 50
             "#)?;
             let q = query.query_map(NO_PARAMS, |row| {
-                let s: String = row.get(1);
-                Origin::from_str(s)
+                Ok(Origin::from_str(row.get_raw(1).as_str().unwrap()))
             })?;
             let q = q.filter_map(|r| r.ok());
             Ok(q.collect())
@@ -798,9 +793,8 @@ impl CrateDb {
                 WHERE ranking > 0.15
                 GROUP BY c.id
             "#)?;
-            let q = q.query_map(NO_PARAMS, |row| -> (Origin, f64, i64) {
-                let s: String = row.get(0);
-                (Origin::from_str(s), row.get(1), row.get(2))
+            let q = q.query_map(NO_PARAMS, |row| -> Result<(Origin, f64, i64)> {
+                Ok((Origin::from_str(row.get_raw(0).as_str().unwrap()), row.get_unwrap(1), row.get_unwrap(2)))
             }).context("sitemap")?.filter_map(|r| r.ok());
             Ok(q.collect())
         })
@@ -812,8 +806,8 @@ impl CrateDb {
             let mut q = conn.prepare(r#"
                 select c.slug, count(*) as cnt from categories c group by c.slug
             "#)?;
-            let q = q.query_map(NO_PARAMS, |row| -> (String, u32) {
-                (row.get(0), row.get(1))
+            let q = q.query_map(NO_PARAMS, |row| -> Result<(String, u32)> {
+                Ok((row.get_unwrap(0), row.get_unwrap(1)))
             }).context("counts")?.filter_map(|r| r.ok());
             Ok(q.collect())
         })
@@ -932,7 +926,7 @@ impl KeywordInsert {
         for (word, (weight, visible)) in self.keywords {
             let args: &[&dyn ToSql] = &[&word, if visible { &1 } else { &0 }];
             insert_name.execute(args)?;
-            let (keyword_id, old_vis): (u32, u32) = select_id.query_row(&[&word], |r| (r.get(0), r.get(1))).context("get keyword")?;
+            let (keyword_id, old_vis): (u32, u32) = select_id.query_row(&[&word], |r| Ok((r.get_unwrap(0), r.get_unwrap(1)))).context("get keyword")?;
             if visible && old_vis == 0 {
                 make_visible.execute(&[&keyword_id]).context("keyword vis")?;
             }

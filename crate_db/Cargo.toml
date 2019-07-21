@@ -10,7 +10,7 @@ name ="crate_db"
 path = "src/lib_crate_db.rs"
 
 [dependencies]
-rusqlite = "0.16"
+rusqlite = "0.19"
 rich_crate = { path = "../rich_crate" }
 categories = { path = "../categories" }
 failure = "0.1.3"

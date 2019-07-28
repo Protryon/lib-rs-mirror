@@ -244,7 +244,9 @@ impl CrateDb {
                 let url = repo.canonical_git_url();
                 insert_keyword.add(&format!("repo:{}", url), 1., false); // crates in monorepo probably belong together
             }
-            insert_keyword.commit(&tx, crate_id)?;
+            // yanked crates may contain garbage, or needlessly come up in similar crates
+            // so knock all keywords' importance if it's yanked
+            insert_keyword.commit(&tx, crate_id, if c.is_yanked() {0.1} else {1.})?;
 
             mark_updated.execute(&[&crate_id, &next_timestamp]).context("mark updated crate")?;
             println!("{}", out);
@@ -899,7 +901,7 @@ impl KeywordInsert {
         }
     }
 
-    pub fn commit(mut self, conn: &Connection, crate_id: u32) -> FResult<()> {
+    pub fn commit(mut self, conn: &Connection, crate_id: u32, overall_weight: f64) -> FResult<()> {
         let mut select_id = conn.prepare_cached("SELECT id, visible FROM keywords WHERE keyword = ?1")?;
         let mut insert_name = conn.prepare_cached("INSERT OR IGNORE INTO keywords (keyword, visible) VALUES (?1, ?2)")?;
         let mut insert_value = conn.prepare_cached("INSERT OR IGNORE INTO crate_keywords(keyword_id, crate_id, weight, explicit)
@@ -930,6 +932,7 @@ impl KeywordInsert {
             if visible && old_vis == 0 {
                 make_visible.execute(&[&keyword_id]).context("keyword vis")?;
             }
+            let weight = weight * overall_weight;
             let args: &[&dyn ToSql] = &[&keyword_id, &crate_id, &weight, if visible { &1 } else { &0 }];
             insert_value.execute(args).context("keyword")?;
         }

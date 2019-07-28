@@ -542,13 +542,13 @@ impl KitchenSink {
             }
         }
 
-        let has_readme = meta.readme.as_ref().ok().and_then(|opt| opt.as_ref()).is_some();
+        let has_readme = meta.readme.as_ref().ok().map_or(false, |o| o.is_some());
         if !has_readme {
             warnings.insert(Warning::NoReadmeProperty);
             if fetch_type != CrateData::Minimal {
                 warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()));
-                let has_readme = meta.readme.as_ref().ok().and_then(|opt| opt.as_ref()).is_some();
-                if !has_readme {
+                let has_readme = meta.readme.as_ref().ok().map_or(false, |o| o.is_some());
+                if !has_readme && meta.manifest.package.as_ref().map_or(false, |p| p.readme.is_some()) {
                     // readmes in form of readme="../foo.md" are lost in packaging,
                     // and the only copy exists in crates.io own api
                     self.add_readme_from_crates_io(&mut meta, name, ver);

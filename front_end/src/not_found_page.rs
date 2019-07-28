@@ -71,7 +71,7 @@ impl NotFoundPage<'_> {
 
     /// Used to render descriptions
     pub fn render_markdown_str(&self, s: &str) -> templates::Html<String> {
-        templates::Html(self.markup.markdown_str(s, false))
+        templates::Html(self.markup.markdown_str(s, false, None))
     }
 }
 

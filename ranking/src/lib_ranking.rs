@@ -400,7 +400,7 @@ code
 
 * list
 * items
-".into()), None, false);
+".into()), None, false, None);
     let mut p = Default::default();
     fill_props(&dom, &mut p, false);
     assert_eq!(p.images, 1);

@@ -189,14 +189,14 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn render_markdown_str(&self, s: &str) -> templates::Html<String> {
-        templates::Html(self.markup.markdown_str(s, true))
+        templates::Html(self.markup.markdown_str(s, true, Some(self.ver.short_name())))
     }
 
     pub fn render_lib_intro(&self) -> Option<templates::Html<String>> {
         self.ver.lib_file_markdown().map(|markup| {
             let docs_url = self.ver.docs_rs_url();
             let base = docs_url.as_ref().map(|u| (u.as_str(), u.as_str()));
-            let (html, warnings) = self.markup.page(&markup, base, self.nofollow());
+            let (html, warnings) = self.markup.page(&markup, base, self.nofollow(), Some(self.ver.short_name()));
             if !warnings.is_empty() {
                 eprintln!("{} lib: {:?}", self.ver.short_name(), warnings);
             }
@@ -214,7 +214,7 @@ impl<'a> CratePage<'a> {
             (Some(l), None) => Some((l.as_str(), l.as_str())),
             _ => None,
         };
-        let (html, warnings) = self.markup.page(&readme.markup, urls, self.nofollow());
+        let (html, warnings) = self.markup.page(&readme.markup, urls, self.nofollow(), Some(self.ver.short_name()));
         if !warnings.is_empty() {
             eprintln!("{} readme: {:?}", self.ver.short_name(), warnings);
         }

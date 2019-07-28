@@ -138,7 +138,7 @@ fn index_search(indexer: &mut Indexer, renderer: &Renderer, k: &RichCrateVersion
 
 fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer, contributors_count: u32) -> (usize, f64) {
     let readme = k.readme().ok().and_then(|r| r).map(|readme| {
-        renderer.page_node(&readme.markup, None, false)
+        renderer.page_node(&readme.markup, None, false, None)
     });
     let langs = k.language_stats();
     let (rust_code_lines, rust_comment_lines) = langs.langs.get(&udedokei::Language::Rust).map(|rs| (rs.code, rs.comments)).unwrap_or_default();

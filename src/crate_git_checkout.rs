@@ -259,7 +259,12 @@ pub fn find_readme(repo: &Repository, package: &Package) -> Result<Option<Readme
     let mut readme = None;
     let mut found_best = false; // it'll find many readmes, including fallbacks
 
-    let prefix = path_in_repo(&repo, &tree, &package.name)?;
+    let mut prefix = path_in_repo(&repo, &tree, &package.name)?;
+    if let Some(ref mut prefix) = prefix {
+        if !prefix.ends_with('/') {
+            prefix.push('/');
+        }
+    }
     let prefix = prefix.as_ref().map(|s| s.as_str()).unwrap_or("");
 
     iter_blobs(&repo, &tree, |base, name, blob| {
@@ -302,6 +307,7 @@ fn readme_from_repo(markup: Markup, repo_url: &Option<String>, base_dir_in_repo:
 fn is_readme_filename(path: &Path, package: Option<&Package>) -> bool {
     path.to_str().map_or(false, |s| {
         if let Some(&Package{readme: Some(ref r),..}) = package {
+            let r = r.trim_start_matches("../"); // hacky hack
             r.eq_ignore_ascii_case(s) // crates published on Mac have this
         } else {
             render_readme::is_readme_filename(path)

@@ -156,42 +156,6 @@ struct MarkupProps {
     sections: u16,
 }
 
-fn is_badge_url(url: &str) -> bool {
-    let url = url.trim_start_matches("http://").trim_start_matches("https://")
-        .trim_start_matches("www.")
-        .trim_start_matches("flat.")
-        .trim_start_matches("images.")
-        .trim_start_matches("img.")
-        .trim_start_matches("api.")
-        .trim_start_matches("ci.")
-        .trim_start_matches("build.");
-    url.starts_with("appveyor.com") ||
-        url.starts_with("badge.") ||
-        url.starts_with("badgen.") ||
-        url.starts_with("badges.") ||
-        url.starts_with("codecov.io") ||
-        url.starts_with("coveralls.io") ||
-        url.starts_with("docs.rs") ||
-        url.starts_with("gitlab.com") ||
-        url.starts_with("isitmaintained.com") ||
-        url.starts_with("meritbadge") ||
-        url.starts_with("microbadger") ||
-        url.starts_with("ohloh.net") ||
-        url.starts_with("openhub.net") ||
-        url.starts_with("repostatus.org") ||
-        url.starts_with("shields.io") ||
-        url.starts_with("snapcraft.io") ||
-        url.starts_with("spearow.io") ||
-        url.starts_with("travis-ci.") ||
-        url.starts_with("zenodo.org") ||
-        url.ends_with("?branch=master") ||
-        url.ends_with("/pipeline.svg") ||
-        url.ends_with("/coverage.svg") ||
-        url.ends_with("/build.svg") ||
-        url.ends_with("badge.svg") ||
-        url.ends_with("badge.png")
-}
-
 fn fill_props(node: &Handle, props: &mut MarkupProps, mut in_code: bool) {
     match node.data {
         NodeData::Text {ref contents} => {
@@ -209,7 +173,7 @@ fn fill_props(node: &Handle, props: &mut MarkupProps, mut in_code: bool) {
             match name.local.get(..).unwrap() {
                 "img" => {
                     if let Some(src) = attrs.borrow().iter().find(|a| a.name.local.get(..).unwrap() == "src") {
-                        if is_badge_url(&src.value) {
+                        if render_readme::is_badge_url(&src.value) {
                             return; // don't count badges
                         }
                     }
@@ -219,7 +183,7 @@ fn fill_props(node: &Handle, props: &mut MarkupProps, mut in_code: bool) {
                 "li" | "tr" => props.list_or_table_rows += 1,
                 "a" => {
                     if let Some(href) = attrs.borrow().iter().find(|a| a.name.local.get(..).unwrap() == "href") {
-                        if is_badge_url(&href.value) {
+                        if render_readme::is_badge_url(&href.value) {
                             return; // don't count badge image children
                         }
                     }

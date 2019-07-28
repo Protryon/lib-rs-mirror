@@ -68,6 +68,12 @@ impl CratesIoClient {
         Ok(res)
     }
 
+    pub fn readme(&self, crate_name: &str, version: &str) -> Result<Option<Vec<u8>>, Error> {
+        let key = format!("{}.html", crate_name);
+        let url = format!("https://crates.io/api/v1/crates/{}/{}/readme", crate_name, version);
+        self.crates.get_cached((&key, version), &url)
+    }
+
     pub fn krate(&self, crate_name: &str, cache_buster: &str, refresh: bool) -> Result<Option<CratesIoCrate>, Error> {
         let (meta, (downloads, owners)) = rayon::join(
                 || self.crate_meta(crate_name, cache_buster),

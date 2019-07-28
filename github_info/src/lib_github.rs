@@ -250,7 +250,12 @@ impl GitHub {
             _ => status.is_success(),
         };
 
-        match body.ok_or(Error::NoBody).and_then(|stats| Ok(postproc(serde_json::from_value(stats)?))) {
+        match body.ok_or(Error::NoBody).and_then(|stats| {
+            let dbg = format!("{:?}", stats);
+            Ok(postproc(serde_json::from_value(stats).map_err(|e| {
+                eprintln!("Error matching JSON: {}\n data: {}", e, dbg); e
+            })?))
+        }) {
             Ok(val) => {
                 let res = (key.1.to_string(), Some(val));
                 if keep_cached {

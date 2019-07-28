@@ -82,6 +82,8 @@ lazy_static! {
         ("cuda", Some(&["nvidia"])), // confuses categorization
         ("subcommand", Some(&["plugin"])),
         ("lint", Some(&["plugin"])),
+        ("email", Some(&["validator", "validation"])),
+        ("e-mail", Some(&["validator", "validation"])),
         ("template", Some(&["derive"])),
         ("dsl", Some(&["template"])),
         ("syn", Some(&["nom"])),

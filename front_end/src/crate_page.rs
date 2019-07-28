@@ -279,7 +279,7 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn up_to_date_class(&self, richdep: &RichDep) -> &str {
-        let (matches_latest, pop) = richdep.dep.req().parse().ok().map(|req| self.kitchen_sink.version_popularity(&richdep.package, &req)).unwrap_or((false, 0.));
+        let (matches_latest, pop) = richdep.dep.req().parse().ok().and_then(|req| self.kitchen_sink.version_popularity(&richdep.package, &req)).unwrap_or((false, 0.));
         match pop {
             x if x >= 0.5 && matches_latest => "top",
             x if x >= 0.75 || matches_latest => "common",
@@ -662,7 +662,7 @@ impl<'a> CratePage<'a> {
                     },
                 };
 
-                let commonality = self.kitchen_sink.index.version_commonality(&name, &semver);
+                let commonality = self.kitchen_sink.index.version_commonality(&name, &semver).expect("vercomm");
                 let is_heavy_build_dep = match &*name {
                     "bindgen" | "clang-sys" | "cmake" | "cc" if depinf.default => true, // you deserve full weight of it
                     _ => false,

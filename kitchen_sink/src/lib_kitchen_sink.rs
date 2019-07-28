@@ -122,6 +122,8 @@ pub enum KitchenSinkErr {
     GitIndexParse(String),
     #[fail(display = "Git index {:?}: {}", _0, _1)]
     GitIndexFile(PathBuf, String),
+    #[fail(display = "Rayon deadlock broke the stats")]
+    DepsStatsNotAvailable,
 }
 
 /// This is a collection of various data sources. It mostly acts as a starting point and a factory for other objects.
@@ -769,7 +771,7 @@ impl KitchenSink {
     }
 
     pub fn prewarm(&self) {
-        self.index.deps_stats();
+        let _ = self.index.deps_stats();
     }
 
     pub fn dependents_stats_of(&self, krate: &RichCrateVersion) -> Option<RevDependencies> {
@@ -777,13 +779,13 @@ impl KitchenSink {
     }
 
     pub fn dependents_stats_of_crates_io_crate(&self, crate_name: &str) -> Option<RevDependencies> {
-        self.index.deps_stats().counts.get(crate_name).cloned()
+        self.index.deps_stats()?.counts.get(crate_name).cloned()
     }
 
     /// (latest, pop)
     /// 0 = not used
     /// 1 = everyone uses it
-    pub fn version_popularity(&self, crate_name: &str, requirement: &VersionReq) -> (bool, f32) {
+    pub fn version_popularity(&self, crate_name: &str, requirement: &VersionReq) -> Option<(bool, f32)> {
         self.index.version_popularity(crate_name, requirement)
     }
 
@@ -929,7 +931,7 @@ impl KitchenSink {
 
         // direct deps are used as extra keywords for similarity matching,
         // but we're taking only niche deps to group similar niche crates together
-        let deps_stats = self.index.deps_stats();
+        let deps_stats = self.index.deps_stats().ok_or(KitchenSinkErr::DepsStatsNotAvailable)?;
         let mut weighed_deps = Vec::<(&str, f32)>::new();
         let all_deps = v.direct_dependencies()?;
         let all_deps = [(all_deps.0, 1.0), (all_deps.2, 0.33)];

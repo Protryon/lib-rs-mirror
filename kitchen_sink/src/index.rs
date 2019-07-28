@@ -82,10 +82,13 @@ impl Index {
         self.git_index.crates().chain(self.crates_io_index.keys())
     }
 
-    pub fn deps_stats(&self) -> &DepsStats {
+    pub fn deps_stats(&self) -> Option<&DepsStats> {
         match self.deps_stats.try_get_for(Duration::from_secs(10), || self.get_deps_stats()) {
-            Some(res) => res,
-            None => panic!("rayon deadlock"),
+            Some(res) => Some(res),
+            None => {
+                eprintln!("rayon deadlock");
+                return None
+            },
         }
     }
 
@@ -264,9 +267,9 @@ impl Index {
     /// For crate being outdated. Returns (is_latest, popularity)
     /// 0 = not used *or deprecated*
     /// 1 = everyone uses it
-    pub fn version_popularity(&self, crate_name: &str, requirement: &VersionReq) -> (bool, f32) {
+    pub fn version_popularity(&self, crate_name: &str, requirement: &VersionReq) -> Option<(bool, f32)> {
         if is_deprecated(crate_name) {
-            return (false, 0.);
+            return Some((false, 0.));
         }
 
         let matches_latest = self
@@ -275,7 +278,7 @@ impl Index {
             .and_then(|krate| Self::highest_version(krate, true).version().parse().ok())
             .map_or(false, |latest| requirement.matches(&latest));
 
-        let stats = self.deps_stats();
+        let stats = self.deps_stats()?;
         let pop = stats.counts.get(crate_name)
         .map(|stats| {
             let mut matches = 0;
@@ -293,24 +296,23 @@ impl Index {
         })
         .unwrap_or(0.);
 
-        (matches_latest, pop)
+        Some((matches_latest, pop))
     }
 
     /// How likely it is that this exact crate will be installed in any project
-    pub fn version_commonality(&self, crate_name: &str, version: &MiniVer) -> f32 {
+    pub fn version_commonality(&self, crate_name: &str, version: &MiniVer) -> Option<f32> {
         match crate_name {
             // bindings' SLoC looks heavier than actual overhead of standard system libs
-            "libc" | "winapi" | "kernel32-sys" => return 0.91,
+            "libc" | "winapi" | "kernel32-sys" => return Some(0.91),
             _ => {},
         }
 
-        let stats = self.deps_stats();
+        let stats = self.deps_stats()?;
         stats.counts.get(crate_name)
         .and_then(|c| {
             c.versions.get(&version)
             .map(|&ver| ver as f32 / stats.total as f32)
         })
-        .unwrap_or(0.)
     }
 }
 
@@ -384,7 +386,7 @@ pub struct DepQuery {
 #[test]
 fn index_test() {
     let idx = Index::new_default().unwrap();
-    let stats = idx.deps_stats();
+    let stats = idx.deps_stats().unwrap();
     assert!(stats.total > 13800);
     let lode = stats.counts.get("lodepng").unwrap();
     assert_eq!(11, lode.runtime.def);

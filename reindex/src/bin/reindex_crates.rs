@@ -180,7 +180,7 @@ fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersi
     let dependency_freshness = if let Ok((runtime, _, build)) = k.direct_dependencies() {
         // outdated dev deps don't matter
         runtime.iter().chain(&build).filter_map(|richdep| {
-            richdep.dep.req().parse().ok().map(|req| (richdep.is_optional(), crates.version_popularity(&richdep.package, &req)))
+            richdep.dep.req().parse().ok().map(|req| (richdep.is_optional(), crates.version_popularity(&richdep.package, &req).expect("verpop")))
         })
         .map(|(is_optional, (is_latest, popularity))| {
             if is_latest {1.0} // don't penalize pioneers

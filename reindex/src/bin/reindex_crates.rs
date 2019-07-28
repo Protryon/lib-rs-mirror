@@ -7,7 +7,7 @@ use rand::{seq::SliceRandom, thread_rng};
 use ranking::CrateTemporalInputs;
 use ranking::CrateVersionInputs;
 use rayon;
-use render_readme::{Markup, Renderer};
+use render_readme::Renderer;
 use search_index::*;
 use std::collections::HashSet;
 use std::sync::mpsc;
@@ -31,12 +31,13 @@ fn main() {
 
     let (tx, rx) = mpsc::sync_channel(64);
     let index_thread = std::thread::spawn({
+        let renderer = renderer.clone();
         move || -> Result<(), failure::Error> {
             let mut n = 0;
             let mut next_n = 100;
             while let Ok((ver, downloads_per_month, score)) = rx.recv() {
                 if stopped() {break;}
-                index_search(&mut indexer, &ver, downloads_per_month, score)?;
+                index_search(&mut indexer, &renderer, &ver, downloads_per_month, score)?;
                 n += 1;
                 if n == next_n {
                     next_n *= 2;
@@ -117,7 +118,7 @@ fn index_crate(crates: &KitchenSink, c: &Origin, renderer: &Renderer, search_sen
     Ok(v)
 }
 
-fn index_search(indexer: &mut Indexer, k: &RichCrateVersion, downloads_per_month: usize, score: f64) -> Result<(), failure::Error> {
+fn index_search(indexer: &mut Indexer, renderer: &Renderer, k: &RichCrateVersion, downloads_per_month: usize, score: f64) -> Result<(), failure::Error> {
     let keywords: Vec<_> = k.keywords(Include::Cleaned).collect();
 
     let mut lib_tmp = None;
@@ -125,13 +126,11 @@ fn index_search(indexer: &mut Indexer, k: &RichCrateVersion, downloads_per_month
         lib_tmp = k.lib_file_markdown();
         lib_tmp.as_ref()
     }).map(|markup| {
-        match markup {
-            Markup::Markdown(ref s) | Markup::Rst(ref s) => s.as_str(),
-        }
+        renderer.visible_text(markup)
     });
     let version = k.version();
 
-    indexer.add(k.short_name(), version, k.description().unwrap_or(""), &keywords, readme, downloads_per_month as u64, score);
+    indexer.add(k.short_name(), version, k.description().unwrap_or(""), &keywords, readme.as_ref().map(|s| s.as_str()), downloads_per_month as u64, score);
     Ok(())
 }
 

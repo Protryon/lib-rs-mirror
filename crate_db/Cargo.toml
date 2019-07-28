@@ -20,3 +20,4 @@ chrono = "0.4.2"
 thread_local = "0.3.6"
 parking_lot = "0.9"
 rake = { git = "https://github.com/kornelski/rake-rs" }
+render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git", version = "0.6.3" }

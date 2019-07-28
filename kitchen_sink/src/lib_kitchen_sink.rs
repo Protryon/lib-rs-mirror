@@ -639,7 +639,7 @@ impl KitchenSink {
     pub fn is_readme_short(&self, readme: Result<Option<&Readme>, ()>) -> bool {
         if let Ok(Some(ref r)) = readme {
             match r.markup {
-                Markup::Markdown(ref s) | Markup::Rst(ref s) => s.len() < 1000,
+                Markup::Markdown(ref s) | Markup::Rst(ref s) | Markup::Html(ref s) => s.len() < 1000,
             }
         } else {
             true

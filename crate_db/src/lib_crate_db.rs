@@ -13,11 +13,11 @@ extern crate lazy_static;
 use chrono::prelude::*;
 use failure::ResultExt;
 use rich_crate::Include;
-use rich_crate::Markup;
 use rich_crate::Origin;
 use rich_crate::Repo;
 use rich_crate::RichCrate;
 use rich_crate::RichCrateVersion;
+use render_readme::Renderer;
 use rusqlite::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -129,7 +129,7 @@ impl CrateDb {
         insert_keyword.add_synonyms(&self.tag_synonyms);
 
         {
-            let d = Self::extract_text_phrases(&c);
+            let d = Self::extract_text_phrases(&c, &Renderer::new(None));
             let mut sw = rake::StopWords::new();
             sw.reserve(STOPWORDS.len());
             sw.extend(STOPWORDS.iter().map(|s| s.to_string())); // TODO: use real stopwords, THEN filter via STOPWORDS again, because multiple Rust-y words are fine
@@ -814,7 +814,7 @@ impl CrateDb {
     }
 
     // returns an array of lowercase phrases
-    fn extract_text_phrases(krate: &RichCrateVersion) -> Vec<(f64, String)> {
+    fn extract_text_phrases(krate: &RichCrateVersion, renderer: &Renderer) -> Vec<(f64, String)> {
         let mut out = Vec::new();
         let mut len = 0;
         if let Some(s) = krate.description() {
@@ -827,9 +827,7 @@ impl CrateDb {
         }
         if let Ok(Some(r)) = krate.readme() {
             // render readme to DOM, extract nodes
-            let sub = match r.markup {
-                Markup::Markdown(ref s) | Markup::Rst(ref s) => s,
-            };
+            let sub = renderer.visible_text(&r.markup);
             for par in sub.split('\n') {
                 if len > 200 {
                     break;
@@ -840,13 +838,15 @@ impl CrateDb {
                     continue;
                 }
                 let par = par.replace("http://", " ").replace("https://", " ");
-                len += par.len();
-                out.push((0.4, par.to_lowercase()));
+                if !par.is_empty() {
+                    len += par.len();
+                    out.push((0.4, par.to_lowercase()));
+                }
             }
-                }
-        out
-                }
         }
+        out
+    }
+}
 
 pub enum RepoChange {
     Removed { crate_name: String, weight: f64 },

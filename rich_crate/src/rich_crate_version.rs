@@ -7,6 +7,7 @@ pub use cargo_toml::{DepsSet, Edition, FeatureSet, MaintenanceStatus, TargetDeps
 use categories::Categories;
 use crates_index::Version;
 use repo_url::Repo;
+use render_readme::Renderer;
 use semver;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -152,9 +153,8 @@ impl RichCrateVersion {
                 }
             };
             if let Ok(Some(r)) = self.readme() {
-                match r.markup {
-                    Markup::Markdown(ref s) | Markup::Rst(ref s) => add_words(s),
-                }
+                let s = Renderer::new(None).visible_text(&r.markup);
+                add_words(&s);
             }
             add_words(self.short_name());
             if let Some(s) = self.description() {add_words(s);}

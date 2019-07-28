@@ -317,6 +317,15 @@ impl KitchenSink {
         Ok(res.into_iter())
     }
 
+    pub fn crate_exists(&self, origin: &Origin) -> bool {
+        match origin {
+            Origin::CratesIo(_) => {
+                self.index.crates_io_crate_by_name(origin).is_ok()
+            },
+            _ => true,
+        }
+    }
+
     /// Wrapper object for metadata common for all versions of a crate
     pub fn rich_crate(&self, origin: &Origin) -> CResult<RichCrate> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}

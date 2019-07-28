@@ -20,6 +20,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::prelude::FutureExt;
 use urlencoding::encode;
+use urlencoding::decode;
 
 mod writer;
 use crate::writer::*;
@@ -146,7 +147,14 @@ fn default_handler(req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
         return Ok(HttpResponse::TemporaryRedirect().header("Location", format!("/keywords/{}", encode(&inverted_hyphens))).body(""));
     }
 
-    let query = path.chars().map(|c| if c.is_alphanumeric() {c} else {' '}).take(100).collect::<String>();
+    render_404_page(state, path)
+}
+
+fn render_404_page(state: &AServerState, path: &str) -> Result<HttpResponse> {
+    let decoded = decode(path).ok();
+    let rawtext = decoded.as_ref().map(|d| d.as_str()).unwrap_or(path);
+
+    let query = rawtext.chars().map(|c| if c.is_alphanumeric() {c} else {' '}).take(100).collect::<String>();
     let query = query.trim();
     let results = state.index.search(query, 5, false).unwrap_or_default();
     let mut page: Vec<u8> = Vec::with_capacity(50000);
@@ -197,8 +205,10 @@ fn handle_home(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> 
 fn handle_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
     let crate_name: String = req.match_info().query("crate").expect("arg");
     println!("crate page for {:?}", crate_name);
-    assert!(is_alnum(&crate_name));
     let state = Arc::clone(req.state());
+    if !is_alnum(&crate_name) || !state.crates.crate_exists(&Origin::from_crates_io_name(&crate_name)) {
+        return Box::new(future::result(render_404_page(&state, &crate_name)));
+    }
     let cache_file = state.public_crates_dir.join(format!("{}.html", crate_name));
     with_file_cache(cache_file, 1800, move || {
         render_crate_page(&state, crate_name)

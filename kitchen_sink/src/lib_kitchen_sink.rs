@@ -547,6 +547,12 @@ impl KitchenSink {
             warnings.insert(Warning::NoReadmeProperty);
             if fetch_type != CrateData::Minimal {
                 warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()));
+                let has_readme = meta.readme.as_ref().ok().and_then(|opt| opt.as_ref()).is_some();
+                if !has_readme {
+                    // readmes in form of readme="../foo.md" are lost in packaging,
+                    // and the only copy exists in crates.io own api
+                    self.add_readme_from_crates_io(&mut meta, name, ver);
+                }
             }
         }
 
@@ -687,6 +693,19 @@ impl KitchenSink {
             }
         }
         warnings
+    }
+
+    fn add_readme_from_crates_io(&self, meta: &mut CrateFile, name: &str, ver: &str) {
+        if let Ok(Some(html)) = self.crates_io.readme(name, ver) {
+            eprintln!("Found readme on crates.io {}@{}", name, ver);
+            meta.readme = Ok(Some(Readme {
+                markup: Markup::Html(String::from_utf8_lossy(&html).to_string()),
+                base_url: None,
+                base_image_url: None,
+            }));
+        } else {
+            eprintln!("No readme on crates.io for {}@{}", name, ver);
+        }
     }
 
     fn remove_redundant_links(&self, package: &mut Package, maybe_repo: Option<&Repo>) -> Warnings {

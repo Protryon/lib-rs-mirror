@@ -505,6 +505,20 @@ impl KitchenSink {
         derived.is_nightly = meta.is_nightly;
 
         let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
+
+        // Guess repo URL if none was specified; must be done before getting stuff from the repo
+        if package.repository.is_none() {
+            warnings.insert(Warning::NoRepositoryProperty);
+            // it may contain data from nowhere! https://github.com/rust-lang/crates.io/issues/1624
+            if let Some(repo) = crates_io_meta.repository {
+                package.repository = Some(repo);
+            } else {
+                if package.homepage.as_ref().map_or(false, |h| Repo::looks_like_repo_url(h)) {
+                    package.repository = package.homepage.take();
+                }
+            }
+        }
+
         let maybe_repo = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
         let path_in_repo = match maybe_repo.as_ref() {
             Some(repo) => if fetch_type != CrateData::Minimal {
@@ -529,18 +543,6 @@ impl KitchenSink {
             }
         }
 
-        // Guess repo URL if none was specified
-        if package.repository.is_none() {
-            warnings.insert(Warning::NoRepositoryProperty);
-            // it may contain data from nowhere! https://github.com/rust-lang/crates.io/issues/1624
-            if let Some(repo) = crates_io_meta.repository {
-                package.repository = Some(repo);
-            } else {
-                if package.homepage.as_ref().map_or(false, |h| Repo::looks_like_repo_url(h)) {
-                    package.repository = package.homepage.take();
-                }
-            }
-        }
 
         let has_readme = meta.readme.as_ref().ok().map_or(false, |o| o.is_some());
         if !has_readme {

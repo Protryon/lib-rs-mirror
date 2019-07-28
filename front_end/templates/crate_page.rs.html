@@ -72,7 +72,9 @@
 
     </h2>
     @if let Some(desc) = c.ver.description() {
-      <p class=desc>@c.render_markdown_str(desc)</p>
+      @if let Ok(Some(_)) = c.ver.readme() {
+        <p class=desc>@c.render_markdown_str(desc)</p>
+      }
     }
     <p class=byline>
       @if c.ver.is_yanked() {
@@ -247,14 +249,21 @@
           </section>
 
           @if let Ok(readme) = c.ver.readme() {
-            @if let Some(readme) = readme {
-              <section id=readme class="readme" vocab="">
+            <section id=readme class="readme" vocab="">
+              @if let Some(readme) = readme {
                 @c.render_readme(readme)
-              </section>
-            }
+              } else {
+                @if let Some(desc) = c.ver.description() {
+                  <hr>
+                  <p class=desc>@c.render_markdown_str(desc)</p>
+                } else {
+                  <p class=error>(This crate has no description)</p>
+                }
+              }
+            </section>
           } else {
             <section id=readme>
-              <p class=error>Error while getting readme</p>
+              <p class=error>(Error while getting the readme)</p>
             </section>
           }
 

@@ -2,9 +2,9 @@ use crate::deps_stats::DepsStats;
 use crate::git_crates_index::*;
 use crate::KitchenSink;
 use crate::KitchenSinkErr;
-use crates_index;
 use crates_index::Crate;
 use crates_index::Version;
+use crates_index;
 use fxhash::{FxHashMap, FxHashSet};
 use lazyonce::LazyOnce;
 use parking_lot::Mutex;
@@ -41,7 +41,8 @@ impl MiniVer {
 }
 
 pub struct Index {
-    crates_io_index: FxHashMap<Origin, Crate>,
+    indexed_crates: LazyOnce<FxHashMap<Origin, Crate>>,
+    pub(crate) crates_io_index: crates_index::Index,
     git_index: GitIndex,
 
     pub(crate) inter: RwLock<StringInterner<Sym>>,
@@ -55,15 +56,13 @@ impl Index {
     }
 
     pub fn new(data_dir: &Path) -> Result<Self, KitchenSinkErr> {
-        let index = crates_index::Index::new(data_dir.join("index"));
-        let crates_io_index = index.crates()
-                .map(|c| (Origin::from_crates_io_name(c.name()), c))
-                .collect();
+        let crates_io_index = crates_index::Index::new(data_dir.join("index"));
         Ok(Self {
             git_index: GitIndex::new(data_dir)?,
             cache: RwLock::new(FxHashMap::with_capacity_and_hasher(5000, Default::default())),
             inter: RwLock::new(StringInterner::new()),
             deps_stats: LazyOnce::new(),
+            indexed_crates: LazyOnce::new(),
             crates_io_index,
         })
     }
@@ -73,13 +72,17 @@ impl Index {
     /// It returns only a thin and mostly useless data from the index itself,
     /// so `rich_crate`/`rich_crate_version` is needed to do more.
     pub fn crates_io_crates(&self) -> &FxHashMap<Origin, Crate> {
-        &self.crates_io_index
+        self.indexed_crates.get(|| {
+            self.crates_io_index.crates()
+                .map(|c| (Origin::from_crates_io_name(c.name()), c))
+                .collect()
+        })
     }
 
     /// All crates available in the crates.io index and our index
     ///
     pub fn all_crates(&self) -> impl Iterator<Item=&Origin> {
-        self.git_index.crates().chain(self.crates_io_index.keys())
+        self.git_index.crates().chain(self.crates_io_crates().keys())
     }
 
     pub fn deps_stats(&self) -> Option<&DepsStats> {

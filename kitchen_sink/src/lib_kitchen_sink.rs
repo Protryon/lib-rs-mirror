@@ -1104,12 +1104,10 @@ impl KitchenSink {
 
     pub fn cachebust_string_for_repo(&self, crate_repo: &Repo) -> CResult<String> {
         Ok(self.crate_db.crates_in_repo(crate_repo)
-            .context("db cache_bust")?
+            .context("db crates_in_repo")?
             .into_iter()
-            .filter_map(|name| {
-                self.index.crate_version_latest_unstable(&Origin::from_crates_io_name(&name)).ok()
-            })
-            .map(|k| k.version().to_string())
+            .filter_map(|origin| self.index.crate_version_latest_unstable(&origin).ok())
+            .map(|c| c.version().to_string())
             .next()
             .unwrap_or_else(|| "*".to_string()))
     }

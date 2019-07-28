@@ -108,7 +108,7 @@ pub fn read_archive(archive: impl Read, prefix: &Path) -> Result<CrateFile> {
 
     Ok(CrateFile {
         decompressed_size,
-        readme: Ok(markup.map(|(path, m)| readme_from_repo(m, manifest.package.as_ref().and_then(|r| r.repository.as_ref()), &path))),
+        readme: markup.map(|(path, m)| readme_from_repo(m, manifest.package.as_ref().and_then(|r| r.repository.as_ref()), &path)),
         manifest,
         files,
         lib_file,

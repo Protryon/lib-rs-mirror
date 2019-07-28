@@ -149,7 +149,7 @@ pub struct KitchenSink {
 struct RichCrateVersionCacheData {
     derived: Derived,
     manifest: Manifest,
-    readme: Result<Option<Readme>, ()>,
+    readme: Option<Readme>,
     lib_file: Option<String>,
     path_in_repo: Option<String>,
     has_buildrs: bool,
@@ -553,12 +553,12 @@ impl KitchenSink {
         }
 
 
-        let has_readme = meta.readme.as_ref().ok().map_or(false, |o| o.is_some());
+        let has_readme = meta.readme.is_some();
         if !has_readme {
             warnings.insert(Warning::NoReadmeProperty);
             if fetch_type != CrateData::Minimal {
                 warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()));
-                let has_readme = meta.readme.as_ref().ok().map_or(false, |o| o.is_some());
+                let has_readme = meta.readme.is_some();
                 if !has_readme && meta.manifest.package.as_ref().map_or(false, |p| p.readme.is_some()) {
                     // readmes in form of readme="../foo.md" are lost in packaging,
                     // and the only copy exists in crates.io own api
@@ -630,7 +630,7 @@ impl KitchenSink {
         }
 
         // lib file takes majority of space in cache, so remove it if it won't be used
-        if !self.is_readme_short(meta.readme.as_ref().map(|r| r.as_ref()).map_err(|_| ())) {
+        if !self.is_readme_short(meta.readme.as_ref()) {
             meta.lib_file = None;
         }
 
@@ -639,7 +639,7 @@ impl KitchenSink {
             has_buildrs,
             has_code_of_conduct,
             manifest: meta.manifest,
-            readme: meta.readme.map_err(|_| ()),
+            readme: meta.readme,
             lib_file: meta.lib_file.map(|s| s.into()),
             path_in_repo,
         }, warnings))
@@ -655,8 +655,8 @@ impl KitchenSink {
         })
     }
 
-    pub fn is_readme_short(&self, readme: Result<Option<&Readme>, ()>) -> bool {
-        if let Ok(Some(ref r)) = readme {
+    pub fn is_readme_short(&self, readme: Option<&Readme>) -> bool {
+        if let Some(r) = readme {
             match r.markup {
                 Markup::Markdown(ref s) | Markup::Rst(ref s) | Markup::Html(ref s) => s.len() < 1000,
             }
@@ -692,7 +692,7 @@ impl KitchenSink {
             });
             match res {
                 Ok(Some(readme)) => {
-                    meta.readme = Ok(Some(readme));
+                    meta.readme = Some(readme);
                 },
                 Ok(None) => {
                     warnings.insert(Warning::NoReadmeInRepo(repo.canonical_git_url().to_string()));
@@ -709,11 +709,11 @@ impl KitchenSink {
     fn add_readme_from_crates_io(&self, meta: &mut CrateFile, name: &str, ver: &str) {
         if let Ok(Some(html)) = self.crates_io.readme(name, ver) {
             eprintln!("Found readme on crates.io {}@{}", name, ver);
-            meta.readme = Ok(Some(Readme {
+            meta.readme = Some(Readme {
                 markup: Markup::Html(String::from_utf8_lossy(&html).to_string()),
                 base_url: None,
                 base_image_url: None,
-            }));
+            });
         } else {
             eprintln!("No readme on crates.io for {}@{}", name, ver);
         }

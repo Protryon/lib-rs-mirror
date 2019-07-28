@@ -828,7 +828,7 @@ impl CrateDb {
             len += s.len();
             out.push((1., s.to_lowercase()));
         }
-        if let Ok(Some(r)) = krate.readme() {
+        if let Some(r) = krate.readme() {
             // render readme to DOM, extract nodes
             let sub = renderer.visible_text(&r.markup);
             for par in sub.split('\n') {

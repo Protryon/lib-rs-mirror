@@ -248,27 +248,21 @@
             </section>
           </section>
 
-          @if let Ok(readme) = c.ver.readme() {
-              @if let Some(readme) = readme {
-                <section id=readme class="readme" vocab="">
-                  @c.render_readme(readme)
-                </section>
-              } else {
-                @if c.has_no_readme_or_lib() {
-                  <section id=readme class="readme" vocab="">
-                    @if let Some(desc) = c.ver.description() {
-                      <hr>
-                      <p class=desc>@c.render_markdown_str(desc)</p>
-                    } else {
-                      <p class=error>(This crate has no description)</p>
-                    }
-                  </section>
-                }
-              }
+          @if let Some(readme) = c.ver.readme() {
+              <section id=readme class="readme" vocab="">
+                @c.render_readme(readme)
+              </section>
           } else {
-            <section id=readme>
-              <p class=error>(Error while getting the readme)</p>
-            </section>
+            @if c.has_no_readme_or_lib() {
+              <section id=readme class="readme" vocab="">
+                @if let Some(desc) = c.ver.description() {
+                  <hr>
+                  <p class=desc>@c.render_markdown_str(desc)</p>
+                } else {
+                  <p class=error>(This crate has no description)</p>
+                }
+              </section>
+            }
           }
 
           @if c.is_readme_short() {

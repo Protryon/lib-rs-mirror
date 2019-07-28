@@ -24,7 +24,7 @@ pub struct RichCrateVersion {
     index: Version,
     derived: Derived,
     authors: Vec<Author>,
-    readme: Result<Option<Readme>, ()>,
+    readme: Option<Readme>,
     lib_file: Option<String>,
     repo: Option<Repo>,
     path_in_repo: Option<String>,
@@ -58,7 +58,7 @@ pub enum Include {
 ///
 /// Crates.rs uses this only for the latest version of a crate.
 impl RichCrateVersion {
-    pub fn new(index: Version, mut manifest: Manifest, derived: Derived, readme: Result<Option<Readme>, ()>,
+    pub fn new(index: Version, mut manifest: Manifest, derived: Derived, readme: Option<Readme>,
         lib_file: Option<String>, path_in_repo: Option<String>, has_buildrs: bool, has_code_of_conduct: bool) -> Self
     {
         let package = manifest.package.take().expect("package");
@@ -152,7 +152,7 @@ impl RichCrateVersion {
                     words.insert(s.to_string(), points);
                 }
             };
-            if let Ok(Some(r)) = self.readme() {
+            if let Some(r) = self.readme() {
                 let s = Renderer::new(None).visible_text(&r.markup);
                 add_words(&s);
             }
@@ -267,8 +267,8 @@ impl RichCrateVersion {
         })
     }
 
-    pub fn readme(&self) -> Result<Option<&Readme>, ()> {
-        self.readme.as_ref().map(|r| r.as_ref()).map_err(|_|())
+    pub fn readme(&self) -> Option<&Readme> {
+        self.readme.as_ref()
     }
 
     /// Contents of the `src/lib.rs` from the crate, if available

@@ -122,7 +122,7 @@ fn index_search(indexer: &mut Indexer, renderer: &Renderer, k: &RichCrateVersion
     let keywords: Vec<_> = k.keywords(Include::Cleaned).collect();
 
     let mut lib_tmp = None;
-    let readme = k.readme().ok().and_then(|r| r).map(|readme| &readme.markup).or_else(|| {
+    let readme = k.readme().map(|readme| &readme.markup).or_else(|| {
         lib_tmp = k.lib_file_markdown();
         lib_tmp.as_ref()
     }).map(|markup| {
@@ -137,7 +137,7 @@ fn index_search(indexer: &mut Indexer, renderer: &Renderer, k: &RichCrateVersion
 
 
 fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer, contributors_count: u32) -> (usize, f64) {
-    let readme = k.readme().ok().and_then(|r| r).map(|readme| {
+    let readme = k.readme().map(|readme| {
         renderer.page_node(&readme.markup, None, false, None)
     });
     let langs = k.language_stats();

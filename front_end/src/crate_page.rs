@@ -209,7 +209,7 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn has_no_readme_or_lib(&self) -> bool {
-        self.ver.readme().as_ref().ok().and_then(|r| r.as_ref()).is_none() && self.ver.lib_file_markdown().is_none()
+        self.ver.readme().is_none() && self.ver.lib_file_markdown().is_none()
     }
 
     pub fn render_readme(&self, readme: &Readme) -> templates::Html<String> {

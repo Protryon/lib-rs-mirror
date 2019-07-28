@@ -26,7 +26,7 @@ pub struct CrateFile {
     pub manifest: Manifest,
     pub lib_file: Option<String>,
     pub files: Vec<PathBuf>,
-    pub readme: Result<Option<Readme>>,
+    pub readme: Option<Readme>,
     pub language_stats: udedokei::Stats,
     pub decompressed_size: usize,
     pub is_nightly: bool,

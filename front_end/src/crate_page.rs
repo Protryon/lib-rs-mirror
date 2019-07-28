@@ -662,7 +662,7 @@ impl<'a> CratePage<'a> {
                     },
                 };
 
-                let commonality = self.kitchen_sink.index.version_commonality(&name, &semver).expect("vercomm");
+                let commonality = self.kitchen_sink.index.version_commonality(&name, &semver).unwrap_or(0.);
                 let is_heavy_build_dep = match &*name {
                     "bindgen" | "clang-sys" | "cmake" | "cc" if depinf.default => true, // you deserve full weight of it
                     _ => false,

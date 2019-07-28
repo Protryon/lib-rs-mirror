@@ -208,6 +208,10 @@ impl<'a> CratePage<'a> {
         self.kitchen_sink.is_readme_short(self.ver.readme())
     }
 
+    pub fn has_no_readme_or_lib(&self) -> bool {
+        self.ver.readme().as_ref().ok().and_then(|r| r.as_ref()).is_none() && self.ver.lib_file_markdown().is_none()
+    }
+
     pub fn render_readme(&self, readme: &Readme) -> templates::Html<String> {
         let urls = match (readme.base_url.as_ref(), readme.base_image_url.as_ref()) {
             (Some(l), Some(i)) => Some((l.as_str(), i.as_str())),

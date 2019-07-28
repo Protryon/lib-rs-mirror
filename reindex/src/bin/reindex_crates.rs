@@ -274,6 +274,19 @@ fn is_deprecated(k: &RichCrateVersion) -> bool {
     if let Some(desc) = k.description() {
         let desc = desc.trim_matches(|c: char| !c.is_ascii_alphabetic()).to_ascii_lowercase();
         return desc.starts_with("deprecated") || desc.starts_with("unsafe and deprecated") ||
+            desc.starts_with("crate is abandoned") ||
+            desc.contains("this crate is abandoned") ||
+            desc.contains("this crate has been abandoned") ||
+            desc.contains("do not use") ||
+            desc == "reserved" ||
+            desc.starts_with("reserved for ") ||
+            desc.starts_with("reserved name") ||
+            desc.starts_with("discontinued") ||
+            desc.starts_with("renamed to ") ||
+            desc.starts_with("crate renamed to ") ||
+            desc.starts_with("temporary fork") ||
+            desc.contains("no longer maintained") ||
+            desc.contains("this tool is abandoned") ||
             desc.ends_with("deprecated") || desc.contains("deprecated in favor") || desc.contains("project is deprecated");
     }
     false

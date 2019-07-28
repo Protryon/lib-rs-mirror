@@ -398,7 +398,8 @@ lazy_static! {
         (Cond::Any(&["aws", "s3", "cpython", "interpreter", "pdf", "derive"]), &[("visualization", 0.8, 0.)]),
 
         (Cond::Any(&["interpreter", "jit", "zx", "emulator"]),
-            &[("emulators", 1.25, 0.1), ("games", 0.7, 0.), ("no-std", 0.9, 0.), ("text-processing", 0.5, 0.), ("parser-implementations", 0.9, 0.), ("multimedia::images", 0.5, 0.), ("no-std", 0.8, 0.), ("command-line-interface", 0.5, 0.), ("multimedia::video", 0.5, 0.), ("command-line-utilities", 0.75, 0.)]),
+            &[("emulators", 1.25, 0.1), ("games", 0.7, 0.), ("no-std", 0.9, 0.), ("email", 0.8, 0.), ("text-processing", 0.5, 0.), ("parser-implementations", 0.9, 0.),
+            ("multimedia::images", 0.5, 0.), ("no-std", 0.8, 0.), ("command-line-interface", 0.5, 0.), ("multimedia::video", 0.5, 0.), ("command-line-utilities", 0.75, 0.)]),
         (Cond::Any(&["qemu", "vm", "codegen"]), &[("emulators", 1.4, 0.1), ("parser-implementations", 0.9, 0.), ("parsing", 0.5, 0.), ("development-tools", 1.1, 0.), ("multimedia::video", 0.5, 0.), ("multimedia::encoding", 0.8, 0.), ("wasm", 0.8, 0.)]),
         (Cond::All(&["virtual", "machine"]), &[("emulators", 1.4, 0.1)]),
         (Cond::Any(&["security", "disassemlber"]), &[("emulators", 0.4, 0.), ("multimedia::encoding", 0.8, 0.), ("os::macos-apis", 0.5, 0.)]),

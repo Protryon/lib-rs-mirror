@@ -56,7 +56,7 @@
             <ol>
             @for (i, c) in p.good_results.iter().chain(p.bad_results).enumerate() {
                 <li>
-                    <a href="@url.krate_by_name(&c.crate_name)"><div class=h>
+                    <a href="@url.crate_by_name(&c.crate_name)"><div class=h>
                         <h4>@c.crate_name</h4>
                         <p class=desc>@p.render_markdown_str(&c.description)</p>
                     </div>

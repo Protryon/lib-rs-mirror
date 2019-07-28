@@ -8,11 +8,15 @@ use urlencoding::encode;
 
 /// One thing responsible for link URL scheme on the site.
 /// Should be used for every internal `<a href>`.
-pub struct Urler {}
+pub struct Urler {
+    own_crate_name: Option<String>,
+}
 
 impl Urler {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(own_crate_name: Option<String>) -> Self {
+        Self {
+            own_crate_name,
+        }
     }
 
     /// Link to a dependency of a crate
@@ -29,17 +33,29 @@ impl Urler {
         format!("https://crates.io/crates/{}/reverse_dependencies", encode(krate.short_name()))
     }
 
-    /// Link to crate individual page
-    pub fn krate(&self, krate: &RichCrateVersion) -> String {
-        self.krate_by_name(krate.short_name())
+    pub fn crates_io_crate(&self, krate: &RichCrateVersion) -> Option<String> {
+        Some(self.crates_io_crate_by_name(krate.short_name()))
     }
 
-    pub fn krate_by_origin(&self, o: &Origin) -> String {
+    fn crates_io_crate_by_name(&self, crate_name: &str) -> String {
+        format!("https://crates.io/crates/{}", encode(crate_name))
+    }
+
+    /// Link to crate individual page
+    pub fn krate(&self, krate: &RichCrateVersion) -> String {
+        self.crate_by_name(krate.short_name())
+    }
+
+    pub fn crate_by_origin(&self, o: &Origin) -> String {
         format!("/crates/{}", encode(o.short_crate_name()))
     }
 
-    pub fn krate_by_name(&self, crate_name: &str) -> String {
-        format!("/crates/{}", encode(crate_name))
+    pub fn crate_by_name(&self, crate_name: &str) -> String {
+        if self.own_crate_name.as_ref().map_or(false, |n| n == crate_name) {
+            self.crates_io_crate_by_name(crate_name)
+        } else {
+            format!("/crates/{}", encode(crate_name))
+        }
     }
 
     pub fn keyword(&self, name: &str) -> String {

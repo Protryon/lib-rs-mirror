@@ -61,7 +61,7 @@ impl Page {
 
 /// See `cat_page.rs.html`
 pub fn render_category(out: &mut dyn Write, cat: &Category, crates: &KitchenSink, markup: &Renderer) -> Result<(), failure::Error> {
-    let urler = Urler::new();
+    let urler = Urler::new(None);
     let page = cat_page::CatPage::new(cat, crates, markup).context("can't prepare rendering of category page")?;
     templates::cat_page(out, &page, &urler)?;
     Ok(())
@@ -69,14 +69,14 @@ pub fn render_category(out: &mut dyn Write, cat: &Category, crates: &KitchenSink
 
 /// See `homepage.rs.html`
 pub fn render_homepage(out: &mut dyn Write, crates: &KitchenSink) -> Result<(), failure::Error> {
-    let urler = Urler::new();
+    let urler = Urler::new(None);
     templates::homepage(out, &home_page::HomePage::new(crates)?, &urler)?;
     Ok(())
 }
 
 /// See `atom.rs.html`
 pub fn render_feed(out: &mut dyn Write, crates: &KitchenSink) -> Result<(), failure::Error> {
-    let urler = Urler::new();
+    let urler = Urler::new(None);
     templates::atom(out, &home_page::HomePage::new(crates)?, &urler)?;
     Ok(())
 }
@@ -115,7 +115,7 @@ pub fn render_crate_page(out: &mut dyn Write, all: &RichCrate, ver: &RichCrateVe
         Err(KitchenSinkErr::Stopped)?;
     }
 
-    let urler = Urler::new();
+    let urler = Urler::new(Some(ver.short_name().to_string()));
     let c = CratePage::new(all, ver, kitchen_sink, markup).context("New crate page")?;
     templates::crate_page(out, &urler, &c).context("crate page io")?;
     Ok(c.page_title())

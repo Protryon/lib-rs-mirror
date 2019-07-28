@@ -106,14 +106,14 @@ impl SearchPage<'_> {
 }
 
 pub fn render_serp_page(out: &mut dyn Write, query: &str, results: &[search_index::CrateFound], markup: &Renderer) -> Result<(), failure::Error> {
-    let urler = Urler::new();
+    let urler = Urler::new(None);
     let page = SearchPage::new(query, results, markup);
     templates::serp(out, &page, &urler)?;
     Ok(())
 }
 
 pub fn render_keyword_page(out: &mut dyn Write, keyword: &str, results: &[search_index::CrateFound], markup: &Renderer) -> Result<(), failure::Error> {
-    let urler = Urler::new();
+    let urler = Urler::new(None);
     let page = SearchPage::new_keyword(keyword, results, markup);
     templates::serp(out, &page, &urler)?;
     Ok(())

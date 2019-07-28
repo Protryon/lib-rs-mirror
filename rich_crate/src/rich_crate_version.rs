@@ -226,10 +226,6 @@ impl RichCrateVersion {
         &self.origin
     }
 
-    pub fn crates_io_url(&self) -> Option<String> {
-        Some(format!("https://crates.io/crates/{}", self.short_name()))
-    }
-
     pub fn docs_rs_url(&self) -> Option<String> {
         Some(format!("https://docs.rs/{}/{}/{}", self.short_name(), self.version(), self.short_name()))
     }

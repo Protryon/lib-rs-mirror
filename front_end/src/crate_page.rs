@@ -115,7 +115,7 @@ impl<'a> CratePage<'a> {
             description: self.ver.description().map(|d| format!("{} | Rust/Cargo package", d)),
             item_name: Some(self.ver.short_name().to_string()),
             item_description: self.ver.description().map(|d| d.to_string()),
-            alternate: self.ver.crates_io_url(),
+            alternate: url.crates_io_crate(&self.ver),
             alternate_type: None,
             canonical: Some(format!("https://lib.rs{}", url.krate(&self.ver))),
             noindex: self.ver.is_yanked(),

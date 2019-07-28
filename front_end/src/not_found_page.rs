@@ -76,7 +76,7 @@ impl NotFoundPage<'_> {
 }
 
 pub fn render_404_page(out: &mut dyn Write, query: &str, results: &[search_index::CrateFound], markup: &Renderer) -> Result<(), failure::Error> {
-    let urler = Urler::new();
+    let urler = Urler::new(None);
     let page = NotFoundPage::new(query, results, markup);
     templates::not_found(out, &page, &urler)?;
     Ok(())

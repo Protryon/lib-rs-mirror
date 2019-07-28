@@ -333,7 +333,7 @@ impl CrateDb {
         })
     }
 
-    pub fn crates_in_repo(&self, repo: &Repo) -> FResult<Vec<String>> {
+    pub fn crates_in_repo(&self, repo: &Repo) -> FResult<Vec<Origin>> {
         self.with_connection(|conn| {
             let mut q = conn.prepare_cached("
                 SELECT crate_name
@@ -342,7 +342,8 @@ impl CrateDb {
                 ORDER BY path, crate_name LIMIT 10
             ")?;
             let q = q.query_map(&[&repo.canonical_git_url()], |r| {
-                let n: Result<String> = r.get(0); n
+                let s = r.get_raw(0).as_str().unwrap();
+                Ok(Origin::from_crates_io_name(s))
             })?.filter_map(|r| r.ok());
             Ok(q.collect())
         })

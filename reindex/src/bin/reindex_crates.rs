@@ -240,7 +240,10 @@ fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersi
     let mut score = (base_score + temp_score) * 0.5 / removals_divisor;
 
     // there's usually a non-macro/non-sys sibling
-    if k.is_proc_macro() || k.is_sys() || is_sub_component(crates, k) {
+    if k.is_proc_macro() || k.is_sys() {
+        score *= 0.9;
+    }
+    if is_sub_component(crates, k) {
         score *= 0.9;
     }
 

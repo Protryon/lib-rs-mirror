@@ -350,7 +350,7 @@ impl CrateDb {
     }
 
     /// Returns crate name (not origin)
-    pub fn parent_crate(&self, repo: &Repo, child_name: &str) -> FResult<Option<String>> {
+    pub fn parent_crate(&self, repo: &Repo, child_name: &str) -> FResult<Option<Origin>> {
         self.with_connection(|conn| {
             let mut paths = conn.prepare_cached("SELECT path, crate_name FROM repo_crates WHERE repo = ?1 LIMIT 100")?;
             let mut paths: HashMap<String, String> = paths
@@ -370,7 +370,7 @@ impl CrateDb {
             loop {
                 child_path = child_path.rsplitn(2, '/').nth(1).unwrap_or("");
                 if let Some(child) = paths.get(child_path) {
-                    return Ok(Some(child.to_owned()));
+                    return Ok(Some(Origin::from_crates_io_name(child)));
                 }
                 if child_path.is_empty() {
                     // in these paths "" is the root
@@ -392,9 +392,9 @@ impl CrateDb {
             }
 
             Ok(if let Some(child) = repo.repo_name().and_then(|n| paths.get(n).or_else(|| paths.get(unprefix(n)))) {
-                Some(child.to_owned())
+                Some(Origin::from_crates_io_name(child))
             } else if let Some(child) = repo.owner_name().and_then(|n| paths.get(n).or_else(|| paths.get(unprefix(n)))) {
-                Some(child.to_owned())
+                Some(Origin::from_crates_io_name(child))
             } else {
                 None
             })

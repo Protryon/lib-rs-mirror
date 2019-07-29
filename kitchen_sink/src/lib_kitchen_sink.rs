@@ -1097,9 +1097,9 @@ impl KitchenSink {
     /// The relationship is based on directory layout of monorepos.
     pub fn parent_crate(&self, child: &RichCrateVersion) -> Option<RichCrateVersion> {
         let repo = child.repository()?;
-        let name = self.crate_db.parent_crate(repo, child.short_name()).ok().and_then(|v| v)?;
-        self.rich_crate_version(&Origin::from_crates_io_name(&name), CrateData::Minimal)
-            .map_err(|e| eprintln!("parent crate: {} {}", e, name)).ok()
+        let origin = self.crate_db.parent_crate(repo, child.short_name()).ok().and_then(|v| v)?;
+        self.rich_crate_version(&origin, CrateData::Minimal)
+            .map_err(|e| eprintln!("parent crate: {} {:?}", e, origin)).ok()
     }
 
     pub fn cachebust_string_for_repo(&self, crate_repo: &Repo) -> CResult<String> {

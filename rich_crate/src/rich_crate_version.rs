@@ -502,7 +502,7 @@ impl RichCrateVersion {
                     *cat = "game-engines".into();
                 }
             }
-            if cat == "science" {
+            if cat == "science" || cat == "algorithms" {
                 if self.package.keywords.iter().any(|k| k == "neural-network" || k == "machine-learning" || k == "deep-learning") {
                     *cat = "science::ml".into();
                 } else if self.package.keywords.iter().any(|k| {

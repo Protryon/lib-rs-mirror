@@ -240,7 +240,7 @@ fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersi
     let mut score = (base_score + temp_score) * 0.5 / removals_divisor;
 
     // there's usually a non-macro/non-sys sibling
-    if k.is_proc_macro() || k.is_sys() {
+    if k.is_proc_macro() || k.is_sys() || is_sub_component(crates, k) {
         score *= 0.9;
     }
 
@@ -258,6 +258,28 @@ fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersi
     }
 
     (downloads_per_month as usize, score)
+}
+
+/// Crates are spilt into foo and foo-core. The core is usually uninteresting/duplicate.
+fn is_sub_component(crates: &KitchenSink, k: &RichCrateVersion) -> bool {
+    let name = k.short_name();
+    if let Some(pos) = name.rfind(|c: char| c == '-' || c == '_') {
+        match name.get(pos+1..) {
+            Some("core") | Some("shared") | Some("utils") => {
+                if let Some(parent_name) = name.get(..pos-1) {
+                    if crates.crate_exists(&Origin::from_crates_io_name(parent_name)) {
+                        // TODO: check if owners overlap?
+                        return true;
+                    }
+                }
+                if crates.parent_crate(k).is_some() {
+                    return true;
+                }
+            },
+            _ => {},
+        }
+    }
+    false
 }
 
 fn is_autopublished(k: &RichCrateVersion) -> bool {
@@ -278,6 +300,8 @@ fn is_deprecated(k: &RichCrateVersion) -> bool {
             desc.contains("this crate is abandoned") ||
             desc.contains("this crate has been abandoned") ||
             desc.contains("do not use") ||
+            desc.contains("this crate is a placeholder") ||
+            desc.contains("this is a dummy package") ||
             desc == "reserved" ||
             desc.starts_with("reserved for ") ||
             desc.starts_with("reserved name") ||

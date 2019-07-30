@@ -180,6 +180,11 @@ fn handle_category(req: &HttpRequest<AServerState>, cat: &Category) -> Result<Ht
 }
 
 fn handle_home(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
+    let query = req.query_string().trim_start_matches('?');
+    if !query.is_empty() && query.find('=').is_none() {
+        return future::ok(HttpResponse::TemporaryRedirect().header("Location", format!("/search?q={}", urlencoding::encode(&query))).finish()).responder();
+    }
+
     let state = Arc::clone(req.state());
     let cache_file = state.public_crates_dir.join("../index.html");
     with_file_cache(cache_file, 3600, move || {

@@ -11,12 +11,27 @@
     <div class="inner-col">
         <div class="breadcrumbs">
             <h1><a href="/">Lib.rs</a></h1>
-            ›
+            <span class="categories has-keywords"> ›
             @if let SearchKind::Keyword(_) = p.query {
                 Keywords
             }
             @if let SearchKind::Query(_) = p.query {
                 Search (beta)
+            }
+            </span>
+            @if let Some(k) = Some(p.top_keywords()) {
+                @if k.len() > 1 {
+                <span class="keywords">
+                  <span>
+                    @for key in k.iter().take(3) {
+                      <a href="@url.keyword(key)" class=keyword><span>#</span>@key</a>
+                    }
+                  </span>
+                  @for key in k.iter().skip(3).take(3) {
+                    <a href="@url.keyword(key)" class=keyword><span>#</span>@key</a>
+                  }
+                </span>
+                }
             }
         </div>
         @if let SearchKind::Query(query) = p.query {
@@ -65,7 +80,7 @@
                         @if c.monthly_downloads >= 100 {
                             <span class=downloads title="c.monthly_downloads recent downloads">@if let Some((num,unit)) = Some(p.downloads(c.monthly_downloads)) {@num<b>@unit</b>}</span>
                         }
-                        @for k in c.keywords.split(", ") {
+                        @for k in c.keywords.split(", ").filter(|k| !k.is_empty()) {
                             <span class=k><span>#</span>@k</span>
                         }
                     </div></a>

@@ -65,6 +65,9 @@
                         @if c.monthly_downloads >= 100 {
                             <span class=downloads title="c.monthly_downloads recent downloads">@if let Some((num,unit)) = Some(p.downloads(c.monthly_downloads)) {@num<b>@unit</b>}</span>
                         }
+                        @for k in c.keywords.split(", ") {
+                            <span class=k><span>#</span>@k</span>
+                        }
                     </div></a>
                 </li>
                 @if i == p.good_results.len() {

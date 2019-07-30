@@ -7,7 +7,7 @@ const CRATE_SCORE_MAX: f64 = 1000000.0;
 pub struct CrateSearchIndex {
     /// as-is
     crate_name_field: Field,
-    /// space-separated
+    /// ", "-separated
     keywords_field: Field,
     description_field: Field,
     readme_field: Field,

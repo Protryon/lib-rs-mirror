@@ -708,7 +708,7 @@ lazy_static! {
         (Cond::Any(&["numeral", "numerals", "human-readable", "formatter", "notation", "pretty", "metric"]),
             &[("value-formatting", 1.2, 0.2), ("simulation", 0.5, 0.), ("wasm", 0.7, 0.), ("no-std", 0.8, 0.)]),
         (Cond::Any(&["pretty-print", "pretty-printing", "punycode", "money", "units", "weights", "uom"]),
-            &[("value-formatting", 1.2, 0.2), ("simulation", 0.5, 0.), ("wasm", 0.7, 0.), ("no-std", 0.8, 0.)]),
+            &[("value-formatting", 1.2, 0.2), ("simulation", 0.5, 0.), ("data-structures", 0.8, 0.), ("wasm", 0.7, 0.), ("no-std", 0.8, 0.)]),
         (Cond::All(&["human", "readable"]), &[("value-formatting", 1.2, 0.2), ("data-structures", 0.8, 0.)]),
         (Cond::All(&["human", "friendly"]), &[("value-formatting", 1.1, 0.)]),
         (Cond::Any(&["fpu", "simd", "comparison"]), &[("value-formatting", 0.5, 0.)]),
@@ -847,7 +847,7 @@ lazy_static! {
             &[("memory-management", 1.3, 0.2), ("caching", 0.8, 0.), ("algorithms", 0.8, 0.), ("game-engines", 0.7, 0.), ("development-tools", 0.8, 0.)]),
         (Cond::Any(&["allocator", "slab", "memory-allocator"]),
             &[("memory-management", 1.3, 0.2), ("caching", 0.8, 0.), ("database", 0.8, 0.), ("algorithms", 0.8, 0.), ("game-engines", 0.7, 0.), ("development-tools", 0.8, 0.)]),
-        (Cond::Any(&["memory", "garbage", "rc", "oom", "malloc"]), &[("memory-management", 1.25, 0.1), ("os", 1.1, 0.), ("development-tools::cargo-plugins", 0.8, 0.),
+        (Cond::Any(&["memory", "garbage", "rc", "refcell", "oom", "malloc"]), &[("memory-management", 1.25, 0.1), ("data-structures", 0.9, 0.), ("os", 1.1, 0.), ("development-tools::cargo-plugins", 0.8, 0.),
             ("development-tools::build-utils", 0.8, 0.), ("internationalization", 0.7, 0.)]),
         (Cond::All(&["memory", "allocation"]), &[("memory-management", 1.25, 0.1)]),
 

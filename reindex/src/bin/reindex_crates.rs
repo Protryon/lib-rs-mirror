@@ -268,7 +268,7 @@ fn is_sub_component(crates: &KitchenSink, k: &RichCrateVersion) -> bool {
     let name = k.short_name();
     if let Some(pos) = name.rfind(|c: char| c == '-' || c == '_') {
         match name.get(pos+1..) {
-            Some("core") | Some("shared") | Some("utils") |
+            Some("core") | Some("shared") | Some("utils") | Some("common") |
             Some("fork") | Some("unofficial") => {
                 if let Some(parent_name) = name.get(..pos-1) {
                     if crates.crate_exists(&Origin::from_crates_io_name(parent_name)) {

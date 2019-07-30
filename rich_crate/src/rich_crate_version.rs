@@ -475,6 +475,9 @@ impl RichCrateVersion {
 
     fn override_bad_categories(&mut self) {
         for cat in &mut self.package.categories {
+            if cat.as_bytes().iter().any(|c| !c.is_ascii_lowercase()) {
+                *cat = cat.to_lowercase();
+            }
             if cat == "localization" {
                 // nobody knows the difference
                 *cat = "internationalization".to_string();

@@ -62,8 +62,8 @@ impl CrateSearchIndex {
 
         let mut schema_builder = SchemaBuilder::default();
 
-        let crate_name_field = schema_builder.add_text_field("crate_name", STRING | STORED); // STRING means stored literally
-        let keywords_field = schema_builder.add_text_field("keywords", TEXT);
+        let crate_name_field = schema_builder.add_text_field("crate_name", TEXT | STORED);
+        let keywords_field = schema_builder.add_text_field("keywords", TEXT | STORED);
         let description_field = schema_builder.add_text_field("description", TEXT | STORED);
         let text_field_indexing = TextFieldIndexing::default().set_tokenizer("en_stem").set_index_option(IndexRecordOption::WithFreqs);
         let text_options = TextOptions::default().set_indexing_options(text_field_indexing);

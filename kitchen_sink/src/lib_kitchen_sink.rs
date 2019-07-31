@@ -1127,12 +1127,15 @@ impl KitchenSink {
                     // so pick one of them and track just that one version
                     let cachebust = self.cachebust_string_for_repo(crate_repo).context("contrib")?;
                     let contributors = self.gh.contributors(repo, &cachebust).context("contributors")?.unwrap_or_default();
-                    if contributors.len() == 100 {
+                    if contributors.len() >= 100 {
                         hit_max_contributor_count = true;
                     }
                     let mut by_login = HashMap::new();
                     for contr in contributors {
                         if let Some(author) = contr.author {
+                            if author.user_type == UserType::Bot {
+                                continue;
+                            }
                             let count = contr.weeks.iter()
                                 .map(|w| {
                                     w.commits as f64 +
@@ -1317,7 +1320,7 @@ impl KitchenSink {
         // That's a guess
         if authors.len() == 1 && owners.len() == 1 && authors[0].github.is_none() {
             let author_is_team = authors[0].likely_a_team();
-            let gh_is_team = owners[0].github.as_ref().map_or(false, |g| g.user_type != UserType::User);
+            let gh_is_team = owners[0].github.as_ref().map_or(false, |g| g.user_type == UserType::Org);
             if author_is_team == gh_is_team {
                 let co = owners.remove(0);
                 authors[0].github = co.github;

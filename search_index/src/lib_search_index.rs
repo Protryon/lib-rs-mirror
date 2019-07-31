@@ -1,3 +1,4 @@
+use kitchen_sink::Origin;
 use std::cmp::Ordering;
 use std::{fs, path::Path};
 use tantivy::{self, collector::TopDocs, query::QueryParser, schema::*, Index, IndexWriter};
@@ -5,6 +6,8 @@ use tantivy::{self, collector::TopDocs, query::QueryParser, schema::*, Index, In
 const CRATE_SCORE_MAX: f64 = 1000000.0;
 
 pub struct CrateSearchIndex {
+    /// Origin.to_str
+    origin_pkey: Field,
     /// as-is
     crate_name_field: Field,
     /// ", "-separated
@@ -23,6 +26,7 @@ pub struct CrateSearchIndex {
 
 #[derive(Debug, Clone)]
 pub struct CrateFound {
+    pub origin: Origin,
     pub crate_name: String,
     pub description: String,
     pub keywords: String,
@@ -47,6 +51,7 @@ impl CrateSearchIndex {
 
         Ok(Self {
             tantivy_index,
+            origin_pkey: schema.get_field("origin").expect("schema"),
             crate_name_field: schema.get_field("crate_name").expect("schema"),
             keywords_field: schema.get_field("keywords").expect("schema"),
             description_field: schema.get_field("description").expect("schema"),
@@ -62,6 +67,7 @@ impl CrateSearchIndex {
 
         let mut schema_builder = SchemaBuilder::default();
 
+        let origin_pkey = schema_builder.add_text_field("origin", STRING | STORED);
         let crate_name_field = schema_builder.add_text_field("crate_name", TEXT | STORED);
         let keywords_field = schema_builder.add_text_field("keywords", TEXT | STORED);
         let description_field = schema_builder.add_text_field("description", TEXT | STORED);
@@ -75,7 +81,7 @@ impl CrateSearchIndex {
         let schema = schema_builder.build();
         let tantivy_index = Index::create_in_dir(index_dir, schema)?;
 
-        Ok(Self { tantivy_index, crate_name_field, keywords_field, description_field, readme_field, monthly_downloads, crate_version, crate_score })
+        Ok(Self { tantivy_index, origin_pkey, crate_name_field, keywords_field, description_field, readme_field, monthly_downloads, crate_version, crate_score })
     }
 
     /// if sort_by_query_relevance is false, sorts by internal crate score (relevance is still used to select the crates)
@@ -104,6 +110,7 @@ impl CrateSearchIndex {
             let mut crate_base_score = take_int(doc.get("crate_score")) as f64;
             let crate_name = take_string(doc.remove("crate_name"));
             Ok(CrateFound {
+                origin: Origin::from_str(take_string(doc.remove("origin"))),
                 score: if sort_by_query_relevance {
                     // first few crates can be ordered by tantivy's relevance
                     let position_bonus = if i < 4 {CRATE_SCORE_MAX / (i as f64 + 8.)} else {0.};
@@ -161,13 +168,15 @@ impl Indexer {
     }
 
     /// score is float 0..=1 range
-    pub fn add(&mut self, crate_name: &str, version: &str, description: &str, keywords: &[&str], readme: Option<&str>, monthly_downloads: u64, score: f64) {
+    pub fn add(&mut self, origin: &Origin, crate_name: &str, version: &str, description: &str, keywords: &[&str], readme: Option<&str>, monthly_downloads: u64, score: f64) {
+        let origin = origin.to_str();
         // delete old doc if any
-        let crate_name_term = Term::from_field_text(self.index.crate_name_field, crate_name);
-        self.writer.delete_term(crate_name_term);
+        let pkey = Term::from_field_text(self.index.origin_pkey, &origin);
+        self.writer.delete_term(pkey);
 
         // index new one
         let mut doc = Document::default();
+        doc.add_text(self.index.origin_pkey, &origin);
         doc.add_text(self.index.crate_name_field, crate_name);
         doc.add_text(self.index.keywords_field, &keywords.join(", "));
         doc.add_text(self.index.description_field, description);

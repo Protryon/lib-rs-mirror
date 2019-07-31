@@ -130,7 +130,7 @@ fn index_search(indexer: &mut Indexer, renderer: &Renderer, k: &RichCrateVersion
     });
     let version = k.version();
 
-    indexer.add(k.short_name(), version, k.description().unwrap_or(""), &keywords, readme.as_ref().map(|s| s.as_str()), downloads_per_month as u64, score);
+    indexer.add(k.origin(), k.short_name(), version, k.description().unwrap_or(""), &keywords, readme.as_ref().map(|s| s.as_str()), downloads_per_month as u64, score);
     Ok(())
 }
 

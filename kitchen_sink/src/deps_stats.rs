@@ -125,7 +125,7 @@ impl Index {
         }
 
 
-        let inter = self.inter.read().expect("read lock poison");
+        let inter = self.inter.read();
         let mut converted = FxHashMap::with_capacity_and_hasher(collected.len(), Default::default());
         converted.extend(collected.into_iter().map(|(k, v)| {
             (inter.resolve(k).expect("resolve").into(), v)

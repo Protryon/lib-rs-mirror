@@ -7,6 +7,7 @@ use crates_index::Version;
 use crates_index;
 use fxhash::{FxHashMap, FxHashSet};
 use lazyonce::LazyOnce;
+use parking_lot::RwLock;
 use parking_lot::Mutex;
 use rich_crate::Origin;
 use semver::Version as SemVer;
@@ -14,7 +15,6 @@ use semver::VersionReq;
 use std::iter;
 use std::path::Path;
 use std::sync::Arc;
-use std::sync::RwLock;
 use std::time::Duration;
 use string_interner::StringInterner;
 use string_interner::Sym;
@@ -145,7 +145,7 @@ impl Index {
 
     pub(crate) fn deps_of_ver(&self, ver: &Version, wants: Features) -> Result<ArcDepSet, KitchenSinkErr> {
         let key = (format!("{}-{}", ver.name(), ver.version()).into(), wants.clone());
-        if let Some(cached) = self.cache.read().unwrap().get(&key) {
+        if let Some(cached) = self.cache.read().get(&key) {
             return Ok(cached.clone());
         }
 
@@ -218,7 +218,7 @@ impl Index {
 
 
             let key = {
-                let mut inter = self.inter.write().unwrap();
+                let mut inter = self.inter.write();
                 (inter.get_or_intern(package), inter.get_or_intern(matched.version()))
             };
 
@@ -233,7 +233,7 @@ impl Index {
         // break infinite recursion. Must be inserted first, since depth-first search
         // may end up requesting it.
         let result = Arc::new(Mutex::new(FxHashMap::default()));
-        self.cache.write().unwrap().insert(key, result.clone());
+        self.cache.write().insert(key, result.clone());
 
         let set: Result<_,_> = set.into_iter().map(|(k, (d, matched, semver, all_features))| {
             let all_features = all_features.into_iter().map(Into::into).collect::<Vec<_>>().into_boxed_slice();
@@ -263,8 +263,8 @@ impl Index {
     }
 
     pub fn clear_cache(&self) {
-        self.cache.write().unwrap().clear();
-        *self.inter.write().unwrap() = StringInterner::new();
+        self.cache.write().clear();
+        *self.inter.write() = StringInterner::new();
     }
 
     /// For crate being outdated. Returns (is_latest, popularity)

@@ -42,7 +42,7 @@ pub struct Indexer {
 
 impl CrateSearchIndex {
     pub fn new(index_dir: impl AsRef<Path>) -> tantivy::Result<Self> {
-        let index_dir = index_dir.as_ref().join("tantivy");
+        let index_dir = index_dir.as_ref().join("tantivy2");
         if !index_dir.exists() {
             return Self::reset_db_to_empty(&index_dir);
         }

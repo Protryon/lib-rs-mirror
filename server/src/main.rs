@@ -104,7 +104,7 @@ fn run_server() -> Result<(), failure::Error> {
     .shutdown_timeout(1)
     .start();
 
-    println!("Started HTTP server on http://127.0.0.1:32531");
+    println!("Started HTTP server {} on http://127.0.0.1:32531", env!("CARGO_PKG_VERSION"));
     let _ = sys.run();
     Ok(())
 }

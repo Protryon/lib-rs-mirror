@@ -95,7 +95,7 @@ impl CrateSearchIndex {
         let query = query_parser.parse_query(query_text)
             .or_else(|_| {
                 let mangled_query: String = query_text.chars().map(|ch| {
-                    if ch.is_alphanumeric() {ch} else {' '}
+                    if ch.is_alphanumeric() {ch.to_ascii_lowercase()} else {' '}
                 }).collect();
                 query_parser.parse_query(mangled_query.trim())
             })?;

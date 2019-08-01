@@ -67,6 +67,10 @@ impl Index {
         })
     }
 
+    pub fn update(&self) {
+        let _ = self.crates_io_index.update().map_err(|e| eprintln!("{}", e));
+    }
+
     /// Crates available in the crates.io index
     ///
     /// It returns only a thin and mostly useless data from the index itself,

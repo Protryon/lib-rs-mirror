@@ -804,6 +804,11 @@ impl KitchenSink {
         let _ = self.index.deps_stats();
     }
 
+    pub fn update(&self) {
+        self.index.update();
+        let _ = self.index.deps_stats();
+    }
+
     pub fn dependents_stats_of(&self, krate: &RichCrateVersion) -> Option<RevDependencies> {
         self.dependents_stats_of_crates_io_crate(krate.short_name())
     }

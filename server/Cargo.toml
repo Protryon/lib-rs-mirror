@@ -1,6 +1,6 @@
 [package]
 name = "crates-server"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Kornel <kornel@geekhood.net>"]
 edition = "2018"
 description = "Crates.rs web server"
@@ -27,3 +27,5 @@ tokio = "0.1.11"
 tokio-timer = "0.2.10"
 categories = { path = "../categories" }
 rayon = "1.0.3"
+arc-swap = "0.3.11"
+signal-hook = "0.1.10"

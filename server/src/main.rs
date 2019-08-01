@@ -1,5 +1,6 @@
 use futures::future::FutureResult;
 use failure::ResultExt;
+use arc_swap::ArcSwap;
 use actix_web::http::*;
 use actix_web::*;
 use categories::Category;
@@ -17,6 +18,7 @@ use search_index::CrateSearchIndex;
 use std::env;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{Duration, SystemTime};
 use tokio::prelude::FutureExt;
 use urlencoding::encode;
@@ -29,12 +31,14 @@ use std::alloc::System;
 #[global_allocator]
 static A: System = System;
 
+static HUP_SIGNAL: AtomicU32 = AtomicU32::new(0);
+
 struct ServerState {
     render_pool: CpuPool,
     search_pool: CpuPool,
     markup: Renderer,
     index: CrateSearchIndex,
-    crates: KitchenSink,
+    crates: ArcSwap<KitchenSink>,
     public_crates_dir: PathBuf,
 }
 
@@ -50,6 +54,13 @@ fn main() {
 }
 
 fn run_server() -> Result<(), failure::Error> {
+    unsafe {
+        signal_hook::register(signal_hook::SIGHUP, || HUP_SIGNAL.store(1, Ordering::SeqCst))
+    }.expect("signal handler");
+    unsafe {
+        signal_hook::register(signal_hook::SIGUSR1, || HUP_SIGNAL.store(1, Ordering::SeqCst))
+    }.expect("signal handler");
+
     env_logger::init();
     kitchen_sink::dont_hijack_ctrlc();
     let sys = actix::System::new("crates-server");
@@ -67,21 +78,40 @@ fn run_server() -> Result<(), failure::Error> {
     let image_filter = Arc::new(ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_dir().join("images.db"))?);
     let markup = Renderer::new_filter(Some(Highlighter::new()), image_filter);
 
-    let index = CrateSearchIndex::new(data_dir)?;
+    let index = CrateSearchIndex::new(&data_dir)?;
 
     let state = Arc::new(ServerState {
         render_pool: CpuPool::new_num_cpus(),
         search_pool: CpuPool::new_num_cpus(),
         markup,
         index,
-        crates,
+        crates: ArcSwap::from_pointee(crates),
         public_crates_dir,
     });
 
+    // refresher thread
     std::thread::spawn({
         let state = state.clone();
         move || {
-            state.crates.prewarm();
+            state.crates.load().prewarm();
+            loop {
+                std::thread::sleep(std::time::Duration::from_secs(1));
+                if 1 == HUP_SIGNAL.swap(0, Ordering::SeqCst) {
+                    println!("HUP!");
+                    match KitchenSink::new(&data_dir, &github_token, 20.) {
+                        Ok(k) => {
+                            let k = Arc::new(k);
+                            k.update();
+                            state.crates.store(k);
+                            state.crates.load().prewarm();
+                        },
+                        Err(e) => {
+                            eprintln!("Refresh failed: {}", e);
+                            std::process::exit(1);
+                        }
+                    }
+                }
+            }
         }
     });
 
@@ -106,6 +136,7 @@ fn run_server() -> Result<(), failure::Error> {
 
     println!("Started HTTP server {} on http://127.0.0.1:32531", env!("CARGO_PKG_VERSION"));
     let _ = sys.run();
+    println!("bye!");
     Ok(())
 }
 
@@ -135,15 +166,16 @@ fn default_handler(req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
         return handle_category(req, cat);
     }
 
+    let crates = state.crates.load();
     let name = path.trim_matches('/');
-    if let Ok(k) = state.crates.rich_crate(&Origin::from_crates_io_name(name)) {
+    if let Ok(k) = crates.rich_crate(&Origin::from_crates_io_name(name)) {
         return Ok(HttpResponse::PermanentRedirect().header("Location", format!("/crates/{}", encode(k.name()))).body(""));
     }
     let inverted_hyphens: String = name.chars().map(|c| if c == '-' {'_'} else if c == '_' {'-'} else {c.to_ascii_lowercase()}).collect();
-    if let Ok(k) = state.crates.rich_crate(&Origin::from_crates_io_name(&inverted_hyphens)) {
+    if let Ok(k) = crates.rich_crate(&Origin::from_crates_io_name(&inverted_hyphens)) {
         return Ok(HttpResponse::TemporaryRedirect().header("Location", format!("/crates/{}", encode(k.name()))).body(""));
     }
-    if state.crates.is_it_a_keyword(&inverted_hyphens) {
+    if crates.is_it_a_keyword(&inverted_hyphens) {
         return Ok(HttpResponse::TemporaryRedirect().header("Location", format!("/keywords/{}", encode(&inverted_hyphens))).body(""));
     }
 
@@ -169,9 +201,10 @@ fn render_404_page(state: &AServerState, path: &str) -> Result<HttpResponse> {
 
 fn handle_category(req: &HttpRequest<AServerState>, cat: &Category) -> Result<HttpResponse> {
     let state = req.state();
-    state.crates.prewarm();
+    let crates = state.crates.load();
+    crates.prewarm();
     let mut page: Vec<u8> = Vec::with_capacity(150000);
-    front_end::render_category(&mut page, cat, &state.crates, &state.markup).expect("render");
+    front_end::render_category(&mut page, cat, &crates, &state.markup).expect("render");
     Ok(HttpResponse::Ok()
         .content_type("text/html;charset=UTF-8")
         .header("Cache-Control", "public, max-age=7200, stale-while-revalidate=259200, stale-if-error=72000")
@@ -193,9 +226,10 @@ fn handle_home(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> 
             .spawn_fn({
                 let state = state.clone();
                 move || {
-                    state.crates.prewarm();
+                    let crates = state.crates.load();
+                    crates.prewarm();
                     let mut page: Vec<u8> = Vec::with_capacity(50000);
-                    front_end::render_homepage(&mut page, &state.crates)?;
+                    front_end::render_homepage(&mut page, &crates)?;
                     Ok(page)
                 }
             })
@@ -211,7 +245,8 @@ fn handle_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse>
     let crate_name: String = req.match_info().query("crate").expect("arg");
     println!("crate page for {:?}", crate_name);
     let state = Arc::clone(req.state());
-    if !is_alnum(&crate_name) || !state.crates.crate_exists(&Origin::from_crates_io_name(&crate_name)) {
+    let crates = state.crates.load();
+    if !is_alnum(&crate_name) || !crates.crate_exists(&Origin::from_crates_io_name(&crate_name)) {
         return Box::new(future::result(render_404_page(&state, &crate_name)));
     }
     let cache_file = state.public_crates_dir.join(format!("{}.html", crate_name));
@@ -272,12 +307,13 @@ fn render_crate_page(state: &AServerState, crate_name: String) -> impl Future<It
     state
         .render_pool
         .spawn_fn(move || {
-            state2.crates.prewarm();
+            let crates = state2.crates.load();
+            crates.prewarm();
             let origin = Origin::from_crates_io_name(&crate_name);
-            let all = state2.crates.rich_crate(&origin)?;
-            let ver = state2.crates.rich_crate_version(&origin, CrateData::Full)?;
+            let all = crates.rich_crate(&origin)?;
+            let ver = crates.rich_crate_version(&origin, CrateData::Full)?;
             let mut page: Vec<u8> = Vec::with_capacity(50000);
-            front_end::render_crate_page(&mut page, &all, &ver, &state2.crates, &state2.markup)?;
+            front_end::render_crate_page(&mut page, &all, &ver, &crates, &state2.markup)?;
             Ok(page)
         })
 }
@@ -382,7 +418,8 @@ fn handle_sitemap(req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
 
     rayon::spawn(move || {
         let mut w = std::io::BufWriter::with_capacity(16000, w);
-        if let Err(e) = front_end::render_sitemap(&mut w, &state.crates) {
+        let crates = state.crates.load();
+        if let Err(e) = front_end::render_sitemap(&mut w, &crates) {
             if let Ok(mut w) = w.into_inner() {
                 w.fail(e.into());
             }
@@ -401,9 +438,10 @@ fn handle_feed(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> 
     state
         .render_pool
         .spawn_fn(move || {
-            state2.crates.prewarm();
+            let crates = state2.crates.load();
+            crates.prewarm();
             let mut page: Vec<u8> = Vec::with_capacity(50000);
-            front_end::render_feed(&mut page, &state2.crates)?;
+            front_end::render_feed(&mut page, &crates)?;
             Ok(page)
         })
         .timeout(Duration::from_secs(60))

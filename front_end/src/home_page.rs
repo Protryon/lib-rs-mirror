@@ -79,7 +79,7 @@ impl<'a> HomePage<'a> {
                     // make container as popular as its best child (already sorted), because homepage sorts by top-level only
                     pop: sub.get(0).map(|c| c.pop).unwrap_or(0).max(own_pop),
                     dl: sub.get(0).map(|c| c.dl).unwrap_or(0),
-                    top: Vec::with_capacity(5),
+                    top: Vec::with_capacity(8),
                     sub,
                     cat,
                 }
@@ -99,12 +99,16 @@ impl<'a> HomePage<'a> {
                 .filter(|c| seen.get(c).is_none())
                 .take(7)
                 .cloned()
-                .inspect(|c| {
-                    if let Ok(Some(d)) = self.crates.downloads_per_month_or_equivalent(c) {
-                        dl += d;
-                    }
-                })
                 .collect();
+
+            // skip topmost popular, because some categories have literally just 1 super-popular crate,
+            // which elevates the whole category
+            for c in top.iter().skip(1) {
+                if let Ok(Some(d)) = self.crates.downloads_per_month_or_equivalent(c) {
+                    dl += d;
+                }
+            }
+
             cat.top.par_extend(top.into_par_iter().with_max_len(1).filter_map(|c| self.crates.rich_crate_version(&c, CrateData::Full).ok()));
             for c in &cat.top {
                 seen.insert(c.origin().to_owned());

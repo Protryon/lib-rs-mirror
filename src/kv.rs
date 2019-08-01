@@ -14,7 +14,7 @@ use std::io::BufReader;
 use std::io::BufWriter;
 use std::marker::PhantomData;
 use std::path::PathBuf;
-use std::sync::RwLock;
+use parking_lot::RwLock;
 use tempfile::NamedTempFile;
 
 struct Inner {
@@ -67,7 +67,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
 
         let _ = Self::ungz(&compr)?; // sanity check
 
-        let mut w = self.data.write().map_err(|_| Error::KvPoison)?;
+        let mut w = self.data.write();
         w.writes += 1;
         w.data.insert(key, compr.into_boxed_slice());
         if w.writes >= w.next_autosave {
@@ -80,7 +80,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
     }
 
     pub fn delete(&self, key: &str) -> Result<(), Error> {
-        let mut d = self.data.write().map_err(|_| Error::KvPoison)?;
+        let mut d = self.data.write();
         if d.data.remove(key).is_some() {
             d.writes += 1;
         }
@@ -88,12 +88,12 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
     }
 
     // pub fn get_all<F: FnOnce(&HashMap<Box<str>, T>)>(&self, cb: F) -> Result<(), Error> {
-    //     cb(&self.data.read().map_err(|_| Error::KvPoison)?.data);
+    //     cb(&self.data.read().data);
     //     Ok(())
     // }
 
     pub fn get(&self, key: &str) -> Result<Option<T>, Error> {
-        let kw = self.data.read().map_err(|_| Error::KvPoison)?;
+        let kw = self.data.read();
         Ok(match kw.data.get(key) {
             Some(gz) => Some(Self::ungz(gz).map_err(|e| {
                 eprintln!("ungz of {} failed in {}", key, self.path.display());
@@ -113,7 +113,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
     pub fn save(&self) -> Result<(), Error> {
         let tmp_path = NamedTempFile::new_in(self.path.parent().expect("tmp"))?;
         let mut file = BufWriter::new(File::create(&tmp_path)?);
-        let d = self.data.read().map_err(|_| Error::KvPoison)?;
+        let d = self.data.read();
         rmp_serde::encode::write(&mut file, &d.data)?;
         drop(d);
         tmp_path.persist(&self.path).map_err(|e| e.error)?;

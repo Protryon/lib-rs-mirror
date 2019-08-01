@@ -1,3 +1,5 @@
+use parking_lot::RwLockReadGuard;
+use parking_lot::RwLockWriteGuard;
 use crate::error::Error;
 use crate::SimpleCache;
 use flate2::read::DeflateDecoder;
@@ -18,7 +20,7 @@ use parking_lot::RwLock;
 use tempfile::NamedTempFile;
 
 struct Inner {
-    data: FxHashMap<Box<str>, Box<[u8]>>,
+    data: Option<FxHashMap<Box<str>, Box<[u8]>>>,
     writes: usize,
     next_autosave: usize,
 }
@@ -34,13 +36,9 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
     pub fn new(path: impl Into<PathBuf>) -> Result<Self, Error> {
         let path = path.into().with_extension("rmpz");
         let data = if path.exists() {
-            let mut f = BufReader::new(File::open(&path)?);
-            rmp_serde::from_read(&mut f).map_err(|e| {
-                eprintln!("File {} is broken: {}", path.display(), e);
-                e
-            })?
+            None
         } else {
-            FxHashMap::default()
+            Some(FxHashMap::default())
         };
 
         Ok(Self {
@@ -60,6 +58,33 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
         self.set_(key.into().into_boxed_str(), value.borrow())
     }
 
+    fn lock_for_write(&self) -> Result<RwLockWriteGuard<Inner>, Error> {
+        let mut inner = self.data.write();
+        if inner.data.is_none() {
+            inner.data = Some(self.load_data()?);
+        }
+        Ok(inner)
+    }
+
+    fn lock_for_read(&self) -> Result<RwLockReadGuard<Inner>, Error> {
+        loop {
+            let inner = self.data.read();
+            if inner.data.is_some() {
+                return Ok(inner);
+            }
+            drop(inner);
+            let _= self.lock_for_write()?;
+        }
+    }
+
+    fn load_data(&self) -> Result<FxHashMap<Box<str>, Box<[u8]>>, Error> {
+        let mut f = BufReader::new(File::open(&self.path)?);
+        Ok(rmp_serde::from_read(&mut f).map_err(|e| {
+            eprintln!("File {} is broken: {}", self.path.display(), e);
+            e
+        })?)
+    }
+
     pub fn set_(&self, key: Box<str>, value: &T) -> Result<(), Error> {
         let mut e = DeflateEncoder::new(Vec::new(), Compression::best());
         rmp_serde::encode::write_named(&mut e, value)?;
@@ -67,9 +92,9 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
 
         let _ = Self::ungz(&compr)?; // sanity check
 
-        let mut w = self.data.write();
+        let mut w = self.lock_for_write()?;
         w.writes += 1;
-        w.data.insert(key, compr.into_boxed_slice());
+        w.data.as_mut().unwrap().insert(key, compr.into_boxed_slice());
         if w.writes >= w.next_autosave {
             w.writes = 0;
             w.next_autosave *= 2;
@@ -80,21 +105,21 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
     }
 
     pub fn delete(&self, key: &str) -> Result<(), Error> {
-        let mut d = self.data.write();
-        if d.data.remove(key).is_some() {
+        let mut d = self.lock_for_write()?;
+        if d.data.as_mut().unwrap().remove(key).is_some() {
             d.writes += 1;
         }
         Ok(())
     }
 
     // pub fn get_all<F: FnOnce(&HashMap<Box<str>, T>)>(&self, cb: F) -> Result<(), Error> {
-    //     cb(&self.data.read().data);
+    //     cb(&self.lock_for_read()?.data);
     //     Ok(())
     // }
 
     pub fn get(&self, key: &str) -> Result<Option<T>, Error> {
-        let kw = self.data.read();
-        Ok(match kw.data.get(key) {
+        let kw = self.lock_for_read()?;
+        Ok(match kw.data.as_ref().unwrap().get(key) {
             Some(gz) => Some(Self::ungz(gz).map_err(|e| {
                 eprintln!("ungz of {} failed in {}", key, self.path.display());
                 drop(kw);
@@ -113,8 +138,8 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
     pub fn save(&self) -> Result<(), Error> {
         let tmp_path = NamedTempFile::new_in(self.path.parent().expect("tmp"))?;
         let mut file = BufWriter::new(File::create(&tmp_path)?);
-        let d = self.data.read();
-        rmp_serde::encode::write(&mut file, &d.data)?;
+        let d = self.lock_for_read()?;
+        rmp_serde::encode::write(&mut file, d.data.as_ref().unwrap())?;
         drop(d);
         tmp_path.persist(&self.path).map_err(|e| e.error)?;
         Ok(())
@@ -149,7 +174,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
 
 impl<T: Serialize + DeserializeOwned + Clone + Send> Drop for TempCache<T> {
     fn drop(&mut self) {
-        if self.data.read().ok().map_or(true, |d| d.writes > 0) {
+        if self.data.read().writes > 0 {
             if let Err(err) = self.save() {
                 eprintln!("Temp db save failed: {}", err);
             }

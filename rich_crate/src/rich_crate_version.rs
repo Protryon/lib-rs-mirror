@@ -293,7 +293,7 @@ impl RichCrateVersion {
     }
 
     pub fn links(&self) -> Option<&str> {
-        self.package().links.as_ref().map(|s| s.as_str())
+        self.manifest.links()
     }
 
     #[inline]
@@ -314,17 +314,16 @@ impl RichCrateVersion {
     }
 
     pub fn has_bin(&self) -> bool {
-        !self.manifest.bin.is_empty()
+        self.manifest.has_bin()
     }
 
     // has cargo-prefixed bin
     pub fn has_cargo_bin(&self) -> bool {
-        // we get binaries normalized, so no need to check for package name
-        self.manifest.bin.iter().any(|b| b.name.as_ref().map_or(false, |n| n.starts_with("cargo-")))
+        self.manifest.has_cargo_bin()
     }
 
     pub fn is_proc_macro(&self) -> bool {
-        self.manifest.lib.as_ref().map_or(false, |lib| lib.proc_macro)
+        self.manifest.is_proc_macro()
     }
 
     pub fn is_app(&self) -> bool {
@@ -343,16 +342,7 @@ impl RichCrateVersion {
     }
 
     pub fn is_sys(&self) -> bool {
-        !self.has_bin() &&
-            self.has_buildrs() &&
-            !self.is_proc_macro() &&
-            (self.links().is_some() ||
-                (
-                    self.short_name().ends_with("-sys") ||
-                        self.short_name().ends_with("_sys") ||
-                        self.category_slugs(Include::RawCargoTomlOnly).any(|c| c == "external-ffi-bindings")
-                    // _dll suffix is a false positive
-                ))
+        self.manifest.is_sys(self.has_buildrs())
     }
 
     pub fn has_runtime_deps(&self) -> bool {
@@ -381,8 +371,49 @@ impl RichCrateVersion {
 
 pub trait ManifestExt {
     fn direct_dependencies(&self) -> Result<(Vec<RichDep>, Vec<RichDep>, Vec<RichDep>), CfgErr>;
+    fn has_bin(&self) -> bool;
+    fn has_cargo_bin(&self) -> bool;
+    fn is_proc_macro(&self) -> bool;
+    fn is_sys(&self, has_buildrs: bool) -> bool;
+    fn links(&self) -> Option<&str>;
+    fn package(&self) -> &Package;
 }
 impl ManifestExt for Manifest {
+    fn is_proc_macro(&self) -> bool {
+        self.lib.as_ref().map_or(false, |lib| lib.proc_macro)
+    }
+
+    fn has_bin(&self) -> bool {
+        !self.bin.is_empty()
+    }
+
+    fn has_cargo_bin(&self) -> bool {
+        // we get binaries normalized, so no need to check for package name
+        self.bin.iter().any(|b| b.name.as_ref().map_or(false, |n| n.starts_with("cargo-")))
+    }
+
+    fn package(&self) -> &Package {
+        self.package.as_ref().unwrap()
+    }
+
+    fn links(&self) -> Option<&str> {
+        self.package().links.as_ref().map(|s| s.as_str())
+    }
+
+    fn is_sys(&self, has_buildrs: bool) -> bool {
+        let name = &self.package().name;
+        !self.has_bin() &&
+            has_buildrs &&
+            !self.is_proc_macro() &&
+            (self.links().is_some() ||
+                (
+                    name.ends_with("-sys") ||
+                        name.ends_with("_sys") ||
+                        self.package().categories.iter().any(|c| c == "external-ffi-bindings")
+                    // _dll suffix is a false positive
+                ))
+    }
+
     fn direct_dependencies(&self) -> Result<(Vec<RichDep>, Vec<RichDep>, Vec<RichDep>), CfgErr> {
         fn to_dep((name, dep): (&String, &Dependency)) -> (String, RichDep) {
             let package = dep.package().unwrap_or(&name).to_owned();

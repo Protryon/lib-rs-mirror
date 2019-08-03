@@ -593,8 +593,10 @@ impl KitchenSink {
             }
         }
 
+        Self::override_bad_categories(package, &meta.manifest.dependencies);
+
         // Guess categories if none were specified
-        if package.categories.is_empty() && fetch_type == CrateData::Full {
+        if categories::Categories::filtered_category_slugs(&package.categories).next().is_none() && fetch_type == CrateData::Full {
             derived.categories = Some({
                 let keywords_iter = package.keywords.iter().map(|s| s.as_str());
                 self.crate_db.guess_crate_categories(&origin, keywords_iter).context("catdb")?
@@ -643,6 +645,50 @@ impl KitchenSink {
             lib_file: meta.lib_file.map(|s| s.into()),
             path_in_repo,
         }, warnings))
+    }
+
+    fn override_bad_categories(package: &mut Package, direct_dependencies: &cargo_toml::DepsSet) {
+        for cat in &mut package.categories {
+            if cat.as_bytes().iter().any(|c| !c.is_ascii_lowercase()) {
+                *cat = cat.to_lowercase();
+            }
+            if cat == "localization" {
+                // nobody knows the difference
+                *cat = "internationalization".to_string();
+            }
+            if cat == "parsers" {
+                if direct_dependencies.keys().any(|k| k == "nom" || k == "peresil" || k == "combine") ||
+                    package.keywords.iter().any(|k| match k.to_ascii_lowercase().as_ref() {
+                        "asn1" | "tls" | "idl" | "crawler" | "xml" | "nom" | "json" | "logs" | "elf" | "uri" | "html" | "protocol" | "semver" | "ecma" |
+                        "chess" | "vcard" | "exe" | "fasta" => true,
+                        _ => false,
+                    })
+                {
+                    *cat = "parser-implementations".into();
+                }
+            }
+            if cat == "cryptography" || cat == "database" || cat == "rust-patterns" || cat == "development-tools" {
+                if package.keywords.iter().any(|k| k == "bitcoin" || k == "ethereum" || k == "ledger" || k == "exonum" || k == "blockchain") {
+                    *cat = "cryptography::cryptocurrencies".into();
+                }
+            }
+            if cat == "games" {
+                if package.keywords.iter().any(|k| {
+                    k == "game-dev" || k == "game-development" || k == "gamedev" || k == "framework" || k == "utilities" || k == "parser" || k == "api"
+                }) {
+                    *cat = "game-engines".into();
+                }
+            }
+            if cat == "science" || cat == "algorithms" {
+                if package.keywords.iter().any(|k| k == "neural-network" || k == "machine-learning" || k == "deep-learning") {
+                    *cat = "science::ml".into();
+                } else if package.keywords.iter().any(|k| {
+                    k == "math" || k == "calculus" || k == "algebra" || k == "linear-algebra" || k == "mathematics" || k == "maths" || k == "number-theory"
+                }) {
+                    *cat = "science::math".into();
+                }
+            }
+        }
     }
 
     fn github_repo(&self, crate_repo: &Repo) -> CResult<Option<GitHubRepo>> {

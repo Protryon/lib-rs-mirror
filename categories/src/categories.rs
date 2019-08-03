@@ -110,8 +110,8 @@ impl Categories {
         }).collect()
     }
 
-    pub fn fixed_category_slugs(cats: &[String]) -> Vec<Cow<'_, str>> {
-        let mut cats = cats.iter().enumerate().filter_map(|(idx, s)| {
+    pub fn filtered_category_slugs(cats: &[String]) -> impl Iterator<Item=&str> {
+        cats.iter().filter_map(|s| {
             if s.len() < 2 {
                 return None;
             }
@@ -121,6 +121,12 @@ impl Categories {
             if s == "api-bindings" { // We pretend it doesn't exist
                 return None;
             }
+            Some(s.as_str())
+        })
+    }
+
+    pub fn fixed_category_slugs(cats: &[String]) -> Vec<Cow<'_, str>> {
+        let mut cats = Self::filtered_category_slugs(cats).enumerate().filter_map(|(idx, s)| {
             let mut chars = s.chars().peekable();
             while let Some(cur) = chars.next() {
                 // look for a:b instead of a::b

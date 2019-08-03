@@ -62,7 +62,7 @@ impl RichCrateVersion {
         lib_file: Option<String>, path_in_repo: Option<String>, has_buildrs: bool, has_code_of_conduct: bool) -> Self
     {
         let package = manifest.package.take().expect("package");
-        let mut s = Self {
+        Self {
             origin: Origin::from_crates_io_name(index.name()),
             repo: package.repository.as_ref().and_then(|r| Repo::new(r).ok()),
             authors: package.authors.iter().map(|a| Author::new(a)).collect(),
@@ -91,9 +91,7 @@ impl RichCrateVersion {
             direct_dependencies: manifest.dependencies,
             direct_build_dependencies: manifest.build_dependencies,
             direct_dev_dependencies: manifest.dev_dependencies,
-        };
-        s.override_bad_categories();
-        s
+        }
     }
 
     #[inline]
@@ -471,50 +469,6 @@ impl RichCrateVersion {
             dep
         }
         Ok((convsort(normal), convsort(dev), convsort(build)))
-    }
-
-    fn override_bad_categories(&mut self) {
-        for cat in &mut self.package.categories {
-            if cat.as_bytes().iter().any(|c| !c.is_ascii_lowercase()) {
-                *cat = cat.to_lowercase();
-            }
-            if cat == "localization" {
-                // nobody knows the difference
-                *cat = "internationalization".to_string();
-            }
-            if cat == "parsers" {
-                if self.direct_dependencies.keys().any(|k| k == "nom" || k == "peresil" || k == "combine") ||
-                    self.package.keywords.iter().any(|k| match k.to_ascii_lowercase().as_ref() {
-                        "asn1" | "tls" | "idl" | "crawler" | "xml" | "nom" | "json" | "logs" | "elf" | "uri" | "html" | "protocol" | "semver" | "ecma" |
-                        "chess" | "vcard" | "exe" | "fasta" => true,
-                        _ => false,
-                    })
-                {
-                    *cat = "parser-implementations".into();
-                }
-            }
-            if cat == "cryptography" || cat == "database" || cat == "rust-patterns" || cat == "development-tools" {
-                if self.package.keywords.iter().any(|k| k == "bitcoin" || k == "ethereum" || k == "ledger" || k == "exonum" || k == "blockchain") {
-                    *cat = "cryptography::cryptocurrencies".into();
-                }
-            }
-            if cat == "games" {
-                if self.package.keywords.iter().any(|k| {
-                    k == "game-dev" || k == "game-development" || k == "gamedev" || k == "framework" || k == "utilities" || k == "parser" || k == "api"
-                }) {
-                    *cat = "game-engines".into();
-                }
-            }
-            if cat == "science" || cat == "algorithms" {
-                if self.package.keywords.iter().any(|k| k == "neural-network" || k == "machine-learning" || k == "deep-learning") {
-                    *cat = "science::ml".into();
-                } else if self.package.keywords.iter().any(|k| {
-                    k == "math" || k == "calculus" || k == "algebra" || k == "linear-algebra" || k == "mathematics" || k == "maths" || k == "number-theory"
-                }) {
-                    *cat = "science::math".into();
-                }
-            }
-        }
     }
 
     pub fn language_stats(&self) -> &udedokei::Stats {

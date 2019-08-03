@@ -40,7 +40,7 @@ use cargo_toml::Package;
 use categories::Category;
 use chrono::DateTime;
 use chrono::prelude::*;
-use crate_db::{CrateDb, RepoChange};
+use crate_db::{CrateDb, RepoChange, CrateVersionData};
 use crate_files::CrateFile;
 use crates_index::Version;
 use crates_io_client::CrateOwner;
@@ -966,14 +966,14 @@ impl KitchenSink {
 
         // direct deps are used as extra keywords for similarity matching,
         // but we're taking only niche deps to group similar niche crates together
-        let deps_stats = self.index.deps_stats().ok_or(KitchenSinkErr::DepsStatsNotAvailable)?;
+        let raw_deps_stats = self.index.deps_stats().ok_or(KitchenSinkErr::DepsStatsNotAvailable)?;
         let mut weighed_deps = Vec::<(&str, f32)>::new();
         let all_deps = v.direct_dependencies()?;
         let all_deps = [(all_deps.0, 1.0), (all_deps.2, 0.33)];
         // runtime and (lesser) build-time deps
         for (deps, overall_weight) in all_deps.iter() {
             for dep in deps {
-                if let Some(rev) = deps_stats.counts.get(dep.package.as_str()) {
+                if let Some(rev) = raw_deps_stats.counts.get(dep.package.as_str()) {
                     let right_popularity = rev.direct > 1 && rev.direct < 150 && rev.runtime.def < 500 && rev.runtime.opt < 800;
                     if Self::dep_interesting_for_index(dep.package.as_str()).unwrap_or(right_popularity) {
                         let weight = overall_weight / (1 + rev.direct) as f32;
@@ -982,7 +982,28 @@ impl KitchenSink {
                 }
             }
         }
-        self.crate_db.index_latest(v, &weighed_deps, score, self.is_build_or_dev(v))?;
+        let (is_build, is_dev) = self.is_build_or_dev(v);
+        self.crate_db.index_latest(CrateVersionData {
+            name: v.short_name(),
+            keywords: v.keywords(Include::AuthoritativeOnly).map(|k| k.trim().to_lowercase()).collect(),
+            description: v.description(),
+            alternative_description: v.alternative_description(),
+            readme_text: v.readme().map(|r| render_readme::Renderer::new(None).visible_text(&r.markup)),
+            category_slugs: v.category_slugs(Include::AuthoritativeOnly).collect(),
+            authors: v.authors(),
+            origin: v.origin(),
+            repository: v.repository(),
+            deps_stats: &weighed_deps,
+            score,
+            features: v.features(),
+            is_sys: v.is_sys(),
+            has_bin: v.has_bin(),
+            is_yanked: v.is_yanked(),
+            has_cargo_bin: v.has_cargo_bin(),
+            is_proc_macro: v.is_proc_macro(),
+            is_build, is_dev,
+            links: v.links(),
+        })?;
         Ok(())
     }
 

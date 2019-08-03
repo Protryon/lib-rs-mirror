@@ -12,16 +12,17 @@ extern crate lazy_static;
 
 use chrono::prelude::*;
 use failure::ResultExt;
-use rich_crate::Include;
+
 use rich_crate::Origin;
 use rich_crate::Repo;
 use rich_crate::RichCrate;
-use rich_crate::RichCrateVersion;
-use render_readme::Renderer;
+
 use rusqlite::*;
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use parking_lot::Mutex;
@@ -37,6 +38,29 @@ pub struct CrateDb {
     conn: ThreadLocal<std::result::Result<RefCell<Connection>, rusqlite::Error>>,
     exclusive_conn: Mutex<Option<Connection>>,
     tag_synonyms: HashMap<Box<str>, (Box<str>, u8)>,
+}
+
+pub struct CrateVersionData<'a> {
+    pub name: &'a str,
+    pub description: Option<&'a str>,
+    pub alternative_description: Option<&'a str>,
+    pub origin: &'a Origin,
+    pub deps_stats: &'a [(&'a str, f32)],
+    pub keywords: Vec<String>,
+    pub score: f64,
+    pub links: Option<&'a str>,
+    pub is_build: bool,
+    pub is_dev: bool,
+    pub is_sys: bool,
+    pub is_yanked: bool,
+    pub authors: &'a [rich_crate::Author],
+    pub category_slugs: Vec<Cow<'a, str>>,
+    pub has_cargo_bin: bool,
+    pub has_bin: bool,
+    pub is_proc_macro: bool,
+    pub features: &'a BTreeMap<String, Vec<String>>,
+    pub repository: Option<&'a Repo>,
+    pub readme_text: Option<String>,
 }
 
 impl CrateDb {
@@ -101,11 +125,11 @@ impl CrateDb {
 
     /// Add data of the latest version of a crate to the index
     /// Score is a ranking of a crate (0 = bad, 1 = great)
-    pub fn index_latest(&self, c: &RichCrateVersion, deps_stats: &[(&str, f32)], score: f64, (is_build, is_dev): (bool, bool)) -> FResult<()> {
-        let origin = c.origin().to_str();
+    pub fn index_latest(&self, c: CrateVersionData) -> FResult<()> {
+        let origin = c.origin.to_str();
 
         let mut insert_keyword = KeywordInsert::new()?;
-        for (i, k) in c.keywords(Include::AuthoritativeOnly).map(|k| k.trim().to_lowercase()).enumerate() {
+        for (i, k) in c.keywords.iter().enumerate() {
             print!("#{}, ", k);
             let mut w: f64 = 100./(6+i*2) as f64;
             if STOPWORDS.get(k.as_str()).is_some() {
@@ -114,13 +138,13 @@ impl CrateDb {
             insert_keyword.add(&k, w, true);
         }
 
-        for (i, k) in c.short_name().split(|c: char| !c.is_alphanumeric()).enumerate() {
+        for (i, k) in c.name.split(|c: char| !c.is_alphanumeric()).enumerate() {
             print!("'{}, ", k);
             let w: f64 = 100./(8+i*2) as f64;
             insert_keyword.add(k, w, false);
         }
 
-        if let Some(l) = c.links() {
+        if let Some(l) = c.links {
             insert_keyword.add(l.trim_start_matches("lib"), 0.54, false);
         }
 
@@ -129,7 +153,7 @@ impl CrateDb {
         insert_keyword.add_synonyms(&self.tag_synonyms);
 
         {
-            let d = Self::extract_text_phrases(&c, &Renderer::new(None));
+            let d = Self::extract_text_phrases(&c);
             let mut sw = rake::StopWords::new();
             sw.reserve(STOPWORDS.len());
             sw.extend(STOPWORDS.iter().map(|s| s.to_string())); // TODO: use real stopwords, THEN filter via STOPWORDS again, because multiple Rust-y words are fine
@@ -154,31 +178,31 @@ impl CrateDb {
             }
         }
 
-        for feat in c.features().keys() {
+        for feat in c.features.keys() {
             if feat != "default" && feat != "std" && feat != "nightly" {
                 insert_keyword.add(&format!("feature:{}", feat), 0.55, false);
             }
         }
-        if c.is_sys() {
+        if c.is_sys {
             insert_keyword.add("has:is_sys", 0.01, false);
         }
-        if c.is_proc_macro() {
+        if c.is_proc_macro {
             insert_keyword.add("has:proc_macro", 0.25, false);
         }
-        if c.has_bin() {
+        if c.has_bin {
             insert_keyword.add("has:bin", 0.01, false);
-            if c.has_cargo_bin() {
+            if c.has_cargo_bin {
                 insert_keyword.add("has:cargo-bin", 0.2, false);
             }
         }
-        if is_build {
+        if c.is_build {
             insert_keyword.add("has:is_build", 0.01, false);
         }
-        if is_dev {
+        if c.is_dev {
             insert_keyword.add("has:is_dev", 0.01, false);
         }
 
-        for &(dep, weight) in deps_stats {
+        for &(dep, weight) in c.deps_stats {
             insert_keyword.add(&format!("dep:{}", dep), (weight / 2.0).into(), false);
         }
 
@@ -202,12 +226,12 @@ impl CrateDb {
             let mut insert_category = tx.prepare_cached("INSERT OR IGNORE INTO categories (crate_id, slug, rank_weight, relevance_weight) VALUES (?1, ?2, ?3, ?4)")?;
             let mut get_crate_id = tx.prepare_cached("SELECT id, recent_downloads FROM crates WHERE origin = ?1")?;
 
-            let args: &[&dyn ToSql] = &[&origin, &0, &score];
+            let args: &[&dyn ToSql] = &[&origin, &0, &c.score];
             insert_crate.execute(args).context("insert crate")?;
             let (crate_id, downloads): (u32, u32) = get_crate_id.query_row(&[&origin], |row| Ok((row.get_unwrap(0), row.get_unwrap(1)))).context("crate_id")?;
-            let is_important_ish = downloads > 2000 || score > 0.8;
+            let is_important_ish = downloads > 2000 || c.score > 0.8;
 
-            if let Some(repo) = c.repository() {
+            if let Some(repo) = c.repository {
                 let url = repo.canonical_git_url();
                 let args: &[&dyn ToSql] = &[&crate_id, &url.as_ref()];
                 insert_repo.execute(args).context("insert repo")?;
@@ -219,7 +243,7 @@ impl CrateDb {
 
             let (categories, had_explicit_categories) = {
                 let keywords = insert_keyword.keywords.iter().map(|(k,_)| k.to_string());
-                self.extract_crate_categories(&tx, c, keywords, is_important_ish)?
+                self.extract_crate_categories(&tx, &c, keywords, is_important_ish)?
             };
 
             if !had_explicit_categories {
@@ -234,19 +258,19 @@ impl CrateDb {
                 }
             }
 
-            for (i, k) in c.authors().iter().filter_map(|a| a.email.as_ref().or(a.name.as_ref())).enumerate() {
+            for (i, k) in c.authors.iter().filter_map(|a| a.email.as_ref().or(a.name.as_ref())).enumerate() {
                 write!(&mut out, "by:{}, ", k)?;
                 let w: f64 = 50. / (100 + i) as f64;
                 insert_keyword.add(&k, w, false);
             }
 
-            if let Some(repo) = c.repository() {
+            if let Some(repo) = c.repository {
                 let url = repo.canonical_git_url();
                 insert_keyword.add(&format!("repo:{}", url), 1., false); // crates in monorepo probably belong together
             }
             // yanked crates may contain garbage, or needlessly come up in similar crates
             // so knock all keywords' importance if it's yanked
-            insert_keyword.commit(&tx, crate_id, if c.is_yanked() {0.1} else {1.})?;
+            insert_keyword.commit(&tx, crate_id, if c.is_yanked {0.1} else {1.})?;
 
             mark_updated.execute(&[&crate_id, &next_timestamp]).context("mark updated crate")?;
             println!("{}", out);
@@ -257,9 +281,8 @@ impl CrateDb {
     /// (rank-relevance, relevance, slug)
     ///
     /// Rank relevance is normalized and biased towards one top category
-    fn extract_crate_categories(&self, conn: &Connection, c: &RichCrateVersion, keywords: impl Iterator<Item=String>, is_important_ish: bool) -> FResult<(Vec<(f64, f64, String)>, bool)> {
-        let (explicit_categories, invalid_categories): (Vec<_>, Vec<_>) = c.category_slugs(Include::AuthoritativeOnly)
-            .map(|k| k.to_string())
+    fn extract_crate_categories(&self, conn: &Connection, c: &CrateVersionData, keywords: impl Iterator<Item=String>, is_important_ish: bool) -> FResult<(Vec<(f64, f64, String)>, bool)> {
+        let (explicit_categories, invalid_categories): (Vec<_>, Vec<_>) = c.category_slugs.iter().map(|c| c.to_string())
             .partition(|slug| {
                 categories::CATEGORIES.from_slug(&slug).next().is_some() // FIXME: that checks top level only
             });
@@ -283,8 +306,8 @@ impl CrateDb {
 
             categories::adjusted_relevance(candidates, keywords_collected, 0.01, 15)
         } else {
-            let cat_w = 0.2 + 0.2 * c.keywords(Include::AuthoritativeOnly).count() as f64;
-            self.guess_crate_categories_tx(conn, &c.origin(), keywords_collected, if is_important_ish {0.1} else {0.3})?.into_iter()
+            let cat_w = 0.2 + 0.2 * c.keywords.len() as f64;
+            self.guess_crate_categories_tx(conn, &c.origin, keywords_collected, if is_important_ish {0.1} else {0.3})?.into_iter()
             .map(|(w, slug)| {
                 ((w * cat_w).min(0.99), slug)
             }).collect()
@@ -817,20 +840,19 @@ impl CrateDb {
     }
 
     // returns an array of lowercase phrases
-    fn extract_text_phrases(krate: &RichCrateVersion, renderer: &Renderer) -> Vec<(f64, String)> {
+    fn extract_text_phrases(c: &CrateVersionData) -> Vec<(f64, String)> {
         let mut out = Vec::new();
         let mut len = 0;
-        if let Some(s) = krate.description() {
+        if let Some(s) = c.description {
             len += s.len();
             out.push((1., s.to_lowercase()));
         }
-        if let Some(s) = krate.alternative_description() {
+        if let Some(s) = c.alternative_description {
             len += s.len();
             out.push((1., s.to_lowercase()));
         }
-        if let Some(r) = krate.readme() {
+        if let Some(sub) = &c.readme_text {
             // render readme to DOM, extract nodes
-            let sub = renderer.visible_text(&r.markup);
             for par in sub.split('\n') {
                 if len > 200 {
                     break;

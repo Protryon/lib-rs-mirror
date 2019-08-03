@@ -472,7 +472,7 @@ impl KitchenSink {
             }
             (d, warn)
         };
-        Ok((RichCrateVersion::new(krate.clone(), d.manifest, d.derived, d.readme, d.lib_file.map(|s| s.into()), d.path_in_repo, d.has_buildrs, d.has_code_of_conduct), warn))
+        Ok((RichCrateVersion::new(Origin::from_crates_io_name(krate.name()), d.manifest, d.derived, d.readme, d.lib_file.map(|s| s.into()), d.path_in_repo, d.has_buildrs, d.has_code_of_conduct, krate.is_yanked()), warn))
     }
 
     pub fn changelog_url(&self, k: &RichCrateVersion) -> Option<String> {

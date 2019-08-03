@@ -5,7 +5,6 @@ use crate::Readme;
 use cargo_toml::{Dependency, Manifest, Package, Product};
 pub use cargo_toml::{DepsSet, Edition, FeatureSet, MaintenanceStatus, TargetDepsSet};
 use categories::Categories;
-use crates_index::Version;
 use repo_url::Repo;
 use render_readme::Renderer;
 use semver;
@@ -21,7 +20,6 @@ pub use parse_cfg::{Cfg, Target};
 #[derive(Debug, Clone)]
 pub struct RichCrateVersion {
     origin: Origin,
-    index: Version,
     derived: Derived,
     authors: Vec<Author>,
     readme: Option<Readme>,
@@ -34,6 +32,7 @@ pub struct RichCrateVersion {
     has_tests: bool,
     has_benches: bool,
     has_badges: bool,
+    is_yanked: bool,
     maintenance: MaintenanceStatus,
 
     // Manifest content
@@ -58,15 +57,14 @@ pub enum Include {
 ///
 /// Crates.rs uses this only for the latest version of a crate.
 impl RichCrateVersion {
-    pub fn new(index: Version, mut manifest: Manifest, derived: Derived, readme: Option<Readme>,
-        lib_file: Option<String>, path_in_repo: Option<String>, has_buildrs: bool, has_code_of_conduct: bool) -> Self
+    pub fn new(origin: Origin, mut manifest: Manifest, derived: Derived, readme: Option<Readme>,
+        lib_file: Option<String>, path_in_repo: Option<String>, has_buildrs: bool, has_code_of_conduct: bool, is_yanked: bool) -> Self
     {
         let package = manifest.package.take().expect("package");
         Self {
-            origin: Origin::from_crates_io_name(index.name()),
+            origin,
             repo: package.repository.as_ref().and_then(|r| Repo::new(r).ok()),
             authors: package.authors.iter().map(|a| Author::new(a)).collect(),
-            index,
             package,
             readme,
             has_buildrs,
@@ -76,6 +74,7 @@ impl RichCrateVersion {
             lib_file,
             lib: manifest.lib,
             bin: manifest.bin,
+            is_yanked,
             has_examples: !manifest.example.is_empty(),
             has_tests: !manifest.test.is_empty(),
             has_benches: !manifest.bench.is_empty(),
@@ -231,7 +230,7 @@ impl RichCrateVersion {
     /// Readable name
     #[inline]
     pub fn short_name(&self) -> &str {
-        self.index.name()
+        &self.package.name
     }
 
     /// Without trailing '.' to match website's style
@@ -319,7 +318,7 @@ impl RichCrateVersion {
 
     #[inline]
     pub fn version(&self) -> &str {
-        self.index.version()
+        &self.package.version
     }
 
     pub fn version_semver(&self) -> Result<semver::Version, semver::SemVerError> {
@@ -327,7 +326,7 @@ impl RichCrateVersion {
     }
 
     pub fn is_yanked(&self) -> bool {
-        self.index.is_yanked()
+        self.is_yanked
     }
 
     pub fn has_lib(&self) -> bool {

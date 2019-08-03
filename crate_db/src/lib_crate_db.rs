@@ -47,7 +47,6 @@ pub struct CrateVersionData<'a> {
     pub origin: &'a Origin,
     pub deps_stats: &'a [(&'a str, f32)],
     pub keywords: Vec<String>,
-    pub score: f64,
     pub links: Option<&'a str>,
     pub is_build: bool,
     pub is_dev: bool,
@@ -226,10 +225,10 @@ impl CrateDb {
             let mut insert_category = tx.prepare_cached("INSERT OR IGNORE INTO categories (crate_id, slug, rank_weight, relevance_weight) VALUES (?1, ?2, ?3, ?4)")?;
             let mut get_crate_id = tx.prepare_cached("SELECT id, recent_downloads FROM crates WHERE origin = ?1")?;
 
-            let args: &[&dyn ToSql] = &[&origin, &0, &c.score];
+            let args: &[&dyn ToSql] = &[&origin, &0, &0];
             insert_crate.execute(args).context("insert crate")?;
             let (crate_id, downloads): (u32, u32) = get_crate_id.query_row(&[&origin], |row| Ok((row.get_unwrap(0), row.get_unwrap(1)))).context("crate_id")?;
-            let is_important_ish = downloads > 2000 || c.score > 0.8;
+            let is_important_ish = downloads > 2000;
 
             if let Some(repo) = c.repository {
                 let url = repo.canonical_git_url();

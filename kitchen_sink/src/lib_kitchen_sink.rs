@@ -1007,7 +1007,7 @@ impl KitchenSink {
         Ok(())
     }
 
-    pub fn index_crate_highest_version(&self, v: &RichCrateVersion, score: f64) -> CResult<()> {
+    pub fn index_crate_highest_version(&self, v: &RichCrateVersion) -> CResult<()> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
 
         // direct deps are used as extra keywords for similarity matching,
@@ -1040,7 +1040,6 @@ impl KitchenSink {
             origin: v.origin(),
             repository: v.repository(),
             deps_stats: &weighed_deps,
-            score,
             features: v.features(),
             is_sys: v.is_sys(),
             has_bin: v.has_bin(),

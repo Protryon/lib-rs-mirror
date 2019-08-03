@@ -111,8 +111,8 @@ fn index_crate(crates: &KitchenSink, c: &Origin, renderer: &Renderer, search_sen
         k.owners().len() as u32
     };
 
+    crates.index_crate_highest_version(&v)?;
     let (downloads_per_month, score) = crate_overall_score(crates, &k, &v, renderer, contributors_count);
-    crates.index_crate_highest_version(&v, score)?;
     crates.index_crate(&k, score)?;
     search_sender.send((v.clone(), downloads_per_month, score))?;
     Ok(v)

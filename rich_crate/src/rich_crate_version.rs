@@ -2,7 +2,7 @@ use crate::Author;
 use crate::Markup;
 use crate::Origin;
 use crate::Readme;
-use cargo_toml::{Dependency, Manifest, Package, Product};
+use cargo_toml::{Dependency, Manifest, Package};
 pub use cargo_toml::{DepsSet, Edition, FeatureSet, MaintenanceStatus, TargetDepsSet};
 use categories::Categories;
 use repo_url::Repo;
@@ -28,22 +28,10 @@ pub struct RichCrateVersion {
     path_in_repo: Option<String>,
     has_buildrs: bool,
     has_code_of_conduct: bool,
-    has_examples: bool,
-    has_tests: bool,
-    has_benches: bool,
-    has_badges: bool,
     is_yanked: bool,
-    maintenance: MaintenanceStatus,
 
     // Manifest content
-    package: Package,
-    lib: Option<Product>,
-    bin: Vec<Product>,
-    features: FeatureSet,
-    target: TargetDepsSet,
-    direct_dependencies: DepsSet,
-    direct_build_dependencies: DepsSet,
-    direct_dev_dependencies: DepsSet,
+    manifest: Manifest,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -57,65 +45,52 @@ pub enum Include {
 ///
 /// Crates.rs uses this only for the latest version of a crate.
 impl RichCrateVersion {
-    pub fn new(origin: Origin, mut manifest: Manifest, derived: Derived, readme: Option<Readme>,
+    pub fn new(origin: Origin, manifest: Manifest, derived: Derived, readme: Option<Readme>,
         lib_file: Option<String>, path_in_repo: Option<String>, has_buildrs: bool, has_code_of_conduct: bool, is_yanked: bool) -> Self
     {
-        let package = manifest.package.take().expect("package");
+        let package = manifest.package.as_ref().expect("package");
         Self {
             origin,
             repo: package.repository.as_ref().and_then(|r| Repo::new(r).ok()),
             authors: package.authors.iter().map(|a| Author::new(a)).collect(),
-            package,
             readme,
             has_buildrs,
             has_code_of_conduct,
             derived,
             path_in_repo,
             lib_file,
-            lib: manifest.lib,
-            bin: manifest.bin,
             is_yanked,
-            has_examples: !manifest.example.is_empty(),
-            has_tests: !manifest.test.is_empty(),
-            has_benches: !manifest.bench.is_empty(),
-            has_badges: manifest.badges.appveyor.is_some() ||
-                manifest.badges.circle_ci.is_some() ||
-                manifest.badges.gitlab.is_some() ||
-                manifest.badges.travis_ci.is_some() ||
-                manifest.badges.codecov.is_some() ||
-                manifest.badges.coveralls.is_some(),
-            maintenance: manifest.badges.maintenance.status,
-            features: manifest.features,
-            target: manifest.target,
-            direct_dependencies: manifest.dependencies,
-            direct_build_dependencies: manifest.build_dependencies,
-            direct_dev_dependencies: manifest.dev_dependencies,
+            manifest,
         }
+    }
+
+    fn package(&self) -> &Package {
+        self.manifest.package.as_ref().unwrap()
     }
 
     #[inline]
     pub fn homepage(&self) -> Option<&str> {
-        self.package.homepage.as_ref().map(|s| s.as_ref())
+        self.package().homepage.as_ref().map(|s| s.as_ref())
     }
 
     pub fn documentation(&self) -> Option<&str> {
-        self.package.documentation.as_ref().map(|s| s.as_ref())
+        self.package().documentation.as_ref().map(|s| s.as_ref())
     }
 
     pub fn edition(&self) -> Edition {
-        self.package.edition
+        self.package().edition
     }
 
     pub fn has_own_keywords(&self) -> bool {
-        !self.package.keywords.is_empty()
+        !self.package().keywords.is_empty()
     }
 
     pub fn has_own_categories(&self) -> bool {
-        !self.package.categories.is_empty()
+        !self.package().categories.is_empty()
     }
 
     pub fn has_categories(&self) -> bool {
-        !self.package.categories.is_empty() || self.derived.categories.as_ref().map_or(false, |c| !c.is_empty())
+        !self.package().categories.is_empty() || self.derived.categories.as_ref().map_or(false, |c| !c.is_empty())
     }
 
     /// Finds preferred capitalization for the name
@@ -174,11 +149,11 @@ impl RichCrateVersion {
             Include::Cleaned => Categories::fixed_category_slugs(if let Some(ref assigned_categories) = self.derived.categories {
                 &assigned_categories
             } else {
-                &self.package.categories
+                &self.package().categories
             }),
-            Include::AuthoritativeOnly => Categories::fixed_category_slugs(&self.package.categories),
+            Include::AuthoritativeOnly => Categories::fixed_category_slugs(&self.package().categories),
             Include::RawCargoTomlOnly => {
-                let tmp: Vec<_> = self.package.categories.iter().map(From::from).collect();
+                let tmp: Vec<_> = self.package().categories.iter().map(From::from).collect();
                 tmp
             },
         }
@@ -186,11 +161,11 @@ impl RichCrateVersion {
     }
 
     pub fn license(&self) -> Option<&str> {
-        self.package.license.as_ref().map(|s| s.as_str())
+        self.package().license.as_ref().map(|s| s.as_str())
     }
 
     pub fn license_name(&self) -> Option<&str> {
-        self.package.license.as_ref().map(|s| match s.as_str() {
+        self.package().license.as_ref().map(|s| match s.as_str() {
             "" => "(unspecified)",
             "MIT OR Apache-2.0" | "MIT/Apache-2.0" | "MIT / Apache-2.0" => "MIT/Apache",
             "Apache-2.0/ISC/MIT" => "MIT/Apache/ISC",
@@ -201,17 +176,17 @@ impl RichCrateVersion {
     }
 
     pub fn license_file(&self) -> Option<&str> {
-        self.package.license_file.as_ref().map(|s| s.as_str())
+        self.package().license_file.as_ref().map(|s| s.as_str())
     }
 
     /// Either original keywords or guessed ones
     pub fn keywords(&self, include: Include) -> impl Iterator<Item = &str> {
         match include {
-            Include::RawCargoTomlOnly => &self.package.keywords,
+            Include::RawCargoTomlOnly => &self.package().keywords,
             Include::AuthoritativeOnly => {
-                if self.package.keywords.is_empty() { self.derived.github_keywords.as_ref() } else { None }.unwrap_or(&self.package.keywords)
+                if self.package().keywords.is_empty() { self.derived.github_keywords.as_ref() } else { None }.unwrap_or(&self.package().keywords)
             },
-            Include::Cleaned => self.derived.keywords.as_ref().unwrap_or(&self.package.keywords),
+            Include::Cleaned => self.derived.keywords.as_ref().unwrap_or(&self.package().keywords),
         }
         .iter()
         .map(|s| s.as_str())
@@ -230,12 +205,12 @@ impl RichCrateVersion {
     /// Readable name
     #[inline]
     pub fn short_name(&self) -> &str {
-        &self.package.name
+        &self.package().name
     }
 
     /// Without trailing '.' to match website's style
     pub fn description(&self) -> Option<&str> {
-        self.package.description.as_ref().map(|d| {
+        self.package().description.as_ref().map(|d| {
             let d = d.as_str().trim();
             if d.contains(". ") {d} // multiple sentences, leave them alone
             else {d.trim_end_matches('.')}
@@ -285,7 +260,7 @@ impl RichCrateVersion {
     }
 
     pub fn has_buildrs(&self) -> bool {
-        self.has_buildrs || self.package.build.is_some()
+        self.has_buildrs || self.package().build.is_some()
     }
 
     pub fn has_code_of_conduct(&self) -> bool {
@@ -293,32 +268,37 @@ impl RichCrateVersion {
     }
 
     pub fn has_examples(&self) -> bool {
-        self.has_examples
+        !self.manifest.example.is_empty()
     }
 
     pub fn has_tests(&self) -> bool {
-        self.has_tests
+        !self.manifest.test.is_empty()
     }
 
     pub fn has_benches(&self) -> bool {
-        self.has_benches
+        !self.manifest.bench.is_empty()
     }
 
     pub fn has_badges(&self) -> bool {
-        self.has_badges
+        self.manifest.badges.appveyor.is_some() ||
+        self.manifest.badges.circle_ci.is_some() ||
+        self.manifest.badges.gitlab.is_some() ||
+        self.manifest.badges.travis_ci.is_some() ||
+        self.manifest.badges.codecov.is_some() ||
+        self.manifest.badges.coveralls.is_some()
     }
 
     pub fn maintenance(&self) -> MaintenanceStatus {
-        self.maintenance
+        self.manifest.badges.maintenance.status
     }
 
     pub fn links(&self) -> Option<&str> {
-        self.package.links.as_ref().map(|s| s.as_str())
+        self.package().links.as_ref().map(|s| s.as_str())
     }
 
     #[inline]
     pub fn version(&self) -> &str {
-        &self.package.version
+        &self.package().version
     }
 
     pub fn version_semver(&self) -> Result<semver::Version, semver::SemVerError> {
@@ -330,21 +310,21 @@ impl RichCrateVersion {
     }
 
     pub fn has_lib(&self) -> bool {
-        !self.is_proc_macro() && (self.lib_file.is_some() || self.lib.is_some())
+        !self.is_proc_macro() && (self.lib_file.is_some() || self.manifest.lib.is_some())
     }
 
     pub fn has_bin(&self) -> bool {
-        !self.bin.is_empty()
+        !self.manifest.bin.is_empty()
     }
 
     // has cargo-prefixed bin
     pub fn has_cargo_bin(&self) -> bool {
         // we get binaries normalized, so no need to check for package name
-        self.bin.iter().any(|b| b.name.as_ref().map_or(false, |n| n.starts_with("cargo-")))
+        self.manifest.bin.iter().any(|b| b.name.as_ref().map_or(false, |n| n.starts_with("cargo-")))
     }
 
     pub fn is_proc_macro(&self) -> bool {
-        self.lib.as_ref().map_or(false, |lib| lib.proc_macro)
+        self.manifest.lib.as_ref().map_or(false, |lib| lib.proc_macro)
     }
 
     pub fn is_app(&self) -> bool {
@@ -376,15 +356,34 @@ impl RichCrateVersion {
     }
 
     pub fn has_runtime_deps(&self) -> bool {
-        !self.direct_dependencies.is_empty() || self.target.values().any(|target| !target.dependencies.is_empty())
+        !self.manifest.dependencies.is_empty() || self.manifest.target.values().any(|target| !target.dependencies.is_empty())
     }
 
     pub fn features(&self) -> &BTreeMap<String, Vec<String>> {
-        &self.features
+        &self.manifest.features
     }
 
     /// Runtime, dev, build
     pub fn direct_dependencies(&self) -> Result<(Vec<RichDep>, Vec<RichDep>, Vec<RichDep>), CfgErr> {
+        self.manifest.direct_dependencies()
+    }
+
+    pub fn language_stats(&self) -> &udedokei::Stats {
+        &self.derived.language_stats
+    }
+
+    /// compressed (whole tarball) and decompressed (extracted files only)
+    #[inline]
+    pub fn crate_size(&self) -> (usize, usize) {
+        (self.derived.crate_compressed_size as usize, self.derived.crate_decompressed_size as usize)
+    }
+}
+
+pub trait ManifestExt {
+    fn direct_dependencies(&self) -> Result<(Vec<RichDep>, Vec<RichDep>, Vec<RichDep>), CfgErr>;
+}
+impl ManifestExt for Manifest {
+    fn direct_dependencies(&self) -> Result<(Vec<RichDep>, Vec<RichDep>, Vec<RichDep>), CfgErr> {
         fn to_dep((name, dep): (&String, &Dependency)) -> (String, RichDep) {
             let package = dep.package().unwrap_or(&name).to_owned();
             (package.clone(), RichDep {
@@ -395,9 +394,9 @@ impl RichCrateVersion {
                 with_features: Vec::new(),
             })
         }
-        let mut normal: BTreeMap<String, RichDep> = self.direct_dependencies.iter().map(to_dep).collect();
-        let mut build: BTreeMap<String, RichDep> = self.direct_build_dependencies.iter().map(to_dep).collect();
-        let mut dev: BTreeMap<String, RichDep> = self.direct_dev_dependencies.iter().map(to_dep).collect();
+        let mut normal: BTreeMap<String, RichDep> = self.dependencies.iter().map(to_dep).collect();
+        let mut build: BTreeMap<String, RichDep> = self.build_dependencies.iter().map(to_dep).collect();
+        let mut dev: BTreeMap<String, RichDep> = self.dev_dependencies.iter().map(to_dep).collect();
 
         fn add_targets(dest: &mut BTreeMap<String, RichDep>, src: &DepsSet, target: &str) -> Result<(), CfgErr> {
             for (name, dep) in src {
@@ -433,11 +432,11 @@ impl RichCrateVersion {
             dev.remove(dep);
         }
 
-        let default_features = self.features().get("default")
+        let default_features = self.features.get("default")
             .map(|d| d.iter().collect::<HashSet<_>>())
             .unwrap_or_default();
 
-        for (for_feature, wants) in self.features().into_iter().filter(|(n,_)| *n != "default") {
+        for (for_feature, wants) in self.features.iter().filter(|(n,_)| *n != "default") {
             for depstr in wants {
                 let mut depstr = depstr.splitn(2, '/');
                 let name = depstr.next().expect("name should be there");
@@ -468,16 +467,6 @@ impl RichCrateVersion {
             dep
         }
         Ok((convsort(normal), convsort(dev), convsort(build)))
-    }
-
-    pub fn language_stats(&self) -> &udedokei::Stats {
-        &self.derived.language_stats
-    }
-
-    /// compressed (whole tarball) and decompressed (extracted files only)
-    #[inline]
-    pub fn crate_size(&self) -> (usize, usize) {
-        (self.derived.crate_compressed_size as usize, self.derived.crate_decompressed_size as usize)
     }
 }
 

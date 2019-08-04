@@ -307,8 +307,11 @@ fn is_deprecated(k: &RichCrateVersion) -> bool {
             desc.contains("reserving this crate") ||
             desc.contains("this is a dummy package") ||
             desc == "reserved" ||
+            desc.starts_with("placeholder") ||
+            desc.starts_with("a placeholder") ||
             desc.starts_with("reserved for ") ||
             desc.starts_with("reserved name") ||
+            desc.starts_with("an empty crate") ||
             desc.starts_with("discontinued") ||
             desc.starts_with("renamed to ") ||
             desc.starts_with("crate renamed to ") ||

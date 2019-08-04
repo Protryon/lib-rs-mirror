@@ -68,7 +68,6 @@ use std::collections::hash_map::Entry::*;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::env;
-use std::mem;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use parking_lot::RwLock;
@@ -490,13 +489,6 @@ impl KitchenSink {
         let has_buildrs = meta.has("build.rs");
         let has_code_of_conduct = meta.has("CODE_OF_CONDUCT.md") || meta.has("docs/CODE_OF_CONDUCT.md") || meta.has(".github/CODE_OF_CONDUCT.md");
 
-        let mut derived = Derived::default();
-        mem::swap(&mut derived.language_stats, &mut meta.language_stats); // move
-        derived.crate_compressed_size = crate_compressed_size as u32;
-        // sometimes uncompressed sources without junk are smaller than tarball with junk
-        derived.crate_decompressed_size = meta.decompressed_size.max(crate_compressed_size) as u32;
-        derived.is_nightly = meta.is_nightly;
-
         let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
 
         // Guess repo URL if none was specified; must be done before getting stuff from the repo
@@ -546,7 +538,8 @@ impl KitchenSink {
         }
 
         let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
-
+        let mut github_keywords = None;
+        let mut derived_keywords = None;
         // Guess keywords if none were specified
         // TODO: also ignore useless keywords that are unique db-wide
         if package.keywords.is_empty() {
@@ -563,19 +556,20 @@ impl KitchenSink {
                     _ => true,
                 });
                 if !topics.is_empty() {
-                    derived.github_keywords = Some(topics);
+                    github_keywords = Some(topics);
                 }
             }
-            if derived.github_keywords.is_none() {
-                derived.keywords = Some(self.crate_db.keywords(&origin).context("keywordsdb")?);
+            if github_keywords.is_none() {
+                derived_keywords = Some(self.crate_db.keywords(&origin).context("keywordsdb")?);
             }
         }
 
         Self::override_bad_categories(package, &meta.manifest.dependencies);
 
+        let mut derived_categories = None;
         // Guess categories if none were specified
         if categories::Categories::filtered_category_slugs(&package.categories).next().is_none() {
-            derived.categories = Some({
+            derived_categories = Some({
                 let keywords_iter = package.keywords.iter().map(|s| s.as_str());
                 self.crate_db.guess_crate_categories(&origin, keywords_iter).context("catdb")?
                 .into_iter().map(|(_, c)| c).collect()
@@ -592,6 +586,8 @@ impl KitchenSink {
 
         warnings.extend(self.remove_redundant_links(package, maybe_repo.as_ref()));
 
+        let mut github_description = None;
+        let mut github_name = None;
         if let Some(ref crate_repo) = maybe_repo {
             if let Some(ghrepo) = self.github_repo(crate_repo)? {
                 if package.homepage.is_none() {
@@ -602,8 +598,8 @@ impl KitchenSink {
                     }
                     warnings.extend(self.remove_redundant_links(package, maybe_repo.as_ref()));
                 }
-                derived.github_description = ghrepo.description;
-                derived.github_name = Some(ghrepo.name);
+                github_description = ghrepo.description;
+                github_name = Some(ghrepo.name);
             }
         }
 
@@ -612,11 +608,25 @@ impl KitchenSink {
             meta.lib_file = None;
         }
 
-        derived.has_buildrs = has_buildrs;
-        derived.has_code_of_conduct = has_code_of_conduct;
-        derived.readme = meta.readme;
-        derived.lib_file = meta.lib_file.map(|s| s.into());
-        derived.path_in_repo = path_in_repo;
+        let derived = Derived {
+            language_stats: meta.language_stats,
+            crate_compressed_size: crate_compressed_size as u32,
+            // sometimes uncompressed sources without junk are smaller than tarball with junk
+            crate_decompressed_size: meta.decompressed_size.max(crate_compressed_size) as u32,
+            is_nightly: meta.is_nightly,
+
+            has_buildrs: has_buildrs,
+            has_code_of_conduct: has_code_of_conduct,
+            readme: meta.readme,
+            lib_file: meta.lib_file.map(|s| s.into()),
+            path_in_repo: path_in_repo,
+            github_description,
+            github_name,
+            github_keywords,
+            keywords: derived_keywords,
+            categories: derived_categories,
+            is_yanked: latest.is_yanked(),
+        };
 
         Ok((RichCrateVersionCacheData {
             derived,

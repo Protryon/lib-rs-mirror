@@ -102,8 +102,10 @@ fn main() {
 }
 
 fn index_crate(crates: &KitchenSink, c: &Origin, renderer: &Renderer, search_sender: &mpsc::SyncSender<(RichCrateVersion, usize, f64)>) -> Result<RichCrateVersion, failure::Error> {
-    let v = crates.rich_crate_version(c, CrateData::FullNoDerived)?;
     let k = crates.rich_crate(c)?;
+    crates.index_crate_highest_version(&k)?;
+    let c = k.origin();
+    let v = crates.rich_crate_version(c, CrateData::Full)?;
     let contrib_info = crates.all_contributors(&v).map_err(|e| eprintln!("{}", e)).ok();
     let contributors_count = if let Some((authors, _owner_only, _, extra_contributors)) = &contrib_info {
         (authors.len() + extra_contributors) as u32
@@ -111,7 +113,6 @@ fn index_crate(crates: &KitchenSink, c: &Origin, renderer: &Renderer, search_sen
         k.owners().len() as u32
     };
 
-    crates.index_crate_highest_version(&v)?;
     let (downloads_per_month, score) = crate_overall_score(crates, &k, &v, renderer, contributors_count);
     crates.index_crate(&k, score)?;
     search_sender.send((v.clone(), downloads_per_month, score))?;
@@ -207,7 +208,7 @@ fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersi
 
     let mut direct_rev_deps = 0;
     let mut indirect_reverse_optional_deps = 0;
-    if let Some(deps) = crates.dependents_stats_of_crates_io_crate(k.short_name()) {
+    if let Some(deps) = crates.dependents_stats_of(k.origin()) {
         direct_rev_deps = deps.direct as u32;
         indirect_reverse_optional_deps = (deps.runtime.def as u32 + deps.runtime.opt as u32)
             .max(deps.dev as u32)

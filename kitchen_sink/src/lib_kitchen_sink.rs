@@ -24,6 +24,7 @@ pub use crates_io_client::OwnerKind;
 pub use github_info::User;
 pub use github_info::UserOrg;
 pub use github_info::UserType;
+use rich_crate::ManifestExt;
 pub use rich_crate::Edition;
 pub use rich_crate::Include;
 pub use rich_crate::MaintenanceStatus;
@@ -429,11 +430,10 @@ impl KitchenSink {
     fn rich_crate_version_from_index(&self, krate: &Version, fetch_type: CrateData) -> CResult<RichCrateVersion> {
         let cache_key = format!("{}-{}", krate.name(), krate.version()).into_boxed_str();
 
-        if fetch_type != CrateData::FullNoDerived {
-            let cache = self.loaded_rich_crate_version_cache.read().unwrap();
-            if let Some(krate) = cache.get(&cache_key) {
-                return Ok(krate.clone());
-            }
+        assert!(fetch_type != CrateData::FullNoDerived);
+        let cache = self.loaded_rich_crate_version_cache.read().unwrap();
+        if let Some(krate) = cache.get(&cache_key) {
+            return Ok(krate.clone());
         }
 
         let krate = self.rich_crate_version_verbose(krate, fetch_type).map(|(krate, _)| krate)?;
@@ -446,29 +446,24 @@ impl KitchenSink {
     /// With warnings
     pub fn rich_crate_version_verbose(&self, krate: &Version, fetch_type: CrateData) -> CResult<(RichCrateVersion, Warnings)> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
+        assert!(fetch_type != CrateData::FullNoDerived);
 
         let key = (krate.name(), krate.version());
-        let cached = if fetch_type != CrateData::FullNoDerived {
-            match self.crate_derived_cache.get(key.0)? {
-                Some((ver, res, warn)) => {
-                    if key.1 != ver {
-                        None
-                    } else {
-                        Some((res, warn))
-                    }
-                },
-                None => None,
-            }
-        } else {
-            None
+        let cached = match self.crate_derived_cache.get(key.0)? {
+            Some((ver, res, warn)) => {
+                if key.1 != ver {
+                    None
+                } else {
+                    Some((res, warn))
+                }
+            },
+            None => None,
         };
 
         let (d, warn) = if let Some(res) = cached {res} else {
             let (d, warn) = self.rich_crate_version_data(krate, fetch_type).with_context(|_| format!("failed geting rich crate data for {}", key.0))?;
             if fetch_type == CrateData::Full {
                 self.crate_derived_cache.set(key.0, (key.1.to_string(), d.clone(), warn.clone()))?;
-            } else if fetch_type == CrateData::FullNoDerived {
-                self.crate_derived_cache.delete(key.0).context("clear cache 2")?;
             }
             (d, warn)
         };
@@ -711,7 +706,7 @@ impl KitchenSink {
         }
     }
 
-    pub fn is_build_or_dev(&self, k: &RichCrateVersion) -> (bool, bool) {
+    pub fn is_build_or_dev(&self, k: &Origin) -> (bool, bool) {
         self.dependents_stats_of(k)
         .map(|d| {
             let is_build = d.build.def > 3 * (d.runtime.def + d.runtime.opt + 5);
@@ -855,12 +850,11 @@ impl KitchenSink {
         let _ = self.index.deps_stats();
     }
 
-    pub fn dependents_stats_of(&self, krate: &RichCrateVersion) -> Option<RevDependencies> {
-        self.dependents_stats_of_crates_io_crate(krate.short_name())
-    }
-
-    pub fn dependents_stats_of_crates_io_crate(&self, crate_name: &str) -> Option<RevDependencies> {
-        self.index.deps_stats()?.counts.get(crate_name).cloned()
+    pub fn dependents_stats_of(&self, origin: &Origin) -> Option<RevDependencies> {
+        match origin {
+            Origin::CratesIo(crate_name) => self.index.deps_stats()?.counts.get(crate_name).cloned(),
+            _ => unimplemented!(),
+        }
     }
 
     /// (latest, pop)
@@ -1007,14 +1001,19 @@ impl KitchenSink {
         Ok(())
     }
 
-    pub fn index_crate_highest_version(&self, v: &RichCrateVersion) -> CResult<()> {
+    pub fn index_crate_highest_version(&self, k: &RichCrate) -> CResult<()> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
+
+        let origin = k.origin();
+        let ver = self.index.crate_version_latest_unstable(origin).context("rich_crate_version")?;
+
+        let (v, _warn) = self.rich_crate_version_data(ver, CrateData::FullNoDerived)?;
 
         // direct deps are used as extra keywords for similarity matching,
         // but we're taking only niche deps to group similar niche crates together
         let raw_deps_stats = self.index.deps_stats().ok_or(KitchenSinkErr::DepsStatsNotAvailable)?;
         let mut weighed_deps = Vec::<(&str, f32)>::new();
-        let all_deps = v.direct_dependencies()?;
+        let all_deps = v.manifest.direct_dependencies()?;
         let all_deps = [(all_deps.0, 1.0), (all_deps.2, 0.33)];
         // runtime and (lesser) build-time deps
         for (deps, overall_weight) in all_deps.iter() {
@@ -1028,27 +1027,29 @@ impl KitchenSink {
                 }
             }
         }
-        let (is_build, is_dev) = self.is_build_or_dev(v);
+        let (is_build, is_dev) = self.is_build_or_dev(origin);
+        let package = v.manifest.package.as_ref().expect("package");
         self.crate_db.index_latest(CrateVersionData {
-            name: v.short_name(),
-            keywords: v.keywords(Include::AuthoritativeOnly).map(|k| k.trim().to_lowercase()).collect(),
-            description: v.description(),
-            alternative_description: v.alternative_description(),
-            readme_text: v.readme().map(|r| render_readme::Renderer::new(None).visible_text(&r.markup)),
-            category_slugs: v.category_slugs(Include::AuthoritativeOnly).collect(),
-            authors: v.authors(),
-            origin: v.origin(),
-            repository: v.repository(),
+            name: &package.name,
+            keywords: package.keywords.iter().map(|k| k.trim().to_lowercase()).collect(),
+            description: package.description.as_ref().map(|s| s.as_str()),
+            alternative_description: v.derived.github_description.as_ref().map(|s| s.as_str()),
+            readme_text: v.readme.map(|r| render_readme::Renderer::new(None).visible_text(&r.markup)),
+            category_slugs: categories::Categories::fixed_category_slugs(&package.categories),
+            authors: &package.authors.iter().map(|a| Author::new(a)).collect::<Vec<_>>(),
+            origin,
+            repository: package.repository.as_ref().and_then(|r| Repo::new(r).ok()).as_ref(),
             deps_stats: &weighed_deps,
-            features: v.features(),
-            is_sys: v.is_sys(),
-            has_bin: v.has_bin(),
-            is_yanked: v.is_yanked(),
-            has_cargo_bin: v.has_cargo_bin(),
-            is_proc_macro: v.is_proc_macro(),
+            features: &v.manifest.features,
+            is_sys: v.manifest.is_sys(v.has_buildrs || package.build.is_some()),
+            has_bin: v.manifest.has_bin(),
+            is_yanked: ver.is_yanked(),
+            has_cargo_bin: v.manifest.has_cargo_bin(),
+            is_proc_macro: v.manifest.is_proc_macro(),
             is_build, is_dev,
-            links: v.links(),
+            links: v.manifest.links(),
         })?;
+        self.crate_derived_cache.delete(k.name()).context("clear cache 2")?;
         Ok(())
     }
 

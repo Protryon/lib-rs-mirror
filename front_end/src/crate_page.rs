@@ -163,11 +163,11 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn is_build_or_dev(&self) -> (bool, bool) {
-        self.kitchen_sink.is_build_or_dev(self.ver)
+        self.kitchen_sink.is_build_or_dev(self.ver.origin())
     }
 
     pub fn dependents_stats(&self) -> Option<(u32, u32)> {
-        self.kitchen_sink.dependents_stats_of(self.ver).map(|d| (
+        self.kitchen_sink.dependents_stats_of(self.ver.origin()).map(|d| (
             d.runtime.def as u32 + d.runtime.opt as u32 +
             d.build.def as u32  + d.build.opt as u32 +
             d.dev as u32, d.direct as u32))

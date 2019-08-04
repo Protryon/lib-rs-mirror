@@ -1000,7 +1000,7 @@ impl KitchenSink {
         Ok(())
     }
 
-    pub fn index_crate_highest_version(&self, k: &RichCrate) -> CResult<()> {
+    pub fn index_crate_highest_version(&self, k: &RichCrate) -> CResult<RichCrateVersion> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
 
         let origin = k.origin();
@@ -1033,7 +1033,7 @@ impl KitchenSink {
             keywords: package.keywords.iter().map(|k| k.trim().to_lowercase()).collect(),
             description: package.description.as_ref().map(|s| s.as_str()),
             alternative_description: v.derived.github_description.as_ref().map(|s| s.as_str()),
-            readme_text: v.readme.map(|r| render_readme::Renderer::new(None).visible_text(&r.markup)),
+            readme_text: v.readme.as_ref().map(|r| render_readme::Renderer::new(None).visible_text(&r.markup)),
             category_slugs: categories::Categories::fixed_category_slugs(&package.categories),
             authors: &package.authors.iter().map(|a| Author::new(a)).collect::<Vec<_>>(),
             origin,
@@ -1049,7 +1049,7 @@ impl KitchenSink {
             links: v.manifest.links(),
         })?;
         self.crate_derived_cache.delete(k.name()).context("clear cache 2")?;
-        Ok(())
+        Ok(RichCrateVersion::new(origin.clone(), v.manifest, v.derived, v.readme, v.lib_file.map(|s| s.into()), v.path_in_repo, v.has_buildrs, v.has_code_of_conduct, ver.is_yanked()))
     }
 
     // deps that are closely related to crates in some category

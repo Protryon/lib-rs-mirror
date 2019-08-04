@@ -325,7 +325,11 @@ fn print_res<T>(res: Result<T, failure::Error>) {
     if let Err(e) = res {
         eprintln!("••• Error: {}", e);
         for c in e.iter_chain().skip(1) {
-            eprintln!("•   error: -- {}", c);
+            let s = c.to_string();
+            eprintln!("•   error: -- {}", s);
+            if s.starts_with("Too many open files") {
+                std::process::exit(7);
+            }
         }
     }
 }

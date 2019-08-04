@@ -62,7 +62,7 @@ impl CratesIoClient {
         let res = self.crates.get_cached((&newkey, version), &url)?;
         if let Some(data) = &res {
             if data.len() < 10 || data[0] != 31 || data[1] != 139 {
-                return Err(Error::Other("Not tarball".into()));
+                return Err(Error::Other(format!("Not tarball: {}", url)));
             }
         }
         Ok(res)

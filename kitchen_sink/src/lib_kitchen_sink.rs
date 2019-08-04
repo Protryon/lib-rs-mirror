@@ -136,7 +136,7 @@ pub struct KitchenSink {
     user_db: user_db::UserDb,
     gh: github_info::GitHub,
     crate_derived_cache: TempCache<(String, RichCrateVersionCacheData, Warnings)>,
-    loaded_rich_crate_version_cache: RwLock<FxHashMap<Box<str>, RichCrateVersion>>,
+    loaded_rich_crate_version_cache: RwLock<FxHashMap<Origin, RichCrateVersion>>,
     category_crate_counts: LazyOnce<Option<HashMap<String, u32>>>,
     removals: LazyOnce<HashMap<Origin, f64>>,
     top_crates_cached: RwLock<FxHashMap<String, Arc<Vec<Origin>>>>,
@@ -416,21 +416,19 @@ impl KitchenSink {
     /// There's no support for getting anything else than the latest version.
     pub fn rich_crate_version(&self, origin: &Origin) -> CResult<RichCrateVersion> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
-        let ver = self.index.crate_version_latest_unstable(origin).context("rich_crate_version")?;
 
-        self.rich_crate_version_from_index( ver)
-    }
-
-    fn rich_crate_version_from_index(&self, krate: &Version) -> CResult<RichCrateVersion> {
-        let cache_key = format!("{}-{}", krate.name(), krate.version()).into_boxed_str();
-
-        if let Some(krate) = self.loaded_rich_crate_version_cache.read().get(&cache_key) {
+        if let Some(krate) = self.loaded_rich_crate_version_cache.read().get(origin) {
             return Ok(krate.clone());
         }
 
-        let krate = self.rich_crate_version_verbose(krate).map(|(krate, _)| krate)?;
-        self.loaded_rich_crate_version_cache.write().insert(cache_key, krate.clone());
+        let krate = if let Ok((manifest, derived)) = self.crate_db.rich_crate_version_data(origin) {
+            RichCrateVersion::new(origin.clone(), manifest, derived)
+        } else {
+            let ver = self.index.crate_version_latest_unstable(origin).context("rich_crate_version")?;
+            self.rich_crate_version_verbose(ver).map(|(krate, _)| krate)?
+        };
 
+        self.loaded_rich_crate_version_cache.write().insert(origin.clone(), krate.clone());
         Ok(krate)
     }
 
@@ -572,7 +570,7 @@ impl KitchenSink {
             derived_categories = Some({
                 let keywords_iter = package.keywords.iter().map(|s| s.as_str());
                 self.crate_db.guess_crate_categories(&origin, keywords_iter).context("catdb")?
-                .into_iter().map(|(_, c)| c).collect()
+                    .into_iter().map(|(_, c)| c).collect()
             });
         }
 

@@ -53,6 +53,25 @@ impl CrateDb {
             );
             CREATE UNIQUE INDEX IF NOT EXISTS crate_versions_idx on crate_versions(crate_id, version);
 
+            CREATE TABLE IF NOT EXISTS crate_derived (
+                crate_id        INTEGER NOT NULL UNIQUE,
+                readme          TEXT,
+                readme_format   TEXT,
+                readme_base_url TEXT,
+                readme_base_image_url TEXT,
+                crate_compressed_size INTEGER NOT NULL,
+                crate_decompressed_size INTEGER NOT NULL,
+                github_keywords TEXT,
+                capitalized_name TEXT NOT NULL,
+                lib_file        TEXT,
+                has_buildrs     INTEGER, -- bool
+                is_nightly      INTEGER, -- bool
+                is_yanked       INTEGER, -- bool
+                has_code_of_conduct       INTEGER, -- bool
+                manifest        BLOB NOT NULL,
+                language_stats  BLOB NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS crate_downloads (
                 crate_id        INTEGER NOT NULL,
                 period          INTEGER NOT NULL,

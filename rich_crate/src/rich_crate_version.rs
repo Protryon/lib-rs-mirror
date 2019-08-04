@@ -6,11 +6,9 @@ use cargo_toml::{Dependency, Manifest, Package};
 pub use cargo_toml::{DepsSet, Edition, FeatureSet, MaintenanceStatus, TargetDepsSet};
 use categories::Categories;
 use repo_url::Repo;
-use render_readme::Renderer;
 use semver;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
-use std::collections::HashMap;
 use std::collections::HashSet;
 use udedokei;
 
@@ -479,7 +477,6 @@ pub struct Derived {
     pub crate_decompressed_size: u32,
     pub is_nightly: bool,
     pub capitalized_name: String,
-
     pub readme: Option<Readme>,
     pub lib_file: Option<String>,
     pub path_in_repo: Option<String>,

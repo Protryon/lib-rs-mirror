@@ -71,7 +71,7 @@ use std::env;
 use std::mem;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::sync::RwLock;
+use parking_lot::RwLock;
 
 pub type CError = failure::Error;
 pub type CResult<T> = Result<T, CError>;
@@ -431,14 +431,13 @@ impl KitchenSink {
         let cache_key = format!("{}-{}", krate.name(), krate.version()).into_boxed_str();
 
         assert!(fetch_type != CrateData::FullNoDerived);
-        let cache = self.loaded_rich_crate_version_cache.read().unwrap();
-        if let Some(krate) = cache.get(&cache_key) {
+        if let Some(krate) = self.loaded_rich_crate_version_cache.read().get(&cache_key) {
             return Ok(krate.clone());
         }
 
         let krate = self.rich_crate_version_verbose(krate, fetch_type).map(|(krate, _)| krate)?;
         if fetch_type == CrateData::Full {
-            self.loaded_rich_crate_version_cache.write().unwrap().insert(cache_key, krate.clone());
+            self.loaded_rich_crate_version_cache.write().insert(cache_key, krate.clone());
         }
         Ok(krate)
     }
@@ -1431,14 +1430,14 @@ impl KitchenSink {
     // Sorted from the top, returns origins
     pub fn top_crates_in_category(&self, slug: &str) -> CResult<Arc<Vec<Origin>>> {
         {
-            let cache = self.top_crates_cached.read().expect("poison");
+            let cache = self.top_crates_cached.read();
             if let Some(category) = cache.get(slug) {
                 return Ok(category.clone());
             }
         }
         let total_count = self.category_crate_count(slug)?;
         let wanted_num = ((total_count/3+25)/50 * 50).max(100);
-        let mut cache = self.top_crates_cached.write().expect("poison");
+        let mut cache = self.top_crates_cached.write();
         use std::collections::hash_map::Entry::*;
         Ok(match cache.entry(slug.to_owned()) {
             Occupied(e) => Arc::clone(e.get()),

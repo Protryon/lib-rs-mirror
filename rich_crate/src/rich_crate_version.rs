@@ -81,54 +81,8 @@ impl RichCrateVersion {
     }
 
     /// Finds preferred capitalization for the name
-    pub fn capitalized_name(&self) -> String {
-        let mut first_capital = String::with_capacity(self.short_name().len());
-        let mut ch = self.short_name().chars();
-        if let Some(f) = ch.next() {
-            first_capital.extend(f.to_uppercase());
-            first_capital.extend(ch.map(|c| if c == '_' {' '} else {c}));
-        }
-
-        let mut words = HashMap::with_capacity(100);
-        {
-            let name = self.short_name().to_lowercase();
-            let shouty = self.short_name().to_uppercase();
-            let mut add_words = |s: &str| {
-                for s in s.split(|c: char| !c.is_ascii_alphanumeric() && c != '-' && c != '_').filter(|&w| w != name && w.eq_ignore_ascii_case(&name)) {
-                    let mut points = 2;
-                    if name.len() > 2 {
-                        if s[1..] != name[1..] {
-                            points += 1;
-                        }
-                        if s != first_capital && s != shouty {
-                            points += 1;
-                        }
-                    }
-                    if let Some(count) = words.get_mut(s) {
-                        *count += points;
-                        continue;
-                    }
-                    words.insert(s.to_string(), points);
-                }
-            };
-            if let Some(r) = self.readme() {
-                let s = Renderer::new(None).visible_text(&r.markup);
-                add_words(&s);
-            }
-            add_words(self.short_name());
-            if let Some(s) = self.description() {add_words(s);}
-            if let Some(s) = self.alternative_description() {add_words(s);}
-            if let Some(s) = &self.derived.github_name {add_words(s);}
-            if let Some(s) = self.homepage() {add_words(s);}
-            if let Some(s) = self.documentation() {add_words(s);}
-            if let Some(r) = self.repository() {add_words(r.url.as_str());}
-        }
-
-        if let Some((name, _)) = words.into_iter().max_by_key(|&(_, v)| v) {
-            name
-        } else {
-            first_capital
-        }
+    pub fn capitalized_name(&self) -> &str {
+        &self.derived.capitalized_name
     }
 
     pub fn category_slugs(&self, include: Include) -> impl Iterator<Item = Cow<'_, str>> {
@@ -202,11 +156,6 @@ impl RichCrateVersion {
             if d.contains(". ") {d} // multiple sentences, leave them alone
             else {d.trim_end_matches('.')}
         })
-    }
-
-    /// Currently from github
-    pub fn alternative_description(&self) -> Option<&str> {
-        self.derived.github_description.as_ref().map(|s| s.as_str())
     }
 
     /// Only explicitly-specified authors
@@ -530,6 +479,7 @@ pub struct Derived {
     pub crate_compressed_size: u32,
     pub crate_decompressed_size: u32,
     pub is_nightly: bool,
+    pub capitalized_name: String,
 
     pub readme: Option<Readme>,
     pub lib_file: Option<String>,

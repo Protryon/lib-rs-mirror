@@ -608,13 +608,29 @@ impl KitchenSink {
             meta.lib_file = None;
         }
 
+        // Process crate's text to guess non-lowercased name
+        let mut words = vec![package.name.as_str()];
+        let readme_txt;
+        if let Some(ref r) = meta.readme {
+            readme_txt = render_readme::Renderer::new(None).visible_text(&r.markup);
+            words.push(&readme_txt);
+        }
+        if let Some(ref s) = package.description {words.push(s);}
+        if let Some(ref s) = github_description {words.push(s);}
+        if let Some(ref s) = github_name {words.push(s);}
+        if let Some(ref s) = package.homepage {words.push(s);}
+        if let Some(ref s) = package.documentation {words.push(s);}
+        if let Some(ref s) = package.repository {words.push(s);}
+
+        let capitalized_name = Self::capitalized_name(&package.name, words.into_iter());
+
         let derived = Derived {
+            capitalized_name,
             language_stats: meta.language_stats,
             crate_compressed_size: crate_compressed_size as u32,
             // sometimes uncompressed sources without junk are smaller than tarball with junk
             crate_decompressed_size: meta.decompressed_size.max(crate_compressed_size) as u32,
             is_nightly: meta.is_nightly,
-
             has_buildrs: has_buildrs,
             has_code_of_conduct: has_code_of_conduct,
             readme: meta.readme,
@@ -1043,6 +1059,43 @@ impl KitchenSink {
         })?;
         self.crate_derived_cache.delete(k.name()).context("clear cache 2")?;
         Ok(RichCrateVersion::new(origin.clone(), v.manifest, v.derived))
+    }
+
+    fn capitalized_name<'a>(name: &str, source_words: impl Iterator<Item = &'a str>) -> String {
+        let mut first_capital = String::with_capacity(name.len());
+        let mut ch = name.chars();
+        if let Some(f) = ch.next() {
+            first_capital.extend(f.to_uppercase());
+            first_capital.extend(ch.map(|c| if c == '_' {' '} else {c}));
+        }
+
+        let mut words = HashMap::with_capacity(100);
+        let lcname = name.to_lowercase();
+        let shouty = name.to_uppercase();
+        for s in source_words {
+            for s in s.split(|c: char| !c.is_ascii_alphanumeric() && c != '-' && c != '_').filter(|&w| w != lcname && w.eq_ignore_ascii_case(&lcname)) {
+                let mut points = 2;
+                if lcname.len() > 2 {
+                    if s[1..] != lcname[1..] {
+                        points += 1;
+                    }
+                    if s != first_capital && s != shouty {
+                        points += 1;
+                    }
+                }
+                if let Some(count) = words.get_mut(s) {
+                    *count += points;
+                    continue;
+                }
+                words.insert(s.to_string(), points);
+            }
+        }
+
+        if let Some((name, _)) = words.into_iter().max_by_key(|&(_, v)| v) {
+            name
+        } else {
+            first_capital
+        }
     }
 
     // deps that are closely related to crates in some category

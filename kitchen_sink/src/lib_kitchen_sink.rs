@@ -1167,11 +1167,9 @@ impl KitchenSink {
 
     /// If given crate is a sub-crate, return crate that owns it.
     /// The relationship is based on directory layout of monorepos.
-    pub fn parent_crate(&self, child: &RichCrateVersion) -> Option<RichCrateVersion> {
+    pub fn parent_crate(&self, child: &RichCrateVersion) -> Option<Origin> {
         let repo = child.repository()?;
-        let origin = self.crate_db.parent_crate(repo, child.short_name()).ok().and_then(|v| v)?;
-        self.rich_crate_version(&origin, CrateData::Minimal)
-            .map_err(|e| eprintln!("parent crate: {} {:?}", e, origin)).ok()
+        self.crate_db.parent_crate(repo, child.short_name()).ok()?
     }
 
     pub fn cachebust_string_for_repo(&self, crate_repo: &Repo) -> CResult<String> {

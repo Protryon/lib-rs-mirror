@@ -185,7 +185,9 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn parent_crate(&self) -> Option<RichCrateVersion> {
-        self.kitchen_sink.parent_crate(self.ver)
+        let origin = self.kitchen_sink.parent_crate(self.ver)?;
+        self.kitchen_sink.rich_crate_version(&origin, CrateData::Minimal)
+            .map_err(|e| eprintln!("parent crate: {} {:?}", e, origin)).ok()
     }
 
     pub fn render_markdown_str(&self, s: &str) -> templates::Html<String> {

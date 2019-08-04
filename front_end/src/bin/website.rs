@@ -10,7 +10,7 @@ use categories;
 use categories::CategoryMap;
 use failure::ResultExt;
 use kitchen_sink::running;
-use kitchen_sink::{CrateData, KitchenSink, Origin};
+use kitchen_sink::{KitchenSink, Origin};
 use parking_lot::Mutex;
 use rayon::prelude::*;
 use render_readme::ImageOptimAPIFilter;
@@ -87,7 +87,7 @@ fn render_categories(
                         return Ok(()); // skip it
                     },
                 };
-                let ver = crates.rich_crate_version(origin, CrateData::Full).context("get rich crate")?;
+                let ver = crates.rich_crate_version(origin).context("get rich crate")?;
                 running()?;
                 let path = PathBuf::from(format!("public/crates/{}.html", ver.short_name()));
                 println!("http://localhost:3000/crates/{}", ver.short_name());

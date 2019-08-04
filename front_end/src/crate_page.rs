@@ -9,7 +9,7 @@ use chrono::Duration;
 use kitchen_sink::CResult;
 use kitchen_sink::CrateAuthor;
 use kitchen_sink::DepInfMap;
-use kitchen_sink::{CrateData, DepTy, KitchenSink, Origin};
+use kitchen_sink::{DepTy, KitchenSink, Origin};
 use locale::Numeric;
 use rayon::prelude::*;
 use render_readme::Renderer;
@@ -186,7 +186,7 @@ impl<'a> CratePage<'a> {
 
     pub fn parent_crate(&self) -> Option<RichCrateVersion> {
         let origin = self.kitchen_sink.parent_crate(self.ver)?;
-        self.kitchen_sink.rich_crate_version(&origin, CrateData::Minimal)
+        self.kitchen_sink.rich_crate_version(&origin)
             .map_err(|e| eprintln!("parent crate: {} {:?}", e, origin)).ok()
     }
 
@@ -734,14 +734,14 @@ impl<'a> CratePage<'a> {
 
     fn get_crate_of_dependency(&self, name: &str, _semver: ()) -> CResult<RichCrateVersion> {
         // FIXME: caching doesn't hold multiple versions, so fetchnig of precise old versions is super expensive
-        return self.kitchen_sink.rich_crate_version(&Origin::from_crates_io_name(name), CrateData::Full);
+        return self.kitchen_sink.rich_crate_version(&Origin::from_crates_io_name(name));
 
         // let krate = self.kitchen_sink.index.crate_by_name(&Origin::from_crates_io_name(name))?;
         // let ver = krate.versions()
         //     .iter().rev()
         //     .find(|k| SemVer::parse(k.version()).ok().map_or(false, |v| &v == semver))
         //     .unwrap_or_else(|| krate.latest_version());
-        // self.kitchen_sink.rich_crate_version_from_index(ver, CrateData::Full)
+        // self.kitchen_sink.rich_crate_version_from_index(ver)
     }
 
     fn is_same_project(one: &RichCrateVersion, two: &RichCrateVersion) -> bool {

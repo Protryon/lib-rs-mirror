@@ -420,32 +420,29 @@ impl KitchenSink {
     /// This function is quite slow, as it reads everything about the crate.
     ///
     /// There's no support for getting anything else than the latest version.
-    pub fn rich_crate_version(&self, origin: &Origin, fetch_type: CrateData) -> CResult<RichCrateVersion> {
+    pub fn rich_crate_version(&self, origin: &Origin) -> CResult<RichCrateVersion> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
         let ver = self.index.crate_version_latest_unstable(origin).context("rich_crate_version")?;
 
-        self.rich_crate_version_from_index( ver, fetch_type)
+        self.rich_crate_version_from_index( ver)
     }
 
-    fn rich_crate_version_from_index(&self, krate: &Version, fetch_type: CrateData) -> CResult<RichCrateVersion> {
+    fn rich_crate_version_from_index(&self, krate: &Version) -> CResult<RichCrateVersion> {
         let cache_key = format!("{}-{}", krate.name(), krate.version()).into_boxed_str();
 
-        assert!(fetch_type != CrateData::FullNoDerived);
         if let Some(krate) = self.loaded_rich_crate_version_cache.read().get(&cache_key) {
             return Ok(krate.clone());
         }
 
-        let krate = self.rich_crate_version_verbose(krate, fetch_type).map(|(krate, _)| krate)?;
-        if fetch_type == CrateData::Full {
-            self.loaded_rich_crate_version_cache.write().insert(cache_key, krate.clone());
-        }
+        let krate = self.rich_crate_version_verbose(krate).map(|(krate, _)| krate)?;
+        self.loaded_rich_crate_version_cache.write().insert(cache_key, krate.clone());
+
         Ok(krate)
     }
 
     /// With warnings
-    pub fn rich_crate_version_verbose(&self, krate: &Version, fetch_type: CrateData) -> CResult<(RichCrateVersion, Warnings)> {
+    pub fn rich_crate_version_verbose(&self, krate: &Version) -> CResult<(RichCrateVersion, Warnings)> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
-        assert!(fetch_type != CrateData::FullNoDerived);
 
         let key = (krate.name(), krate.version());
         let cached = match self.crate_derived_cache.get(key.0)? {
@@ -460,10 +457,8 @@ impl KitchenSink {
         };
 
         let (d, warn) = if let Some(res) = cached {res} else {
-            let (d, warn) = self.rich_crate_version_data(krate, fetch_type).with_context(|_| format!("failed geting rich crate data for {}", key.0))?;
-            if fetch_type == CrateData::Full {
-                self.crate_derived_cache.set(key.0, (key.1.to_string(), d.clone(), warn.clone()))?;
-            }
+            let (d, warn) = self.rich_crate_version_data(krate).with_context(|_| format!("failed geting rich crate data for {}", key.0))?;
+            self.crate_derived_cache.set(key.0, (key.1.to_string(), d.clone(), warn.clone()))?;
             (d, warn)
         };
         Ok((RichCrateVersion::new(Origin::from_crates_io_name(krate.name()), d.manifest, d.derived, d.readme, d.lib_file.map(|s| s.into()), d.path_in_repo, d.has_buildrs, d.has_code_of_conduct, krate.is_yanked()), warn))
@@ -480,7 +475,7 @@ impl KitchenSink {
         None
     }
 
-    fn rich_crate_version_data(&self, latest: &crates_index::Version, fetch_type: CrateData) -> CResult<(RichCrateVersionCacheData, Warnings)> {
+    fn rich_crate_version_data(&self, latest: &crates_index::Version) -> CResult<(RichCrateVersionCacheData, Warnings)> {
         let mut warnings = HashSet::new();
 
         let name = latest.name();
@@ -489,7 +484,7 @@ impl KitchenSink {
 
         let (crate_tarball, crates_io_meta) = rayon::join(
             || self.crates_io.crate_data(name, ver).context("crate_file"),
-            || self.crates_io_meta(&origin, fetch_type == CrateData::FullNoDerived));
+            || self.crates_io_meta(&origin, true));
 
         let crates_io_meta = crates_io_meta?.meta.krate;
         let crate_tarball = crate_tarball?.ok_or_else(|| KitchenSinkErr::DataNotFound(format!("{}-{}", name, ver)))?;
@@ -524,11 +519,7 @@ impl KitchenSink {
 
         let maybe_repo = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
         let path_in_repo = match maybe_repo.as_ref() {
-            Some(repo) => if fetch_type != CrateData::Minimal {
-                self.crate_db.path_in_repo(repo, name)?
-            } else {
-                None
-            },
+            Some(repo) => self.crate_db.path_in_repo(repo, name)?,
             None => None,
         };
 
@@ -550,14 +541,12 @@ impl KitchenSink {
         let has_readme = meta.readme.is_some();
         if !has_readme {
             warnings.insert(Warning::NoReadmeProperty);
-            if fetch_type != CrateData::Minimal {
-                warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()));
-                let has_readme = meta.readme.is_some();
-                if !has_readme && meta.manifest.package.as_ref().map_or(false, |p| p.readme.is_some()) {
-                    // readmes in form of readme="../foo.md" are lost in packaging,
-                    // and the only copy exists in crates.io own api
-                    self.add_readme_from_crates_io(&mut meta, name, ver);
-                }
+            warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()));
+            let has_readme = meta.readme.is_some();
+            if !has_readme && meta.manifest.package.as_ref().map_or(false, |p| p.readme.is_some()) {
+                // readmes in form of readme="../foo.md" are lost in packaging,
+                // and the only copy exists in crates.io own api
+                self.add_readme_from_crates_io(&mut meta, name, ver);
             }
         }
 
@@ -565,7 +554,7 @@ impl KitchenSink {
 
         // Guess keywords if none were specified
         // TODO: also ignore useless keywords that are unique db-wide
-        if package.keywords.is_empty() && fetch_type != CrateData::Minimal {
+        if package.keywords.is_empty() {
             let gh = match maybe_repo.as_ref() {
                 Some(repo) => if let RepoHost::GitHub(ref gh) = repo.host() {
                     self.gh.topics(gh, &self.cachebust_string_for_repo(repo).context("fetch topics")?)?
@@ -582,7 +571,7 @@ impl KitchenSink {
                     derived.github_keywords = Some(topics);
                 }
             }
-            if derived.github_keywords.is_none() && fetch_type != CrateData::FullNoDerived {
+            if derived.github_keywords.is_none() {
                 derived.keywords = Some(self.crate_db.keywords(&origin).context("keywordsdb")?);
             }
         }
@@ -590,7 +579,7 @@ impl KitchenSink {
         Self::override_bad_categories(package, &meta.manifest.dependencies);
 
         // Guess categories if none were specified
-        if categories::Categories::filtered_category_slugs(&package.categories).next().is_none() && fetch_type == CrateData::Full {
+        if categories::Categories::filtered_category_slugs(&package.categories).next().is_none() {
             derived.categories = Some({
                 let keywords_iter = package.keywords.iter().map(|s| s.as_str());
                 self.crate_db.guess_crate_categories(&origin, keywords_iter).context("catdb")?
@@ -608,20 +597,18 @@ impl KitchenSink {
 
         warnings.extend(self.remove_redundant_links(package, maybe_repo.as_ref()));
 
-        if fetch_type != CrateData::Minimal {
-            if let Some(ref crate_repo) = maybe_repo {
-                if let Some(ghrepo) = self.github_repo(crate_repo)? {
-                    if package.homepage.is_none() {
-                        if let Some(url) = ghrepo.github_page_url {
-                            package.homepage = Some(url);
-                        } else if let Some(url) = ghrepo.homepage {
-                            package.homepage = Some(url);
-                        }
-                        warnings.extend(self.remove_redundant_links(package, maybe_repo.as_ref()));
+        if let Some(ref crate_repo) = maybe_repo {
+            if let Some(ghrepo) = self.github_repo(crate_repo)? {
+                if package.homepage.is_none() {
+                    if let Some(url) = ghrepo.github_page_url {
+                        package.homepage = Some(url);
+                    } else if let Some(url) = ghrepo.homepage {
+                        package.homepage = Some(url);
                     }
-                    derived.github_description = ghrepo.description;
-                    derived.github_name = Some(ghrepo.name);
+                    warnings.extend(self.remove_redundant_links(package, maybe_repo.as_ref()));
                 }
+                derived.github_description = ghrepo.description;
+                derived.github_name = Some(ghrepo.name);
             }
         }
 
@@ -1006,7 +993,7 @@ impl KitchenSink {
         let origin = k.origin();
         let ver = self.index.crate_version_latest_unstable(origin).context("rich_crate_version")?;
 
-        let (v, _warn) = self.rich_crate_version_data(ver, CrateData::FullNoDerived)?;
+        let (v, _warn) = self.rich_crate_version_data(ver)?;
 
         // direct deps are used as extra keywords for similarity matching,
         // but we're taking only niche deps to group similar niche crates together
@@ -1511,13 +1498,6 @@ impl KitchenSink {
     fn repo_commits(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Option<Vec<github_info::CommitMeta>>> {
         Ok(self.gh.commits(repo, as_of_version)?)
     }
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum CrateData {
-    Minimal,
-    Full,
-    FullNoDerived,
 }
 
 /// This is used to uniquely identify authors based on as little information as is available

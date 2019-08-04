@@ -1,6 +1,6 @@
 use rich_crate::RichCrate;
 use std::collections::HashMap;
-use kitchen_sink::{KitchenSink, CratesIndexCrate, Origin, CrateData, stopped};
+use kitchen_sink::{KitchenSink, CratesIndexCrate, Origin,, stopped};
 use fxhash::FxHashMap;
 use fxhash::FxHashSet;
 use rayon::prelude::*;

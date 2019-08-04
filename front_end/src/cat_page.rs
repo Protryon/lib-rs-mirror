@@ -3,7 +3,7 @@ use crate::Page;
 use categories::Category;
 use categories::CATEGORIES;
 use failure::Error;
-use kitchen_sink::{CrateData, KitchenSink};
+use kitchen_sink::KitchenSink;
 use rayon::prelude::*;
 use render_readme::Renderer;
 use rich_crate::RichCrateVersion;
@@ -30,7 +30,7 @@ impl<'a> CatPage<'a> {
                 .par_iter()
                 .with_max_len(1)
                 .filter_map(|o| {
-                    let c = match crates.rich_crate_version(&o, CrateData::Full) {
+                    let c = match crates.rich_crate_version(&o) {
                         Ok(c) => c,
                         Err(e) => {
                             eprintln!("Skipping {:?} because {}", o, e);

@@ -10,7 +10,6 @@ use front_end;
 use futures::future::{self, Future};
 use futures_cpupool::CpuPool;
 use kitchen_sink;
-use kitchen_sink::CrateData;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::Origin;
 use render_readme::{Highlighter, ImageOptimAPIFilter, Renderer};
@@ -311,7 +310,7 @@ fn render_crate_page(state: &AServerState, crate_name: String) -> impl Future<It
             crates.prewarm();
             let origin = Origin::from_crates_io_name(&crate_name);
             let all = crates.rich_crate(&origin)?;
-            let ver = crates.rich_crate_version(&origin, CrateData::Full)?;
+            let ver = crates.rich_crate_version(&origin)?;
             let mut page: Vec<u8> = Vec::with_capacity(50000);
             front_end::render_crate_page(&mut page, &all, &ver, &crates, &state2.markup)?;
             Ok(page)

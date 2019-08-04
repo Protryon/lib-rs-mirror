@@ -6,7 +6,7 @@ use categories::CATEGORIES;
 use failure;
 use kitchen_sink::stopped;
 use kitchen_sink::CrateAuthor;
-use kitchen_sink::{CrateData, KitchenSink};
+use kitchen_sink::KitchenSink;
 use rayon::prelude::*;
 use rich_crate::Origin;
 use rich_crate::RichCrate;
@@ -53,7 +53,7 @@ impl<'a> HomePage<'a> {
 
             let new: Vec<_> =
                 self.crates.recently_updated_crates_in_category(&cat.cat.slug).unwrap().into_iter().filter(|c| seen.get(&c).is_none()).take(3).collect();
-            let new: Vec<_> = new.into_par_iter().with_max_len(1).filter_map(|c| self.crates.rich_crate_version(&c, CrateData::Full).ok()).collect();
+            let new: Vec<_> = new.into_par_iter().with_max_len(1).filter_map(|c| self.crates.rich_crate_version(&c).ok()).collect();
             for c in &new {
                 seen.insert(c.origin().to_owned());
             }
@@ -109,7 +109,7 @@ impl<'a> HomePage<'a> {
                 }
             }
 
-            cat.top.par_extend(top.into_par_iter().with_max_len(1).filter_map(|c| self.crates.rich_crate_version(&c, CrateData::Full).ok()));
+            cat.top.par_extend(top.into_par_iter().with_max_len(1).filter_map(|c| self.crates.rich_crate_version(&c).ok()));
             for c in &cat.top {
                 seen.insert(c.origin().to_owned());
             }
@@ -171,7 +171,7 @@ impl<'a> HomePage<'a> {
 
     pub fn recently_updated_crates<'z>(&'z self) -> impl Iterator<Item = (RichCrate, RichCrateVersion)> + 'z {
         self.crates.recently_updated_crates().expect("recent crates").into_iter().map(move |o| {
-            (self.crates.rich_crate(&o).unwrap(), self.crates.rich_crate_version(&o, CrateData::Full).unwrap())
+            (self.crates.rich_crate(&o).unwrap(), self.crates.rich_crate_version(&o).unwrap())
         })
     }
 

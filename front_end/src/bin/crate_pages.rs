@@ -1,7 +1,7 @@
 use front_end;
 use kitchen_sink;
 use kitchen_sink::RichCrate;
-use kitchen_sink::{stopped, CrateData, KitchenSink, Origin};
+use kitchen_sink::{stopped, KitchenSink, Origin};
 use rayon;
 use render_readme::{Highlighter, ImageOptimAPIFilter, Renderer};
 use rich_crate::RichCrateVersion;
@@ -45,7 +45,7 @@ fn render(origin: &Origin, crates: &KitchenSink, path: &PathBuf, markup: &Render
         return Ok(());
     }
 
-    let c = crates.rich_crate_version(origin, CrateData::Full)?;
+    let c = crates.rich_crate_version(origin)?;
     if !always && !is_useful2(&c) {
         return Ok(());
     }

@@ -60,7 +60,11 @@ impl CrateDb {
     /// Path to sqlite db file to create/update
     pub fn new(path: impl AsRef<Path>) -> FResult<Self> {
         let path = path.as_ref();
-        let tag_synonyms = fs::read_to_string(path.with_file_name("tag-synonyms.csv"))?;
+        Self::new_with_synonyms(path, &path.with_file_name("tag-synonyms.csv"))
+    }
+
+    pub fn new_with_synonyms(path: &Path, synonyms: &Path) -> FResult<Self> {
+        let tag_synonyms = fs::read_to_string(synonyms)?;
         let tag_synonyms = tag_synonyms.lines()
             .filter(|l| !l.starts_with('#'))
             .map(|l| {
@@ -980,3 +984,32 @@ fn none_rows<T>(res: std::result::Result<T, rusqlite::Error>) -> std::result::Re
         Err(err) => Err(err),
     }
 }
+
+#[test]
+fn try_indexing() {
+    let t = tempfile::NamedTempFile::new().unwrap();
+
+    let db = CrateDb::new_with_synonyms(t.as_ref(), Path::new("../data/tag-synonyms.csv")).unwrap();
+    let origin = Origin::from_crates_io_name("cratedbtest");
+    let derived = Default::default();
+    let manifest = cargo_toml::Manifest::from_str(r#"[package]
+name="crates-indexing-unit-test-hi"
+version="1.2.3"
+keywords = ["test-CRATE"]
+"#).unwrap();
+    db.index_latest(CrateVersionData {
+        derived: &derived,
+        manifest: &manifest,
+        origin: &origin,
+        deps_stats: &[],
+        is_build: false,
+        is_dev: false,
+        is_yanked: false,
+        authors: &[],
+        category_slugs: Vec::new(),
+        repository: None,
+        readme_text: None,
+    }).unwrap();
+    assert_eq!(1, db.crates_with_keyword("test-crate").unwrap());
+}
+

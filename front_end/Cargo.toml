@@ -13,7 +13,7 @@ path = "src/front_end.rs"
 ructe = "0.5.6"
 
 [dependencies]
-kitchen_sink = { path = "../kitchen_sink", version = "0.7.0" }
+kitchen_sink = { path = "../kitchen_sink", version = "0.8" }
 rich_crate = { path = "../rich_crate" }
 render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git", version = "0.6.0" }
 categories = { path = "../categories" }

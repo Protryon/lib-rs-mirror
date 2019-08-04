@@ -150,11 +150,6 @@ pub struct KitchenSink {
 struct RichCrateVersionCacheData {
     derived: Derived,
     manifest: Manifest,
-    readme: Option<Readme>,
-    lib_file: Option<String>,
-    path_in_repo: Option<String>,
-    has_buildrs: bool,
-    has_code_of_conduct: bool,
 }
 
 impl KitchenSink {
@@ -179,7 +174,7 @@ impl KitchenSink {
                 || github_info::GitHub::new(&data_path.join("github.db"), github_token)),
             || rayon::join(
                 || Index::new(data_path),
-                || TempCache::new(&data_path.join("crate_derived.db"))));
+                || TempCache::new(&data_path.join("crate_derived2.db"))));
         Ok(Self {
             crates_io: crates_io.context("cratesio")?,
             index: index.context("index")?,
@@ -461,7 +456,7 @@ impl KitchenSink {
             self.crate_derived_cache.set(key.0, (key.1.to_string(), d.clone(), warn.clone()))?;
             (d, warn)
         };
-        Ok((RichCrateVersion::new(Origin::from_crates_io_name(krate.name()), d.manifest, d.derived, d.readme, d.lib_file.map(|s| s.into()), d.path_in_repo, d.has_buildrs, d.has_code_of_conduct, krate.is_yanked()), warn))
+        Ok((RichCrateVersion::new(Origin::from_crates_io_name(krate.name()), d.manifest, d.derived), warn))
     }
 
     pub fn changelog_url(&self, k: &RichCrateVersion) -> Option<String> {
@@ -617,14 +612,15 @@ impl KitchenSink {
             meta.lib_file = None;
         }
 
+        derived.has_buildrs = has_buildrs;
+        derived.has_code_of_conduct = has_code_of_conduct;
+        derived.readme = meta.readme;
+        derived.lib_file = meta.lib_file.map(|s| s.into());
+        derived.path_in_repo = path_in_repo;
+
         Ok((RichCrateVersionCacheData {
             derived,
-            has_buildrs,
-            has_code_of_conduct,
             manifest: meta.manifest,
-            readme: meta.readme,
-            lib_file: meta.lib_file.map(|s| s.into()),
-            path_in_repo,
         }, warnings))
     }
 
@@ -1020,14 +1016,14 @@ impl KitchenSink {
             keywords: package.keywords.iter().map(|k| k.trim().to_lowercase()).collect(),
             description: package.description.as_ref().map(|s| s.as_str()),
             alternative_description: v.derived.github_description.as_ref().map(|s| s.as_str()),
-            readme_text: v.readme.as_ref().map(|r| render_readme::Renderer::new(None).visible_text(&r.markup)),
+            readme_text: v.derived.readme.as_ref().map(|r| render_readme::Renderer::new(None).visible_text(&r.markup)),
             category_slugs: categories::Categories::fixed_category_slugs(&package.categories),
             authors: &package.authors.iter().map(|a| Author::new(a)).collect::<Vec<_>>(),
             origin,
             repository: package.repository.as_ref().and_then(|r| Repo::new(r).ok()).as_ref(),
             deps_stats: &weighed_deps,
             features: &v.manifest.features,
-            is_sys: v.manifest.is_sys(v.has_buildrs || package.build.is_some()),
+            is_sys: v.manifest.is_sys(v.derived.has_buildrs || package.build.is_some()),
             has_bin: v.manifest.has_bin(),
             is_yanked: ver.is_yanked(),
             has_cargo_bin: v.manifest.has_cargo_bin(),
@@ -1036,7 +1032,7 @@ impl KitchenSink {
             links: v.manifest.links(),
         })?;
         self.crate_derived_cache.delete(k.name()).context("clear cache 2")?;
-        Ok(RichCrateVersion::new(origin.clone(), v.manifest, v.derived, v.readme, v.lib_file.map(|s| s.into()), v.path_in_repo, v.has_buildrs, v.has_code_of_conduct, ver.is_yanked()))
+        Ok(RichCrateVersion::new(origin.clone(), v.manifest, v.derived))
     }
 
     // deps that are closely related to crates in some category

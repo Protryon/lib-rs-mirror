@@ -22,13 +22,7 @@ pub struct RichCrateVersion {
     origin: Origin,
     derived: Derived,
     authors: Vec<Author>,
-    readme: Option<Readme>,
-    lib_file: Option<String>,
     repo: Option<Repo>,
-    path_in_repo: Option<String>,
-    has_buildrs: bool,
-    has_code_of_conduct: bool,
-    is_yanked: bool,
 
     // Manifest content
     manifest: Manifest,
@@ -45,21 +39,14 @@ pub enum Include {
 ///
 /// Crates.rs uses this only for the latest version of a crate.
 impl RichCrateVersion {
-    pub fn new(origin: Origin, manifest: Manifest, derived: Derived, readme: Option<Readme>,
-        lib_file: Option<String>, path_in_repo: Option<String>, has_buildrs: bool, has_code_of_conduct: bool, is_yanked: bool) -> Self
+    pub fn new(origin: Origin, manifest: Manifest, derived: Derived) -> Self
     {
         let package = manifest.package.as_ref().expect("package");
         Self {
             origin,
             repo: package.repository.as_ref().and_then(|r| Repo::new(r).ok()),
             authors: package.authors.iter().map(|a| Author::new(a)).collect(),
-            readme,
-            has_buildrs,
-            has_code_of_conduct,
             derived,
-            path_in_repo,
-            lib_file,
-            is_yanked,
             manifest,
         }
     }
@@ -234,22 +221,22 @@ impl RichCrateVersion {
 
     pub fn repository_http_url(&self) -> Option<(&Repo, Cow<'_, str>)> {
         self.repository().map(|repo| {
-            let relpath = self.path_in_repo.as_ref().map(|s| s.as_str()).unwrap_or("");
+            let relpath = self.derived.path_in_repo.as_ref().map(|s| s.as_str()).unwrap_or("");
             (repo, repo.canonical_http_url(relpath))
         })
     }
 
     pub fn readme(&self) -> Option<&Readme> {
-        self.readme.as_ref()
+        self.derived.readme.as_ref()
     }
 
     /// Contents of the `src/lib.rs` from the crate, if available
     pub fn lib_file(&self) -> Option<&str> {
-        self.lib_file.as_ref().map(|s| s.as_str())
+        self.derived.lib_file.as_ref().map(|s| s.as_str())
     }
 
     pub fn lib_file_markdown(&self) -> Option<Markup> {
-        self.lib_file.as_ref().and_then(|code| {
+        self.derived.lib_file.as_ref().and_then(|code| {
             let out = extract_doc_comments(code);
             if !out.trim_start().is_empty() {
                 Some(Markup::Markdown(out))
@@ -260,11 +247,11 @@ impl RichCrateVersion {
     }
 
     pub fn has_buildrs(&self) -> bool {
-        self.has_buildrs || self.package().build.is_some()
+        self.derived.has_buildrs || self.package().build.is_some()
     }
 
     pub fn has_code_of_conduct(&self) -> bool {
-        self.has_code_of_conduct
+        self.derived.has_code_of_conduct
     }
 
     pub fn has_examples(&self) -> bool {
@@ -306,11 +293,11 @@ impl RichCrateVersion {
     }
 
     pub fn is_yanked(&self) -> bool {
-        self.is_yanked
+        self.derived.is_yanked
     }
 
     pub fn has_lib(&self) -> bool {
-        !self.is_proc_macro() && (self.lib_file.is_some() || self.manifest.lib.is_some())
+        !self.is_proc_macro() && (self.derived.lib_file.is_some() || self.manifest.lib.is_some())
     }
 
     pub fn has_bin(&self) -> bool {
@@ -543,6 +530,13 @@ pub struct Derived {
     pub crate_compressed_size: u32,
     pub crate_decompressed_size: u32,
     pub is_nightly: bool,
+
+    pub readme: Option<Readme>,
+    pub lib_file: Option<String>,
+    pub path_in_repo: Option<String>,
+    pub has_buildrs: bool,
+    pub has_code_of_conduct: bool,
+    pub is_yanked: bool,
 }
 
 fn extract_doc_comments(code: &str) -> String {

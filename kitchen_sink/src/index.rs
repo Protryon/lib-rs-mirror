@@ -396,5 +396,5 @@ fn index_test() {
     let stats = idx.deps_stats().unwrap();
     assert!(stats.total > 13800);
     let lode = stats.counts.get("lodepng").unwrap();
-    assert_eq!(10, lode.runtime.def);
+    assert_eq!(11, lode.runtime.def);
 }

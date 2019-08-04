@@ -473,7 +473,6 @@ pub struct Derived {
     pub categories: Option<Vec<String>>,
     pub keywords: Option<Vec<String>>,
     pub github_keywords: Option<Vec<String>>,
-    pub github_name: Option<String>,
     pub github_description: Option<String>,
     pub language_stats: udedokei::Stats,
     pub crate_compressed_size: u32,

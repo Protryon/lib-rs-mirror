@@ -13,16 +13,18 @@ extern crate lazy_static;
 use chrono::prelude::*;
 use failure::ResultExt;
 
+use rich_crate::Derived;
+use rich_crate::Manifest;
 use rich_crate::Origin;
 use rich_crate::Repo;
 use rich_crate::RichCrate;
+use rich_crate::ManifestExt;
 
 use rusqlite::*;
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use parking_lot::Mutex;
@@ -41,23 +43,15 @@ pub struct CrateDb {
 }
 
 pub struct CrateVersionData<'a> {
-    pub name: &'a str,
-    pub description: Option<&'a str>,
-    pub alternative_description: Option<&'a str>,
+    pub manifest: &'a Manifest,
+    pub derived: &'a Derived,
     pub origin: &'a Origin,
     pub deps_stats: &'a [(&'a str, f32)],
-    pub keywords: Vec<String>,
-    pub links: Option<&'a str>,
     pub is_build: bool,
     pub is_dev: bool,
-    pub is_sys: bool,
     pub is_yanked: bool,
     pub authors: &'a [rich_crate::Author],
     pub category_slugs: Vec<Cow<'a, str>>,
-    pub has_cargo_bin: bool,
-    pub has_bin: bool,
-    pub is_proc_macro: bool,
-    pub features: &'a BTreeMap<String, Vec<String>>,
     pub repository: Option<&'a Repo>,
     pub readme_text: Option<String>,
 }
@@ -127,8 +121,10 @@ impl CrateDb {
     pub fn index_latest(&self, c: CrateVersionData) -> FResult<()> {
         let origin = c.origin.to_str();
 
+        let manifest = &c.manifest;
+        let package = manifest.package.as_ref().expect("package");
         let mut insert_keyword = KeywordInsert::new()?;
-        for (i, k) in c.keywords.iter().enumerate() {
+        for (i, k) in package.keywords.iter().enumerate() {
             print!("#{}, ", k);
             let mut w: f64 = 100./(6+i*2) as f64;
             if STOPWORDS.get(k.as_str()).is_some() {
@@ -137,13 +133,13 @@ impl CrateDb {
             insert_keyword.add(&k, w, true);
         }
 
-        for (i, k) in c.name.split(|c: char| !c.is_alphanumeric()).enumerate() {
+        for (i, k) in package.name.split(|c: char| !c.is_alphanumeric()).enumerate() {
             print!("'{}, ", k);
             let w: f64 = 100./(8+i*2) as f64;
             insert_keyword.add(k, w, false);
         }
 
-        if let Some(l) = c.links {
+        if let Some(l) = manifest.links() {
             insert_keyword.add(l.trim_start_matches("lib"), 0.54, false);
         }
 
@@ -177,20 +173,20 @@ impl CrateDb {
             }
         }
 
-        for feat in c.features.keys() {
+        for feat in manifest.features.keys() {
             if feat != "default" && feat != "std" && feat != "nightly" {
                 insert_keyword.add(&format!("feature:{}", feat), 0.55, false);
             }
         }
-        if c.is_sys {
+        if manifest.is_sys(c.derived.has_buildrs || package.build.is_some()) {
             insert_keyword.add("has:is_sys", 0.01, false);
         }
-        if c.is_proc_macro {
+        if manifest.is_proc_macro() {
             insert_keyword.add("has:proc_macro", 0.25, false);
         }
-        if c.has_bin {
+        if manifest.has_bin() {
             insert_keyword.add("has:bin", 0.01, false);
-            if c.has_cargo_bin {
+            if manifest.has_cargo_bin() {
                 insert_keyword.add("has:cargo-bin", 0.2, false);
             }
         }
@@ -305,7 +301,7 @@ impl CrateDb {
 
             categories::adjusted_relevance(candidates, keywords_collected, 0.01, 15)
         } else {
-            let cat_w = 0.2 + 0.2 * c.keywords.len() as f64;
+            let cat_w = 0.2 + 0.2 * c.manifest.package().keywords.len() as f64;
             self.guess_crate_categories_tx(conn, &c.origin, keywords_collected, if is_important_ish {0.1} else {0.3})?.into_iter()
             .map(|(w, slug)| {
                 ((w * cat_w).min(0.99), slug)
@@ -842,13 +838,15 @@ impl CrateDb {
     fn extract_text_phrases(c: &CrateVersionData) -> Vec<(f64, String)> {
         let mut out = Vec::new();
         let mut len = 0;
-        if let Some(s) = c.description {
+        if let Some(s) = &c.manifest.package().description {
+            let s = s.to_lowercase();
             len += s.len();
-            out.push((1., s.to_lowercase()));
+            out.push((1., s));
         }
-        if let Some(s) = c.alternative_description {
+        if let Some(s) = &c.derived.github_description {
+            let s = s.to_lowercase();
             len += s.len();
-            out.push((1., s.to_lowercase()));
+            out.push((1., s));
         }
         if let Some(sub) = &c.readme_text {
             // render readme to DOM, extract nodes
@@ -857,14 +855,11 @@ impl CrateDb {
                     break;
                 }
                 let par = par.trim_start_matches(|c: char| c.is_whitespace() || c == '#' || c == '=' || c == '*' || c == '-');
-                // code block start/end and badges
-                if par.starts_with('`') || par.starts_with('<') || par.starts_with("![") || par.starts_with("[![") || par.contains("shields.io") {
-                    continue;
-                }
                 let par = par.replace("http://", " ").replace("https://", " ");
                 if !par.is_empty() {
+                    let par = par.to_lowercase();
                     len += par.len();
-                    out.push((0.4, par.to_lowercase()));
+                    out.push((0.4, par));
                 }
             }
         }

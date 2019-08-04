@@ -12,6 +12,7 @@ pub use render_readme::Readme;
 pub use repo_url::Repo;
 pub use repo_url::RepoHost;
 pub use repo_url::SimpleRepo;
+pub use cargo_toml::Manifest;
 
 /// URL-like identifier of location where crate has been published + normalized crate name
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]

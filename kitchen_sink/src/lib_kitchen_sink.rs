@@ -637,7 +637,6 @@ impl KitchenSink {
             lib_file: meta.lib_file.map(|s| s.into()),
             path_in_repo: path_in_repo,
             github_description,
-            github_name,
             github_keywords,
             keywords: derived_keywords,
             categories: derived_categories,
@@ -1036,26 +1035,21 @@ impl KitchenSink {
             }
         }
         let (is_build, is_dev) = self.is_build_or_dev(origin);
-        let package = v.manifest.package.as_ref().expect("package");
+        let package = v.manifest.package();
+        let readme_text = v.derived.readme.as_ref().map(|r| render_readme::Renderer::new(None).visible_text(&r.markup));
+        let repository = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
+        let authors = package.authors.iter().map(|a| Author::new(a)).collect::<Vec<_>>();
         self.crate_db.index_latest(CrateVersionData {
-            name: &package.name,
-            keywords: package.keywords.iter().map(|k| k.trim().to_lowercase()).collect(),
-            description: package.description.as_ref().map(|s| s.as_str()),
-            alternative_description: v.derived.github_description.as_ref().map(|s| s.as_str()),
-            readme_text: v.derived.readme.as_ref().map(|r| render_readme::Renderer::new(None).visible_text(&r.markup)),
+            readme_text,
             category_slugs: categories::Categories::fixed_category_slugs(&package.categories),
-            authors: &package.authors.iter().map(|a| Author::new(a)).collect::<Vec<_>>(),
+            authors: &authors,
             origin,
-            repository: package.repository.as_ref().and_then(|r| Repo::new(r).ok()).as_ref(),
+            repository: repository.as_ref(),
             deps_stats: &weighed_deps,
-            features: &v.manifest.features,
-            is_sys: v.manifest.is_sys(v.derived.has_buildrs || package.build.is_some()),
-            has_bin: v.manifest.has_bin(),
             is_yanked: ver.is_yanked(),
-            has_cargo_bin: v.manifest.has_cargo_bin(),
-            is_proc_macro: v.manifest.is_proc_macro(),
             is_build, is_dev,
-            links: v.manifest.links(),
+            manifest: &v.manifest,
+            derived: &v.derived,
         })?;
         self.crate_derived_cache.delete(k.name()).context("clear cache 2")?;
         Ok(RichCrateVersion::new(origin.clone(), v.manifest, v.derived))

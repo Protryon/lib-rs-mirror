@@ -72,14 +72,6 @@ impl CrateDb {
                 language_stats  BLOB NOT NULL
             );
 
-            CREATE TABLE IF NOT EXISTS crate_downloads (
-                crate_id        INTEGER NOT NULL,
-                period          INTEGER NOT NULL,
-                version         TEXT,
-                downloads       INTEGER NOT NULL
-            );
-            CREATE UNIQUE INDEX IF NOT EXISTS crate_downloads_idx on crate_downloads(crate_id, period, version);
-
             CREATE UNIQUE INDEX IF NOT EXISTS keywords_idx on crate_keywords(keyword_id, crate_id);
             CREATE INDEX IF NOT EXISTS keywords_ridx on crate_keywords(crate_id);
             CREATE TABLE IF NOT EXISTS categories (

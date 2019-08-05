@@ -58,7 +58,7 @@ fn main() {
             c.shuffle(&mut thread_rng());
             Either::Left(c)
         } else {
-            Either::Right(crates.all_new_crates().unwrap().map(|c| c.origin().clone()))
+            Either::Right(crates.all_new_crates().unwrap().into_iter().map(|c| c.origin().clone()))
         };
         for (i, k) in c.into_iter().enumerate() {
             if stopped() {

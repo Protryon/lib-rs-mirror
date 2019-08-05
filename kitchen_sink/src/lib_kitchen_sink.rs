@@ -293,10 +293,10 @@ impl KitchenSink {
         Ok(res)
     }
 
-    pub fn all_new_crates<'a>(&'a self) -> CResult<impl Iterator<Item = RichCrate> + 'a> {
+    pub fn all_new_crates(&self) -> CResult<Vec<RichCrate>> {
         let min_timestamp = self.crate_db.latest_crate_update_timestamp()?.unwrap_or(0);
         let all: Vec<_> = self.index.all_crates().collect();
-        let res: Vec<RichCrate> = all.into_par_iter()
+        Ok(all.into_par_iter()
         .filter_map(move |o| {
             self.rich_crate(o).map_err(|e| eprintln!("{:?}: {}", o, e)).ok()
         })
@@ -308,8 +308,7 @@ impl KitchenSink {
                 eprintln!("Can't parse {} of {}", latest, k.name());
                 true
             }
-        }).collect();
-        Ok(res.into_iter())
+        }).collect())
     }
 
     pub fn crate_exists(&self, origin: &Origin) -> bool {

@@ -423,7 +423,9 @@ impl KitchenSink {
         let krate = match self.crate_db.rich_crate_version_data(origin) {
             Ok((manifest, derived)) => RichCrateVersion::new(origin.clone(), manifest, derived),
             Err(e) => {
-                eprintln!("{}: {}", origin.to_str(), e);
+                for e in e.iter_chain() {
+                    eprintln!("{}: {}", origin.to_str(), e);
+                }
                 let ver = self.index.crate_version_latest_unstable(origin).context("rich_crate_version")?;
                 self.rich_crate_version_verbose(ver).map(|(krate, _)| krate)?
             },

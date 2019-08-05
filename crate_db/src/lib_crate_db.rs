@@ -176,7 +176,12 @@ impl CrateDb {
                 None => None,
             };
 
-            let keywords = package.keywords.iter().map(|s| s.to_lowercase()).collect();
+            let keywords: HashSet<_> = package.keywords.iter().map(|s| s.to_lowercase()).collect();
+            let keywords_derived = if keywords.is_empty() {
+                Some(self.keywords_tx(conn, &origin).context("keywordsdb2")?)
+            } else {
+                None
+            };
             let categories = if categories::Categories::fixed_category_slugs(&package.categories).is_empty() {
                 Some(self.guess_crate_categories_tx(conn, &origin, keywords, 0.1).context("catdb")?
                     .into_iter().map(|(_, c)| c).collect())
@@ -193,7 +198,7 @@ impl CrateDb {
                 crate_decompressed_size: row.crate_decompressed_size,
                 github_description: None,
                 github_keywords: row.github_keywords,
-                keywords: Some(self.keywords_tx(conn, &origin).context("keywordsdb2")?),
+                keywords: keywords_derived,
                 lib_file: row.lib_file,
                 has_buildrs: row.has_buildrs,
                 is_nightly: row.is_nightly,

@@ -538,6 +538,8 @@ impl KitchenSink {
             }
         }
 
+        Self::override_bad_categories(&mut meta.manifest);
+
         let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
         let mut github_keywords = None;
         let mut derived_keywords = None;
@@ -564,8 +566,6 @@ impl KitchenSink {
                 derived_keywords = Some(self.crate_db.keywords(&origin).context("keywordsdb")?);
             }
         }
-
-        Self::override_bad_categories(package, &meta.manifest.dependencies);
 
         let mut derived_categories = None;
         // Guess categories if none were specified
@@ -650,10 +650,18 @@ impl KitchenSink {
         }, warnings))
     }
 
-    fn override_bad_categories(package: &mut Package, direct_dependencies: &cargo_toml::DepsSet) {
+    fn override_bad_categories(manifest: &mut Manifest) {
+        let direct_dependencies = &manifest.dependencies;
+        let has_cargo_bin = manifest.has_cargo_bin();
+        let package = manifest.package.as_mut().expect("pkg");
         for cat in &mut package.categories {
             if cat.as_bytes().iter().any(|c| !c.is_ascii_lowercase()) {
                 *cat = cat.to_lowercase();
+            }
+            if cat == "development-tools" || (cat == "command-line-utilities" && has_cargo_bin) {
+                if package.keywords.iter().any(|k| k.eq_ignore_ascii_case("cargo-subcommand") || k.eq_ignore_ascii_case("subcommand")) {
+                    *cat = "development-tools::cargo-plugins".into();
+                }
             }
             if cat == "localization" {
                 // nobody knows the difference

@@ -89,12 +89,12 @@ impl Index {
         self.git_index.crates().chain(self.crates_io_crates().keys())
     }
 
-    pub fn deps_stats(&self) -> Option<&DepsStats> {
+    pub fn deps_stats(&self) -> Result<&DepsStats, KitchenSinkErr> {
         match self.deps_stats.try_get_for(Duration::from_secs(10), || self.get_deps_stats()) {
-            Some(res) => Some(res),
+            Some(res) => Ok(res),
             None => {
                 eprintln!("rayon deadlock");
-                return None
+                return Err(KitchenSinkErr::DepsStatsNotAvailable)
             },
         }
     }
@@ -274,15 +274,14 @@ impl Index {
     /// For crate being outdated. Returns (is_latest, popularity)
     /// 0 = not used *or deprecated*
     /// 1 = everyone uses it
-    pub fn version_popularity(&self, crate_name: &str, requirement: &VersionReq) -> Option<(bool, f32)> {
+    pub fn version_popularity(&self, crate_name: &str, requirement: &VersionReq) -> Result<Option<(bool, f32)>, KitchenSinkErr> {
         if is_deprecated(crate_name) {
-            return Some((false, 0.));
+            return Ok(Some((false, 0.)));
         }
 
-        let matches_latest = self
-            .crates_io_crate_by_name(&Origin::from_crates_io_name(crate_name))
-            .ok()
-            .and_then(|krate| Self::highest_version(krate, true).version().parse().ok())
+        let krate = self.crates_io_crate_by_name(&Origin::from_crates_io_name(crate_name))?;
+
+        let matches_latest = Self::highest_version(krate, true).version().parse().ok()
             .map_or(false, |latest| requirement.matches(&latest));
 
         let stats = self.deps_stats()?;
@@ -303,23 +302,23 @@ impl Index {
         })
         .unwrap_or(0.);
 
-        Some((matches_latest, pop))
+        Ok(Some((matches_latest, pop)))
     }
 
     /// How likely it is that this exact crate will be installed in any project
-    pub fn version_commonality(&self, crate_name: &str, version: &MiniVer) -> Option<f32> {
+    pub fn version_commonality(&self, crate_name: &str, version: &MiniVer) -> Result<Option<f32>, KitchenSinkErr> {
         match crate_name {
             // bindings' SLoC looks heavier than actual overhead of standard system libs
-            "libc" | "winapi" | "kernel32-sys" => return Some(0.91),
+            "libc" | "winapi" | "kernel32-sys" => return Ok(Some(0.91)),
             _ => {},
         }
 
         let stats = self.deps_stats()?;
-        stats.counts.get(crate_name)
+        Ok(stats.counts.get(crate_name)
         .and_then(|c| {
             c.versions.get(&version)
             .map(|&ver| ver as f32 / stats.total as f32)
-        })
+        }))
     }
 }
 

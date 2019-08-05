@@ -711,14 +711,14 @@ impl KitchenSink {
         }
     }
 
-    pub fn is_build_or_dev(&self, k: &Origin) -> (bool, bool) {
-        self.dependents_stats_of(k)
+    pub fn is_build_or_dev(&self, k: &Origin) -> Result<(bool, bool), KitchenSinkErr> {
+        Ok(self.dependents_stats_of(k)?
         .map(|d| {
             let is_build = d.build.def > 3 * (d.runtime.def + d.runtime.opt + 5);
             let is_dev = !is_build && d.dev > (3 * d.runtime.def + d.runtime.opt + 3 * d.build.def + d.build.opt + 5);
             (is_build, is_dev)
         })
-        .unwrap_or((false, false))
+        .unwrap_or((false, false)))
     }
 
     fn add_readme_from_repo(&self, meta: &mut CrateFile, maybe_repo: Option<&Repo>) -> Warnings {
@@ -855,9 +855,9 @@ impl KitchenSink {
         let _ = self.index.deps_stats();
     }
 
-    pub fn dependents_stats_of(&self, origin: &Origin) -> Option<RevDependencies> {
+    pub fn dependents_stats_of(&self, origin: &Origin) -> Result<Option<RevDependencies>, KitchenSinkErr> {
         match origin {
-            Origin::CratesIo(crate_name) => self.index.deps_stats()?.counts.get(crate_name).cloned(),
+            Origin::CratesIo(crate_name) => Ok(self.index.deps_stats()?.counts.get(crate_name).cloned()),
             _ => unimplemented!(),
         }
     }
@@ -865,7 +865,7 @@ impl KitchenSink {
     /// (latest, pop)
     /// 0 = not used
     /// 1 = everyone uses it
-    pub fn version_popularity(&self, crate_name: &str, requirement: &VersionReq) -> Option<(bool, f32)> {
+    pub fn version_popularity(&self, crate_name: &str, requirement: &VersionReq) -> Result<Option<(bool, f32)>, KitchenSinkErr> {
         self.index.version_popularity(crate_name, requirement)
     }
 
@@ -1016,7 +1016,7 @@ impl KitchenSink {
 
         // direct deps are used as extra keywords for similarity matching,
         // but we're taking only niche deps to group similar niche crates together
-        let raw_deps_stats = self.index.deps_stats().ok_or(KitchenSinkErr::DepsStatsNotAvailable)?;
+        let raw_deps_stats = self.index.deps_stats()?;
         let mut weighed_deps = Vec::<(&str, f32)>::new();
         let all_deps = v.manifest.direct_dependencies()?;
         let all_deps = [(all_deps.0, 1.0), (all_deps.2, 0.33)];
@@ -1032,7 +1032,7 @@ impl KitchenSink {
                 }
             }
         }
-        let (is_build, is_dev) = self.is_build_or_dev(origin);
+        let (is_build, is_dev) = self.is_build_or_dev(origin)?;
         let package = v.manifest.package();
         let readme_text = v.derived.readme.as_ref().map(|r| render_readme::Renderer::new(None).visible_text(&r.markup));
         let repository = package.repository.as_ref().and_then(|r| Repo::new(r).ok());

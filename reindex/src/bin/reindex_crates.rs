@@ -179,7 +179,7 @@ fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersi
     let dependency_freshness = if let Ok((runtime, _, build)) = k.direct_dependencies() {
         // outdated dev deps don't matter
         runtime.iter().chain(&build).filter_map(|richdep| {
-            richdep.dep.req().parse().ok().map(|req| (richdep.is_optional(), crates.version_popularity(&richdep.package, &req).expect("verpop")))
+            richdep.dep.req().parse().ok().map(|req| (richdep.is_optional(), crates.version_popularity(&richdep.package, &req).expect("verpop").expect("verpop")))
         })
         .map(|(is_optional, (is_latest, popularity))| {
             if is_latest {1.0} // don't penalize pioneers
@@ -206,7 +206,7 @@ fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersi
 
     let mut direct_rev_deps = 0;
     let mut indirect_reverse_optional_deps = 0;
-    if let Some(deps) = crates.dependents_stats_of(k.origin()) {
+    if let Some(deps) = crates.dependents_stats_of(k.origin()).expect("depsstats") {
         direct_rev_deps = deps.direct as u32;
         indirect_reverse_optional_deps = (deps.runtime.def as u32 + deps.runtime.opt as u32)
             .max(deps.dev as u32)

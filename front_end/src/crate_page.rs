@@ -163,11 +163,11 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn is_build_or_dev(&self) -> (bool, bool) {
-        self.kitchen_sink.is_build_or_dev(self.ver.origin())
+        self.kitchen_sink.is_build_or_dev(self.ver.origin()).expect("deps")
     }
 
     pub fn dependents_stats(&self) -> Option<(u32, u32)> {
-        self.kitchen_sink.dependents_stats_of(self.ver.origin()).map(|d| (
+        self.kitchen_sink.dependents_stats_of(self.ver.origin()).expect("deps").map(|d| (
             d.runtime.def as u32 + d.runtime.opt as u32 +
             d.build.def as u32  + d.build.opt as u32 +
             d.dev as u32, d.direct as u32))
@@ -285,7 +285,7 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn up_to_date_class(&self, richdep: &RichDep) -> &str {
-        let (matches_latest, pop) = richdep.dep.req().parse().ok().and_then(|req| self.kitchen_sink.version_popularity(&richdep.package, &req)).unwrap_or((false, 0.));
+        let (matches_latest, pop) = richdep.dep.req().parse().ok().and_then(|req| self.kitchen_sink.version_popularity(&richdep.package, &req).expect("deps")).unwrap_or((false, 0.));
         match pop {
             x if x >= 0.5 && matches_latest => "top",
             x if x >= 0.75 || matches_latest => "common",
@@ -668,7 +668,7 @@ impl<'a> CratePage<'a> {
                     },
                 };
 
-                let commonality = self.kitchen_sink.index.version_commonality(&name, &semver).unwrap_or(0.);
+                let commonality = self.kitchen_sink.index.version_commonality(&name, &semver).expect("depsstats").unwrap_or(0.);
                 let is_heavy_build_dep = match &*name {
                     "bindgen" | "clang-sys" | "cmake" | "cc" if depinf.default => true, // you deserve full weight of it
                     _ => false,

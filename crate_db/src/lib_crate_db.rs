@@ -177,9 +177,12 @@ impl CrateDb {
             };
 
             let keywords = package.keywords.iter().map(|s| s.to_lowercase()).collect();
-            let categories =
+            let categories = if categories::Categories::fixed_category_slugs(&package.categories).is_empty() {
                 Some(self.guess_crate_categories_tx(conn, &origin, keywords, 0.1).context("catdb")?
-                    .into_iter().map(|(_, c)| c).collect());
+                    .into_iter().map(|(_, c)| c).collect())
+            } else {
+                None
+            };
 
             Ok((manifest, Derived {
                 path_in_repo,
@@ -1135,6 +1138,7 @@ fn try_indexing() {
 name="crates-indexing-unit-test-hi"
 version="1.2.3"
 keywords = ["test-CRATE"]
+categories = ["1", "two", "GAMES", "science", "::science::math::"]
 "#).unwrap();
     db.index_latest(CrateVersionData {
         derived: &derived,
@@ -1153,6 +1157,7 @@ keywords = ["test-CRATE"]
     let (new_manifest, new_derived) = db.rich_crate_version_data(&origin).unwrap();
     assert_eq!(manifest.package().name, new_manifest.package().name);
     assert_eq!(manifest.package().keywords, new_manifest.package().keywords);
+    assert_eq!(manifest.package().categories, new_manifest.package().categories);
 
     assert_eq!(new_derived.github_keywords, derived.github_keywords);
     assert_eq!(new_derived.github_description, derived.github_description);

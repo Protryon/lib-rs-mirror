@@ -127,6 +127,7 @@ impl Categories {
 
     pub fn fixed_category_slugs(cats: &[String]) -> Vec<Cow<'_, str>> {
         let mut cats = Self::filtered_category_slugs(cats).enumerate().filter_map(|(idx, s)| {
+            let s = s.trim_matches(':');
             let mut chars = s.chars().peekable();
             while let Some(cur) = chars.next() {
                 // look for a:b instead of a::b
@@ -150,6 +151,12 @@ impl Categories {
             }
             let depth = s.split("::").count();
             Some((depth, idx, Cow::Borrowed(s.as_ref())))
+        }).filter(|(_, _, s)| {
+            if CATEGORIES.from_slug(s).next().is_none() {
+                println!("invalid cat name {}", s);
+                return false;
+            }
+            true
         }).collect::<Vec<_>>();
 
         // depth, then original order

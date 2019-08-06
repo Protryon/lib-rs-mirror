@@ -8,6 +8,7 @@ use rich_crate::RichCrateVersion;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
+use either::Either;
 
 fn main() {
     if let Err(e) = run(std::env::args().nth(1)) {
@@ -61,21 +62,28 @@ fn run(filter: Option<String>) -> Result<(), failure::Error> {
     rayon::ThreadPoolBuilder::new().thread_name(|i| format!("rayon-{}", i)).build_global()?;
 
     let crates = Arc::new(kitchen_sink::KitchenSink::new_default()?);
-    // crates.prewarm();
+    crates.prewarm();
     let image_filter = Arc::new(ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_dir().join("images.db"))?);
     let markup = &Renderer::new_filter(Some(Highlighter::new()), image_filter);
+
     rayon::scope(move |s1| {
-        for origin in crates.all_crates() {
-            if let Some(ref filter) = filter {
-                if origin.short_crate_name() != filter {
-                    continue;
-                }
-            }
+        let tmp;
+        let always_render = filter.is_some();
+        let all_crates = if let Some(filter) = &filter {
+            tmp = [if filter.contains(':') {
+                Origin::from_str(filter)
+            } else {
+                Origin::from_crates_io_name(filter)
+            }];
+            Either::Left(tmp.iter())
+        } else {
+            Either::Right(crates.all_crates())
+        };
+        for origin in all_crates {
             if stopped() {
                 break;
             }
             let origin = origin.clone();
-            let always_render = filter.is_some();
             let crates = Arc::clone(&crates);
             let path = PathBuf::from(format!("public/crates/{}.html", origin.short_crate_name()));
             s1.spawn(move |_| {

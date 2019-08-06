@@ -25,6 +25,11 @@ fn main() {
     let renderer = Arc::new(Renderer::new(None));
 
     let everything = std::env::args().nth(1).map_or(false, |a| a == "--all");
+    let specific = if !everything {
+        std::env::args().nth(1).map(Origin::from_str)
+    } else {
+        None
+    };
     let repos = !everything;
 
     let mut indexer = Indexer::new(CrateSearchIndex::new(crates.main_cache_dir()).expect("init search")).expect("init search indexer");
@@ -57,6 +62,8 @@ fn main() {
             let mut c: Vec<_> = crates.all_crates().cloned().collect::<Vec<_>>();
             c.shuffle(&mut thread_rng());
             Either::Left(c)
+        } else if let Some(origin) = specific {
+            Either::Left(vec![origin])
         } else {
             Either::Right(crates.all_new_crates().unwrap().into_iter().map(|c| c.origin().clone()))
         };

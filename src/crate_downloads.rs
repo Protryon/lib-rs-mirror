@@ -86,4 +86,3 @@ impl CrateDownloadsFile {
             .collect()
     }
 }
-

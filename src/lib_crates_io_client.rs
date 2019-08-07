@@ -1,14 +1,15 @@
 #[macro_use] extern crate serde_derive;
 use serde;
 use chrono::{Date, TimeZone, Utc};
-use std::collections::HashMap;
-use std::collections::HashSet;
-use std::path::Path;
 use mysteriouspants_throttle::Throttle;
+use parking_lot::Mutex;
+use serde;
 pub use simple_cache::Error;
 use simple_cache::SimpleCache;
 use simple_cache::TempCache;
-use parking_lot::Mutex;
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::path::Path;
 
 mod crate_deps;
 mod crate_downloads;

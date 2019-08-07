@@ -21,6 +21,6 @@ pub struct CrateDependency {
     pub default_features: bool, // true,
     pub features: Vec<String>,  // [],
     pub target: Option<String>, // null,
-    pub kind: CrateDepKind, // "normal",
-    // downloads: usize, // 0; looks broken
+    pub kind: CrateDepKind,     // "normal",
+                                // downloads: usize, // 0; looks broken
 }

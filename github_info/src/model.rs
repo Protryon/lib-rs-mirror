@@ -138,7 +138,13 @@ pub struct GitHubRepo {
     // has_wiki: true,
     pub has_pages: bool,
     pub archived: bool,
-    // default_branch: master,
+    pub default_branch: Option<String>,
+    pub owner: Option<User>,
+    #[serde(default)]
+    pub topics: Vec<String>,
+
+    #[serde(default)]
+    pub is_template: Vec<String>,
 
     /// My custom addition!
     pub github_page_url: Option<String>,

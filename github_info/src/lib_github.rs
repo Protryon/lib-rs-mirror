@@ -1,6 +1,4 @@
 use github_rs;
-use hyper::header::{HeaderValue, ACCEPT};
-
 use serde;
 
 #[macro_use] extern crate serde_derive;
@@ -74,7 +72,6 @@ pub struct GitHub {
     commits: TempCache<(String, Option<Vec<CommitMeta>>)>,
     releases: TempCache<(String, Option<Vec<GitHubRelease>>)>,
     contribs: TempCache<(String, Option<Vec<UserContrib>>)>,
-    topics: TempCache<(String, Option<Vec<String>>)>,
     repos: TempCache<(String, Option<GitHubRepo>)>,
     emails: TempCache<(String, Option<Vec<User>>)>,
 }
@@ -88,8 +85,7 @@ impl GitHub {
             commits: TempCache::new(&cache_path.as_ref().with_file_name("github_commits.bin"))?,
             releases: TempCache::new(&cache_path.as_ref().with_file_name("github_releases.bin"))?,
             contribs: TempCache::new(&cache_path.as_ref().with_file_name("github_contribs.bin"))?,
-            topics: TempCache::new(&cache_path.as_ref().with_file_name("github_topics.bin"))?,
-            repos: TempCache::new(&cache_path.as_ref().with_file_name("github_repos.bin"))?,
+            repos: TempCache::new(&cache_path.as_ref().with_file_name("github_repos2.bin"))?,
             emails: TempCache::new(&cache_path.as_ref().with_file_name("github_emails.bin"))?,
         })
     }
@@ -153,12 +149,8 @@ impl GitHub {
     }
 
     pub fn topics(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Option<Vec<String>>> {
-        let key = format!("{}/{}", repo.owner, repo.repo);
-        let path = format!("repos/{}/{}/topics", repo.owner, repo.repo);
-        self.get_cached(&self.topics, (&key, as_of_version), |client| client.get()
-                           .custom_endpoint(&path)
-                           .set_header(ACCEPT, HeaderValue::from_static("application/vnd.github.mercy-preview+json"))
-                           .execute(), |t: Topics| t.names).map_err(|e| e.context("topics"))
+        let repo = self.repo(repo, as_of_version)?;
+        Ok(repo.map(|r| r.topics))
     }
 
     pub fn repo(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Option<GitHubRepo>> {

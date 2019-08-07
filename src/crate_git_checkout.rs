@@ -94,7 +94,7 @@ fn get_repo(repo: &Repo, base_path: &Path) -> Result<Repository, git2::Error> {
             }
             if err.code() == git2::ErrorCode::Exists {
                 if let Ok(repo) = Repository::open(&repo_path) {
-                    return Ok(repo)
+                    return Ok(repo);
                 }
                 let _ = fs::remove_dir_all(&repo_path);
             }
@@ -121,6 +121,7 @@ fn get_repo(repo: &Repo, base_path: &Path) -> Result<Repository, git2::Error> {
     }
 }
 
+/// Returns (path, Cargo.toml)
 pub fn find_manifests(repo: &Repository) -> Result<(Vec<(String, Manifest)>, Vec<ParseError>), failure::Error> {
     let head = repo.head()?;
     let tree = head.peel_to_tree()?;
@@ -171,7 +172,7 @@ fn find_manifests_in_tree(repo: &Repository, tree: &Tree<'_>) -> Result<(Vec<(St
         if name == "Cargo.toml" {
             match Manifest::from_slice(blob.content()) {
                 Ok(mut toml) => {
-                    toml.complete_from_abstract_filesystem(GitFS {repo, tree})?;
+                    toml.complete_from_abstract_filesystem(GitFS { repo, tree })?;
                     if toml.package.is_some() {
                         tomls.push((inner_path.to_owned(), toml))
                     }
@@ -198,7 +199,6 @@ struct State {
     since: Option<usize>,
     until: Option<usize>,
 }
-
 
 /// Callback gets added, removed, number of commits ago.
 pub fn find_dependency_changes(repo: &Repository, mut cb: impl FnMut(HashSet<String>, HashSet<String>, usize)) -> Result<(), failure::Error> {
@@ -250,8 +250,6 @@ pub fn find_dependency_changes(repo: &Repository, mut cb: impl FnMut(HashSet<Str
     }
     Ok(())
 }
-
-
 
 pub fn find_readme(repo: &Repository, package: &Package) -> Result<Option<Readme>, failure::Error> {
     let head = repo.head()?;
@@ -306,7 +304,7 @@ fn readme_from_repo(markup: Markup, repo_url: &Option<String>, base_dir_in_repo:
 /// Check if given filename is a README. If `package` is missing, guess.
 fn is_readme_filename(path: &Path, package: Option<&Package>) -> bool {
     path.to_str().map_or(false, |s| {
-        if let Some(&Package{readme: Some(ref r),..}) = package {
+        if let Some(&Package { readme: Some(ref r), .. }) = package {
             let r = r.trim_start_matches("../"); // hacky hack
             r.eq_ignore_ascii_case(s) // crates published on Mac have this
         } else {
@@ -328,4 +326,3 @@ fn git_fs() {
     assert!(manif.lib.is_some());
     assert_eq!(0, manif.bin.len());
 }
-

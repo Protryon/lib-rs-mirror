@@ -38,7 +38,7 @@ impl<'repo> Iterator for HistoryIter<'repo> {
     type Item = HistoryItem<'repo>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(Generation{commit, num, ..}) = self.to_visit.pop() {
+        if let Some(Generation { commit, num, .. }) = self.to_visit.pop() {
             let seen = &mut self.seen; // technically needed only after merges
             let mut is_merge = false;
             self.to_visit.extend(commit.parents()

@@ -1,11 +1,12 @@
-use parking_lot::RwLockReadGuard;
-use parking_lot::RwLockWriteGuard;
 use crate::error::Error;
 use crate::SimpleCache;
 use flate2::read::DeflateDecoder;
 use flate2::write::DeflateEncoder;
 use flate2::Compression;
 use fxhash::FxHashMap;
+use parking_lot::RwLock;
+use parking_lot::RwLockReadGuard;
+use parking_lot::RwLockWriteGuard;
 use rmp_serde;
 use serde::de::DeserializeOwned;
 use serde::*;
@@ -16,7 +17,6 @@ use std::io::BufReader;
 use std::io::BufWriter;
 use std::marker::PhantomData;
 use std::path::PathBuf;
-use parking_lot::RwLock;
 use tempfile::NamedTempFile;
 
 struct Inner {
@@ -73,7 +73,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
                 return Ok(inner);
             }
             drop(inner);
-            let _= self.lock_for_write()?;
+            let _ = self.lock_for_write()?;
         }
     }
 

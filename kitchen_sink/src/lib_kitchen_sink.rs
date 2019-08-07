@@ -433,7 +433,7 @@ impl KitchenSink {
                 match origin {
                     Origin::CratesIo(name) => {
                         let ver = self.index.crate_version_latest_unstable(name).context("rich_crate_version1")?;
-                        self.rich_crate_version_verbose(ver).map(|(krate, _)| krate)?
+                        self.rich_crate_version_from_crates_io(ver).map(|(krate, _)| krate)?
                     },
                     _ => {
                         unimplemented!()
@@ -447,7 +447,7 @@ impl KitchenSink {
     }
 
     /// With warnings
-    pub fn rich_crate_version_verbose(&self, krate: &Version) -> CResult<(RichCrateVersion, Warnings)> {
+    fn rich_crate_version_from_crates_io(&self, krate: &Version) -> CResult<(RichCrateVersion, Warnings)> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
 
         let key = (krate.name(), krate.version());
@@ -463,7 +463,7 @@ impl KitchenSink {
         };
 
         let (d, warn) = if let Some(res) = cached {res} else {
-            let (d, warn) = self.rich_crate_version_data(krate).with_context(|_| format!("failed geting rich crate data for {}", key.0))?;
+            let (d, warn) = self.rich_crate_version_data_from_crates_io(krate).with_context(|_| format!("failed geting rich crate data for {}", key.0))?;
             self.crate_derived_cache.set(key.0, (key.1.to_string(), d.clone(), warn.clone()))?;
             (d, warn)
         };
@@ -474,14 +474,14 @@ impl KitchenSink {
         let repo = k.repository()?;
         if let RepoHost::GitHub(ref gh) = repo.host() {
             let releases = self.gh.releases(gh, &self.cachebust_string_for_repo(repo).ok()?).ok()??;
-            if releases.iter().any(|rel| rel.body.as_ref().map_or(false, |b| b.len() > 10)) {
+            if releases.iter().any(|rel| rel.body.as_ref().map_or(false, |b| b.len() > 15)) {
                 return Some(format!("https://github.com/{}/{}/releases", gh.owner, gh.repo));
             }
         }
         None
     }
 
-    fn rich_crate_version_data(&self, latest: &crates_index::Version) -> CResult<(RichCrateVersionCacheData, Warnings)> {
+    fn rich_crate_version_data_from_crates_io(&self, latest: &crates_index::Version) -> CResult<(RichCrateVersionCacheData, Warnings)> {
         let mut warnings = HashSet::new();
 
         let name = latest.name();
@@ -498,8 +498,32 @@ impl KitchenSink {
         let mut meta = crate_files::read_archive(&crate_tarball[..], name, ver)?;
         drop(crate_tarball);
 
-        let has_buildrs = meta.has("build.rs");
-        let has_code_of_conduct = meta.has("CODE_OF_CONDUCT.md") || meta.has("docs/CODE_OF_CONDUCT.md") || meta.has(".github/CODE_OF_CONDUCT.md");
+        let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
+
+        // it may contain data from nowhere! https://github.com/rust-lang/crates.io/issues/1624
+        if package.homepage.is_none() {
+            if let Some(repo) = crates_io_meta.homepage {
+                package.homepage = Some(repo);
+            }
+        }
+        if package.documentation.is_none() {
+            if let Some(repo) = crates_io_meta.documentation {
+                package.documentation = Some(repo);
+            }
+        }
+
+        let maybe_repo = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
+        let has_readme = meta.readme.is_some();
+        if !has_readme {
+            warnings.insert(Warning::NoReadmeProperty);
+            warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()));
+            let has_readme = meta.readme.is_some();
+            if !has_readme && meta.manifest.package.as_ref().map_or(false, |p| p.readme.is_some()) {
+                // readmes in form of readme="../foo.md" are lost in packaging,
+                // and the only copy exists in crates.io own api
+                self.add_readme_from_crates_io(&mut meta, name, ver);
+            }
+        }
 
         let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
 
@@ -516,44 +540,23 @@ impl KitchenSink {
             }
         }
 
-        let maybe_repo = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
         let path_in_repo = match maybe_repo.as_ref() {
             Some(repo) => self.crate_db.path_in_repo(repo, name)?,
             None => None,
         };
 
-        ///// Fixing and faking the data /////
+        self.rich_crate_version_data_common(origin, meta, path_in_repo, crate_compressed_size as u32, latest.is_yanked(), warnings)
+    }
 
-        // it may contain data from nowhere! https://github.com/rust-lang/crates.io/issues/1624
-        if package.homepage.is_none() {
-            if let Some(repo) = crates_io_meta.homepage {
-                package.homepage = Some(repo);
-            }
-        }
-        if package.documentation.is_none() {
-            if let Some(repo) = crates_io_meta.documentation {
-                package.documentation = Some(repo);
-            }
-        }
-
-
-        let has_readme = meta.readme.is_some();
-        if !has_readme {
-            warnings.insert(Warning::NoReadmeProperty);
-            warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()));
-            let has_readme = meta.readme.is_some();
-            if !has_readme && meta.manifest.package.as_ref().map_or(false, |p| p.readme.is_some()) {
-                // readmes in form of readme="../foo.md" are lost in packaging,
-                // and the only copy exists in crates.io own api
-                self.add_readme_from_crates_io(&mut meta, name, ver);
-            }
-        }
-
+    ///// Fixing and faking the data
+    fn rich_crate_version_data_common(&self, origin: Origin, mut meta: CrateFile, path_in_repo: Option<String>, crate_compressed_size: u32, is_yanked: bool, mut warnings: Warnings) -> CResult<(RichCrateVersionCacheData, Warnings)> {
         Self::override_bad_categories(&mut meta.manifest);
 
-        let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
         let mut github_keywords = None;
         let mut derived_keywords = None;
+
+        let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
+        let maybe_repo = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
         // Guess keywords if none were specified
         // TODO: also ignore useless keywords that are unique db-wide
         if package.keywords.is_empty() {
@@ -588,11 +591,13 @@ impl KitchenSink {
             });
         }
 
-        // Delete the original docs.rs link, because we have our own
-        // TODO: what if the link was to another crate or a subpage?
-        if package.documentation.as_ref().map_or(false, |s| Self::is_docs_rs_link(s)) {
-            if self.has_docs_rs(name, ver) {
-                package.documentation = None; // docs.rs is not proper docs
+        if let Origin::CratesIo(name) = &origin {
+            // Delete the original docs.rs link, because we have our own
+            // TODO: what if the link was to another crate or a subpage?
+            if package.documentation.as_ref().map_or(false, |s| Self::is_docs_rs_link(s)) {
+                    if self.has_docs_rs(name, &package.version) {
+                    package.documentation = None; // docs.rs is not proper docs
+                }
             }
         }
 
@@ -636,12 +641,15 @@ impl KitchenSink {
 
         let capitalized_name = Self::capitalized_name(&package.name, words.into_iter());
 
+        let has_buildrs = meta.has("build.rs");
+        let has_code_of_conduct = meta.has("CODE_OF_CONDUCT.md") || meta.has("docs/CODE_OF_CONDUCT.md") || meta.has(".github/CODE_OF_CONDUCT.md");
+
         let derived = Derived {
             capitalized_name,
             language_stats: meta.language_stats,
-            crate_compressed_size: crate_compressed_size as u32,
+            crate_compressed_size,
             // sometimes uncompressed sources without junk are smaller than tarball with junk
-            crate_decompressed_size: meta.decompressed_size.max(crate_compressed_size) as u32,
+            crate_decompressed_size: (meta.decompressed_size as u32).max(crate_compressed_size),
             is_nightly: meta.is_nightly,
             has_buildrs: has_buildrs,
             has_code_of_conduct: has_code_of_conduct,
@@ -652,7 +660,7 @@ impl KitchenSink {
             github_keywords,
             keywords: derived_keywords,
             categories: derived_categories,
-            is_yanked: latest.is_yanked(),
+            is_yanked,
         };
 
         Ok((RichCrateVersionCacheData {
@@ -1042,7 +1050,7 @@ impl KitchenSink {
             _ => unimplemented!(),
         };
 
-        let (v, _warn) = self.rich_crate_version_data(ver)?;
+        let (v, _warn) = self.rich_crate_version_data_from_crates_io(ver)?;
 
         // direct deps are used as extra keywords for similarity matching,
         // but we're taking only niche deps to group similar niche crates together

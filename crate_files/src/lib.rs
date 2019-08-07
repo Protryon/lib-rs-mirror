@@ -1,67 +1,58 @@
-use cargo_toml;
-use render_readme;
-use udedokei;
-#[macro_use]
-extern crate quick_error;
-use cargo_toml::{Manifest, Package};
-use render_readme::{Markup, Readme};
-use repo_url::Repo;
-use std::io::Read;
-use std::path::{Path, PathBuf};
-
-mod error;
-mod tarball;
-
-pub use crate::error::*;
+#[macro_use] extern crate quick_error;
 pub type Result<T> = std::result::Result<T, UnarchiverError>;
+use libflate::gzip::Decoder;
+use std::io::Read;
+use std::io;
+use tar::{Archive, Entries, Entry};
 
-/// Read tarball and get Cargo.toml, etc. out of it.
-pub fn read_archive(archive_tgz: impl Read, name: &str, ver: &str) -> Result<CrateFile> {
-    let prefix = format!("{}-{}", name, ver);
-    Ok(tarball::read_archive(archive_tgz, Path::new(&prefix))?)
-}
-
-#[derive(Debug, Clone)]
-pub struct CrateFile {
-    pub manifest: Manifest,
-    pub lib_file: Option<String>,
-    pub files: Vec<PathBuf>,
-    pub readme: Option<Readme>,
-    pub language_stats: udedokei::Stats,
-    pub decompressed_size: usize,
-    pub is_nightly: bool,
-}
-
-impl CrateFile {
-    /// Checks whether tarball contained given file path,
-    /// relative to project root.
-    pub fn has(&self, path: impl AsRef<Path>) -> bool {
-        let path = path.as_ref();
-        self.files.iter().any(|p| p == path)
-    }
-
-    /// Find path that matches according to the callback
-    pub fn find(&self, mut f: impl FnMut(&Path) -> bool) -> Option<&Path> {
-        self.files.iter().map(|p| p.as_path()).find(|p| f(p))
-    }
-}
-
-fn readme_from_repo(markup: Markup, repo_url: Option<&String>, base_path: &str) -> Readme {
-    let repo = repo_url.and_then(|url| Repo::new(url).ok());
-    let base_url = repo.as_ref().map(|r| r.readme_base_url(base_path));
-    let base_image_url = repo.map(|r| r.readme_base_image_url(base_path));
-
-    Readme::new(markup, base_url, base_image_url)
-}
-
-/// Check if given filename is a README. If `package` is missing, guess.
-fn is_readme_filename(path: &Path, package: Option<&Package>) -> bool {
-    path.to_str().map_or(false, |pathstr| {
-        if let Some(&Package { readme: Some(ref r), .. }) = package {
-            // packages put ./README which doesn't match README
-            r.trim_start_matches('.').trim_start_matches('/') == pathstr
-        } else {
-            render_readme::is_readme_filename(path)
+quick_error! {
+    #[derive(Debug, Clone)]
+    pub enum UnarchiverError {
+        TomlNotFound(files: String) {
+            display("Cargo.toml not found\nFound files: {}", files)
         }
+        TomlParse(err: cargo_toml::Error) {
+            display("Cargo.toml parsing error: {}", err)
+            from()
+            cause(err)
+        }
+        Io(err: String) {
+            from(err: io::Error) -> (err.to_string())
+        }
+    }
+}
+
+/// Self-referential struct.
+/// This can't implement iterator itself.
+pub struct Files<'r, R: Read + 'r> {
+    leaked_archive: *mut Archive<R>,
+    pinned_entries: Option<Entries<'r, R>>,
+}
+
+impl<'r, R: Read + 'r> Drop for Files<'r, R> {
+    fn drop(&mut self) {
+        self.pinned_entries.take();
+        unsafe { Box::from_raw(self.leaked_archive) };
+    }
+}
+
+impl<'r, 'i, R: Read + 'r> IntoIterator for &'i mut Files<'r, R> {
+    type IntoIter = &'i mut Entries<'i, R>;
+    type Item = std::io::Result<Entry<'i, R>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let entries = self.pinned_entries.as_mut().unwrap();
+        // shorten lifetime of entries to lifetime of the `Files`
+        unsafe { std::mem::transmute::<&'i mut Entries<'r, R>, &'i mut Entries<'i, R>>(entries) }
+    }
+}
+
+pub fn read_archive_files<'a>(archive: impl Read) -> Result<Files<'a, impl Read>> {
+    let archive = Box::new(Archive::new(Decoder::new(archive)?)); // Box gives it stable addr
+    let archive = Box::into_raw(archive);
+    let entries = unsafe{(archive.as_mut().unwrap())}.entries()?;
+    Ok(Files {
+        leaked_archive: archive,
+        pinned_entries: Some(entries),
     })
 }

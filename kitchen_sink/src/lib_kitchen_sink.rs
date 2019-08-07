@@ -11,7 +11,7 @@ mod deps_stats;
 pub use crate::deps_stats::*;
 
 mod git_crates_index;
-
+mod tarball;
 mod ctrlcbreak;
 pub use crate::ctrlcbreak::*;
 
@@ -42,7 +42,7 @@ use categories::Category;
 use chrono::prelude::*;
 use chrono::DateTime;
 use crate_db::{CrateDb, CrateVersionData, RepoChange};
-use crate_files::CrateFile;
+use crate::tarball::CrateFile;
 use crates_index::Version;
 use crates_io_client::CrateOwner;
 use failure::ResultExt;
@@ -493,7 +493,7 @@ impl KitchenSink {
         let crates_io_meta = crates_io_meta?.meta.krate;
         let crate_tarball = crate_tarball?.ok_or_else(|| KitchenSinkErr::DataNotFound(format!("{}-{}", name, ver)))?;
         let crate_compressed_size = crate_tarball.len();
-        let mut meta = crate_files::read_archive(&crate_tarball[..], name, ver)?;
+        let mut meta = crate::tarball::read_archive(&crate_tarball[..], name, ver)?;
         drop(crate_tarball);
 
         let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;

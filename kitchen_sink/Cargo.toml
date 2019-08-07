@@ -46,4 +46,4 @@ flate2 = "1.0.6"
 string-interner = "0.7.0"
 fxhash = "0.2.1"
 parking_lot = "0.9"
-
+udedokei = { path = "../udedokei" }

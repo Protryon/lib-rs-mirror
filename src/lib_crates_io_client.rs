@@ -1,10 +1,8 @@
-#[macro_use] extern crate serde_derive;
-use serde;
+pub use simple_cache::Error;
 use chrono::{Date, TimeZone, Utc};
 use mysteriouspants_throttle::Throttle;
 use parking_lot::Mutex;
-use serde;
-pub use simple_cache::Error;
+use serde_derive::*;
 use simple_cache::SimpleCache;
 use simple_cache::TempCache;
 use std::collections::HashMap;

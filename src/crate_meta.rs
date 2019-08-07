@@ -1,3 +1,4 @@
+use serde_derive::*;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

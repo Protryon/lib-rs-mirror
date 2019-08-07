@@ -1,3 +1,5 @@
+use serde_derive::*;
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct CrateDepsFile {
     pub dependencies: Vec<CrateDependency>,

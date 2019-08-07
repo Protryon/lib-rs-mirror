@@ -1,3 +1,5 @@
+use serde_derive::*;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateOwnersFile {
     pub users: Vec<CrateOwner>,

@@ -14,9 +14,7 @@ pub struct Urler {
 
 impl Urler {
     pub fn new(own_crate_name: Option<String>) -> Self {
-        Self {
-            own_crate_name,
-        }
+        Self { own_crate_name }
     }
 
     /// Link to a dependency of a crate

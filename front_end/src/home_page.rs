@@ -163,16 +163,21 @@ impl<'a> HomePage<'a> {
     }
 
     pub fn all_contributors<'c>(&self, krate: &'c RichCrateVersion) -> Option<Vec<CrateAuthor<'c>>> {
-        self.crates.all_contributors(krate).map(|(mut a,mut o,..)| {
-            a.append(&mut o);
-            a
-        }).ok()
+        self.crates
+            .all_contributors(krate)
+            .map(|(mut a, mut o, ..)| {
+                a.append(&mut o);
+                a
+            })
+            .ok()
     }
 
     pub fn recently_updated_crates<'z>(&'z self) -> impl Iterator<Item = (RichCrate, RichCrateVersion)> + 'z {
-        self.crates.recently_updated_crates().expect("recent crates").into_iter().map(move |o| {
-            (self.crates.rich_crate(&o).unwrap(), self.crates.rich_crate_version(&o).unwrap())
-        })
+        self.crates
+            .recently_updated_crates()
+            .expect("recent crates")
+            .into_iter()
+            .map(move |o| (self.crates.rich_crate(&o).unwrap(), self.crates.rich_crate_version(&o).unwrap()))
     }
 
     pub fn page(&self) -> Page {

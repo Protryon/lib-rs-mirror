@@ -3,9 +3,9 @@ use rusqlite::types::ToSql;
 
 use github_info::User;
 use github_info::UserType;
+use parking_lot::Mutex;
 use rusqlite::*;
 use std::path::Path;
-use parking_lot::Mutex;
 type Result<T> = std::result::Result<T, failure::Error>;
 
 mod schema;

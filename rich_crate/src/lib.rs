@@ -7,18 +7,18 @@ pub use crate::rich_crate::*;
 mod rich_crate_version;
 pub use crate::rich_crate_version::*;
 
+pub use cargo_toml::Manifest;
 pub use render_readme::Markup;
 pub use render_readme::Readme;
 pub use repo_url::Repo;
 pub use repo_url::RepoHost;
 pub use repo_url::SimpleRepo;
-pub use cargo_toml::Manifest;
 
 /// URL-like identifier of location where crate has been published + normalized crate name
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum Origin {
     CratesIo(Box<str>),
-    GitHub {repo: SimpleRepo, package: Box<str>},
+    GitHub { repo: SimpleRepo, package: Box<str> },
 }
 
 impl Origin {
@@ -27,7 +27,7 @@ impl Origin {
     }
 
     pub fn from_github(repo: SimpleRepo, package: impl Into<Box<str>>) -> Self {
-        Origin::GitHub {repo, package: package.into()}
+        Origin::GitHub { repo, package: package.into() }
     }
 
     pub fn from_repo(r: &Repo, package: &str) -> Option<Self> {
@@ -57,14 +57,14 @@ impl Origin {
     pub fn to_str(&self) -> String {
         match *self {
             Origin::CratesIo(ref s) => format!("crates.io:{}", s),
-            Origin::GitHub {ref repo, ref package} => format!("github:{}/{}/{}", repo.owner, repo.repo, package),
+            Origin::GitHub { ref repo, ref package } => format!("github:{}/{}/{}", repo.owner, repo.repo, package),
         }
     }
 
     pub fn short_crate_name(&self) -> &str {
         match *self {
             Origin::CratesIo(ref s) => s,
-            Origin::GitHub {ref package, ..} => package,
+            Origin::GitHub { ref package, .. } => package,
         }
     }
 }
@@ -79,8 +79,8 @@ fn roundtrip() {
 
 #[test]
 fn roundtrip_gh() {
-    let o1 = Origin::from_github(SimpleRepo {owner: "foo".into(), repo: "bar".into()}, "baz");
-    let o3 = Origin::from_github(SimpleRepo {owner: "foo".into(), repo: "bar".into()}, "other_package");
+    let o1 = Origin::from_github(SimpleRepo { owner: "foo".into(), repo: "bar".into() }, "baz");
+    let o3 = Origin::from_github(SimpleRepo { owner: "foo".into(), repo: "bar".into() }, "other_package");
     let o2 = Origin::from_str(o1.to_str());
     assert_eq!(o1, o2);
     assert_ne!(o1, o3);

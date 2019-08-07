@@ -1,3 +1,4 @@
+use either::Either;
 use front_end;
 use kitchen_sink;
 use kitchen_sink::RichCrate;
@@ -8,7 +9,6 @@ use rich_crate::RichCrateVersion;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
-use either::Either;
 
 fn main() {
     if let Err(e) = run(std::env::args().nth(1)) {

@@ -4,7 +4,6 @@ use crate::Urler;
 use render_readme::Renderer;
 use std::io::Write;
 
-
 pub struct NotFoundPage<'a> {
     markup: &'a Renderer,
     pub results: &'a [search_index::CrateFound],
@@ -13,15 +12,10 @@ pub struct NotFoundPage<'a> {
 
 impl NotFoundPage<'_> {
     pub fn new<'a>(query: &'a str, results: &'a [search_index::CrateFound], markup: &'a Renderer) -> NotFoundPage<'a> {
-        NotFoundPage {
-            query,
-            markup,
-            results,
-        }
+        NotFoundPage { query, markup, results }
     }
 
     pub fn page(&self) -> Page {
-
         Page {
             title: "Crate not found".into(),
             description: Some("Error".into()),

@@ -1,12 +1,12 @@
-use futures::future::FutureResult;
-use failure::ResultExt;
-use arc_swap::ArcSwap;
 use actix_web::http::*;
 use actix_web::*;
+use arc_swap::ArcSwap;
 use categories::Category;
 use categories::CATEGORIES;
 use env_logger;
+use failure::ResultExt;
 use front_end;
+use futures::future::FutureResult;
 use futures::future::{self, Future};
 use futures_cpupool::CpuPool;
 use kitchen_sink;
@@ -16,12 +16,12 @@ use render_readme::{Highlighter, ImageOptimAPIFilter, Renderer};
 use search_index::CrateSearchIndex;
 use std::env;
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::prelude::FutureExt;
-use urlencoding::encode;
 use urlencoding::decode;
+use urlencoding::encode;
 
 mod writer;
 use crate::writer::*;
@@ -301,20 +301,18 @@ fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: impl FnOnc
     }))
 }
 
-fn render_crate_page(state: &AServerState, crate_name: String) -> impl Future<Item=Vec<u8>, Error=failure::Error> {
+fn render_crate_page(state: &AServerState, crate_name: String) -> impl Future<Item = Vec<u8>, Error = failure::Error> {
     let state2 = Arc::clone(state);
-    state
-        .render_pool
-        .spawn_fn(move || {
-            let crates = state2.crates.load();
-            crates.prewarm();
-            let origin = Origin::from_crates_io_name(&crate_name);
-            let all = crates.rich_crate(&origin)?;
-            let ver = crates.rich_crate_version(&origin)?;
-            let mut page: Vec<u8> = Vec::with_capacity(50000);
-            front_end::render_crate_page(&mut page, &all, &ver, &crates, &state2.markup)?;
-            Ok(page)
-        })
+    state.render_pool.spawn_fn(move || {
+        let crates = state2.crates.load();
+        crates.prewarm();
+        let origin = Origin::from_crates_io_name(&crate_name);
+        let all = crates.rich_crate(&origin)?;
+        let ver = crates.rich_crate_version(&origin)?;
+        let mut page: Vec<u8> = Vec::with_capacity(50000);
+        front_end::render_crate_page(&mut page, &all, &ver, &crates, &state2.markup)?;
+        Ok(page)
+    })
 }
 
 fn handle_keyword(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
@@ -392,21 +390,21 @@ fn handle_search(req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
 
             let (mut w, page) = writer();
             rayon::spawn(move || {
-                let res = state.index.search(&query, 50, true)
-                .map_err(From::from)
-                .and_then(|results| {
-                    front_end::render_serp_page(&mut w, &query, &results, &state.markup)
-                });
+                let res = state
+                    .index
+                    .search(&query, 50, true)
+                    .map_err(From::from)
+                    .and_then(|results| front_end::render_serp_page(&mut w, &query, &results, &state.markup));
                 if let Err(e) = res {
                     w.fail(e.into());
                 }
             });
 
             Ok(HttpResponse::Ok()
-                    .content_type("text/html;charset=UTF-8")
-                    .header("Cache-Control", "public, max-age=600, stale-while-revalidate=259200, stale-if-error=72000")
-                    .body(Body::Streaming(Box::new(page))))
-        },
+                .content_type("text/html;charset=UTF-8")
+                .header("Cache-Control", "public, max-age=600, stale-while-revalidate=259200, stale-if-error=72000")
+                .body(Body::Streaming(Box::new(page))))
+        }
         _ => Ok(HttpResponse::PermanentRedirect().header("Location", "/").finish()),
     }
 }
@@ -426,9 +424,9 @@ fn handle_sitemap(req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
     });
 
     Ok(HttpResponse::Ok()
-            .content_type("application/xml;charset=UTF-8")
-            .header("Cache-Control", "public, max-age=259200, stale-while-revalidate=72000, stale-if-error=72000")
-            .body(Body::Streaming(Box::new(page))))
+        .content_type("application/xml;charset=UTF-8")
+        .header("Cache-Control", "public, max-age=259200, stale-while-revalidate=72000, stale-if-error=72000")
+        .body(Body::Streaming(Box::new(page))))
 }
 
 fn handle_feed(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
@@ -458,8 +456,8 @@ fn handle_feed(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> 
         .responder()
 }
 
-use header::HeaderValue;
 use actix_web::middleware::{Middleware, Response};
+use header::HeaderValue;
 struct StandardHeaders;
 
 impl<S> Middleware<S> for StandardHeaders {

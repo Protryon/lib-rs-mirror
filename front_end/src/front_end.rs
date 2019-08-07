@@ -5,24 +5,23 @@
 //! because the template engine Ructe doesn't support
 //! complex expressions in the templates.
 
-
 mod cat_page;
 mod crate_page;
 mod download_graph;
 mod home_page;
-mod not_found_page;
 mod iter;
+mod not_found_page;
 mod search_page;
 mod urler;
-pub use crate::search_page::*;
 pub use crate::not_found_page::*;
+pub use crate::search_page::*;
 
-use categories::Category;
-use chrono::prelude::*;
 use crate::crate_page::*;
 use crate::urler::Urler;
-use failure::ResultExt;
+use categories::Category;
+use chrono::prelude::*;
 use failure;
+use failure::ResultExt;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::{stopped, KitchenSinkErr};
 use render_readme::Renderer;

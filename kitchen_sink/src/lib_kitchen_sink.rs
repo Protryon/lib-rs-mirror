@@ -16,18 +16,18 @@ mod ctrlcbreak;
 pub use crate::ctrlcbreak::*;
 
 pub use crates_index::Crate as CratesIndexCrate;
-pub use crates_io_client::CrateDependency;
 pub use crates_io_client::CrateDepKind;
+pub use crates_io_client::CrateDependency;
 pub use crates_io_client::CrateMetaVersion;
 pub use crates_io_client::CratesIoCrate;
 pub use crates_io_client::OwnerKind;
 pub use github_info::User;
 pub use github_info::UserOrg;
 pub use github_info::UserType;
-use rich_crate::ManifestExt;
 pub use rich_crate::Edition;
 pub use rich_crate::Include;
 pub use rich_crate::MaintenanceStatus;
+use rich_crate::ManifestExt;
 pub use rich_crate::Markup;
 pub use rich_crate::Origin;
 pub use rich_crate::RichCrate;
@@ -39,9 +39,9 @@ pub use semver::Version as SemVer;
 use cargo_toml::Manifest;
 use cargo_toml::Package;
 use categories::Category;
-use chrono::DateTime;
 use chrono::prelude::*;
-use crate_db::{CrateDb, RepoChange, CrateVersionData};
+use chrono::DateTime;
+use crate_db::{CrateDb, CrateVersionData, RepoChange};
 use crate_files::CrateFile;
 use crates_index::Version;
 use crates_io_client::CrateOwner;
@@ -51,6 +51,7 @@ use github_info::GitCommitAuthor;
 use github_info::GitHubRepo;
 use itertools::Itertools;
 use lazyonce::LazyOnce;
+use parking_lot::RwLock;
 use rayon::prelude::*;
 use repo_url::Repo;
 use repo_url::RepoHost;
@@ -72,7 +73,6 @@ use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
-use parking_lot::RwLock;
 
 pub type CError = failure::Error;
 pub type CResult<T> = Result<T, CError>;
@@ -315,9 +315,7 @@ impl KitchenSink {
 
     pub fn crate_exists(&self, origin: &Origin) -> bool {
         match origin {
-            Origin::CratesIo(name) => {
-                self.index.crates_io_crate_by_name(name).is_ok()
-            },
+            Origin::CratesIo(name) => self.index.crates_io_crate_by_name(name).is_ok(),
             _ => self.rich_crate(origin).is_ok(),
         }
     }

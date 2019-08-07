@@ -84,7 +84,7 @@ impl Categories {
             let obvious_keywords = details.remove("obvious-keywords").and_then(|v| v.try_into().ok()).unwrap_or_default();
             let siblings = details.remove("siblings").and_then(|v| v.try_into().ok()).unwrap_or_default();
 
-            let mut full_slug = String::with_capacity(full_slug_start.len()+2+slug.len());
+            let mut full_slug = String::with_capacity(full_slug_start.len() + 2 + slug.len());
             if full_slug_start != "" {
                 full_slug.push_str(full_slug_start);
                 full_slug.push_str("::");
@@ -126,7 +126,8 @@ impl Categories {
     }
 
     pub fn fixed_category_slugs(cats: &[String]) -> Vec<Cow<'_, str>> {
-        let mut cats = Self::filtered_category_slugs(cats).enumerate().filter_map(|(idx, s)| {
+        let mut cats = Self::filtered_category_slugs(cats).enumerate()
+        .filter_map(|(idx, s)| {
             let s = s.trim_matches(':');
             let mut chars = s.chars().peekable();
             while let Some(cur) = chars.next() {
@@ -151,13 +152,15 @@ impl Categories {
             }
             let depth = s.split("::").count();
             Some((depth, idx, Cow::Borrowed(s.as_ref())))
-        }).filter(|(_, _, s)| {
+        })
+        .filter(|(_, _, s)| {
             if CATEGORIES.from_slug(s).next().is_none() {
                 println!("invalid cat name {}", s);
                 return false;
             }
             true
-        }).collect::<Vec<_>>();
+        })
+        .collect::<Vec<_>>();
 
         // depth, then original order
         cats.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));

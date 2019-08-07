@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::path::Path;
+use std::path::PathBuf;
 
 use serde_derive::*;
 use tokei;
@@ -222,9 +222,7 @@ impl LanguageExt for Language {
 
 impl Collect {
     pub fn new() -> Self {
-        Self {
-            stats: Stats::default(),
-        }
+        Self { stats: Stats::default() }
     }
 
     pub fn finish(self) -> Stats {

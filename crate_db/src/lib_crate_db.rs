@@ -1,35 +1,25 @@
 use categories;
-use rusqlite::types::ToSql;
-use rusqlite::NO_PARAMS;
-use std::fmt::Write;
-
-use rusqlite;
-#[macro_use]
-extern crate failure;
-
-#[macro_use]
-extern crate lazy_static;
-
 use chrono::prelude::*;
-use failure::ResultExt;
-
+use failure::*;
+use parking_lot::Mutex;
 use rich_crate::Derived;
 use rich_crate::Manifest;
-use rich_crate::Origin;
-use rich_crate::Repo;
-use rich_crate::Readme;
-use rich_crate::Markup;
-use rich_crate::RichCrate;
 use rich_crate::ManifestExt;
-
+use rich_crate::Markup;
+use rich_crate::Origin;
+use rich_crate::Readme;
+use rich_crate::Repo;
+use rich_crate::RichCrate;
 use rusqlite::*;
+use rusqlite::NO_PARAMS;
+use rusqlite::types::ToSql;
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::fmt::Write;
 use std::fs;
 use std::path::Path;
-use parking_lot::Mutex;
 use thread_local::ThreadLocal;
 type FResult<T> = std::result::Result<T, failure::Error>;
 
@@ -309,8 +299,7 @@ impl CrateDb {
             tmp.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
             write!(&mut out, "#{} ", tmp.into_iter().map(|(k, _)| k.to_string()).collect::<Vec<_>>().join(" #"))?;
         }
-        let next_timestamp = (Utc::now().timestamp() + 3600*24*31) as u32;
-
+        let next_timestamp = (Utc::now().timestamp() + 3600 * 24 * 31) as u32;
 
         self.with_tx("insert_crate", |tx| {
             let mut insert_crate = tx.prepare_cached("INSERT OR IGNORE INTO crates (origin, recent_downloads, ranking) VALUES (?1, ?2, ?3)")?;
@@ -580,16 +569,14 @@ impl CrateDb {
     }
 
     pub fn path_in_repo(&self, repo: &Repo, crate_name: &str) -> FResult<Option<String>> {
-        self.with_connection("path_in_repo", |conn| {
-            self.path_in_repo_tx(conn, repo, crate_name)
-        })
+        self.with_connection("path_in_repo", |conn| self.path_in_repo_tx(conn, repo, crate_name))
     }
 
     pub fn path_in_repo_tx(&self, conn: &Connection, repo: &Repo, crate_name: &str) -> FResult<Option<String>> {
         let repo = repo.canonical_git_url();
-            let mut get_path = conn.prepare_cached("SELECT path FROM repo_crates WHERE repo = ?1 AND crate_name = ?2")?;
-            let args: &[&dyn ToSql] = &[&repo, &crate_name];
-            Ok(none_rows(get_path.query_row(args, |row| row.get(0))).context("path_in_repo")?)
+        let mut get_path = conn.prepare_cached("SELECT path FROM repo_crates WHERE repo = ?1 AND crate_name = ?2")?;
+        let args: &[&dyn ToSql] = &[&repo, &crate_name];
+        Ok(none_rows(get_path.query_row(args, |row| row.get(0))).context("path_in_repo")?)
     }
 
     /// Update download counts of the crate
@@ -1105,7 +1092,6 @@ impl KeywordInsert {
     }
 }
 
-
 fn chop3words(s: &str) -> &str {
     let mut words = 0;
     for (pos, ch) in s.char_indices() {
@@ -1118,7 +1104,6 @@ fn chop3words(s: &str) -> &str {
     }
     return s;
 }
-
 
 #[inline]
 fn none_rows<T>(res: std::result::Result<T, rusqlite::Error>) -> std::result::Result<Option<T>, rusqlite::Error> {

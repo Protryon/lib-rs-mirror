@@ -1,6 +1,6 @@
-use futures::Stream;
 use futures::sink::{Sink, Wait};
 use futures::sync::mpsc;
+use futures::Stream;
 use std::io;
 
 pub struct Writer<T, E>(Wait<mpsc::Sender<Result<T, E>>>);

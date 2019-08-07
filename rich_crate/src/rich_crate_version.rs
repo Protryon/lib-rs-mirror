@@ -37,8 +37,7 @@ pub enum Include {
 ///
 /// Crates.rs uses this only for the latest version of a crate.
 impl RichCrateVersion {
-    pub fn new(origin: Origin, manifest: Manifest, derived: Derived) -> Self
-    {
+    pub fn new(origin: Origin, manifest: Manifest, derived: Derived) -> Self {
         let package = manifest.package.as_ref().expect("package");
         Self {
             origin,

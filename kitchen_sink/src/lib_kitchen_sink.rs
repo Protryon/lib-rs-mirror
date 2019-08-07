@@ -67,6 +67,7 @@ use std::cmp::Ordering;
 use std::collections::hash_map::Entry::*;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::convert::TryInto;
 use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -336,16 +337,19 @@ impl KitchenSink {
                 Ok(RichCrate::new(origin.clone(), meta.owners, meta.meta.krate.name, versions))
             },
             Origin::GitHub {repo, package} => {
-                Ok(RichCrate::new(origin.clone(), vec![
+                let host = RepoHost::GitHub(repo.clone()).try_into().map_err(|_| KitchenSinkErr::CrateNotFound(origin.clone())).context("ghrepo host bad")?;
+                let cachebust = self.cachebust_string_for_repo(&host).context("ghrepo")?;
+                let gh = self.gh.repo(repo, &cachebust)?.ok_or_else(|| KitchenSinkErr::CrateNotFound(origin.clone())).context("ghrepo not found")?;
+                Ok(RichCrate::new(origin.clone(), gh.owner.into_iter().map(|o| {
                     CrateOwner {
                         id: 0,
-                        login: repo.owner.to_string(),
-                        kind: OwnerKind::User, // FIXME: not really true if this is an org
-                        url: format!("https://github.com/{}", repo.owner),
-                        name: None,
-                        avatar: None,
+                        avatar: o.avatar_url,
+                        url: o.html_url,
+                        login: o.login,
+                        kind: OwnerKind::User, // FIXME: crates-io uses teams, and we'd need to find the right team? is "owners" a guaranteed thing?
+                        name: o.name,
                     }
-                ],
+                }).collect(),
                 format!("{}/{}/{}", repo.owner, repo.repo, package),
                 vec![]))
             }
@@ -1247,7 +1251,10 @@ impl KitchenSink {
             })
             .map(|c| c.version().to_string())
             .next()
-            .unwrap_or_else(|| "*".to_string()))
+            .unwrap_or_else(|| {
+                let weeks = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).expect("clock").as_secs() / (3600*24*7);
+                format!("w{}", weeks)
+            }))
     }
 
     pub fn user_github_orgs(&self, github_login: &str) -> CResult<Option<Vec<UserOrg>>> {
@@ -1475,8 +1482,10 @@ impl KitchenSink {
         // (the id field is crates-io's field), but it does keep the avatar URL
         // which contains github's ID
         if let Some(ref avatar) = owner.avatar {
-            let r = regex::Regex::new("https://avatars[0-9]+.githubusercontent.com/u/([0-9]+)").expect("regex");
-            if let Some(c) = r.captures(avatar) {
+            lazy_static::lazy_static! {
+                static ref R: regex::Regex = regex::Regex::new("https://avatars[0-9]+.githubusercontent.com/u/([0-9]+)").expect("regex");
+            }
+            if let Some(c) = R.captures(avatar) {
                 let id = c.get(1).expect("regex").as_str();
                 return Ok(id.parse().expect("regex"))
             }

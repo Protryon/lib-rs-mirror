@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use url;
 use url::Url;
+use std::convert::TryFrom;
 
 pub type GResult<T> = Result<T, GitError>;
 
@@ -174,24 +175,41 @@ impl Repo {
         }
     }
 
-    /// URL for cloning the repository via git
     pub fn canonical_git_url(&self) -> Cow<'_, str> {
-        match self.host {
-            RepoHost::GitHub(SimpleRepo {ref owner, ref repo}) => {
-                format!("https://github.com/{}/{}.git", owner, repo).into()
-            },
-            RepoHost::GitLab(SimpleRepo {ref owner, ref repo}) => {
-                format!("https://gitlab.com/{}/{}.git", owner, repo).into()
-            },
-            RepoHost::BitBucket(SimpleRepo {ref owner, ref repo}) => {
-                format!("https://bitbucket.org/{}/{}", owner, repo).into()
-            },
-            RepoHost::Other => self.url.as_str().into(),
+        match self.host.canonical_git_url() {
+            Some(s) => s.into(),
+            None => self.url.as_str().into(),
         }
     }
 
     pub fn owner_name(&self) -> Option<&str> {
-        match self.host {
+        self.host.owner_name()
+    }
+
+    pub fn repo_name(&self) -> Option<&str> {
+        self.host.repo_name()
+    }
+}
+
+impl RepoHost {
+    /// URL for cloning the repository via git
+    pub fn canonical_git_url(&self) -> Option<String> {
+        match self {
+            RepoHost::GitHub(SimpleRepo {ref owner, ref repo}) => {
+                Some(format!("https://github.com/{}/{}.git", owner, repo))
+            },
+            RepoHost::GitLab(SimpleRepo {ref owner, ref repo}) => {
+                Some(format!("https://gitlab.com/{}/{}.git", owner, repo))
+            },
+            RepoHost::BitBucket(SimpleRepo {ref owner, ref repo}) => {
+                Some(format!("https://bitbucket.org/{}/{}", owner, repo))
+            },
+            RepoHost::Other => None,
+        }
+    }
+
+    pub fn owner_name(&self) -> Option<&str> {
+        match self {
             RepoHost::GitHub(SimpleRepo { ref owner, .. }) |
             RepoHost::BitBucket(SimpleRepo { ref owner, .. }) |
             RepoHost::GitLab(SimpleRepo { ref owner, .. }) => return Some(owner),
@@ -200,12 +218,23 @@ impl Repo {
     }
 
     pub fn repo_name(&self) -> Option<&str> {
-        match self.host {
+        match self {
             RepoHost::GitHub(SimpleRepo { ref repo, .. }) |
             RepoHost::BitBucket(SimpleRepo { ref repo, .. }) |
             RepoHost::GitLab(SimpleRepo { ref repo, .. }) => return Some(repo),
             RepoHost::Other => None,
         }
+    }
+}
+
+
+impl TryFrom<RepoHost> for Repo {
+    type Error = &'static str;
+    fn try_from(host: RepoHost) -> Result<Self, Self::Error> {
+        host.canonical_git_url()
+            .and_then(|url| url.parse().ok())
+            .map(|url| Repo {host, url})
+            .ok_or("not a known git host")
     }
 }
 

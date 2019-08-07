@@ -1,7 +1,7 @@
 use std::borrow::Cow;
+use std::convert::TryFrom;
 use url;
 use url::Url;
-use std::convert::TryFrom;
 
 pub type GResult<T> = Result<T, GitError>;
 

@@ -70,6 +70,7 @@ use std::collections::HashSet;
 use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::SystemTime;
 use parking_lot::RwLock;
 
 pub type CError = failure::Error;
@@ -235,7 +236,7 @@ impl KitchenSink {
     ///
     /// It returns only identifiers,
     /// so `rich_crate`/`rich_crate_version` is needed to do more.
-    pub fn all_crates(&self) -> impl Iterator<Item=&Origin> {
+    pub fn all_crates(&self) -> impl Iterator<Item=Origin> + '_ {
         self.index.all_crates()
     }
 
@@ -243,7 +244,7 @@ impl KitchenSink {
     ///
     /// It returns only identifiers,
     /// so `rich_crate`/`rich_crate_version` is needed to do more.
-    pub fn all_crates_io_crates(&self) -> &FxHashMap<Origin, CratesIndexCrate> {
+    pub fn all_crates_io_crates(&self) -> &FxHashMap<Box<str>, CratesIndexCrate> {
         self.index.crates_io_crates()
     }
 
@@ -298,7 +299,7 @@ impl KitchenSink {
         let all: Vec<_> = self.index.all_crates().collect();
         Ok(all.into_par_iter()
         .filter_map(move |o| {
-            self.rich_crate(o).map_err(|e| eprintln!("{:?}: {}", o, e)).ok()
+            self.rich_crate(&o).map_err(|e| eprintln!("{:?}: {}", o, e)).ok()
         })
         .filter(move |k| {
             let latest = k.versions().iter().map(|v| v.created_at.as_str()).max().unwrap_or("");
@@ -313,10 +314,10 @@ impl KitchenSink {
 
     pub fn crate_exists(&self, origin: &Origin) -> bool {
         match origin {
-            Origin::CratesIo(_) => {
-                self.index.crates_io_crate_by_name(origin).is_ok()
+            Origin::CratesIo(name) => {
+                self.index.crates_io_crate_by_name(name).is_ok()
             },
-            _ => true,
+            _ => self.rich_crate(origin).is_ok(),
         }
     }
 
@@ -324,8 +325,8 @@ impl KitchenSink {
     pub fn rich_crate(&self, origin: &Origin) -> CResult<RichCrate> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
         match origin {
-            Origin::CratesIo(_) => {
-                let meta = self.crates_io_meta(origin, false)?;
+            Origin::CratesIo(name) => {
+                let meta = self.crates_io_meta(name, false)?;
                 let versions = meta.meta.versions().map(|c| CrateVersion {
                     num: c.num,
                     updated_at: c.updated_at,
@@ -382,27 +383,26 @@ impl KitchenSink {
 
     fn downloads_recent(&self, origin: &Origin) -> CResult<Option<usize>> {
         Ok(match origin {
-            Origin::CratesIo(_) => {
-                let meta = self.crates_io_meta(origin, true)?;
+            Origin::CratesIo(name) => {
+                let meta = self.crates_io_meta(name, true)?;
                 meta.meta.krate.recent_downloads
             },
             _ => None,
         })
     }
 
-    fn crates_io_meta(&self, origin: &Origin, refresh: bool) -> CResult<CratesIoCrate> {
-        let krate = self.index.crates_io_crate_by_name(origin).context("rich_crate")?;
-        let name = krate.name();
+    fn crates_io_meta(&self, name: &str, refresh: bool) -> CResult<CratesIoCrate> {
+        let krate = self.index.crates_io_crate_by_name(name).context("rich_crate")?;
         let latest_in_index = krate.latest_version().version(); // most recently published version
         let meta = self.crates_io.krate(name, latest_in_index, refresh)
             .with_context(|_| format!("crates.io meta for {} {}", name, latest_in_index))?;
         let mut meta = meta.ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?;
         if !meta.meta.versions.iter().any(|v| v.num == latest_in_index) {
-            eprintln!("Crate data missing latest version {:?}@{}", origin, latest_in_index);
+            eprintln!("Crate data missing latest version {}@{}", name, latest_in_index);
             meta = self.crates_io.krate(name, &format!("{}-try-again", latest_in_index), true)?
                 .ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?;
             if !meta.meta.versions.iter().any(|v| v.num == latest_in_index) {
-                eprintln!("Error: crate data is borked {:?}@{}. Has only: {:?}", origin, latest_in_index, meta.meta.versions.iter().map(|v| &v.num).collect::<Vec<_>>());
+                eprintln!("Error: crate data is borked {}@{}. Has only: {:?}", name, latest_in_index, meta.meta.versions.iter().map(|v| &v.num).collect::<Vec<_>>());
             }
         }
         Ok(meta)
@@ -426,8 +426,15 @@ impl KitchenSink {
                 for e in e.iter_chain() {
                     eprintln!("{}: {}", origin.to_str(), e);
                 }
-                let ver = self.index.crate_version_latest_unstable(origin).context("rich_crate_version")?;
-                self.rich_crate_version_verbose(ver).map(|(krate, _)| krate)?
+                match origin {
+                    Origin::CratesIo(name) => {
+                        let ver = self.index.crate_version_latest_unstable(name).context("rich_crate_version1")?;
+                        self.rich_crate_version_verbose(ver).map(|(krate, _)| krate)?
+                    },
+                    _ => {
+                        unimplemented!()
+                    }
+                }
             },
         };
 
@@ -479,7 +486,7 @@ impl KitchenSink {
 
         let (crate_tarball, crates_io_meta) = rayon::join(
             || self.crates_io.crate_data(name, ver).context("crate_file"),
-            || self.crates_io_meta(&origin, true));
+            || self.crates_io_meta(name, true));
 
         let crates_io_meta = crates_io_meta?.meta.krate;
         let crate_tarball = crate_tarball?.ok_or_else(|| KitchenSinkErr::DataNotFound(format!("{}-{}", name, ver)))?;
@@ -854,7 +861,12 @@ impl KitchenSink {
     }
 
     pub fn all_dependencies_flattened(&self, origin: &Origin) -> Result<DepInfMap, KitchenSinkErr> {
-        self.index.all_dependencies_flattened(self.index.crates_io_crate_by_name(origin)?)
+        match origin {
+            Origin::CratesIo(name) => {
+                self.index.all_dependencies_flattened(self.index.crates_io_crate_by_name(name)?)
+            },
+            _ => unimplemented!()
+        }
     }
 
     pub fn prewarm(&self) {
@@ -956,7 +968,7 @@ impl KitchenSink {
             let origin = k.origin();
             match origin {
                 Origin::CratesIo(name) => {
-                    let meta = self.crates_io_meta(origin, true)?;
+                    let meta = self.crates_io_meta(name, true)?;
                     self.index_crate_downloads(name, &meta)?;
                 },
                 _ => {},
@@ -1021,7 +1033,10 @@ impl KitchenSink {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
 
         let origin = k.origin();
-        let ver = self.index.crate_version_latest_unstable(origin).context("rich_crate_version")?;
+        let ver = match origin {
+            Origin::CratesIo(ref name) => self.index.crate_version_latest_unstable(name).context("rich_crate_version2")?,
+            _ => unimplemented!(),
+        };
 
         let (v, _warn) = self.rich_crate_version_data(ver)?;
 
@@ -1224,7 +1239,12 @@ impl KitchenSink {
         Ok(self.crate_db.crates_in_repo(crate_repo)
             .context("db crates_in_repo")?
             .into_iter()
-            .filter_map(|origin| self.index.crate_version_latest_unstable(&origin).ok())
+            .filter_map(|origin| {
+                match origin {
+                    Origin::CratesIo(name) => self.index.crate_version_latest_unstable(&name).ok(),
+                    _ => None,
+                }
+            })
             .map(|c| c.version().to_string())
             .next()
             .unwrap_or_else(|| "*".to_string()))

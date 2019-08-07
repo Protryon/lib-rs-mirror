@@ -59,7 +59,7 @@ fn main() {
     let seen_repos = &Mutex::new(HashSet::new());
     rayon::scope(move |s1| {
         let c = if everything {
-            let mut c: Vec<_> = crates.all_crates().cloned().collect::<Vec<_>>();
+            let mut c: Vec<_> = crates.all_crates().collect::<Vec<_>>();
             c.shuffle(&mut thread_rng());
             Either::Left(c)
         } else if let Some(origin) = specific {

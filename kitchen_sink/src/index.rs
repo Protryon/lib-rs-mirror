@@ -41,7 +41,7 @@ impl MiniVer {
 }
 
 pub struct Index {
-    indexed_crates: LazyOnce<FxHashMap<Origin, Crate>>,
+    indexed_crates: LazyOnce<FxHashMap<Box<str>, Crate>>,
     pub(crate) crates_io_index: crates_index::Index,
     git_index: GitIndex,
 
@@ -75,18 +75,18 @@ impl Index {
     ///
     /// It returns only a thin and mostly useless data from the index itself,
     /// so `rich_crate`/`rich_crate_version` is needed to do more.
-    pub fn crates_io_crates(&self) -> &FxHashMap<Origin, Crate> {
+    pub fn crates_io_crates(&self) -> &FxHashMap<Box<str>, Crate> {
         self.indexed_crates.get(|| {
             self.crates_io_index.crates()
-                .map(|c| (Origin::from_crates_io_name(c.name()), c))
+                .map(|c| (c.name().into(), c))
                 .collect()
         })
     }
 
     /// All crates available in the crates.io index and our index
     ///
-    pub fn all_crates(&self) -> impl Iterator<Item=&Origin> {
-        self.git_index.crates().chain(self.crates_io_crates().keys())
+    pub fn all_crates(&self) -> impl Iterator<Item=Origin> + '_ {
+        self.git_index.crates().cloned().chain(self.crates_io_crates().keys().map(|n| Origin::from_crates_io_name(&n)))
     }
 
     pub fn deps_stats(&self) -> Result<&DepsStats, KitchenSinkErr> {
@@ -99,17 +99,17 @@ impl Index {
         }
     }
 
-    pub fn crates_io_crate_by_name(&self, name: &Origin) -> Result<&Crate, KitchenSinkErr> {
+    pub fn crates_io_crate_by_name(&self, name: &str) -> Result<&Crate, KitchenSinkErr> {
         self.crates_io_crates()
         .get(name)
-        .ok_or_else(|| KitchenSinkErr::CrateNotFound(name.clone()))
+        .ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))
     }
 
-    pub fn crate_version_latest_unstable(&self, name: &Origin) -> Result<&Version, KitchenSinkErr> {
-        Ok(Self::highest_version(self.crates_io_crate_by_name(name)?, false))
+    pub fn crate_version_latest_unstable(&self, name: &str) -> Result<&Version, KitchenSinkErr> {
+        Ok(Self::highest_crates_io_version(self.crates_io_crate_by_name(name)?, false))
     }
 
-    pub fn highest_version(krate: &Crate, stable_only: bool) -> &Version {
+    fn highest_crates_io_version(krate: &Crate, stable_only: bool) -> &Version {
         krate.versions()
             .iter()
             .max_by_key(|a| {
@@ -123,7 +123,7 @@ impl Index {
     }
 
     pub(crate) fn deps_of_crate(&self, krate: &Crate, DepQuery { default, all_optional, dev }: DepQuery) -> Result<Dep, KitchenSinkErr> {
-        let latest = Self::highest_version(krate, true);
+        let latest = Self::highest_crates_io_version(krate, true);
         let mut features = Vec::with_capacity(if all_optional { latest.features().len() } else { 0 });
         if all_optional {
             features.extend(latest.features().iter().filter(|(_, v)| !v.is_empty()).map(|(c, _)| c.to_string().into_boxed_str()));
@@ -201,7 +201,7 @@ impl Index {
             }
 
             let req = VersionReq::parse(d.requirement()).map_err(|_| KitchenSinkErr::SemverParsingError)?;
-            let krate = match self.crates_io_crate_by_name(&Origin::from_crates_io_name(package)) {
+            let krate = match self.crates_io_crate_by_name(package) {
                 Ok(k) => k,
                 Err(e) => {
                     eprintln!("{}@{} depends on missing crate {} (@{}): {}", ver.name(), ver.version(), package, req, e);
@@ -279,9 +279,9 @@ impl Index {
             return Ok(Some((false, 0.)));
         }
 
-        let krate = self.crates_io_crate_by_name(&Origin::from_crates_io_name(crate_name))?;
+        let krate = self.crates_io_crate_by_name(crate_name)?;
 
-        let matches_latest = Self::highest_version(krate, true).version().parse().ok()
+        let matches_latest = Self::highest_crates_io_version(krate, true).version().parse().ok()
             .map_or(false, |latest| requirement.matches(&latest));
 
         let stats = self.deps_stats()?;

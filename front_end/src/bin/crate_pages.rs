@@ -70,12 +70,12 @@ fn run(filter: Option<String>) -> Result<(), failure::Error> {
         let tmp;
         let always_render = filter.is_some();
         let all_crates = if let Some(filter) = &filter {
-            tmp = [if filter.contains(':') {
+            tmp = vec![if filter.contains(':') {
                 Origin::from_str(filter)
             } else {
                 Origin::from_crates_io_name(filter)
             }];
-            Either::Left(tmp.iter())
+            Either::Left(tmp.into_iter())
         } else {
             Either::Right(crates.all_crates())
         };

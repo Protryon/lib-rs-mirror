@@ -32,7 +32,7 @@ fn main() {
                 let tx = tx1.clone();
                 s1.spawn(move |_| {
                     println!("{:?}", o.short_crate_name());
-                    let r1 = crates.rich_crate_version(o);
+                    let r1 = crates.rich_crate_version(&o);
                     let res = r1.and_then(|c| {
                         for a in c.authors().iter().filter(|a| a.email.is_some()) {
                             if let Some(email) = a.email.as_ref() {

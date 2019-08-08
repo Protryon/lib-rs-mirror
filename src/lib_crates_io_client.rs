@@ -8,7 +8,7 @@ use simple_cache::TempCache;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::Path;
-
+use urlencoding::encode;
 mod crate_deps;
 mod crate_downloads;
 mod crate_meta;
@@ -57,7 +57,7 @@ impl CratesIoClient {
 
     pub fn crate_data(&self, crate_name: &str, version: &str) -> Result<Option<Vec<u8>>, Error> {
         let newkey = format!("{}.crate", crate_name);
-        let url = format!("https://crates.io/api/v1/crates/{}/{}/download", crate_name, version);
+        let url = format!("https://crates.io/api/v1/crates/{}/{}/download", encode(crate_name), encode(version));
         let res = self.crates.get_cached((&newkey, version), &url)?;
         if let Some(data) = &res {
             if data.len() < 10 || data[0] != 31 || data[1] != 139 {
@@ -69,7 +69,7 @@ impl CratesIoClient {
 
     pub fn readme(&self, crate_name: &str, version: &str) -> Result<Option<Vec<u8>>, Error> {
         let key = format!("{}.html", crate_name);
-        let url = format!("https://crates.io/api/v1/crates/{}/{}/readme", crate_name, version);
+        let url = format!("https://crates.io/api/v1/crates/{}/{}/readme", encode(crate_name), encode(version));
         self.crates.get_cached((&key, version), &url)
     }
 
@@ -104,11 +104,11 @@ impl CratesIoClient {
     }
 
     pub fn crate_meta(&self, crate_name: &str, as_of_version: &str) -> Result<Option<CrateMetaFile>, Error> {
-        self.get_json((crate_name, as_of_version), crate_name)
+        self.get_json((crate_name, as_of_version), encode(crate_name))
     }
 
     pub fn crate_downloads(&self, crate_name: &str, as_of_version: &str, refresh: bool) -> Result<Option<CrateDownloadsFile>, Error> {
-        let url = format!("{}/downloads", crate_name);
+        let url = format!("{}/downloads", encode(crate_name));
         let new_key = (url.as_str(), as_of_version);
         let data: CrateDownloadsFile = cioopt!(self.get_json(new_key, &url)?);
         if refresh && !self.cache.cache_only && data.is_stale() {
@@ -122,8 +122,8 @@ impl CratesIoClient {
     }
 
     pub fn crate_owners(&self, crate_name: &str, as_of_version: &str) -> Result<Option<Vec<CrateOwner>>, Error> {
-        let url1 = format!("{}/owner_user", crate_name);
-        let url2 = format!("{}/owner_team", crate_name);
+        let url1 = format!("{}/owner_user", encode(crate_name));
+        let url2 = format!("{}/owner_team", encode(crate_name));
         let (res1, res2) = rayon::join(
             || self.get_json((&url1, as_of_version), &url1),
             || self.get_json((&url2, as_of_version), &url2));

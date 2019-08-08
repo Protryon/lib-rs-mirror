@@ -105,10 +105,11 @@ lazy_static! {
             ("no-std", 0.9, 0.), ("development-tools::cargo-plugins", 0.7, 0.), ("rust-patterns", 0.8, 0.), ("rendering::data-formats", 0.2, 0.)]),
         (Cond::Any(&["rgb", "palette"]), &[("command-line-utilities", 0.8, 0.), ("config", 0.8, 0.)]),
 
-        (Cond::Any(&["cargo"]), &[("development-tools", 1.1, 0.), ("development-tools::build-utils", 1.1, 0.),
+        (Cond::Any(&["cargo", "rustup"]), &[("development-tools", 1.1, 0.), ("development-tools::build-utils", 1.1, 0.),
             ("algorithms", 0.6, 0.), ("os", 0.7, 0.), ("os::macos-apis", 0.7, 0.), ("os::windows-apis", 0.7, 0.), ("cryptography::cryptocurrencies", 0.6, 0.)]),
         (Cond::Any(&["scripts", "scripting"]), &[("development-tools", 1.1, 0.), ("development-tools::build-utils", 1.1, 0.),
             ("algorithms", 0.9, 0.), ("cryptography::cryptocurrencies", 0.9, 0.)]),
+        (Cond::Any(&["compilation", "pointer-width"]), &[("development-tools", 1.1, 0.), ("development-tools::build-utils", 1.1, 0.)]),
         (Cond::Any(&["pkg-config"]), &[("os::windows-apis", 0.5, 0.), ("config", 0.8, 0.), ("algorithms", 0.8, 0.)]),
         (Cond::Any(&["autotools"]), &[("os::windows-apis", 0.7, 0.)]),
 
@@ -573,11 +574,11 @@ lazy_static! {
         (Cond::All(&["implementations"]), &[("games", 0.8, 0.), ("development-tools", 0.8, 0.)]),
         (Cond::Any(&["singleton", "iterators", "newtype", "dictionary", "functor", "monad", "haskell", "mutation"]),
             &[("rust-patterns", 1.1, 0.1), ("command-line-utilities", 0.7, 0.), ("development-tools", 0.8, 0.), ("memory-management", 0.8, 0.), ("internationalization", 0.8, 0.), ("command-line-interface", 0.8, 0.), ("games", 0.5, 0.)]),
-        (Cond::Any(&["rustc", "string", "strings", "impl", "num", "struct", "coproduct"]),
+        (Cond::Any(&["rustc", "string", "strings", "num", "struct", "coproduct", "slice", "assert",]),
             &[("rust-patterns", 1.1, 0.1), ("command-line-utilities", 0.7, 0.), ("development-tools", 0.8, 0.),
             ("memory-management", 0.8, 0.), ("command-line-interface", 0.8, 0.), ("games", 0.5, 0.), ("parser-implementations", 0.7, 0.)]),
-        (Cond::Any(&["monoidal", "monoid", "type-level", "bijective", "slice", "assert", "semigroup"]),
-            &[("rust-patterns", 1.1, 0.1), ("command-line-utilities", 0.7, 0.), ("development-tools", 0.8, 0.), ("os::macos-apis", 0.8, 0.),
+        (Cond::Any(&["monoidal", "monoid", "type-level", "bijective", "impl", "semigroup"]),
+            &[("rust-patterns", 1.1, 0.1), ("command-line-utilities", 0.7, 0.), ("internationalization", 0.7, 0.), ("development-tools", 0.8, 0.), ("os::macos-apis", 0.8, 0.),
             ("memory-management", 0.8, 0.), ("command-line-interface", 0.8, 0.), ("games", 0.5, 0.), ("parser-implementations", 0.7, 0.)]),
         (Cond::Any(&["iterator", "stack", "type-inference", "builder", "nan", "zero-cost"]),
             &[("rust-patterns", 1.1, 0.1), ("algorithms", 1.1, 0.1), ("gui", 0.9, 0.)]),
@@ -639,7 +640,8 @@ lazy_static! {
                 &[("data-structures", 1.25, 0.1), ("algorithms", 1.1, 0.), ("science::math", 0.8, 0.), ("caching", 0.8, 0.), ("command-line-interface", 0.4, 0.), ("os", 0.9, 0.), ("command-line-utilities", 0.4, 0.)]),
 
         (Cond::Any(&["macro", "macros", "dsl", "procedural-macros", "proc-macro", "proc-macros", "derive", "proc_macro", "custom-derive"]), &[
-            ("development-tools::procedural-macro-helpers", 1.4, 0.2), ("rust-patterns", 1.2, 0.1), ("cryptography", 0.7, 0.), ("memory-management", 0.7, 0.), ("algorithms", 0.8, 0.), ("science::math", 0.7, 0.),
+            ("development-tools::procedural-macro-helpers", 1.4, 0.2), ("rust-patterns", 1.2, 0.1), ("cryptography", 0.7, 0.),
+            ("memory-management", 0.7, 0.), ("internationalization", 0.7, 0.), ("algorithms", 0.8, 0.), ("science::math", 0.7, 0.),
             ("web-programming::websocket", 0.6, 0.), ("no-std", 0.8, 0.), ("command-line-interface", 0.5, 0.),
             ("development-tools::testing", 0.8, 0.), ("development-tools::debugging", 0.8, 0.), ("development-tools::build-utils", 0.6, 0.)]),
         (Cond::Any(&["has:proc_macro"]), &[("development-tools::procedural-macro-helpers", 1.5, 0.3), ("rust-patterns", 0.7, 0.)]),
@@ -861,7 +863,7 @@ lazy_static! {
             &[("memory-management", 1.3, 0.2), ("caching", 0.8, 0.), ("encoding", 0.8, 0.), ("algorithms", 0.8, 0.), ("game-engines", 0.7, 0.), ("development-tools", 0.8, 0.)]),
         (Cond::Any(&["allocator", "slab", "memory-allocator"]),
             &[("memory-management", 1.3, 0.2), ("caching", 0.8, 0.), ("database", 0.8, 0.), ("algorithms", 0.8, 0.), ("game-engines", 0.7, 0.), ("development-tools", 0.8, 0.)]),
-        (Cond::Any(&["garbage", "gc", "refcell", "garbage-collection"]), &[
+        (Cond::Any(&["garbage", "reclamation", "gc", "refcell", "garbage-collection"]), &[
             ("memory-management", 1.3, 0.2), ("data-structures", 0.9, 0.), ("authentication", 0.8, 0.),
             ("science::math", 0.7, 0.), ("rendering::graphics-api", 0.8, 0.), ("concurrency", 0.9, 0.),
             ("encoding", 0.7, 0.), ("development-tools::cargo-plugins", 0.8, 0.), ("development-tools::build-utils", 0.8, 0.), ("internationalization", 0.7, 0.)]),

@@ -73,6 +73,7 @@ lazy_static! {
         ("arm", Some(&["no-std", "no_std", "feature:no_std"])),
         ("float", Some(&["math"])),
         ("emulator", Some(&["6502"])),
+        ("garbage", Some(&["tracing"])),
         ("terminal", Some(&["math", "emulator"])),
         ("editor", Some(&["terminal"])),
         ("build", Some(&["logic"])), // confuses categorization

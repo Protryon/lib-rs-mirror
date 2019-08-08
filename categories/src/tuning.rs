@@ -167,7 +167,7 @@ lazy_static! {
             ("os::macos-apis", 0.9, 0.), ("command-line-utilities", 0.8, 0.), ("encoding", 0.8, 0.),
             ("command-line-interface", 0.5, 0.), ("text-editors", 0.5, 0.), ("development-tools::testing", 0.6, 0.)]),
         (Cond::Any(&["sanitizer", "nom"]), &[("parser-implementations", 1.3, 0.2), ("algorithms", 0.8, 0.), ("encoding", 0.8, 0.)]),
-        (Cond::Any(&["tokenizer", "lexer", "parser", "jwt", "macro", "rpc"]), &[("encoding", 0.8, 0.)]),
+        (Cond::Any(&["tokenizer", "lexer", "parser", "jwt", "macro", "rpc"]), &[("encoding", 0.8, 0.), ("rendering::graphics-api", 0.9, 0.)]),
 
         (Cond::Any(&["tokenizer", "tokenize", "parser-combinators", "peg", "lalr", "yacc", "ll1", "lexer", "lex", "context-free", "grammars", "grammar"]),
             &[("parsing", 1.2, 0.1), ("parser-implementations", 0.8, 0.), ("os", 0.7, 0.), ("internationalization", 0.8, 0.), ("games", 0.8, 0.)]),
@@ -847,9 +847,12 @@ lazy_static! {
             &[("memory-management", 1.3, 0.2), ("caching", 0.8, 0.), ("algorithms", 0.8, 0.), ("game-engines", 0.7, 0.), ("development-tools", 0.8, 0.)]),
         (Cond::Any(&["allocator", "slab", "memory-allocator"]),
             &[("memory-management", 1.3, 0.2), ("caching", 0.8, 0.), ("database", 0.8, 0.), ("algorithms", 0.8, 0.), ("game-engines", 0.7, 0.), ("development-tools", 0.8, 0.)]),
-        (Cond::Any(&["memory", "garbage", "rc", "refcell", "oom", "malloc"]), &[("memory-management", 1.25, 0.1), ("data-structures", 0.9, 0.), ("os", 1.1, 0.), ("development-tools::cargo-plugins", 0.8, 0.),
+        (Cond::Any(&["memory", "garbage", "gc", "rc", "refcell", "oom", "malloc"]), &[("memory-management", 1.25, 0.1), ("data-structures", 0.9, 0.),
+            ("os", 1.1, 0.), ("rendering::graphics-api", 0.8, 0.), ("concurrency", 0.9, 0.), ("development-tools::cargo-plugins", 0.8, 0.),
             ("development-tools::build-utils", 0.8, 0.), ("internationalization", 0.7, 0.)]),
         (Cond::All(&["memory", "allocation"]), &[("memory-management", 1.25, 0.1)]),
+        (Cond::All(&["garbage", "collector"]), &[("memory-management", 1.25, 0.1), ("rendering::graphics-api", 0.8, 0.), ("concurrency", 0.9, 0.)]),
+        (Cond::All(&["memory", "pool"]), &[("memory-management", 1.25, 0.1), ("rendering::graphics-api", 0.8, 0.), ("concurrency", 0.9, 0.)]),
 
         (Cond::All(&["vector", "clock"]), &[("games", 0.25, 0.), ("algorithms", 1.25, 0.1), ("date-and-time", 0.3, 0.)]),
         (Cond::Any(&["vectorclock"]), &[("games", 0.25, 0.), ("algorithms", 1.5, 0.2), ("date-and-time", 0.3, 0.)]),

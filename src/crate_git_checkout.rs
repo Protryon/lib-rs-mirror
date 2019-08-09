@@ -17,6 +17,7 @@ use std::process::Command;
 use std::sync::Arc;
 use std::sync::Mutex;
 use urlencoding;
+pub use git2::Oid;
 pub use git2::Repository;
 
 mod iter;
@@ -41,24 +42,28 @@ pub fn checkout(repo: &Repo, base_path: &Path) -> Result<Repository, git2::Error
 }
 
 #[inline]
-pub fn iter_blobs<F>(repo: &Repository, cb: F) -> Result<(), failure::Error>
-    where F: FnMut(&str, &str, Blob<'_>) -> Result<(), failure::Error>
+pub fn iter_blobs<F>(repo: &Repository, at: Option<Oid>, cb: F) -> Result<(), failure::Error>
+    where F: FnMut(&str, &Tree<'_>, &str, Blob<'_>) -> Result<(), failure::Error>
 {
-    let head = repo.head()?;
-    let tree = head.peel_to_tree()?;
+    let tree = if let Some(oid) = at {
+        repo.find_tree(oid)?
+    } else {
+        let head = repo.head()?;
+        head.peel_to_tree()?
+    };
     iter_blobs_in_tree(repo, &tree, cb)
 }
 
 #[inline]
 pub fn iter_blobs_in_tree<F>(repo: &Repository, tree: &Tree<'_>, mut cb: F) -> Result<(), failure::Error>
-    where F: FnMut(&str, &str, Blob<'_>) -> Result<(), failure::Error>
+    where F: FnMut(&str, &Tree<'_>, &str, Blob<'_>) -> Result<(), failure::Error>
 {
     iter_blobs_recurse(repo, tree, &mut String::with_capacity(500), &mut cb)?;
     Ok(())
 }
 
 fn iter_blobs_recurse<F>(repo: &Repository, tree: &Tree<'_>, path: &mut String, cb: &mut F) -> Result<(), failure::Error>
-    where F: FnMut(&str, &str, Blob<'_>) -> Result<(), failure::Error>
+    where F: FnMut(&str, &Tree<'_>, &str, Blob<'_>) -> Result<(), failure::Error>
 {
     for i in tree.iter() {
         let name = match i.name() {
@@ -77,7 +82,7 @@ fn iter_blobs_recurse<F>(repo: &Repository, tree: &Tree<'_>, path: &mut String, 
                 path.truncate(pre_len);
             },
             Some(ObjectType::Blob) => {
-                cb(path, name, repo.find_blob(i.id())?)?;
+                cb(path, tree, name, repo.find_blob(i.id())?)?;
             },
             _ => {},
         }
@@ -131,8 +136,8 @@ fn get_repo(repo: &Repo, base_path: &Path) -> Result<Repository, git2::Error> {
     }
 }
 
-/// Returns (path, Cargo.toml)
-pub fn find_manifests(repo: &Repository) -> Result<(Vec<(String, Manifest)>, Vec<ParseError>), failure::Error> {
+/// Returns (path, Tree Oid, Cargo.toml)
+pub fn find_manifests(repo: &Repository) -> Result<(Vec<(String, Oid, Manifest)>, Vec<ParseError>), failure::Error> {
     let head = repo.head()?;
     let tree = head.peel_to_tree()?;
     find_manifests_in_tree(&repo, &tree)
@@ -175,16 +180,17 @@ impl GitFS<'_, '_> {
     }
 }
 
-fn find_manifests_in_tree(repo: &Repository, tree: &Tree<'_>) -> Result<(Vec<(String, Manifest)>, Vec<ParseError>), failure::Error> {
+/// Path, tree Oid, parsed TOML
+fn find_manifests_in_tree(repo: &Repository, start_tree: &Tree<'_>) -> Result<(Vec<(String, Oid, Manifest)>, Vec<ParseError>), failure::Error> {
     let mut tomls = Vec::with_capacity(8);
     let mut warnings = Vec::new();
-    iter_blobs_in_tree(repo, tree, |inner_path, name, blob| {
+    iter_blobs_in_tree(repo, start_tree, |inner_path, inner_tree, name, blob| {
         if name == "Cargo.toml" {
             match Manifest::from_slice(blob.content()) {
                 Ok(mut toml) => {
-                    toml.complete_from_abstract_filesystem(GitFS { repo, tree })?;
+                    toml.complete_from_abstract_filesystem(GitFS { repo, tree: inner_tree })?;
                     if toml.package.is_some() {
-                        tomls.push((inner_path.to_owned(), toml))
+                        tomls.push((inner_path.to_owned(), inner_tree.id(), toml))
                     }
                 },
                 Err(err) => {
@@ -197,11 +203,16 @@ fn find_manifests_in_tree(repo: &Repository, tree: &Tree<'_>) -> Result<(Vec<(St
     Ok((tomls, warnings))
 }
 
-fn path_in_repo(repo: &Repository, tree: &Tree<'_>, crate_name: &str) -> Result<Option<String>, failure::Error> {
+pub fn path_in_repo(repo: &Repository, crate_name: &str) -> Result<Option<(String, Oid, Manifest)>, failure::Error> {
+    let head = repo.head()?;
+    let tree = head.peel_to_tree()?;
+    path_in_repo_in_tree(repo, &tree, crate_name)
+}
+
+fn path_in_repo_in_tree(repo: &Repository, tree: &Tree<'_>, crate_name: &str) -> Result<Option<(String, Oid, Manifest)>, failure::Error> {
     Ok(find_manifests_in_tree(repo, tree)?.0
         .into_iter()
-        .find(|(_, manifest)| manifest.package.as_ref().map_or(false, |p| p.name == crate_name))
-        .map(|(path, _)| path))
+        .find(|(_, _, manifest)| manifest.package.as_ref().map_or(false, |p| p.name == crate_name)))
 }
 
 #[derive(Debug, Copy, Clone, Default)]
@@ -225,7 +236,7 @@ pub fn find_dependency_changes(repo: &Repository, mut cb: impl FnMut(HashSet<Str
         // All deps in a repo, because we traverse history once per repo, not once per crate,
         // and because moving of deps between internal crates doesn't count.
         let mut older_deps = HashSet::with_capacity(100);
-        for (_, manifest) in find_manifests_in_tree(&repo, &commit.tree()?)?.0 {
+        for (_, _, manifest) in find_manifests_in_tree(&repo, &commit.tree()?)?.0 {
             older_deps.extend(manifest.dependencies.into_iter().map(|(k, _)| k));
             older_deps.extend(manifest.dev_dependencies.into_iter().map(|(k, _)| k));
             older_deps.extend(manifest.build_dependencies.into_iter().map(|(k, _)| k));
@@ -261,21 +272,22 @@ pub fn find_dependency_changes(repo: &Repository, mut cb: impl FnMut(HashSet<Str
     Ok(())
 }
 
+// FIXME: buggy, barely works
 pub fn find_readme(repo: &Repository, package: &Package) -> Result<Option<Readme>, failure::Error> {
     let head = repo.head()?;
     let tree = head.peel_to_tree()?;
     let mut readme = None;
     let mut found_best = false; // it'll find many readmes, including fallbacks
 
-    let mut prefix = path_in_repo(&repo, &tree, &package.name)?;
-    if let Some(ref mut prefix) = prefix {
+    let mut prefix = path_in_repo_in_tree(&repo, &tree, &package.name)?;
+    if let Some((ref mut prefix, _, _)) = prefix {
         if !prefix.ends_with('/') {
             prefix.push('/');
         }
     }
-    let prefix = prefix.as_ref().map(|s| s.as_str()).unwrap_or("");
+    let prefix = prefix.as_ref().map(|(s, _, _)| s.as_str()).unwrap_or("");
 
-    iter_blobs_in_tree(&repo, &tree, |base, name, blob| {
+    iter_blobs_in_tree(&repo, &tree, |base, _inner_tree, name, blob| {
         if found_best {
             return Ok(()); // done
         }
@@ -330,7 +342,7 @@ fn git_fs() {
     assert_eq!(1, m.len());
     assert_eq!(0, w.len());
     assert_eq!("", &m[0].0);
-    let manif = &m[0].1;
+    let manif = &m[0].2;
     let pkg = manif.package.as_ref().expect("package");
     assert_eq!("crate_git_checkout", &pkg.name);
     assert!(manif.lib.is_some());

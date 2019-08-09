@@ -15,7 +15,6 @@ crates_io_client = { git = "https://gitlab.com/crates.rs/crates_io_client.git", 
 docs_rs_client = { git = "https://gitlab.com/crates.rs/docs_rs_client.git", version = "0.4.0" }
 github_info = { path = "../github_info", version = "0.8.0" }
 crate_git_checkout = { git = "https://gitlab.com/crates.rs/crate_git_checkout.git", version = "0.4.0" }
-crate_files = { path = "../crate_files", version = "0.2" }
 user_db = { path = "../user_db", version = "0.3" }
 crate_db = { path = "../crate_db", version = "0.4.0" }
 categories = { path = "../categories" }
@@ -47,3 +46,6 @@ string-interner = "0.7.0"
 fxhash = "0.2.1"
 parking_lot = "0.9"
 udedokei = { path = "../udedokei" }
+tar = "0.4.15"
+libflate = "0.1.14"
+

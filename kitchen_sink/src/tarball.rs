@@ -1,6 +1,5 @@
 use cargo_toml::Manifest;
 use cargo_toml::Package;
-use crate_files::read_archive_files;
 use render_readme::Markup;
 use render_readme::Readme;
 use repo_url::Repo;
@@ -11,6 +10,40 @@ use std::path::Path;
 use std::path::PathBuf;
 use udedokei::LanguageExt;
 use udedokei;
+use libflate::gzip::Decoder;
+use tar::{Archive, Entry, EntryType};
+
+
+#[derive(Debug, Fail)]
+pub enum UnarchiverError {
+    #[fail(display = "Cargo.toml not found. Got files: {}", _0)]
+    TomlNotFound(String),
+    #[fail(display = "I/O error during unarchiving: {}", _0)]
+    Io(io::Error),
+    #[fail(display = "Cargo.toml parsing error: {}", _0)]
+    Toml(cargo_toml::Error),
+}
+
+impl From<io::Error> for UnarchiverError {
+    fn from(i: io::Error) -> Self {
+        UnarchiverError::Io(i)
+    }
+}
+
+impl From<cargo_toml::Error> for UnarchiverError {
+    fn from(i: cargo_toml::Error) -> Self {
+        UnarchiverError::Toml(i)
+    }
+}
+
+fn read_archive_files<R: Read>(archive: R, mut cb: impl FnMut(Entry<Decoder<R>>) -> Result<(), UnarchiverError>) -> Result<(), UnarchiverError> {
+    let mut archive = Archive::new(Decoder::new(archive)?);
+    let entries = archive.entries()?;
+    for entry in entries {
+        cb(entry?)?
+    }
+    Ok(())
+}
 
 enum ReadAs {
     Toml,
@@ -20,56 +53,62 @@ enum ReadAs {
     GetStatsOfFile(udedokei::Language),
 }
 
-struct FileEntry<'a> {
-    relpath: PathBuf,
-    size: usize,
-    data: Box<dyn Read + 'a>,
-}
-
 const MAX_FILE_SIZE: u64 = 50_000_000;
 
-pub fn read_archive(archive: impl Read, name: &str, ver: &str) -> crate_files::Result<CrateFile> {
+pub fn read_archive(archive: impl Read, name: &str, ver: &str) -> Result<CrateFile, UnarchiverError> {
     let prefix = PathBuf::from(format!("{}-{}", name, ver));
-    read_archive_from(&mut read_archive_files(archive)?.into_iter().filter_map(|f| {
-        f.map(|file| {
+    let mut collect = Collector::new();
+    read_archive_files(archive, |mut file| {
             let header = file.header();
             let path = header.path();
             let relpath = match path {
                 Ok(ref p) => match p.strip_prefix(&prefix) {
                     Ok(relpath) => relpath,
-                    _ => return None,
+                    _ => return Ok(()),
                 },
-                _ => return None,
+                _ => return Ok(()),
             };
-            Some(FileEntry {
-                relpath: relpath.to_owned(),
-                size: header.size().ok()? as usize,
-                data: Box::new(file),
-            })
-        }).transpose()
-    }))
+            match header.entry_type() {
+                EntryType::Regular |
+                EntryType::Char => collect.add(&relpath.to_path_buf(), header.size()?, &mut file),
+                _ => Ok(()),
+            }
+    })?;
+    collect.finish()
 }
 
-fn read_archive_from<'a>(src: &mut dyn Iterator<Item=io::Result<FileEntry<'a>>>) -> crate_files::Result<CrateFile> {
-    let mut manifest: Option<Manifest> = None;
-    let mut markup = None;
-    let mut files = Vec::new();
-    let mut lib_file = None;
-    let mut stats = udedokei::Collect::new();
-    let mut decompressed_size = 0;
-    let mut is_nightly = false;
+struct Collector {
+    manifest: Option<Manifest>,
+    markup: Option<(String, Markup)>,
+    files: Vec<PathBuf>,
+    lib_file: Option<String>,
+    stats: udedokei::Collect,
+    decompressed_size: usize,
+    is_nightly: bool,
+}
 
-    for file in src {
-        let file = file?;
+impl Collector {
+    pub fn new() -> Self {
+        Self {
+            manifest: None,
+            markup: None,
+            files: Vec::new(),
+            lib_file: None,
+            stats: udedokei::Collect::new(),
+            decompressed_size: 0,
+            is_nightly: false,
+        }
+    }
 
+    pub fn add(&mut self, relpath: &Path, size: u64, file_data: &mut dyn Read) -> Result<(), UnarchiverError> {
         let path_match = {
 
-            files.push(file.relpath.clone());
+            self.files.push(relpath.to_path_buf());
 
-            match file.relpath.as_path() {
+            match relpath {
                 p if p == Path::new("Cargo.toml") || p == Path::new("cargo.toml") => ReadAs::Toml,
                 p if p == Path::new("src/lib.rs") => ReadAs::Lib,
-                p if is_readme_filename(p, manifest.as_ref().and_then(|m| m.package.as_ref())) => {
+                p if is_readme_filename(p, self.manifest.as_ref().and_then(|m| m.package.as_ref())) => {
                     let path_prefix = p.parent().unwrap().display().to_string();
                     if p.extension().map_or(false, |e| e == "rst") {
                         ReadAs::ReadmeRst(path_prefix)
@@ -82,58 +121,62 @@ fn read_archive_from<'a>(src: &mut dyn Iterator<Item=io::Result<FileEntry<'a>>>)
                         if lang.is_code() {
                             ReadAs::GetStatsOfFile(lang)
                         } else {
-                            continue;
+                            return Ok(());
                         }
                     } else {
-                        continue;
+                        return Ok(());
                     }
                 },
             }
         };
 
-        let mut data = Vec::with_capacity(file.size.min(MAX_FILE_SIZE as usize));
-        file.data.take(MAX_FILE_SIZE).read_to_end(&mut data)?;
-        decompressed_size += data.len();
+        let mut data = Vec::with_capacity(size.min(MAX_FILE_SIZE) as usize);
+        file_data.take(MAX_FILE_SIZE).read_to_end(&mut data)?;
+        self.decompressed_size += data.len();
         let data = String::from_utf8_lossy(&data);
 
         match path_match {
             ReadAs::Lib => {
-                stats.add_to_stats(udedokei::from_path("lib.rs").unwrap(), &data);
+                self.stats.add_to_stats(udedokei::from_path("lib.rs").unwrap(), &data);
                 if check_if_uses_nightly_features(&data) {
-                    is_nightly = true;
+                    self.is_nightly = true;
                 }
-                lib_file = Some(data.to_string());
+                self.lib_file = Some(data.to_string());
             },
             ReadAs::Toml => {
-                manifest = Some(Manifest::from_slice(data.as_bytes())?);
+                self.manifest = Some(Manifest::from_slice(data.as_bytes())?);
             },
             ReadAs::ReadmeMarkdown(path_prefix) => {
-                markup = Some((path_prefix, Markup::Markdown(data.to_string())));
+                self.markup = Some((path_prefix, Markup::Markdown(data.to_string())));
             },
             ReadAs::ReadmeRst(path_prefix) => {
-                markup = Some((path_prefix, Markup::Rst(data.to_string())));
+                self.markup = Some((path_prefix, Markup::Rst(data.to_string())));
             },
             ReadAs::GetStatsOfFile(lang) => {
-                stats.add_to_stats(lang, &data);
+                self.stats.add_to_stats(lang, &data);
             },
         }
+        Ok(())
     }
 
-    let mut manifest = manifest.ok_or_else(|| crate_files::UnarchiverError::TomlNotFound(
-        files.iter().map(|p| p.display().to_string()).collect::<Vec<_>>().join(", "),
-    ))?;
+    fn finish(self) -> Result<CrateFile, UnarchiverError> {
+        let mut manifest = match self.manifest {
+            Some(m) => m,
+            None => return Err(UnarchiverError::TomlNotFound(self.files.iter().map(|p| p.display().to_string()).collect::<Vec<_>>().join(", "))),
+        };
 
-    manifest.complete_from_abstract_filesystem(FilesFs(&files))?;
+        manifest.complete_from_abstract_filesystem(FilesFs(&self.files))?;
 
-    Ok(CrateFile {
-        decompressed_size,
-        readme: markup.map(|(path, m)| readme_from_repo(m, manifest.package.as_ref().and_then(|r| r.repository.as_ref()), &path)),
-        manifest,
-        files,
-        lib_file,
-        language_stats: stats.finish(),
-        is_nightly,
-    })
+        Ok(CrateFile {
+            decompressed_size: self.decompressed_size,
+            readme: self.markup.map(|(path, m)| readme_from_repo(m, manifest.package.as_ref().and_then(|r| r.repository.as_ref()), &path)),
+            manifest,
+            files: self.files,
+            lib_file: self.lib_file,
+            language_stats: self.stats.finish(),
+            is_nightly: self.is_nightly,
+        })
+    }
 }
 
 struct FilesFs<'a>(&'a [PathBuf]);
@@ -191,11 +234,6 @@ impl CrateFile {
         let path = path.as_ref();
         self.files.iter().any(|p| p == path)
     }
-
-    // /// Find path that matches according to the callback
-    // pub fn find(&self, mut f: impl FnMut(&Path) -> bool) -> Option<&Path> {
-    //     self.files.iter().map(|p| p.as_path()).find(|p| f(p))
-    // }
 }
 
 fn readme_from_repo(markup: Markup, repo_url: Option<&String>, base_path: &str) -> Readme {
@@ -216,4 +254,22 @@ fn is_readme_filename(path: &Path, package: Option<&Package>) -> bool {
             render_readme::is_readme_filename(path)
         }
     })
+}
+
+#[test]
+fn unpack_crate() {
+    let k = include_bytes!("../test.crate");
+    let d = read_archive(&k[..], "testing", "1.0.0").unwrap();
+    assert_eq!(d.manifest.package.as_ref().unwrap().name, "crates-server");
+    assert_eq!(d.manifest.package.as_ref().unwrap().version, "0.5.1");
+    assert!(d.lib_file.unwrap().contains("fn nothing"));
+    assert_eq!(d.files.len(), 5);
+    assert!(match d.readme.unwrap().markup {
+        Markup::Rst(a) => a == "o hi\n", _ => false,
+    });
+    assert_eq!(d.language_stats.langs.get(&udedokei::Language::Rust).unwrap().code, 1);
+    assert_eq!(d.language_stats.langs.get(&udedokei::Language::C).unwrap().code, 1);
+    assert_eq!(d.language_stats.langs.get(&udedokei::Language::JavaScript).unwrap().code, 0);
+    assert!(d.language_stats.langs.get(&udedokei::Language::Bash).is_none());
+    assert_eq!(d.decompressed_size, 161);
 }

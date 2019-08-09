@@ -3,7 +3,7 @@ use cargo_toml::{Manifest, Package};
 use failure;
 use git2;
 use git2::build::RepoBuilder;
-use git2::{Blob, ObjectType, Reference, Repository, Tree};
+use git2::{Blob, ObjectType, Reference, Tree};
 use lazy_static::lazy_static;
 use render_readme;
 use render_readme::{Markup, Readme};
@@ -17,6 +17,7 @@ use std::process::Command;
 use std::sync::Arc;
 use std::sync::Mutex;
 use urlencoding;
+pub use git2::Repository;
 
 mod iter;
 
@@ -40,7 +41,16 @@ pub fn checkout(repo: &Repo, base_path: &Path) -> Result<Repository, git2::Error
 }
 
 #[inline]
-pub fn iter_blobs<F>(repo: &Repository, tree: &Tree<'_>, mut cb: F) -> Result<(), failure::Error>
+pub fn iter_blobs<F>(repo: &Repository, cb: F) -> Result<(), failure::Error>
+    where F: FnMut(&str, &str, Blob<'_>) -> Result<(), failure::Error>
+{
+    let head = repo.head()?;
+    let tree = head.peel_to_tree()?;
+    iter_blobs_in_tree(repo, &tree, cb)
+}
+
+#[inline]
+pub fn iter_blobs_in_tree<F>(repo: &Repository, tree: &Tree<'_>, mut cb: F) -> Result<(), failure::Error>
     where F: FnMut(&str, &str, Blob<'_>) -> Result<(), failure::Error>
 {
     iter_blobs_recurse(repo, tree, &mut String::with_capacity(500), &mut cb)?;
@@ -168,7 +178,7 @@ impl GitFS<'_, '_> {
 fn find_manifests_in_tree(repo: &Repository, tree: &Tree<'_>) -> Result<(Vec<(String, Manifest)>, Vec<ParseError>), failure::Error> {
     let mut tomls = Vec::with_capacity(8);
     let mut warnings = Vec::new();
-    iter_blobs(repo, tree, |inner_path, name, blob| {
+    iter_blobs_in_tree(repo, tree, |inner_path, name, blob| {
         if name == "Cargo.toml" {
             match Manifest::from_slice(blob.content()) {
                 Ok(mut toml) => {
@@ -265,7 +275,7 @@ pub fn find_readme(repo: &Repository, package: &Package) -> Result<Option<Readme
     }
     let prefix = prefix.as_ref().map(|s| s.as_str()).unwrap_or("");
 
-    iter_blobs(&repo, &tree, |base, name, blob| {
+    iter_blobs_in_tree(&repo, &tree, |base, name, blob| {
         if found_best {
             return Ok(()); // done
         }

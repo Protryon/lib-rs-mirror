@@ -57,15 +57,12 @@ enum ReadAs {
 
 const MAX_FILE_SIZE: u64 = 50_000_000;
 
-pub fn read_repo(repo: &crate_git_checkout::Repository, path_in_tree: &Path) -> Result<CrateFile, failure::Error> {
+pub fn read_repo(repo: &crate_git_checkout::Repository, path_in_tree: crate_git_checkout::Oid) -> Result<CrateFile, failure::Error> {
     let mut collect = Collector::new();
-    crate_git_checkout::iter_blobs(repo, |path, name, blob| {
-        let path = Path::new(path);
+    crate_git_checkout::iter_blobs(repo, Some(path_in_tree), |path, _, name, blob| {
         // FIXME: skip directories that contain other crates
-        if let Ok(p) = path.strip_prefix(path_in_tree) {
-            let mut blob_content = blob.content();
-            collect.add(p.join(name), blob_content.len() as u64, &mut blob_content)?;
-        }
+        let mut blob_content = blob.content();
+        collect.add(Path::new(path).join(name), blob_content.len() as u64, &mut blob_content)?;
         Ok(())
     })?;
     Ok(collect.finish()?)
@@ -276,6 +273,30 @@ fn is_readme_filename(path: &Path, package: Option<&Package>) -> bool {
 fn unpack_crate() {
     let k = include_bytes!("../test.crate");
     let d = read_archive(&k[..], "testing", "1.0.0").unwrap();
+    assert_eq!(d.manifest.package.as_ref().unwrap().name, "crates-server");
+    assert_eq!(d.manifest.package.as_ref().unwrap().version, "0.5.1");
+    assert!(d.lib_file.unwrap().contains("fn nothing"));
+    assert_eq!(d.files.len(), 5);
+    assert!(match d.readme.unwrap().markup {
+        Markup::Rst(a) => a == "o hi\n", _ => false,
+    });
+    assert_eq!(d.language_stats.langs.get(&udedokei::Language::Rust).unwrap().code, 1);
+    assert_eq!(d.language_stats.langs.get(&udedokei::Language::C).unwrap().code, 1);
+    assert_eq!(d.language_stats.langs.get(&udedokei::Language::JavaScript).unwrap().code, 0);
+    assert!(d.language_stats.langs.get(&udedokei::Language::Bash).is_none());
+    assert_eq!(d.decompressed_size, 161);
+}
+
+#[test]
+fn unpack_repo() {
+    let test_repo_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("test.repo");
+    let repo = Repo::new("http://example.invalid/foo.git").unwrap();
+    let checkout = crate_git_checkout::checkout(&repo, &test_repo_path).unwrap();
+    let (_path_in_repo, tree_id, manifest) = crate_git_checkout::path_in_repo(&checkout, "crates-server").unwrap().unwrap();
+
+    let d = read_repo(&checkout, tree_id).unwrap();
+    assert_eq!(d.manifest.package, manifest.package);
+
     assert_eq!(d.manifest.package.as_ref().unwrap().name, "crates-server");
     assert_eq!(d.manifest.package.as_ref().unwrap().version, "0.5.1");
     assert!(d.lib_file.unwrap().contains("fn nothing"));

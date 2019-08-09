@@ -92,6 +92,8 @@ pub enum Warning {
     ErrorCloning(String),
     #[fail(display = "{} URL is a broken link: {}", _0, _1)]
     BrokenLink(String, String),
+    #[fail(display = "Error parsing manifest: {}", _0)]
+    ManifestParseError(String),
 }
 
 #[derive(Debug, Clone, Fail)]
@@ -104,6 +106,8 @@ pub enum KitchenSinkErr {
     CategoryQueryFailed,
     #[fail(display = "crate not found: {:?}", _0)]
     CrateNotFound(Origin),
+    #[fail(display = "crate {} not found in repo {}", _0, _1)]
+    CrateNotFoundInRepo(String, String),
     #[fail(display = "crate is not a package: {:?}", _0)]
     NotAPackage(Origin),
     #[fail(display = "data not found, wanted {}", _0)]
@@ -433,8 +437,9 @@ impl KitchenSink {
                         let ver = self.index.crate_version_latest_unstable(name).context("rich_crate_version1")?;
                         self.rich_crate_version_from_crates_io(ver).map(|(krate, _)| krate)?
                     },
-                    _ => {
-                        unimplemented!()
+                    o => {
+                        let d = self.rich_crate_version_from_repo(o).map(|(krate, _)| krate)?;
+                        RichCrateVersion::new(origin.clone(), d.manifest, d.derived)
                     }
                 }
             },
@@ -477,6 +482,24 @@ impl KitchenSink {
             }
         }
         None
+    }
+
+    fn rich_crate_version_from_repo(&self, origin: &Origin) -> CResult<(RichCrateVersionCacheData, Warnings)> {
+        let (repo, package) = match origin {
+            Origin::GitHub {repo, package} => {
+                (RepoHost::GitHub(repo.clone()).try_into().expect("repohost"), &**package)
+            },
+            _ => unreachable!()
+        };
+
+        let checkout = crate_git_checkout::checkout(&repo, &self.git_checkout_path)?;
+        let (path_in_repo, tree_id, manifest) = crate_git_checkout::path_in_repo(&checkout, package)?
+            .ok_or_else(|| KitchenSinkErr::CrateNotFoundInRepo(repo.canonical_git_url().to_string(), package.to_string()))?;
+
+        let meta = tarball::read_repo(&checkout, tree_id)?;
+        assert_eq!(meta.manifest.package, manifest.package);
+
+        self.rich_crate_version_data_common(origin.clone(), meta, Some(path_in_repo), 0, false, HashSet::new())
     }
 
     fn rich_crate_version_data_from_crates_io(&self, latest: &crates_index::Version) -> CResult<(RichCrateVersionCacheData, Warnings)> {
@@ -1158,7 +1181,7 @@ impl KitchenSink {
         for warn in warnings {
             eprintln!("warning: {}", warn.0);
         }
-        let manif = manif.into_iter().filter_map(|(subpath, manifest)| {
+        let manif = manif.into_iter().filter_map(|(subpath, _, manifest)| {
             manifest.package.map(|p| (subpath, p.name))
         });
         self.crate_db.index_repo_crates(repo, manif).context("index rev repo")?;

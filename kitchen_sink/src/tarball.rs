@@ -45,34 +45,48 @@ fn read_archive_files<R: Read>(archive: R, mut cb: impl FnMut(Entry<Decoder<R>>)
     Ok(())
 }
 
+#[derive(Eq, PartialEq)]
 enum ReadAs {
     Toml,
     ReadmeMarkdown(String),
     ReadmeRst(String),
     Lib,
     GetStatsOfFile(udedokei::Language),
+    Skip,
 }
 
 const MAX_FILE_SIZE: u64 = 50_000_000;
+
+pub fn read_repo(repo: &crate_git_checkout::Repository, path_in_tree: &Path) -> Result<CrateFile, failure::Error> {
+    let mut collect = Collector::new();
+    crate_git_checkout::iter_blobs(repo, |path, name, blob| {
+        let path = Path::new(path);
+        // FIXME: skip directories that contain other crates
+        if let Ok(p) = path.strip_prefix(path_in_tree) {
+            let mut blob_content = blob.content();
+            collect.add(p.join(name), blob_content.len() as u64, &mut blob_content)?;
+        }
+        Ok(())
+    })?;
+    Ok(collect.finish()?)
+}
 
 pub fn read_archive(archive: impl Read, name: &str, ver: &str) -> Result<CrateFile, UnarchiverError> {
     let prefix = PathBuf::from(format!("{}-{}", name, ver));
     let mut collect = Collector::new();
     read_archive_files(archive, |mut file| {
-            let header = file.header();
-            let path = header.path();
-            let relpath = match path {
-                Ok(ref p) => match p.strip_prefix(&prefix) {
-                    Ok(relpath) => relpath,
-                    _ => return Ok(()),
-                },
-                _ => return Ok(()),
-            };
-            match header.entry_type() {
-                EntryType::Regular |
-                EntryType::Char => collect.add(&relpath.to_path_buf(), header.size()?, &mut file),
-                _ => Ok(()),
-            }
+        let header = file.header();
+        match header.entry_type() {
+            EntryType::Regular |
+            EntryType::Char => {
+                let path = header.path()?;
+                if let Ok(relpath) = path.strip_prefix(&prefix) {
+                    return collect.add(relpath.to_path_buf(), header.size()?, &mut file);
+                }
+            },
+            _ => {},
+        }
+        return Ok(());
     })?;
     collect.finish()
 }
@@ -100,12 +114,9 @@ impl Collector {
         }
     }
 
-    pub fn add(&mut self, relpath: &Path, size: u64, file_data: &mut dyn Read) -> Result<(), UnarchiverError> {
+    pub fn add(&mut self, relpath: PathBuf, size: u64, file_data: &mut dyn Read) -> Result<(), UnarchiverError> {
         let path_match = {
-
-            self.files.push(relpath.to_path_buf());
-
-            match relpath {
+            match &relpath {
                 p if p == Path::new("Cargo.toml") || p == Path::new("cargo.toml") => ReadAs::Toml,
                 p if p == Path::new("src/lib.rs") => ReadAs::Lib,
                 p if is_readme_filename(p, self.manifest.as_ref().and_then(|m| m.package.as_ref())) => {
@@ -121,14 +132,18 @@ impl Collector {
                         if lang.is_code() {
                             ReadAs::GetStatsOfFile(lang)
                         } else {
-                            return Ok(());
+                            ReadAs::Skip
                         }
                     } else {
-                        return Ok(());
+                        ReadAs::Skip
                     }
                 },
             }
         };
+        self.files.push(relpath);
+        if path_match == ReadAs::Skip {
+            return Ok(());
+        }
 
         let mut data = Vec::with_capacity(size.min(MAX_FILE_SIZE) as usize);
         file_data.take(MAX_FILE_SIZE).read_to_end(&mut data)?;
@@ -155,6 +170,7 @@ impl Collector {
             ReadAs::GetStatsOfFile(lang) => {
                 self.stats.add_to_stats(lang, &data);
             },
+            ReadAs::Skip => unreachable!(),
         }
         Ok(())
     }

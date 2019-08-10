@@ -26,6 +26,15 @@ pub struct SimpleRepo {
     pub repo: Box<str>,
 }
 
+impl SimpleRepo {
+    pub fn new(owner: impl Into<Box<str>>, repo: impl Into<Box<str>>) -> Self {
+        Self {
+            owner: owner.into(),
+            repo: repo.into(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum GitError {
     IncompleteUrl,

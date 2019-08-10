@@ -1,1 +1,4 @@
-[]
+[
+    "github:imazen/imageflow/imageflow_server",
+    "github:imazen/imageflow/imageflow_core"
+]

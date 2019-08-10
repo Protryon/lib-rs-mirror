@@ -25,10 +25,10 @@ fn main() {
     let renderer = Arc::new(Renderer::new(None));
 
     let everything = std::env::args().nth(1).map_or(false, |a| a == "--all");
-    let specific = if !everything {
-        std::env::args().nth(1).map(Origin::from_str)
+    let specific: Vec<_> = if !everything {
+        std::env::args().skip(1).map(Origin::from_str).collect()
     } else {
-        None
+        Vec::new()
     };
     let repos = !everything;
 
@@ -62,8 +62,8 @@ fn main() {
             let mut c: Vec<_> = crates.all_crates().collect::<Vec<_>>();
             c.shuffle(&mut thread_rng());
             Either::Left(c)
-        } else if let Some(origin) = specific {
-            Either::Left(vec![origin])
+        } else if !specific.is_empty() {
+            Either::Left(specific)
         } else {
             Either::Right(crates.all_new_crates().unwrap().into_iter().map(|c| c.origin().clone()))
         };

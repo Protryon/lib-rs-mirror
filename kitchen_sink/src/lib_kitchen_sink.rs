@@ -352,7 +352,7 @@ impl KitchenSink {
                     })
                 }).collect::<Vec<_>>();
                 if versions.is_empty() {
-                    eprintln!("No versions found for {:?}", origin);
+                    Err(KitchenSinkErr::CrateNotFound(origin.clone())).context("missing releases")?;
                 }
                 Ok(RichCrate::new(origin.clone(), gh.owner.into_iter().map(|o| {
                     CrateOwner {

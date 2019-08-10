@@ -29,6 +29,7 @@
           <span class="cfg k">@t</span>
         }
       }
-      <a href="@url.dependency(d)">@d.package</a>&nbsp;<span class="version @c.up_to_date_class(d)">@c.pretty_print_req(d.dep.req())</span>@for f in d.dep.req_features() {<span class="with-feature"><wbr>+<span>@f</span></span>}
+      @if !d.dep.is_crates_io() {<span class="label label-git">git</span>&nbsp;}<a
+      href="@url.dependency(d)">@d.package</a>@if let Some(updclass)=Some(c.up_to_date_class(d)) {@if updclass != "common" {&nbsp;<span class="version @updclass">@c.pretty_print_req(d.dep.req())</span>}}@for f in d.dep.req_features() {<span class="with-feature"><wbr>+<span>@f</span></span>}
     </li>
 }

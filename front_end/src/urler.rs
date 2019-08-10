@@ -2,6 +2,8 @@ use categories::Category;
 use kitchen_sink::CrateAuthor;
 use kitchen_sink::UserType;
 use rich_crate::Origin;
+use rich_crate::Repo;
+use rich_crate::RepoHost;
 use rich_crate::RichCrateVersion;
 use rich_crate::RichDep;
 use urlencoding::encode;
@@ -20,24 +22,42 @@ impl Urler {
     /// Link to a dependency of a crate
     pub fn dependency(&self, dep: &RichDep) -> String {
         if let Some(git) = dep.dep.git() {
-            git.to_string() // FIXME: sanitise URL? Make relative crate?
-        } else {
-            // FIXME: support path deps
-            format!("/crates/{}", encode(&dep.package))
+            if let Ok(repo) = Repo::new(git) {
+                if let RepoHost::GitHub(repo) = repo.host() {
+                    return format!("/gh/{}/{}/{}", encode(&repo.owner), encode(&repo.repo), encode(&dep.package));
+                } else {
+                    return repo.canonical_http_url("").into_owned();
+                }
+            }
+        } else if dep.dep.detail().map_or(false, |d| d.path.is_some()) {
+            if let Some(Origin::GitHub{ref repo,..}) = self.own_crate {
+                return format!("/gh/{}/{}/{}", encode(&repo.owner), encode(&repo.repo), encode(&dep.package))
+            }
         }
+        format!("/crates/{}", encode(&dep.package))
     }
 
     /// Summary of all dependencies
     pub fn deps(&self, krate: &RichCrateVersion) -> String {
-        format!("https://deps.rs/crate/{}/{}", encode(krate.short_name()), encode(krate.version()))
+        match krate.origin() {
+            Origin::CratesIo(name) => {
+                format!("https://deps.rs/crate/{}/{}", encode(&name), encode(krate.version()))
+            },
+            Origin::GitHub {repo, ..} => {
+                format!("https://deps.rs/repo/github/{}/{}", encode(&repo.owner), encode(&repo.repo))
+            },
+        }
     }
 
     pub fn reverse_deps(&self, krate: &RichCrateVersion) -> String {
         format!("https://crates.io/crates/{}/reverse_dependencies", encode(krate.short_name()))
     }
 
-    pub fn crates_io_crate(&self, krate: &RichCrateVersion) -> Option<String> {
-        Some(self.crates_io_crate_by_name(krate.short_name()))
+    pub fn crates_io_crate(&self, origin: &Origin) -> Option<String> {
+        match origin {
+            Origin::CratesIo(name) => Some(self.crates_io_crate_by_name(name)),
+            _ => None,
+        }
     }
 
     fn crates_io_crate_by_name(&self, crate_name: &str) -> String {

@@ -2,6 +2,7 @@
 @use crate::Urler;
 @use crate::SearchPage;
 @use crate::SearchKind;
+@use rich_crate::Origin;
 
 @(p: &SearchPage, url: &Urler)
 
@@ -72,13 +73,13 @@
             @for (i, c) in p.good_results.iter().chain(p.bad_results).enumerate() {
                 <li>
                     <a href="@url.crate_by_origin(&c.origin)"><div class=h>
-                        <h4>@c.crate_name</h4>
+                        <h4>@if let Origin::GitHub{ref repo,..} = c.origin {@repo.owner/}@c.crate_name</h4>
                         <p class=desc>@p.render_markdown_str(&c.description)</p>
                     </div>
                     <div class=meta>
-                        <span class="version @p.version_class(&c.version)"><span>v</span>@c.version</span>
+                        <span class="version @p.version_class(&c.version)"><span>@if let Origin::GitHub{..} = c.origin {GitHub } else {v}</span>@c.version</span>
                         @if c.monthly_downloads >= 100 {
-                            <span class=downloads title="c.monthly_downloads recent downloads">@if let Some((num,unit)) = Some(p.downloads(c.monthly_downloads)) {@num<b>@unit</b>}</span>
+                            <span class=downloads title="@c.monthly_downloads recent downloads">@if let Some((num,unit)) = Some(p.downloads(c.monthly_downloads)) {@num<b>@unit</b>}</span>
                         }
                         @for k in c.keywords.split(", ").filter(|k| !k.is_empty()) {
                             <span class=k><span>#</span>@k</span>

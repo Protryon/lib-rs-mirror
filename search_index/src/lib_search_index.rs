@@ -109,8 +109,8 @@ impl CrateSearchIndex {
             let mut doc = self.tantivy_index.schema().to_named_doc(&retrieved_doc).0;
             let mut crate_base_score = take_int(doc.get("crate_score")) as f64;
             let crate_name = take_string(doc.remove("crate_name"));
+            let origin = Origin::from_str(take_string(doc.remove("origin")));
             Ok(CrateFound {
-                origin: Origin::from_str(take_string(doc.remove("origin"))),
                 score: if sort_by_query_relevance {
                     // first few crates can be ordered by tantivy's relevance
                     let position_bonus = if i < 4 {CRATE_SCORE_MAX / (i as f64 + 8.)} else {0.};
@@ -126,7 +126,8 @@ impl CrateSearchIndex {
                 description: take_string(doc.remove("description")),
                 keywords: take_string(doc.remove("keywords")),
                 version: take_string(doc.remove("crate_version")),
-                monthly_downloads: take_int(doc.get("monthly_downloads")),
+                monthly_downloads: if let Origin::CratesIo(_) = &origin {take_int(doc.get("monthly_downloads"))} else {0},
+                origin,
             })
         })
         .collect::<tantivy::Result<Vec<_>>>()?;

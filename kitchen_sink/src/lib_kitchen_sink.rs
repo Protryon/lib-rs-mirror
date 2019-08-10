@@ -387,15 +387,17 @@ impl KitchenSink {
             return Ok(Some(dl));
         }
 
-        match origin {
-            Origin::GitHub {repo, ..} => {
-                let repo = Repo::new(&format!("https://github.com/{}/{}", repo.owner, repo.repo))?;
-                if let Some(gh) = self.github_repo(&repo)? {
-                    // arbitrary multiplier. TODO: it's not fair for apps vs libraries
-                    return Ok(Some(gh.stargazers_count as usize * 100));
-                }
-            },
-            _ => {},
+        // arbitrary multiplier. TODO: it's not fair for apps vs libraries
+        Ok(self.github_stargazers_and_watchers(origin)?.map(|(stars, watch)| stars.saturating_sub(1) as usize * 50 + watch.saturating_sub(1) as usize * 150))
+    }
+
+    /// Only for GitHub origins, not for crates-io crates
+    pub fn github_stargazers_and_watchers(&self, origin: &Origin) -> CResult<Option<(u32, u32)>> {
+        if let Origin::GitHub {repo, ..} = origin {
+            let repo = RepoHost::GitHub(repo.clone()).try_into().expect("repohost");
+            if let Some(gh) = self.github_repo(&repo)? {
+                return Ok(Some((gh.stargazers_count, gh.subscribers_count)));
+            }
         }
         Ok(None)
     }
@@ -521,9 +523,8 @@ impl KitchenSink {
         let mut meta = tarball::read_repo(&checkout, tree_id)?;
         debug_assert_eq!(meta.manifest.package, manifest.package);
         let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
-        if package.repository.is_none() {
-            package.repository = Some(repo.canonical_git_url().into_owned());
-        }
+        // Allowing any other URL would allow spoofing
+        package.repository = Some(repo.canonical_git_url().into_owned());
 
         self.rich_crate_version_data_common(origin.clone(), meta, Some(path_in_repo), 0, false, HashSet::new())
     }

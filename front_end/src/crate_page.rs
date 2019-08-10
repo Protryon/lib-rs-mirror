@@ -115,7 +115,7 @@ impl<'a> CratePage<'a> {
             description: self.ver.description().map(|d| format!("{} | Rust/Cargo package", d)),
             item_name: Some(self.ver.short_name().to_string()),
             item_description: self.ver.description().map(|d| d.to_string()),
-            alternate: url.crates_io_crate(&self.ver),
+            alternate: url.crates_io_crate(self.ver.origin()),
             alternate_type: None,
             canonical: Some(format!("https://lib.rs{}", url.krate(&self.ver))),
             noindex: self.ver.is_yanked(),
@@ -285,6 +285,9 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn up_to_date_class(&self, richdep: &RichDep) -> &str {
+        if richdep.dep.req() == "*" {
+            return "common";
+        }
         let (matches_latest, pop) = richdep.dep.req().parse().ok().and_then(|req| {
             if !richdep.dep.is_crates_io() {
                 return None;
@@ -593,6 +596,10 @@ impl<'a> CratePage<'a> {
 
     pub fn downloads_per_month(&self) -> Option<usize> {
         self.kitchen_sink.downloads_per_month(self.all.origin()).ok().and_then(|x| x)
+    }
+
+    pub fn github_stargazers_and_watchers(&self) -> Option<(u32, u32)> {
+        self.kitchen_sink.github_stargazers_and_watchers(self.all.origin()).ok().and_then(|x| x)
     }
 
     pub fn related_crates(&self) -> Option<Vec<Origin>> {

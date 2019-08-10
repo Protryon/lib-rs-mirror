@@ -39,13 +39,20 @@ pub enum Include {
 impl RichCrateVersion {
     pub fn new(origin: Origin, manifest: Manifest, derived: Derived) -> Self {
         let package = manifest.package.as_ref().expect("package");
-        Self {
+        if let Origin::GitHub {..} = &origin {
+            assert!(package.repository.is_some());
+        }
+        let s = Self {
             origin,
             repo: package.repository.as_ref().and_then(|r| Repo::new(r).ok()),
             authors: package.authors.iter().map(|a| Author::new(a)).collect(),
             derived,
             manifest,
+        };
+        if let Origin::GitHub {..} = &s.origin {
+            debug_assert!(s.repo.is_some());
         }
+        s
     }
 
     fn package(&self) -> &Package {

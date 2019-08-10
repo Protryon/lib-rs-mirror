@@ -9,19 +9,20 @@ use urlencoding::encode;
 /// One thing responsible for link URL scheme on the site.
 /// Should be used for every internal `<a href>`.
 pub struct Urler {
-    own_crate_name: Option<String>,
+    own_crate: Option<Origin>,
 }
 
 impl Urler {
-    pub fn new(own_crate_name: Option<String>) -> Self {
-        Self { own_crate_name }
+    pub fn new(own_crate: Option<Origin>) -> Self {
+        Self { own_crate }
     }
 
     /// Link to a dependency of a crate
     pub fn dependency(&self, dep: &RichDep) -> String {
         if let Some(git) = dep.dep.git() {
-            git.to_string()
+            git.to_string() // FIXME: sanitise URL? Make relative crate?
         } else {
+            // FIXME: support path deps
             format!("/crates/{}", encode(&dep.package))
         }
     }
@@ -45,20 +46,25 @@ impl Urler {
 
     /// Link to crate individual page
     pub fn krate(&self, krate: &RichCrateVersion) -> String {
-        self.crate_by_name(krate.short_name())
+        self.crate_by_origin(krate.origin())
     }
 
     pub fn crate_by_origin(&self, o: &Origin) -> String {
-        format!("/crates/{}", encode(o.short_crate_name()))
-    }
-
-    pub fn crate_by_name(&self, crate_name: &str) -> String {
-        if self.own_crate_name.as_ref().map_or(false, |n| n == crate_name) {
-            self.crates_io_crate_by_name(crate_name)
-        } else {
-            format!("/crates/{}", encode(crate_name))
+        match o {
+            Origin::CratesIo(crate_name) => {
+                match self.own_crate {
+                    Some(Origin::CratesIo(ref own)) if own == crate_name => {
+                        self.crates_io_crate_by_name(crate_name)
+                    },
+                    _ => format!("/crates/{}", encode(crate_name)),
+                }
+            },
+            Origin::GitHub {repo, package} => {
+                format!("/gh/{}/{}/{}", encode(&repo.owner), encode(&repo.repo), encode(package))
+            },
         }
     }
+
 
     pub fn keyword(&self, name: &str) -> String {
         format!("/keywords/{}", encode(&name.to_lowercase()))

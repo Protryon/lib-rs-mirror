@@ -115,7 +115,7 @@ pub fn render_crate_page(out: &mut dyn Write, all: &RichCrate, ver: &RichCrateVe
         Err(KitchenSinkErr::Stopped)?;
     }
 
-    let urler = Urler::new(Some(ver.short_name().to_string()));
+    let urler = Urler::new(Some(ver.origin().clone()));
     let c = CratePage::new(all, ver, kitchen_sink, renderer).context("New crate page")?;
     templates::crate_page(out, &urler, &c).context("crate page io")?;
     Ok(c.page_title())

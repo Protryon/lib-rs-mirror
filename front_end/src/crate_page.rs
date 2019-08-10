@@ -62,14 +62,14 @@ pub struct Version<'a> {
 ///
 #[derive(Debug, Default)]
 struct ReleaseCounts {
-    total: usize,
-    stable: usize,
-    major: usize,
-    major_recent: usize,
-    patch: usize,
-    unstable: usize,
-    breaking: usize,
-    breaking_recent: usize,
+    total: u32,
+    stable: u32,
+    major: u32,
+    major_recent: u32,
+    patch: u32,
+    unstable: u32,
+    breaking: u32,
+    breaking_recent: u32,
 }
 
 pub(crate) struct Contributors<'a> {
@@ -428,9 +428,9 @@ impl<'a> CratePage<'a> {
     fn version_stats(&self) -> ReleaseCounts {
         let mut cnt = ReleaseCounts::default();
         let mut prev: Option<Version<'a>> = None;
-        let mut all: Vec<_> = self.all_versions().collect();
+        let mut all: Vec<_> = self.all_versions().filter(|v| !v.yanked).collect();
         all.sort_by(|a, b| a.semver.cmp(&b.semver));
-        cnt.total = all.len();
+        cnt.total = all.len() as u32;
         let recent = *all.iter().map(|d| &d.created_at).max().expect("no versions") - Duration::weeks(40);
         for v in all {
             if v.semver.major == 0 {
@@ -766,10 +766,13 @@ pub struct DepsSize {
 
 type LanguageStats = Vec<(Language, Lines, (u32, u32))>;
 
+fn plural(n: u32) -> &'static str {
+    if n == 1 { "" } else { "s" }
+}
+
 impl ReleaseCounts {
     /// Judge how often the crate makes breaking or stable releases
     pub fn summary(&self) -> (String, Option<String>) {
-        // TODO take yanked into account
         // show (n this year|n last year)
         let (n, label, n2, label2, majorinfo) = if self.stable > 0 {
             let breaking = self.major_recent > 2 && self.major * 2 >= self.stable;
@@ -790,16 +793,26 @@ impl ReleaseCounts {
         };
         if n == self.total || (n > 7 && n * 10 >= self.total * 8) {
             if majorinfo {
-                (format!("{} {} release{}", n, label, if n == 1 { "" } else { "s" }), Some(format!("({} {})", n2, label2)))
+                (format!("{} {} release{}", n, label, plural(n)), Some(format!("({} {})", n2, label2)))
             } else {
-                (format!("{} {} release{}", n, label, if n == 1 { "" } else { "s" }), None)
+                (format!("{} {} release{}", n, label, plural(n)), None)
             }
         } else if n * 3 >= self.total * 2 {
-            (format!("{} release{}", self.total, if self.total == 1 { "" } else { "s" }), Some(format!("({})", label)))
+            (format!("{} release{}", self.total, plural(self.total)), Some(format!("({})", label)))
         } else {
-            (format!("{} release{}", self.total, if self.total == 1 { "" } else { "s" }), Some(format!("({} {})", n, label)))
+            (format!("{} release{}", self.total, plural(self.total)), if label != "" { Some(format!("({} {})", n, label)) } else { None })
         }
     }
+}
+
+#[test]
+fn counts() {
+    let r = ReleaseCounts {total: 10, stable: 0, major: 0, major_recent: 0, patch: 0, unstable: 9, breaking: 9, breaking_recent: 0};
+    assert_eq!(r.summary(), ("9 breaking releases".to_string(), None));
+    let r = ReleaseCounts {total: 25, stable: 3, major: 0, major_recent: 0, patch: 7, unstable: 2, breaking: 1, breaking_recent: 2};
+    assert_eq!(r.summary(), ("25 releases".to_string(), Some("(3 stable)".to_string())));
+    let r = ReleaseCounts { total: 27, stable: 0, major: 1, major_recent: 0, patch: 23, unstable: 13, breaking: 1, breaking_recent: 0 };
+    assert_eq!(r.summary(), ("27 releases".to_string(), None));
 }
 
 #[test]

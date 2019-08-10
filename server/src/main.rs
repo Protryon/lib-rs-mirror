@@ -289,6 +289,10 @@ fn handle_gh_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpRespon
         return Box::new(future::result(render_404_page(&state, &crate_name)));
     }
 
+    if state.crates.load().crate_exists(&Origin::from_crates_io_name(&crate_name)) {
+        return Box::new(future::ok(HttpResponse::TemporaryRedirect().header("Location", format!("/crates/{}", crate_name)).finish()));
+    }
+
     let cache_file = state.page_cache_dir.join(format!("gh,{},{},{}.html", owner, repo, crate_name));
     let origin = Origin::from_github(SimpleRepo::new(owner, repo), crate_name);
     with_file_cache(cache_file, 9000, move || {
@@ -325,7 +329,8 @@ fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: impl FnOnc
     where F: Future<Item=Vec<u8>, Error=failure::Error> + 'static {
     if let Ok(modified) = std::fs::metadata(&cache_file).and_then(|m| m.modified()) {
         let now = SystemTime::now();
-        let is_fresh = modified > (now - Duration::from_secs((cache_time/20+5).into()));
+        // rebuild in debug always
+        let is_fresh = !cfg!(debug_assertions) && modified > (now - Duration::from_secs((cache_time/20+5).into()));
         let is_acceptable = modified > (now - Duration::from_secs((3600*24*7 + cache_time*5).into()));
 
         let age_secs = now.duration_since(modified).ok().map(|age| age.as_secs() as u32).unwrap_or(0);

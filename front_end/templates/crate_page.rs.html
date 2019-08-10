@@ -143,7 +143,7 @@
         <div>
           <section class="about-crate">
             <section id="versions">
-              @if let Some(parts) = Some(c.version_stats_summary()) {
+              @if let Some(parts) = c.version_stats_summary() {
                 <h3>
                   @if let Some(url) = c.changelog_url() {
                     <a href="@url">@parts.0</a>

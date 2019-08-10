@@ -111,7 +111,7 @@ impl<'a> CratePage<'a> {
         Page {
             title: self.page_title(),
             keywords: if keywords != "" { Some(keywords) } else { None },
-            created: Some(self.date_created()),
+            created: self.date_created(),
             description: self.ver.description().map(|d| format!("{} | Rust/Cargo package", d)),
             item_name: Some(self.ver.short_name().to_string()),
             item_description: self.ver.description().map(|d| d.to_string()),
@@ -423,18 +423,18 @@ impl<'a> CratePage<'a> {
     }
 
     /// String describing how often breaking changes are made
-    pub fn version_stats_summary(&self) -> (String, Option<String>) {
-        self.version_stats().summary()
+    pub fn version_stats_summary(&self) -> Option<(String, Option<String>)> {
+        self.version_stats().map(|v| v.summary())
     }
 
     /// Counts minor and major releases for the summary
-    fn version_stats(&self) -> ReleaseCounts {
+    fn version_stats(&self) -> Option<ReleaseCounts> {
         let mut cnt = ReleaseCounts::default();
         let mut prev: Option<Version<'a>> = None;
         let mut all: Vec<_> = self.all_versions().filter(|v| !v.yanked).collect();
         all.sort_by(|a, b| a.semver.cmp(&b.semver));
         cnt.total = all.len() as u32;
-        let recent = *all.iter().map(|d| &d.created_at).max().expect("no versions") - Duration::weeks(40);
+        let recent = *all.iter().map(|d| &d.created_at).max()? - Duration::weeks(40);
         for v in all {
             if v.semver.major == 0 {
                 cnt.unstable += 1;
@@ -469,7 +469,7 @@ impl<'a> CratePage<'a> {
             }
             prev = Some(v);
         }
-        cnt
+        Some(cnt)
     }
 
     /// Most relevant category for the crate and rank in that category
@@ -567,12 +567,12 @@ impl<'a> CratePage<'a> {
             .collect()
     }
 
-    pub fn date_created(&self) -> String {
-        self.most_recent_version().created_at.format("%Y-%m-%d").to_string()
+    pub fn date_created(&self) -> Option<String> {
+        self.most_recent_version().map(|v| v.created_at.format("%Y-%m-%d").to_string())
     }
 
-    pub fn most_recent_version(&self) -> Version<'a> {
-        self.all_versions().max_by(|a, b| a.created_at.cmp(&b.created_at)).expect("no versions?")
+    fn most_recent_version(&self) -> Option<Version<'a>> {
+        self.all_versions().max_by(|a, b| a.created_at.cmp(&b.created_at))
     }
 
     pub fn all_versions(&self) -> impl Iterator<Item = Version<'a>> {

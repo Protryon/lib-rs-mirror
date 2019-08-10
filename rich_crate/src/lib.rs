@@ -1,6 +1,6 @@
 #[macro_use]
 extern crate serde_derive;
-
+use std::fmt;
 pub use cargo_author::*;
 mod rich_crate;
 pub use crate::rich_crate::*;
@@ -15,10 +15,19 @@ pub use repo_url::RepoHost;
 pub use repo_url::SimpleRepo;
 
 /// URL-like identifier of location where crate has been published + normalized crate name
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Clone, Eq, PartialEq, Hash)]
 pub enum Origin {
     CratesIo(Box<str>),
     GitHub { repo: SimpleRepo, package: Box<str> },
+}
+
+impl fmt::Debug for Origin {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Origin::CratesIo(name) => write!(f, "Origin(lib.rs/{})", name),
+            Origin::GitHub {repo, package} => write!(f, "Origin(github.com/{}/{}#{})", repo.owner, repo.repo, package),
+        }
+    }
 }
 
 impl Origin {

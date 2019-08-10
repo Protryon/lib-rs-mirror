@@ -39,7 +39,8 @@ struct ServerState {
     markup: Renderer,
     index: CrateSearchIndex,
     crates: ArcSwap<KitchenSink>,
-    public_crates_dir: PathBuf,
+    page_cache_dir: PathBuf,
+    data_dir: PathBuf,
 }
 
 type AServerState = Arc<ServerState>;
@@ -65,13 +66,14 @@ fn run_server() -> Result<(), failure::Error> {
     kitchen_sink::dont_hijack_ctrlc();
     let sys = actix::System::new("crates-server");
 
-    let public_styles_dir: PathBuf = env::var_os("DOCUMENT_ROOT").map(From::from).unwrap_or_else(|| "../style/public".into());
-    let public_crates_dir: PathBuf = env::var_os("CRATE_HTML_ROOT").map(From::from).unwrap_or_else(|| "/www/crates.rs/public/crates".into());
+    let public_document_root: PathBuf = env::var_os("DOCUMENT_ROOT").map(From::from).unwrap_or_else(|| "../style/public".into());
+    let page_cache_dir: PathBuf = "/var/tmp/crates-server".into();
     let data_dir: PathBuf = env::var_os("CRATE_DATA_DIR").map(From::from).unwrap_or_else(|| "../data".into());
     let github_token = env::var("GITHUB_TOKEN").context("GITHUB_TOKEN missing")?;
 
-    assert!(public_crates_dir.exists(), "CRATE_HTML_ROOT {} does not exist", public_crates_dir.display());
-    assert!(public_styles_dir.exists(), "DOCUMENT_ROOT {} does not exist", public_styles_dir.display());
+    let _ = std::fs::create_dir_all(&page_cache_dir);
+    assert!(page_cache_dir.exists(), "{} does not exist", page_cache_dir.display());
+    assert!(public_document_root.exists(), "DOCUMENT_ROOT {} does not exist", public_document_root.display());
     assert!(data_dir.exists(), "CRATE_DATA_DIR {} does not exist", data_dir.display());
 
     let crates = KitchenSink::new(&data_dir, &github_token, 20.)?;
@@ -86,7 +88,8 @@ fn run_server() -> Result<(), failure::Error> {
         markup,
         index,
         crates: ArcSwap::from_pointee(crates),
-        public_crates_dir,
+        page_cache_dir,
+        data_dir: data_dir.clone(),
     });
 
     // refresher thread
@@ -127,7 +130,7 @@ fn run_server() -> Result<(), failure::Error> {
             .resource("/gh/{owner}/{repo}/{crate}", |r| r.method(Method::GET).f(handle_gh_crate))
             .resource("/atom.xml", |r| r.method(Method::GET).f(handle_feed))
             .resource("/sitemap.xml", |r| r.method(Method::GET).f(handle_sitemap))
-            .handler("/", fs::StaticFiles::new(&public_styles_dir).expect("public directory")
+            .handler("/", fs::StaticFiles::new(&public_document_root).expect("public directory")
                 .default_handler(default_handler))
     })
     .bind("127.0.0.1:32531")
@@ -155,12 +158,12 @@ fn find_category<'a>(slugs: impl Iterator<Item=&'a str>) -> Option<&'static Cate
     found
 }
 
-fn default_handler(req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
-    let path = req.uri().path();
+fn default_handler(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
     let state = req.state();
+    let path = req.uri().path();
     assert!(path.starts_with('/'));
     if path.ends_with('/') {
-        return Ok(HttpResponse::PermanentRedirect().header("Location", path.trim_end_matches('/')).body(""));
+        return Box::new(future::ok(HttpResponse::PermanentRedirect().header("Location", path.trim_end_matches('/')).body("")));
     }
 
     if let Some(cat) = find_category(path.split('/').skip(1)) {
@@ -170,17 +173,17 @@ fn default_handler(req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
     let crates = state.crates.load();
     let name = path.trim_matches('/');
     if let Ok(k) = crates.rich_crate(&Origin::from_crates_io_name(name)) {
-        return Ok(HttpResponse::PermanentRedirect().header("Location", format!("/crates/{}", encode(k.name()))).body(""));
+        return Box::new(future::ok(HttpResponse::PermanentRedirect().header("Location", format!("/crates/{}", encode(k.name()))).body("")));
     }
     let inverted_hyphens: String = name.chars().map(|c| if c == '-' {'_'} else if c == '_' {'-'} else {c.to_ascii_lowercase()}).collect();
     if let Ok(k) = crates.rich_crate(&Origin::from_crates_io_name(&inverted_hyphens)) {
-        return Ok(HttpResponse::TemporaryRedirect().header("Location", format!("/crates/{}", encode(k.name()))).body(""));
+        return Box::new(future::ok(HttpResponse::TemporaryRedirect().header("Location", format!("/crates/{}", encode(k.name()))).body("")));
     }
     if crates.is_it_a_keyword(&inverted_hyphens) {
-        return Ok(HttpResponse::TemporaryRedirect().header("Location", format!("/keywords/{}", encode(&inverted_hyphens))).body(""));
+        return Box::new(future::ok(HttpResponse::TemporaryRedirect().header("Location", format!("/keywords/{}", encode(&inverted_hyphens))).body("")));
     }
 
-    render_404_page(state, path)
+    Box::new(future::result(render_404_page(state, path)))
 }
 
 fn render_404_page(state: &AServerState, path: &str) -> Result<HttpResponse> {
@@ -200,17 +203,21 @@ fn render_404_page(state: &AServerState, path: &str) -> Result<HttpResponse> {
         .body(page))
 }
 
-fn handle_category(req: &HttpRequest<AServerState>, cat: &Category) -> Result<HttpResponse> {
-    let state = req.state();
+fn handle_category(req: &HttpRequest<AServerState>, cat: &'static Category) -> FutureResponse<HttpResponse> {
+    let state = Arc::clone(req.state());
     let crates = state.crates.load();
     crates.prewarm();
-    let mut page: Vec<u8> = Vec::with_capacity(150000);
-    front_end::render_category(&mut page, cat, &crates, &state.markup).expect("render");
-    Ok(HttpResponse::Ok()
-        .content_type("text/html;charset=UTF-8")
-        .header("Cache-Control", "public, max-age=7200, stale-while-revalidate=259200, stale-if-error=72000")
-        .content_length(page.len() as u64)
-        .body(page))
+    let cache_file = state.page_cache_dir.join(format!("_{}.html", cat.slug));
+    with_file_cache(cache_file, 7200, move || {
+        Arc::clone(&state).render_pool.spawn_fn(move || {
+            let mut page: Vec<u8> = Vec::with_capacity(150000);
+            front_end::render_category(&mut page, cat, &crates, &state.markup).expect("render");
+            Ok(page)
+        })
+    })
+    .from_err()
+    .and_then(serve_cached)
+    .responder()
 }
 
 fn handle_home(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
@@ -220,22 +227,20 @@ fn handle_home(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> 
     }
 
     let state = Arc::clone(req.state());
-    let cache_file = state.public_crates_dir.join("../index.html");
+    let cache_file = state.page_cache_dir.join("_.html");
     with_file_cache(cache_file, 3600, move || {
-        state
-            .render_pool
-            .spawn_fn({
-                let state = state.clone();
-                move || {
-                    let crates = state.crates.load();
-                    crates.prewarm();
-                    let mut page: Vec<u8> = Vec::with_capacity(50000);
-                    front_end::render_homepage(&mut page, &crates)?;
-                    Ok(page)
-                }
-            })
-            .timeout(Duration::from_secs(300))
-            .map_err(map_err)
+        state.render_pool.spawn_fn({
+            let state = state.clone();
+            move || {
+                let crates = state.crates.load();
+                crates.prewarm();
+                let mut page: Vec<u8> = Vec::with_capacity(50000);
+                front_end::render_homepage(&mut page, &crates)?;
+                Ok(page)
+            }
+        })
+        .timeout(Duration::from_secs(300))
+        .map_err(map_err)
     })
     .from_err()
     .and_then(serve_cached)
@@ -253,7 +258,7 @@ fn handle_gh_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpRespon
         return Box::new(future::result(render_404_page(&state, &crate_name)));
     }
 
-    let cache_file = state.public_crates_dir.join(format!("gh,{},{},{}.html", owner, repo, crate_name));
+    let cache_file = state.page_cache_dir.join(format!("gh,{},{},{}.html", owner, repo, crate_name));
     let origin = Origin::from_github(SimpleRepo::new(owner, repo), crate_name);
     with_file_cache(cache_file, 9000, move || {
         render_crate_page(&state, origin)
@@ -273,7 +278,7 @@ fn handle_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse>
     if !is_alnum(&crate_name) || !crates.crate_exists(&origin) {
         return Box::new(future::result(render_404_page(&state, &crate_name)));
     }
-    let cache_file = state.public_crates_dir.join(format!("{}.html", crate_name));
+    let cache_file = state.page_cache_dir.join(format!("{}.html", crate_name));
     with_file_cache(cache_file, 1800, move || {
         render_crate_page(&state, origin)
             .timeout(Duration::from_secs(30))
@@ -362,7 +367,7 @@ fn handle_keyword(req: &HttpRequest<AServerState>) -> FutureResponse<HttpRespons
                         Ok((query, None))
                     }
                 })
-                .timeout(Duration::from_secs(3))
+                .timeout(Duration::from_secs(4))
                 .map_err(map_err)
                 .from_err()
                 .and_then(|(query, page)| {

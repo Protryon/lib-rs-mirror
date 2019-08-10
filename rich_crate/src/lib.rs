@@ -24,8 +24,8 @@ pub enum Origin {
 impl fmt::Debug for Origin {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Origin::CratesIo(name) => write!(f, "Origin(lib.rs/{})", name),
-            Origin::GitHub {repo, package} => write!(f, "Origin(github.com/{}/{}#{})", repo.owner, repo.repo, package),
+            Origin::CratesIo(name) => write!(f, "Origin( lib.rs/{} )", name),
+            Origin::GitHub {repo, package} => write!(f, "Origin( github.com/{}/{}#{} )", repo.owner, repo.repo, package),
         }
     }
 }

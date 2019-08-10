@@ -167,7 +167,7 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn dependents_stats(&self) -> Option<(u32, u32)> {
-        self.kitchen_sink.dependents_stats_of(self.ver.origin()).expect("deps").map(|d| (
+        self.kitchen_sink.crates_io_dependents_stats_of(self.ver.origin()).expect("deps").map(|d| (
             d.runtime.def as u32 + d.runtime.opt as u32 +
             d.build.def as u32  + d.build.opt as u32 +
             d.dev as u32, d.direct as u32))
@@ -285,7 +285,12 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn up_to_date_class(&self, richdep: &RichDep) -> &str {
-        let (matches_latest, pop) = richdep.dep.req().parse().ok().and_then(|req| self.kitchen_sink.version_popularity(&richdep.package, &req).expect("deps")).unwrap_or((false, 0.));
+        let (matches_latest, pop) = richdep.dep.req().parse().ok().and_then(|req| {
+            if !richdep.dep.is_crates_io() {
+                return None;
+            }
+            self.kitchen_sink.version_popularity(&richdep.package, &req).expect("deps")
+        }).unwrap_or((false, 0.));
         match pop {
             x if x >= 0.5 && matches_latest => "top",
             x if x >= 0.75 || matches_latest => "common",
@@ -568,12 +573,12 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn all_versions(&self) -> impl Iterator<Item = Version<'a>> {
-        self.all.versions().iter().map(|v| Version {
+        self.all.versions().iter().filter_map(|v| Some(Version {
             yanked: v.yanked,
             num: &v.num,
-            semver: SemVer::parse(&v.num).expect("semver parse"),
+            semver: SemVer::parse(&v.num).map_err(|e| eprintln!("semver parse {} {:?}", e, v.num)).ok()?,
             created_at: DateTime::parse_from_rfc3339(&v.created_at).expect("created_at parse"),
-        })
+        }))
     }
 
     pub fn published_date(&self) -> DateTime<FixedOffset> {

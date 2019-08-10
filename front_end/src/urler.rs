@@ -19,7 +19,11 @@ impl Urler {
 
     /// Link to a dependency of a crate
     pub fn dependency(&self, dep: &RichDep) -> String {
-        format!("/crates/{}", encode(&dep.package))
+        if let Some(git) = dep.dep.git() {
+            git.to_string()
+        } else {
+            format!("/crates/{}", encode(&dep.package))
+        }
     }
 
     /// Summary of all dependencies

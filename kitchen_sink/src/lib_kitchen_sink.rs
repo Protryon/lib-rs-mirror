@@ -342,6 +342,19 @@ impl KitchenSink {
                 let host = RepoHost::GitHub(repo.clone()).try_into().map_err(|_| KitchenSinkErr::CrateNotFound(origin.clone())).context("ghrepo host bad")?;
                 let cachebust = self.cachebust_string_for_repo(&host).context("ghrepo")?;
                 let gh = self.gh.repo(repo, &cachebust)?.ok_or_else(|| KitchenSinkErr::CrateNotFound(origin.clone())).context("ghrepo not found")?;
+                let releases = self.gh.releases(repo, &cachebust)?.ok_or_else(|| KitchenSinkErr::CrateNotFound(origin.clone())).context("releases not found")?;
+                let versions = releases.into_iter().filter_map(|r| {
+                    let date = r.published_at.or(r.created_at)?;
+                    Some(CrateVersion {
+                        num: r.tag_name?.trim_start_matches(|c:char| !c.is_numeric()).to_string(),
+                        yanked: r.draft.unwrap_or(false),
+                        updated_at: date.clone(),
+                        created_at: date,
+                    })
+                }).collect::<Vec<_>>();
+                if versions.is_empty() {
+                    eprintln!("No versions found for {:?}", origin);
+                }
                 Ok(RichCrate::new(origin.clone(), gh.owner.into_iter().map(|o| {
                     CrateOwner {
                         id: 0,
@@ -353,7 +366,7 @@ impl KitchenSink {
                     }
                 }).collect(),
                 format!("{}/{}/{}", repo.owner, repo.repo, package),
-                vec![]))
+                versions))
             }
         }
     }
@@ -494,10 +507,23 @@ impl KitchenSink {
 
         let checkout = crate_git_checkout::checkout(&repo, &self.git_checkout_path)?;
         let (path_in_repo, tree_id, manifest) = crate_git_checkout::path_in_repo(&checkout, package)?
-            .ok_or_else(|| KitchenSinkErr::CrateNotFoundInRepo(repo.canonical_git_url().to_string(), package.to_string()))?;
+            .ok_or_else(|| {
+                let (has, err) = crate_git_checkout::find_manifests(&checkout).unwrap_or_default();
+                for e in err {
+                    eprintln!("parse err: {}", e.0);
+                }
+                for h in has {
+                    eprintln!("has: {} -> {}", h.0, h.2.package.as_ref().map(|p| p.name.as_str()).unwrap_or("?"));
+                }
+                KitchenSinkErr::CrateNotFoundInRepo(package.to_string(), repo.canonical_git_url().into_owned())
+            })?;
 
-        let meta = tarball::read_repo(&checkout, tree_id)?;
-        assert_eq!(meta.manifest.package, manifest.package);
+        let mut meta = tarball::read_repo(&checkout, tree_id)?;
+        debug_assert_eq!(meta.manifest.package, manifest.package);
+        let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
+        if package.repository.is_none() {
+            package.repository = Some(repo.canonical_git_url().into_owned());
+        }
 
         self.rich_crate_version_data_common(origin.clone(), meta, Some(path_in_repo), 0, false, HashSet::new())
     }
@@ -763,7 +789,7 @@ impl KitchenSink {
     }
 
     pub fn is_build_or_dev(&self, k: &Origin) -> Result<(bool, bool), KitchenSinkErr> {
-        Ok(self.dependents_stats_of(k)?
+        Ok(self.crates_io_dependents_stats_of(k)?
         .map(|d| {
             let is_build = d.build.def > 3 * (d.runtime.def + d.runtime.opt + 5);
             let is_dev = !is_build && d.dev > (3 * d.runtime.def + d.runtime.opt + 3 * d.build.def + d.build.opt + 5);
@@ -898,7 +924,10 @@ impl KitchenSink {
             Origin::CratesIo(name) => {
                 self.index.all_dependencies_flattened(self.index.crates_io_crate_by_name(name)?)
             },
-            _ => unimplemented!()
+            _ => {
+                eprintln!("deps unimplemented!()");
+                return Ok(Default::default())
+            }
         }
     }
 
@@ -911,10 +940,10 @@ impl KitchenSink {
         let _ = self.index.deps_stats();
     }
 
-    pub fn dependents_stats_of(&self, origin: &Origin) -> Result<Option<RevDependencies>, KitchenSinkErr> {
+    pub fn crates_io_dependents_stats_of(&self, origin: &Origin) -> Result<Option<RevDependencies>, KitchenSinkErr> {
         match origin {
             Origin::CratesIo(crate_name) => Ok(self.index.deps_stats()?.counts.get(crate_name).cloned()),
-            _ => unimplemented!(),
+            _ => Ok(None),
         }
     }
 
@@ -999,12 +1028,9 @@ impl KitchenSink {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
         let (res1, res2) = rayon::join(|| -> CResult<()> {
             let origin = k.origin();
-            match origin {
-                Origin::CratesIo(name) => {
-                    let meta = self.crates_io_meta(name, true)?;
-                    self.index_crate_downloads(name, &meta)?;
-                },
-                _ => {},
+            if let Origin::CratesIo(name) = origin {
+                let meta = self.crates_io_meta(name, true)?;
+                self.index_crate_downloads(name, &meta)?;
             }
             Ok(())
         }, || self.crate_db.index_versions(k, score, self.downloads_recent(k.origin())?));
@@ -1066,12 +1092,17 @@ impl KitchenSink {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
 
         let origin = k.origin();
-        let ver = match origin {
-            Origin::CratesIo(ref name) => self.index.crate_version_latest_unstable(name).context("rich_crate_version2")?,
-            _ => unimplemented!(),
+        let (v, is_yanked) = match origin {
+            Origin::CratesIo(ref name) => {
+                let ver = self.index.crate_version_latest_unstable(name).context("rich_crate_version2")?;
+                let (v, _warn) = self.rich_crate_version_data_from_crates_io(ver)?;
+                (v, ver.is_yanked())
+            },
+            Origin::GitHub {..} => {
+                let (v, _warn) = self.rich_crate_version_from_repo(&origin)?;
+                (v, false)
+            },
         };
-
-        let (v, _warn) = self.rich_crate_version_data_from_crates_io(ver)?;
 
         // direct deps are used as extra keywords for similarity matching,
         // but we're taking only niche deps to group similar niche crates together
@@ -1103,7 +1134,7 @@ impl KitchenSink {
             origin,
             repository: repository.as_ref(),
             deps_stats: &weighed_deps,
-            is_yanked: ver.is_yanked(),
+            is_yanked,
             is_build, is_dev,
             manifest: &v.manifest,
             derived: &v.derived,

@@ -320,10 +320,7 @@ impl KitchenSink {
     }
 
     pub fn crate_exists(&self, origin: &Origin) -> bool {
-        match origin {
-            Origin::CratesIo(name) => self.index.crates_io_crate_by_name(name).is_ok(),
-            _ => self.rich_crate(origin).is_ok(),
-        }
+        self.index.crate_exists(origin)
     }
 
     /// Wrapper object for metadata common for all versions of a crate
@@ -1207,6 +1204,12 @@ impl KitchenSink {
             "derive_more" | "ron" | "fxhash" | "simple-logger" | "chan" | "stderrlog" => Some(false),
             _ => None,
         }
+    }
+
+    pub fn inspect_repo_manifests(&self, repo: &Repo) -> CResult<Vec<(String, crate_git_checkout::Oid, Manifest)>> {
+        let checkout = crate_git_checkout::checkout(repo, &self.git_checkout_path)?;
+        let (has, _) = crate_git_checkout::find_manifests(&checkout)?;
+        Ok(has)
     }
 
     pub fn index_repo(&self, repo: &Repo, as_of_version: &str) -> CResult<()> {

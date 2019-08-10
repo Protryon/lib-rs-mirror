@@ -83,6 +83,13 @@ impl Index {
         })
     }
 
+    pub fn crate_exists(&self, origin: &Origin) -> bool {
+        match origin {
+            Origin::CratesIo(name) => self.crates_io_crate_by_name(name).is_ok(),
+            Origin::GitHub {..} => self.git_index.has(origin),
+        }
+    }
+
     /// All crates available in the crates.io index and our index
     ///
     pub fn all_crates(&self) -> impl Iterator<Item=Origin> + '_ {
@@ -99,6 +106,7 @@ impl Index {
         }
     }
 
+    #[inline]
     pub fn crates_io_crate_by_name(&self, name: &str) -> Result<&Crate, KitchenSinkErr> {
         self.crates_io_crates()
         .get(name)

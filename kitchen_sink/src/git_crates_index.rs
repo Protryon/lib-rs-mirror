@@ -29,6 +29,10 @@ impl GitIndex {
         })
     }
 
+    pub fn has(&self, origin: &Origin) -> bool {
+        self.index.get(origin).is_some()
+    }
+
     pub fn crates(&self) -> impl Iterator<Item=&Origin> {
         self.index.iter()
     }

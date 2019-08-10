@@ -289,12 +289,12 @@ fn handle_gh_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpRespon
         return Box::new(future::result(render_404_page(&state, &crate_name)));
     }
 
-    if state.crates.load().crate_exists(&Origin::from_crates_io_name(&crate_name)) {
-        return Box::new(future::ok(HttpResponse::TemporaryRedirect().header("Location", format!("/crates/{}", crate_name)).finish()));
+    let cache_file = state.page_cache_dir.join(format!("gh,{},{},{}.html", owner, repo, crate_name));
+    let origin = Origin::from_github(SimpleRepo::new(owner.as_str(), repo.as_str()), crate_name);
+    if !state.crates.load().crate_exists(&origin) {
+        return Box::new(future::ok(HttpResponse::TemporaryRedirect().header("Location", format!("https://github.com/{}/{}", owner, repo)).finish()));
     }
 
-    let cache_file = state.page_cache_dir.join(format!("gh,{},{},{}.html", owner, repo, crate_name));
-    let origin = Origin::from_github(SimpleRepo::new(owner, repo), crate_name);
     with_file_cache(cache_file, 9000, move || {
         render_crate_page(&state, origin)
             .timeout(Duration::from_secs(60))

@@ -20,6 +20,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::prelude::FutureExt;
+use repo_url::SimpleRepo;
 use urlencoding::decode;
 use urlencoding::encode;
 
@@ -123,6 +124,7 @@ fn run_server() -> Result<(), failure::Error> {
             .resource("/index", |r| r.method(Method::GET).f(handle_search)) // old crates.rs/index url
             .resource("/keywords/{keyword}", |r| r.method(Method::GET).f(handle_keyword))
             .resource("/crates/{crate}", |r| r.method(Method::GET).f(handle_crate))
+            .resource("/gh/{owner}/{repo}/{crate}", |r| r.method(Method::GET).f(handle_gh_crate))
             .resource("/atom.xml", |r| r.method(Method::GET).f(handle_feed))
             .resource("/sitemap.xml", |r| r.method(Method::GET).f(handle_sitemap))
             .handler("/", fs::StaticFiles::new(&public_styles_dir).expect("public directory")
@@ -240,17 +242,40 @@ fn handle_home(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> 
     .responder()
 }
 
+fn handle_gh_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
+    let inf = req.match_info();
+    let state = Arc::clone(req.state());
+    let owner: String = inf.query("owner").expect("arg1");
+    let repo: String = inf.query("repo").expect("arg2");
+    let crate_name: String = inf.query("crate").expect("arg3");
+    println!("GH crate {}/{}/{}", owner, repo, crate_name);
+    if !is_alnum(&owner) || !is_alnum(&repo) || !is_alnum(&crate_name) {
+        return Box::new(future::result(render_404_page(&state, &crate_name)));
+    }
+
+    let cache_file = state.public_crates_dir.join(format!("gh,{},{},{}.html", owner, repo, crate_name));
+    let origin = Origin::from_github(SimpleRepo::new(owner, repo), crate_name);
+    with_file_cache(cache_file, 9000, move || {
+        render_crate_page(&state, origin)
+            .timeout(Duration::from_secs(60))
+            .map_err(map_err)})
+    .from_err()
+    .and_then(serve_cached)
+    .responder()
+}
+
 fn handle_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
     let crate_name: String = req.match_info().query("crate").expect("arg");
     println!("crate page for {:?}", crate_name);
     let state = Arc::clone(req.state());
     let crates = state.crates.load();
-    if !is_alnum(&crate_name) || !crates.crate_exists(&Origin::from_crates_io_name(&crate_name)) {
+    let origin = Origin::from_crates_io_name(&crate_name);
+    if !is_alnum(&crate_name) || !crates.crate_exists(&origin) {
         return Box::new(future::result(render_404_page(&state, &crate_name)));
     }
     let cache_file = state.public_crates_dir.join(format!("{}.html", crate_name));
     with_file_cache(cache_file, 1800, move || {
-        render_crate_page(&state, crate_name)
+        render_crate_page(&state, origin)
             .timeout(Duration::from_secs(30))
             .map_err(map_err)})
     .from_err()
@@ -301,12 +326,11 @@ fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: impl FnOnc
     }))
 }
 
-fn render_crate_page(state: &AServerState, crate_name: String) -> impl Future<Item = Vec<u8>, Error = failure::Error> {
+fn render_crate_page(state: &AServerState, origin: Origin) -> impl Future<Item = Vec<u8>, Error = failure::Error> {
     let state2 = Arc::clone(state);
     state.render_pool.spawn_fn(move || {
         let crates = state2.crates.load();
         crates.prewarm();
-        let origin = Origin::from_crates_io_name(&crate_name);
         let all = crates.rich_crate(&origin)?;
         let ver = crates.rich_crate_version(&origin)?;
         let mut page: Vec<u8> = Vec::with_capacity(50000);

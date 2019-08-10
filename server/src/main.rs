@@ -12,7 +12,7 @@ use futures_cpupool::CpuPool;
 use kitchen_sink;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::Origin;
-use render_readme::{Highlighter, ImageOptimAPIFilter, Renderer};
+use render_readme::{Highlighter, ImageOptimAPIFilter, Renderer, Markup};
 use search_index::CrateSearchIndex;
 use std::env;
 use std::path::PathBuf;
@@ -158,6 +158,31 @@ fn find_category<'a>(slugs: impl Iterator<Item=&'a str>) -> Option<&'static Cate
     found
 }
 
+fn handle_static_page(state: &ServerState, path: &str) -> Result<Option<HttpResponse>> {
+    let path = &path[1..]; // remove leading /
+    if !is_alnum(path) {
+        return Ok(None);
+    }
+
+    let md_path = state.data_dir.as_path().join(format!("page/{}.md", path));
+    if !md_path.exists() {
+        return Ok(None)
+    }
+
+    let mut chars = path.chars();
+    let path_capitalized = chars.next().into_iter().flat_map(|c| c.to_uppercase()).chain(chars).collect();
+
+    let md = std::fs::read_to_string(md_path)?
+        .replace("$CRATE_NUM", &format!("{}", state.crates.load().all_crates_io_crates().len()));
+    let mut page = Vec::with_capacity(md.len()*2);
+    front_end::render_static_page(&mut page, path_capitalized, &Markup::Markdown(md), &state.markup)?;
+    Ok(Some(HttpResponse::Ok()
+        .content_type("text/html;charset=UTF-8")
+        .header("Cache-Control", "public, max-age=7200, stale-while-revalidate=604800, stale-if-error=86400")
+        .content_length(page.len() as u64)
+        .body(page)))
+}
+
 fn default_handler(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
     let state = req.state();
     let path = req.uri().path();
@@ -168,6 +193,12 @@ fn default_handler(req: &HttpRequest<AServerState>) -> FutureResponse<HttpRespon
 
     if let Some(cat) = find_category(path.split('/').skip(1)) {
         return handle_category(req, cat);
+    }
+
+    match handle_static_page(state, path) {
+        Ok(None) => {},
+        Ok(Some(page)) => return Box::new(future::ok(page)),
+        Err(err) => return Box::new(future::err(err)),
     }
 
     let crates = state.crates.load();

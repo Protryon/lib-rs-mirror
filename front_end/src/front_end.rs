@@ -13,6 +13,7 @@ mod iter;
 mod not_found_page;
 mod search_page;
 mod urler;
+use render_readme::Markup;
 pub use crate::not_found_page::*;
 pub use crate::search_page::*;
 
@@ -59,9 +60,9 @@ impl Page {
 }
 
 /// See `cat_page.rs.html`
-pub fn render_category(out: &mut dyn Write, cat: &Category, crates: &KitchenSink, markup: &Renderer) -> Result<(), failure::Error> {
+pub fn render_category(out: &mut dyn Write, cat: &Category, crates: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
     let urler = Urler::new(None);
-    let page = cat_page::CatPage::new(cat, crates, markup).context("can't prepare rendering of category page")?;
+    let page = cat_page::CatPage::new(cat, crates, renderer).context("can't prepare rendering of category page")?;
     templates::cat_page(out, &page, &urler)?;
     Ok(())
 }
@@ -109,15 +110,43 @@ pub fn render_sitemap(sitemap: &mut impl Write, crates: &KitchenSink) -> Result<
 }
 
 /// See `crate_page.rs.html`
-pub fn render_crate_page(out: &mut dyn Write, all: &RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, markup: &Renderer) -> Result<String, failure::Error> {
+pub fn render_crate_page(out: &mut dyn Write, all: &RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<String, failure::Error> {
     if stopped() {
         Err(KitchenSinkErr::Stopped)?;
     }
 
     let urler = Urler::new(Some(ver.short_name().to_string()));
-    let c = CratePage::new(all, ver, kitchen_sink, markup).context("New crate page")?;
+    let c = CratePage::new(all, ver, kitchen_sink, renderer).context("New crate page")?;
     templates::crate_page(out, &urler, &c).context("crate page io")?;
     Ok(c.page_title())
+}
+
+/// See `crate_page.rs.html`
+pub fn render_static_page(out: &mut dyn Write, title: String, page: &Markup, renderer: &Renderer) -> Result<(), failure::Error> {
+    if stopped() {
+        Err(KitchenSinkErr::Stopped)?;
+    }
+
+    let (html, warnings) = renderer.page(page, Some(("https://lib.rs", "https://lib.rs")), false, None);
+    if !warnings.is_empty() {
+        eprintln!("static: {:?}", warnings);
+    }
+
+    templates::static_page(out, &Page {
+        title,
+        alternate: None,
+        alternate_type: None,
+        canonical: None,
+        critical_css_data: None,
+        created: None,
+        description: None,
+        item_description: None,
+        item_name: None,
+        keywords: None,
+        noindex: false,
+        search_meta: true,
+    }, templates::Html(html))?;
+    Ok(())
 }
 
 /// Ructe doesn't like complex expressions…

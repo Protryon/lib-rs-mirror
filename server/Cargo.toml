@@ -1,6 +1,6 @@
 [package]
 name = "crates-server"
-version = "0.5.1"
+version = "0.5.2"
 authors = ["Kornel <kornel@geekhood.net>"]
 edition = "2018"
 description = "Crates.rs web server"
@@ -9,6 +9,7 @@ readme = "README.md"
 [package.metadata.deb]
 assets = [
     ["target/release/crates-server", "usr/bin/", "755"],
+    ["../data/page/*", "/var/lib/crates-server/page/", "755"],
 ]
 
 [dependencies]

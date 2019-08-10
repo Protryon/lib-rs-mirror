@@ -130,6 +130,8 @@ pub enum KitchenSinkErr {
     GitIndexFile(PathBuf, String),
     #[fail(display = "Rayon deadlock broke the stats")]
     DepsStatsNotAvailable,
+    #[fail(display = "Git crate '{}' can't be indexed, because crates-io name exists", _0)]
+    GitConflict(String),
 }
 
 /// This is a collection of various data sources. It mostly acts as a starting point and a factory for other objects.
@@ -1099,7 +1101,11 @@ impl KitchenSink {
                 let (v, _warn) = self.rich_crate_version_data_from_crates_io(ver)?;
                 (v, ver.is_yanked())
             },
-            Origin::GitHub {..} => {
+            Origin::GitHub {package, ..} => {
+                // avoid headache
+                if self.index.crates_io_crate_by_name(package).is_ok() {
+                    Err(KitchenSinkErr::GitConflict(package.to_string()))?
+                }
                 let (v, _warn) = self.rich_crate_version_from_repo(&origin)?;
                 (v, false)
             },

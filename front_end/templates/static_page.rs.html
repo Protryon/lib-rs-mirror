@@ -1,0 +1,32 @@
+@use crate::Page;
+@use crate::templates::base;
+
+@(page: &Page, content: Html<String>)
+
+@:base(page, {
+    <header id="page">
+        <div class="inner-col">
+            <div class="breadcrumbs">
+                <h1>
+                  <a href="/"><span>Lib</span>.rs</a>
+                </h1> › @page.title
+            </div>
+            <nav><ul>
+              <li class=active>@page.title</li>
+              <li><a href="/">Categories & Search</a></li>
+              <li><a href="https://gitlab.com/crates.rs?sort=stars_desc">Lib.rs's GitLab</a></li>
+              <li><a href="https://gitlab.com/crates.rs/crates.rs/issues/new">Report a bug</a></li>
+            </ul></nav>
+        </div>
+    </header>
+
+    <main>
+        <div class="inner-col">
+            @content
+        </div>
+    </main>
+
+    <footer>
+        <div class="inner-col" role="contentinfo">
+        <p>Formely Crates.rs. By <a href=https://kornel.ski>kornelski</a>.</p></div></footer>
+})

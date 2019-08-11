@@ -121,8 +121,12 @@ impl Urler {
             if let Some(ref em) = info.email {
                 Some(format!("mailto:{}", em)) // add name? encode?
             } else if let Some(ref url) = info.url {
-                assert!(url.starts_with("http:") || url.starts_with("https:") || url.starts_with("mailto:"));
-                Some(url.to_owned())
+                if url.starts_with("http://") || url.starts_with("https://") || url.starts_with("mailto:") {
+                    Some(url.to_owned())
+                } else {
+                    println!("bad info url: {:?}", author);
+                    None
+                }
             } else {
                 None
             }

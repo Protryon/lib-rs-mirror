@@ -227,10 +227,14 @@ impl RepoHost {
     }
 
     pub fn repo_name(&self) -> Option<&str> {
+        self.repo().map(|r| &*r.repo)
+    }
+
+    pub fn repo(&self) -> Option<&SimpleRepo> {
         match self {
-            RepoHost::GitHub(SimpleRepo { ref repo, .. }) |
-            RepoHost::BitBucket(SimpleRepo { ref repo, .. }) |
-            RepoHost::GitLab(SimpleRepo { ref repo, .. }) => return Some(repo),
+            RepoHost::GitHub(repo) |
+            RepoHost::BitBucket(repo) |
+            RepoHost::GitLab(repo) => return Some(repo),
             RepoHost::Other => None,
         }
     }

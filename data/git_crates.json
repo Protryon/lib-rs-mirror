@@ -75,6 +75,7 @@
 "github:kolloch/crate2nix/crate2nix",
 "github:kondrak/rust64/rust64",
 "github:koute/pinky/emumisc",
+"github:koute/pinky/mos6502",
 "github:koute/pinky/nes",
 "github:kpcyrd/mini-docker-rust/mini-docker-rust",
 "github:kud1ing/tinkerpop-rs/tinkerpop-rs",

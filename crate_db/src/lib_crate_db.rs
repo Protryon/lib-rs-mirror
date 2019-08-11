@@ -589,12 +589,10 @@ impl CrateDb {
             let crate_id: u32 = get_crate_id.query_row(&[&origin], |row| row.get(0))
                 .with_context(|_| format!("the crate {} hasn't been indexed yet", origin))?;
 
-            if let Some(recent) = downloads_recent {
-                let recent = recent as u32;
-                let mut update_recent = tx.prepare_cached("UPDATE crates SET recent_downloads = ?1, ranking = ?2 WHERE id = ?3")?;
-                let args: &[&dyn ToSql] = &[&recent, &score, &crate_id];
-                update_recent.execute(args).context("update recent")?;
-            }
+            let recent = downloads_recent.unwrap_or(0) as u32;
+            let mut update_recent = tx.prepare_cached("UPDATE crates SET recent_downloads = ?1, ranking = ?2 WHERE id = ?3")?;
+            let args: &[&dyn ToSql] = &[&recent, &score, &crate_id];
+            update_recent.execute(args).context("update recent")?;
 
             for ver in all.versions() {
                 let timestamp = DateTime::parse_from_rfc3339(&ver.created_at).context("version timestamp")?;

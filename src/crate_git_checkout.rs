@@ -224,7 +224,7 @@ struct State {
 
 pub type PackageVersionTimestamps = HashMap<String, HashMap<String, i64>>;
 
-pub fn find_tagged_versions(repo: &Repository) -> Result<PackageVersionTimestamps, failure::Error> {
+pub fn find_versions(repo: &Repository) -> Result<PackageVersionTimestamps, failure::Error> {
     let mut package_versions: PackageVersionTimestamps = HashMap::with_capacity(4);
     for commit in repo.tag_names(None)?.iter()
         .filter_map(|s| s)
@@ -236,6 +236,10 @@ pub fn find_tagged_versions(repo: &Repository) -> Result<PackageVersionTimestamp
                 add_package(&mut package_versions, pkg, &commit);
             }
         }
+    }
+
+    if package_versions.is_empty() {
+        return find_dependency_changes(repo, |_,_,_| {});
     }
 
     Ok(package_versions)
@@ -250,10 +254,11 @@ fn add_package(package_versions: &mut PackageVersionTimestamps, pkg: Package, co
 }
 
 /// Callback gets added, removed, number of commits ago.
-pub fn find_dependency_changes(repo: &Repository, mut cb: impl FnMut(HashSet<String>, HashSet<String>, usize)) -> Result<(), failure::Error> {
+pub fn find_dependency_changes(repo: &Repository, mut cb: impl FnMut(HashSet<String>, HashSet<String>, usize)) -> Result<PackageVersionTimestamps, failure::Error> {
     let head = repo.head()?;
 
     let mut newer_deps: HashMap<String, State> = HashMap::with_capacity(100);
+    let mut package_versions: PackageVersionTimestamps = HashMap::with_capacity(4);
 
     // iterates from the latest!
     // The generation number here is not quite accurate (due to diamond-shaped histories),
@@ -265,6 +270,11 @@ pub fn find_dependency_changes(repo: &Repository, mut cb: impl FnMut(HashSet<Str
         // and because moving of deps between internal crates doesn't count.
         let mut older_deps = HashSet::with_capacity(100);
         for (_, _, manifest) in find_manifests_in_tree(&repo, &commit.tree()?)?.0 {
+            // Find oldest occurence of each version, assuming it's a release date
+            if let Some(pkg) = manifest.package {
+                add_package(&mut package_versions, pkg, &commit);
+            }
+
             older_deps.extend(manifest.dependencies.into_iter().map(|(k, _)| k));
             older_deps.extend(manifest.dev_dependencies.into_iter().map(|(k, _)| k));
             older_deps.extend(manifest.build_dependencies.into_iter().map(|(k, _)| k));
@@ -297,7 +307,7 @@ pub fn find_dependency_changes(repo: &Repository, mut cb: impl FnMut(HashSet<Str
 
         cb(added, removed, age);
     }
-    Ok(())
+    Ok(package_versions)
 }
 
 // FIXME: buggy, barely works

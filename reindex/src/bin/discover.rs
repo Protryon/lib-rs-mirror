@@ -1,3 +1,4 @@
+use std::io::Write;
 use std::io::BufRead;
 use repo_url::*;
 use std::io;
@@ -29,19 +30,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn check_repo(line: &str, crates: &KitchenSink) -> Result<(), Box<dyn std::error::Error>> {
     let repo = Repo::new(line)?;
     if let RepoHost::GitHub(gh) = repo.host() {
-        print!("\nFetching {}/{}", gh.owner, gh.repo);
+        print!("\nFetching {}/{}…", gh.owner, gh.repo);
+        std::io::stdout().flush()?;
         let manifests = crates.inspect_repo_manifests(&repo)?;
-        println!("{} found", manifests.len());
+        println!(" {} found", manifests.len());
         for (path, _, manif) in manifests {
             if let Some(pkg) = &manif.package {
-                if let Some(d) = &pkg.description {
-                    println!("// {}", d);
+                if path.contains("example") {
+                    println!("// skip {} {}", path, pkg.name);
+                    continue;
                 }
                 if crates.crate_exists(&Origin::from_github(gh.clone(), pkg.name.as_str())) {
                     print!("// GIT alredy exists! ");
-                }
-                if crates.crate_exists(&Origin::from_crates_io_name(&pkg.name)) {
-                    print!("// crate alredy exists! https://lib.rs/crates/{} ", pkg.name);
+                } else {
+                    if crates.crate_exists(&Origin::from_crates_io_name(&pkg.name)) {
+                        print!("// crate alredy exists! https://lib.rs/crates/{} ", pkg.name);
+                        if let Some(d) = &pkg.description {
+                            print!("// {} // ", d.trim());
+                        }
+                    }
+                    else if let Some(d) = &pkg.description {
+                        println!("// {}", d.trim());
+                    }
                 }
                 println!("\"github:{}/{}/{}\",{}", gh.owner, gh.repo, pkg.name, if path != "" && path != pkg.name {format!(" // in {}", path)} else {String::new()});
             }

@@ -303,10 +303,10 @@ impl KitchenSink {
 
     pub fn all_new_crates(&self) -> CResult<Vec<RichCrate>> {
         let min_timestamp = self.crate_db.latest_crate_update_timestamp()?.unwrap_or(0);
-        let all: Vec<_> = self.index.all_crates().collect();
+        let all = self.index.crates_io_crates(); // too slow to scan all GH crates
         Ok(all.into_par_iter()
-        .filter_map(move |o| {
-            self.rich_crate(&o).map_err(|e| eprintln!("{:?}: {}", o, e)).ok()
+        .filter_map(move |(name, _)| {
+            self.rich_crate(&Origin::from_crates_io_name(&*name)).map_err(|e| eprintln!("{}: {}", name, e)).ok()
         })
         .filter(move |k| {
             let latest = k.versions().iter().map(|v| v.created_at.as_str()).max().unwrap_or("");

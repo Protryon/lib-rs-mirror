@@ -2,6 +2,7 @@
 @use crate::templates::labels;
 @use crate::cat_page::CatPage;
 @use rich_crate::Include;
+@use rich_crate::Origin;
 @use crate::Urler;
 @use crate::iter::*;
 
@@ -84,13 +85,13 @@
                 <li>
                     <a href="@url.krate(c)">
                         <div class=h>
-                            <h4>@c.short_name()</h4>
+                            <h4>@if let Origin::GitHub{ref repo,..} = c.origin() {@repo.owner/}@c.short_name()</h4>
                             @if let Some(desc) = c.description() {
                               <p class=desc>@p.render_markdown_str(desc)</p>
                             }
                         </div>
                         <div class=meta>
-                            <span class="version @p.version_class(c)"><span>v</span>@c.version()</span>
+                            <span class="version @p.version_class(c)"><span>@if let Origin::GitHub{..} = c.origin() {GitHub } else {v}</span>@c.version()</span>
                             @if *downloads >= 100 {
                               <span class=downloads title="@downloads recent downloads">@if let Some((num,unit)) = Some(p.downloads(*downloads)) {@num<b>@unit</b>}</span>
                             }

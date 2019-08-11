@@ -228,8 +228,8 @@ pub fn find_tagged_versions(repo: &Repository) -> Result<PackageVersionTimestamp
     let mut package_versions: PackageVersionTimestamps = HashMap::with_capacity(4);
     for commit in repo.tag_names(None)?.iter()
         .filter_map(|s| s)
-        .filter_map(|tag| repo.refname_to_id(&format!("refs/tags/{}", tag)).map_err(|e| eprintln!("bad tag {}: {}", tag, e)).ok())
-        .filter_map(|r| repo.find_commit(r).map_err(|e| eprintln!("bad commit {}: {}", r, e)).ok())
+        .filter_map(|tag| repo.find_reference(&format!("refs/tags/{}", tag)).map_err(|e| eprintln!("bad tag {}: {}", tag, e)).ok())
+        .filter_map(|r| r.peel_to_commit().map_err(|e| eprintln!("bad ref/tag: {}", e)).ok())
     {
         for (_, _, manifest) in find_manifests_in_tree(&repo, &commit.tree()?)?.0 {
             if let Some(pkg) = manifest.package {

@@ -206,6 +206,16 @@ impl CrateDb {
         })
     }
 
+    pub fn crate_versions(&self, origin: &Origin) -> FResult<Vec<(String, u32)>> {
+        self.with_connection("crate_versions", |conn| {
+            let mut q = conn.prepare("SELECT v.version, v.created FROM crates c JOIN crate_versions v ON v.crate_id = c.id WHERE c.origin = ?1")?;
+            let res = q.query_map(&[&origin.to_str()][..], |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })?;
+            Ok(res.collect::<Result<Vec<(String, u32)>>>()?)
+        })
+    }
+
     /// Add data of the latest version of a crate to the index
     /// Score is a ranking of a crate (0 = bad, 1 = great)
     pub fn index_latest(&self, c: CrateVersionData) -> FResult<()> {

@@ -341,38 +341,7 @@ impl KitchenSink {
                 let host = RepoHost::GitHub(repo.clone()).try_into().map_err(|_| KitchenSinkErr::CrateNotFound(origin.clone())).context("ghrepo host bad")?;
                 let cachebust = self.cachebust_string_for_repo(&host).context("ghrepo")?;
                 let gh = self.gh.repo(repo, &cachebust)?.ok_or_else(|| KitchenSinkErr::CrateNotFound(origin.clone())).context("ghrepo not found")?;
-                let releases = self.gh.releases(repo, &cachebust)?.ok_or_else(|| KitchenSinkErr::CrateNotFound(origin.clone())).context("releases not found")?;
-                let mut versions = releases.into_iter().filter_map(|r| {
-                    let date = r.published_at.or(r.created_at)?;
-                    let num = r.tag_name?;
-                    let num = num.trim_start_matches(|c:char| !c.is_numeric());
-                    // verify that it semver-parses
-                    let _ = SemVer::parse(num).map_err(|e| eprintln!("{}: ignoring {}, {}", package, num, e)).ok()?;
-                    Some(CrateVersion {
-                        num: num.to_string(),
-                        yanked: r.draft.unwrap_or(false),
-                        updated_at: date.clone(),
-                        created_at: date,
-                    })
-                }).collect::<Vec<_>>();
-                if versions.is_empty() {
-                    let checkout = crate_git_checkout::checkout(&host, &self.git_checkout_path)?;
-                    let mut pkg_ver = crate_git_checkout::find_versions(&checkout)?;
-                    if let Some(v) = pkg_ver.remove(&**package) {
-                        versions = v.into_iter().map(|(num, timestamp)| {
-                            let date = Utc.timestamp(timestamp, 0).to_rfc3339();
-                            CrateVersion {
-                                num,
-                                yanked: false,
-                                updated_at: date.clone(),
-                                created_at: date,
-                            }
-                        }).collect();
-                    }
-                    if versions.is_empty() {
-                        Err(KitchenSinkErr::CrateNotFound(origin.clone())).context("missing releases, even tags")?;
-                    }
-                }
+                let versions = self.get_repo_versions(origin, &host, &cachebust)?;
                 Ok(RichCrate::new(origin.clone(), gh.owner.into_iter().map(|o| {
                     CrateOwner {
                         id: 0,
@@ -387,6 +356,60 @@ impl KitchenSink {
                 versions))
             }
         }
+    }
+
+    fn get_repo_versions(&self, origin: &Origin, repo: &Repo, cachebust: &str) -> CResult<Vec<CrateVersion>> {
+        let (gh_repo, package) = match origin {
+            Origin::GitHub {repo, package} => (repo, package),
+            _ => unreachable!(),
+        };
+        let releases = self.gh.releases(&gh_repo, cachebust)?.ok_or_else(|| KitchenSinkErr::CrateNotFound(origin.clone())).context("releases not found")?;
+        let versions: Vec<_> = releases.into_iter().filter_map(|r| {
+            let date = r.published_at.or(r.created_at)?;
+            let num = r.tag_name?;
+            let num = num.trim_start_matches(|c:char| !c.is_numeric());
+            // verify that it semver-parses
+            let _ = SemVer::parse(num).map_err(|e| eprintln!("{:?}: ignoring {}, {}", origin, num, e)).ok()?;
+            Some(CrateVersion {
+                num: num.to_string(),
+                yanked: r.draft.unwrap_or(false),
+                updated_at: date.clone(),
+                created_at: date,
+            })
+        }).collect();
+        if !versions.is_empty() {
+            return Ok(versions);
+        }
+        let versions: Vec<_> = self.crate_db.crate_versions(origin)?.into_iter().map(|(num, timestamp)| {
+            let date = Utc.timestamp(timestamp as _, 0).to_rfc3339();
+            CrateVersion {
+                num,
+                yanked: false,
+                updated_at: date.clone(),
+                created_at: date,
+            }
+        }).collect();
+        if !versions.is_empty() {
+            return Ok(versions);
+        }
+        eprintln!("Need to scan repo {:?}", repo);
+        let checkout = crate_git_checkout::checkout(repo, &self.git_checkout_path)?;
+        let mut pkg_ver = crate_git_checkout::find_versions(&checkout)?;
+        if let Some(v) = pkg_ver.remove(&**package) {
+            let versions: Vec<_> = v.into_iter().map(|(num, timestamp)| {
+                let date = Utc.timestamp(timestamp, 0).to_rfc3339();
+                CrateVersion {
+                    num,
+                    yanked: false,
+                    updated_at: date.clone(),
+                    created_at: date,
+                }
+            }).collect();
+            if !versions.is_empty() {
+                return Ok(versions);
+            }
+        }
+        Err(KitchenSinkErr::CrateNotFound(origin.clone())).context("missing releases, even tags")?
     }
 
     /// Fudge-factor score proprtional to how many times a crate has been removed from some project

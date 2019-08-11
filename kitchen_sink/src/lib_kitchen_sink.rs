@@ -684,7 +684,7 @@ impl KitchenSink {
             // Delete the original docs.rs link, because we have our own
             // TODO: what if the link was to another crate or a subpage?
             if package.documentation.as_ref().map_or(false, |s| Self::is_docs_rs_link(s)) {
-                    if self.has_docs_rs(name, &package.version) {
+                    if self.has_docs_rs(&origin, &package.version) {
                     package.documentation = None; // docs.rs is not proper docs
                 }
             }
@@ -945,8 +945,11 @@ impl KitchenSink {
         d.starts_with("docs.rs/") || d.starts_with("crates.fyi/")
     }
 
-    pub fn has_docs_rs(&self, name: &str, ver: &str) -> bool {
-        self.docs_rs.builds(name, ver).unwrap_or(true) // fail open
+    pub fn has_docs_rs(&self, origin: &Origin, ver: &str) -> bool {
+        match origin {
+            Origin::CratesIo(name) => self.docs_rs.builds(name, ver).unwrap_or(true), // fail open
+            _ => false,
+        }
     }
 
     fn is_same_url<A: AsRef<str> + std::fmt::Debug>(a: Option<A>, b: Option<&String>) -> bool {

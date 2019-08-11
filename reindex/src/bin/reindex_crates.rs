@@ -205,7 +205,7 @@ fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersi
     let mut temp_inp = CrateTemporalInputs {
         versions: all.versions(),
         is_app: k.is_app(),
-        has_docs_rs: crates.has_docs_rs(k.short_name(), k.version()),
+        has_docs_rs: crates.has_docs_rs(k.origin(), k.version()),
         is_nightly: k.is_nightly(),
         downloads_per_month,
         downloads_per_month_minus_most_downloaded_user: downloads_per_month,
@@ -263,6 +263,12 @@ fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersi
 
     if is_deprecated(&k) {
         score *= 0.2;
+    }
+
+    match k.origin() {
+        Origin::CratesIo(_) => {},
+        // installation and usage of other crate sources is more limited
+        _ => score *= 0.75,
     }
 
     // k bye

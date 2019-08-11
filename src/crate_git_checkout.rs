@@ -238,6 +238,7 @@ pub fn find_versions(repo: &Repository) -> Result<PackageVersionTimestamps, fail
         }
     }
 
+    eprintln!("no tags, falling back to slow versions");
     if package_versions.is_empty() {
         return find_dependency_changes(repo, |_,_,_| {});
     }

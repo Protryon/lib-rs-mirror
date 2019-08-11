@@ -119,6 +119,8 @@
 "github:paritytech/polkadot/polkadot-cli",
 "github:paritytech/substrate/substrate-cli",
 "github:pcwalton/sprocketnes/sprocketnes",
+"github:rsaarelm/magog/vitral",
+"github:rsaarelm/magog/magog",
 "github:pingcap/tipb/tipb",
 "github:pop-os/system76-power/system76-power",
 "github:rawrasaur/rust-jdbc/jdbc",

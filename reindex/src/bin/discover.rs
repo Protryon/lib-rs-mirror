@@ -29,8 +29,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn check_repo(line: &str, crates: &KitchenSink) -> Result<(), Box<dyn std::error::Error>> {
     let repo = Repo::new(line)?;
     if let RepoHost::GitHub(gh) = repo.host() {
-        println!("\nFetching {}/{}", gh.owner, gh.repo);
+        print!("\nFetching {}/{}", gh.owner, gh.repo);
         let manifests = crates.inspect_repo_manifests(&repo)?;
+        println!("{} found", manifests.len());
         for (path, _, manif) in manifests {
             if let Some(pkg) = &manif.package {
                 if let Some(d) = &pkg.description {

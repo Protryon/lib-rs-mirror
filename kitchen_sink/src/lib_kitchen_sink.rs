@@ -357,7 +357,7 @@ impl KitchenSink {
                 }).collect::<Vec<_>>();
                 if versions.is_empty() {
                     let checkout = crate_git_checkout::checkout(&host, &self.git_checkout_path)?;
-                    let mut pkg_ver = crate_git_checkout::find_tagged_versions(&checkout)?;
+                    let mut pkg_ver = crate_git_checkout::find_versions(&checkout)?;
                     if let Some(v) = pkg_ver.remove(&**package) {
                         versions = v.into_iter().map(|(num, timestamp)| {
                             let date = Utc.timestamp(timestamp, 0).to_rfc3339();

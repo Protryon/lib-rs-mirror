@@ -1586,7 +1586,20 @@ impl KitchenSink {
     }
 
     fn crate_owners(&self, krate: &RichCrateVersion) -> CResult<Vec<CrateOwner>> {
-        self.crates_io_crate_owners(krate.short_name(), krate.version())
+        match krate.origin() {
+            Origin::CratesIo(name) => self.crates_io_crate_owners(name, krate.version()),
+            Origin::GitHub {repo, ..} => Ok(vec![
+                CrateOwner {
+                    id: 0,
+                    avatar: None,
+                    url: Default::default(),
+                    // FIXME: read from GH
+                    login: repo.owner.to_string(),
+                    kind: OwnerKind::User, // FIXME: crates-io uses teams, and we'd need to find the right team? is "owners" a guaranteed thing?
+                    name: None,
+                }
+            ]),
+        }
     }
 
     pub fn crates_io_crate_owners(&self, crate_name: &str, version: &str) -> CResult<Vec<CrateOwner>> {

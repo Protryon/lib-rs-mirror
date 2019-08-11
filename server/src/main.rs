@@ -83,7 +83,7 @@ fn run_server() -> Result<(), failure::Error> {
     let index = CrateSearchIndex::new(&data_dir)?;
 
     let state = Arc::new(ServerState {
-        render_pool: CpuPool::new_num_cpus(),
+        render_pool: CpuPool::new(8), // may be network-blocked, so not num CPUs
         search_pool: CpuPool::new_num_cpus(),
         markup,
         index,

@@ -4,6 +4,7 @@ use failure;
 use git2;
 use git2::build::RepoBuilder;
 use git2::{Blob, ObjectType, Reference, Tree};
+use git2::Commit;
 use lazy_static::lazy_static;
 use render_readme;
 use render_readme::{Markup, Readme};
@@ -219,6 +220,33 @@ fn path_in_repo_in_tree(repo: &Repository, tree: &Tree<'_>, crate_name: &str) ->
 struct State {
     since: Option<usize>,
     until: Option<usize>,
+}
+
+pub type PackageVersionTimestamps = HashMap<String, HashMap<String, i64>>;
+
+pub fn find_tagged_versions(repo: &Repository) -> Result<PackageVersionTimestamps, failure::Error> {
+    let mut package_versions: PackageVersionTimestamps = HashMap::with_capacity(4);
+    for commit in repo.tag_names(None)?.iter()
+        .filter_map(|s| s)
+        .filter_map(|tag| repo.refname_to_id(&format!("refs/tags/{}", tag)).map_err(|e| eprintln!("bad tag {}: {}", tag, e)).ok())
+        .filter_map(|r| repo.find_commit(r).map_err(|e| eprintln!("bad commit {}: {}", r, e)).ok())
+    {
+        for (_, _, manifest) in find_manifests_in_tree(&repo, &commit.tree()?)?.0 {
+            if let Some(pkg) = manifest.package {
+                add_package(&mut package_versions, pkg, &commit);
+            }
+        }
+    }
+
+    Ok(package_versions)
+}
+
+fn add_package(package_versions: &mut PackageVersionTimestamps, pkg: Package, commit: &Commit) {
+    // Find oldest occurence of each version, assuming it's a release date
+    let time_epoch = commit.time().seconds();
+    let ver_time = package_versions.entry(pkg.name).or_insert_with(HashMap::new)
+        .entry(pkg.version).or_insert(time_epoch);
+    *ver_time = (*ver_time).min(time_epoch);
 }
 
 /// Callback gets added, removed, number of commits ago.

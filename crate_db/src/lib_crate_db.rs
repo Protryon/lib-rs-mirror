@@ -1,6 +1,7 @@
 use categories;
 use chrono::prelude::*;
 use failure::*;
+use heck::KebabCase;
 use parking_lot::Mutex;
 use rich_crate::Derived;
 use rich_crate::Manifest;
@@ -166,7 +167,7 @@ impl CrateDb {
                 None => None,
             };
 
-            let keywords: HashSet<_> = package.keywords.iter().map(|s| s.to_lowercase()).collect();
+            let keywords: HashSet<_> = package.keywords.iter().filter(|k| !k.is_empty()).map(|s| s.to_kebab_case()).collect();
             let keywords_derived = if keywords.is_empty() {
                 Some(self.keywords_tx(conn, &origin).context("keywordsdb2")?)
             } else {
@@ -1035,7 +1036,7 @@ impl KeywordInsert {
         if word.is_empty() || weight <= 0.000001 {
             return;
         }
-        let word = word.to_lowercase().replace(' ', "-");
+        let word = word.to_kebab_case();
         if word == "rust" || word == "rs" {
             return;
         }

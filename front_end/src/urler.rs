@@ -1,4 +1,5 @@
 use categories::Category;
+use heck::KebabCase;
 use kitchen_sink::CrateAuthor;
 use kitchen_sink::UserType;
 use rich_crate::Origin;
@@ -87,7 +88,7 @@ impl Urler {
 
 
     pub fn keyword(&self, name: &str) -> String {
-        format!("/keywords/{}", encode(&name.to_lowercase()))
+        format!("/keywords/{}", encode(&name.to_kebab_case()))
     }
 
     /// First page of category listing

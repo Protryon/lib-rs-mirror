@@ -21,6 +21,7 @@ thread_local = "0.3.6"
 parking_lot = "0.9"
 rake = { git = "https://github.com/kornelski/rake-rs" }
 rmp-serde = "0.14"
+heck = "0.3.1"
 
 [dev-dependencies]
 tempfile = "3.1.0"

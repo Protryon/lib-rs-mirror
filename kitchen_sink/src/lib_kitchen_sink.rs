@@ -772,6 +772,8 @@ impl KitchenSink {
         let direct_dependencies = &manifest.dependencies;
         let has_cargo_bin = manifest.has_cargo_bin();
         let package = manifest.package.as_mut().expect("pkg");
+        let eq = |a:&str,b:&str| -> bool {a.eq_ignore_ascii_case(b)};
+
         for cat in &mut package.categories {
             if cat.as_bytes().iter().any(|c| !c.is_ascii_lowercase()) {
                 *cat = cat.to_lowercase();
@@ -797,22 +799,22 @@ impl KitchenSink {
                 }
             }
             if cat == "cryptography" || cat == "database" || cat == "rust-patterns" || cat == "development-tools" {
-                if package.keywords.iter().any(|k| k == "bitcoin" || k == "ethereum" || k == "ledger" || k == "exonum" || k == "blockchain") {
+                if package.keywords.iter().any(|k| eq(k,"bitcoin") || eq(k,"ethereum") || eq(k,"ledger") || eq(k,"exonum") || eq(k,"blockchain")) {
                     *cat = "cryptography::cryptocurrencies".into();
                 }
             }
             if cat == "games" {
                 if package.keywords.iter().any(|k| {
-                    k == "game-dev" || k == "game-development" || k == "gamedev" || k == "framework" || k == "utilities" || k == "parser" || k == "api"
+                    k == "game-dev" || k == "game-development" || eq(k,"gamedev") || eq(k,"framework") || eq(k,"utilities") || eq(k,"parser") || eq(k,"api")
                 }) {
                     *cat = "game-engines".into();
                 }
             }
             if cat == "science" || cat == "algorithms" {
-                if package.keywords.iter().any(|k| k == "neural-network" || k == "machine-learning" || k == "deep-learning") {
+                if package.keywords.iter().any(|k| k == "neural-network" || eq(k,"machine-learning") || eq(k,"neuralnetworks") || eq(k,"neuralnetwork") || eq(k,"tensorflow") || eq(k,"deep-learning")) {
                     *cat = "science::ml".into();
                 } else if package.keywords.iter().any(|k| {
-                    k == "math" || k == "calculus" || k == "algebra" || k == "linear-algebra" || k == "mathematics" || k == "maths" || k == "number-theory"
+                    k == "math" || eq(k,"calculus") || eq(k,"algebra") || eq(k,"linear-algebra") || eq(k,"mathematics") || eq(k,"maths") || eq(k,"number-theory")
                 }) {
                     *cat = "science::math".into();
                 }

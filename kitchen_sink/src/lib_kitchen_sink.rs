@@ -680,11 +680,11 @@ impl KitchenSink {
             });
         }
 
-        if let Origin::CratesIo(name) = &origin {
+        if let Origin::CratesIo(_) = &origin {
             // Delete the original docs.rs link, because we have our own
             // TODO: what if the link was to another crate or a subpage?
             if package.documentation.as_ref().map_or(false, |s| Self::is_docs_rs_link(s)) {
-                    if self.has_docs_rs(&origin, &package.version) {
+                if self.has_docs_rs(&origin, &package.version) {
                     package.documentation = None; // docs.rs is not proper docs
                 }
             }

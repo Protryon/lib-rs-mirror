@@ -23,6 +23,10 @@ fn main() {
         },
     });
     let renderer = Arc::new(Renderer::new(None));
+    let pre = std::thread::spawn({
+        let crates = crates.clone();
+        move || crates.prewarm()
+    });
 
     let everything = std::env::args().nth(1).map_or(false, |a| a == "--all");
     let specific: Vec<_> = if !everything {
@@ -57,6 +61,7 @@ fn main() {
     });
 
     let seen_repos = &Mutex::new(HashSet::new());
+    let _ = pre.join().unwrap();
     rayon::scope(move |s1| {
         let c = if everything {
             let mut c: Vec<_> = crates.all_crates().collect::<Vec<_>>();

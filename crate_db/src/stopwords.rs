@@ -54,6 +54,7 @@ lazy_static! {
         ("windows", Some(&["gnu"])),
         ("iterator", Some(&["window"])),
         ("web", Some(&["windows", "macos", "mac", "osx", "linux"])),
+        ("macos", Some(&["core"])),
         ("wasm", Some(&["embedded", "javascript", "no-std", "no_std", "feature:no_std"])),
         ("javascript", Some(&["embedded", "no-std", "no_std", "feature:no_std"])),
         ("webassembly", Some(&["embedded", "javascript", "no-std", "no_std", "feature:no_std"])),

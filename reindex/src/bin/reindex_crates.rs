@@ -125,7 +125,7 @@ fn index_crate(crates: &KitchenSink, c: &Origin, renderer: &Renderer, search_sen
 
     let (downloads_per_month, score) = crate_overall_score(crates, &k, &v, renderer, contributors_count);
     crates.index_crate(&k, score)?;
-    search_sender.send((v.clone(), downloads_per_month, score))?;
+    search_sender.send((v.clone(), downloads_per_month, score)).expect("closed channel?");
     Ok(v)
 }
 
@@ -347,12 +347,16 @@ fn is_deprecated(k: &RichCrateVersion) -> bool {
 
 fn print_res<T>(res: Result<T, failure::Error>) {
     if let Err(e) = res {
-        eprintln!("••• Error: {}", e);
+        let s = e.to_string();
+        if s.starts_with("Too many open files") {
+            panic!(s);
+        }
+        eprintln!("••• Error: {}", s);
         for c in e.iter_chain().skip(1) {
             let s = c.to_string();
             eprintln!("•   error: -- {}", s);
             if s.starts_with("Too many open files") {
-                std::process::exit(7);
+                panic!(s);
             }
         }
     }

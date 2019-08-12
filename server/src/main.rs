@@ -285,7 +285,7 @@ fn handle_gh_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpRespon
     let repo: String = inf.query("repo").expect("arg2");
     let crate_name: String = inf.query("crate").expect("arg3");
     println!("GH crate {}/{}/{}", owner, repo, crate_name);
-    if !is_alnum(&owner) || !is_alnum(&repo) || !is_alnum(&crate_name) {
+    if !is_alnum(&owner) || !is_alnum_dot(&repo) || !is_alnum(&crate_name) {
         return Box::new(future::result(render_404_page(&state, &crate_name)));
     }
 
@@ -445,6 +445,14 @@ fn map_err(err: tokio_timer::timeout::Error<failure::Error>) -> failure::Error {
 
 fn is_alnum(q: &str) -> bool {
     q.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+}
+
+fn is_alnum_dot(q: &str) -> bool {
+    let mut chars = q.chars();
+    if !chars.next().map_or(false, |first| first.is_ascii_alphanumeric() || first == '_') {
+        return false;
+    }
+    chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.')
 }
 
 fn handle_search(req: &HttpRequest<AServerState>) -> Result<HttpResponse> {

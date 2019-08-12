@@ -1,4 +1,4 @@
-use kitchen_sink::Origin;
+use rich_crate::Origin;
 use std::cmp::Ordering;
 use std::{fs, path::Path};
 use tantivy::{self, collector::TopDocs, query::QueryParser, schema::*, Index, IndexWriter};

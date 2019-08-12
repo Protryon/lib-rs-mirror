@@ -10,6 +10,6 @@ path = "src/lib_search_index.rs"
 
 [dependencies]
 tantivy = "0.10"
-kitchen_sink = { path = "../kitchen_sink", version = "0.8" }
+rich_crate = { path = "../rich_crate" }
 rayon = "1.0.3"
 rand = "0.7"

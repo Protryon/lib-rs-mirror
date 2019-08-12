@@ -702,9 +702,15 @@ impl KitchenSink {
         if let Some(ref crate_repo) = maybe_repo {
             if let Some(ghrepo) = self.github_repo(crate_repo)? {
                 if package.homepage.is_none() {
-                    if let Some(url) = ghrepo.github_page_url {
+                    if let Some(url) = ghrepo.homepage {
+                        let also_add_docs = package.documentation.is_none() && ghrepo.github_page_url.as_ref().map_or(false, |p| p != &url);
                         package.homepage = Some(url);
-                    } else if let Some(url) = ghrepo.homepage {
+                        if also_add_docs {
+                            if let Some(url) = ghrepo.github_page_url {
+                                package.documentation = Some(url);
+                            }
+                        }
+                    } else if let Some(url) = ghrepo.github_page_url {
                         package.homepage = Some(url);
                     }
                     warnings.extend(self.remove_redundant_links(package, maybe_repo.as_ref()));
@@ -737,7 +743,6 @@ impl KitchenSink {
 
         let has_buildrs = meta.has("build.rs");
         let has_code_of_conduct = meta.has("CODE_OF_CONDUCT.md") || meta.has("docs/CODE_OF_CONDUCT.md") || meta.has(".github/CODE_OF_CONDUCT.md");
-
         let derived = Derived {
             capitalized_name,
             language_stats: meta.language_stats,
@@ -1623,7 +1628,8 @@ impl KitchenSink {
                 CrateOwner {
                     id: 0,
                     avatar: None,
-                    url: Default::default(),
+                    // FIXME: read from GH
+                    url: format!("https://github.com/{}", repo.owner),
                     // FIXME: read from GH
                     login: repo.owner.to_string(),
                     kind: OwnerKind::User, // FIXME: crates-io uses teams, and we'd need to find the right team? is "owners" a guaranteed thing?

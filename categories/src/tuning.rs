@@ -432,7 +432,7 @@ lazy_static! {
             &[("emulators", 1.25, 0.15), ("games", 0.7, 0.), ("no-std", 0.9, 0.), ("email", 0.8, 0.), ("concurrency", 0.7, 0.), ("text-processing", 0.5, 0.), ("parser-implementations", 0.9, 0.),
             ("multimedia::images", 0.5, 0.), ("no-std", 0.8, 0.), ("command-line-interface", 0.5, 0.), ("multimedia::video", 0.5, 0.), ("command-line-utilities", 0.75, 0.)]),
         (Cond::Any(&["qemu", "vm", "codegen"]), &[("emulators", 1.4, 0.1), ("parser-implementations", 0.9, 0.), ("parsing", 0.5, 0.), ("development-tools", 1.1, 0.), ("multimedia::video", 0.5, 0.), ("multimedia::encoding", 0.8, 0.), ("wasm", 0.8, 0.)]),
-        (Cond::Any(&["z80", "c64", "spc700", "snes", "gameboy", "game-boy", "gba", "nintendo", "mos6502", "6502", "commodore", "nes", "atari"]), &[("emulators", 1.3, 0.1), ("wasm", 0.7, 0.)]),
+        (Cond::Any(&["z80", "c64", "spc700", "snes", "gameboy", "game-boy", "gba", "nintendo", "mos6502", "6502", "commodore", "nes", "atari"]), &[("emulators", 1.3, 0.1), ("wasm", 0.5, 0.)]),
         (Cond::All(&["virtual", "machine"]), &[("emulators", 1.4, 0.1)]),
         (Cond::All(&["game", "gb"]), &[("emulators", 1.2, 0.05), ("wasm", 0.8, 0.)]),
         (Cond::All(&["commodore", "64"]), &[("emulators", 1.3, 0.1), ("wasm", 0.8, 0.)]),
@@ -950,7 +950,7 @@ lazy_static! {
         (Cond::Any(&["has:bin"]), &[("command-line-interface", 0.6, 0.)]),
         (Cond::Any(&["dep:ansi_term", "dep:pager"]), &[("command-line-utilities", 1.1, 0.1)]),
 
-        (Cond::NotAny(&["web", "html", "js", "javascript", "json", "jwt", "proxy", "apache", "rpc", "rest", "thrift", "serverless", "graphql", "lambda", "aws", "mime", "wordpress", "rss", "atom", "xml", "css", "xss", "rocket", "webhook", "conduit", "hyper", "nodejs", "asmjs", "browser", "front-end", "ipfs", "youtube", "google", "jsonrpc", "jsonapi", "http-api", "json-api", "dep:actix-web"]),
+        (Cond::NotAny(&["web", "html", "js", "javascript", "json", "jwt", "proxy", "apache", "rpc", "rest", "k8s", "containers", "kubernetes", "thrift", "serverless", "graphql", "lambda", "aws", "mime", "wordpress", "rss", "atom", "xml", "css", "xss", "rocket", "webhook", "conduit", "hyper", "nodejs", "asmjs", "browser", "front-end", "ipfs", "youtube", "google", "jsonrpc", "jsonapi", "http-api", "json-api", "dep:actix-web"]),
             &[("web-programming", 0.8, 0.)]),
         (Cond::NotAny(&["web", "http", "http2", "api", "fetch", "http-client", "serverless", "graphql", "lambda", "s3", "aws", "client", "rest", "thrift", "gotham", "hyper", "request", "json", "jsonrpc", "jsonapi", "rpc", "curl", "tls", "requests", "http-api", "json-api"]),
             &[("web-programming::http-client", 0.8, 0.)]),
@@ -1011,7 +1011,8 @@ lazy_static! {
         (Cond::Any(&["json"]), &[("web-programming", 1.1, 0.1), ("algorithms", 0.8, 0.), ("command-line-utilities", 0.75, 0.), ("text-processing", 0.8, 0.)]),
         (Cond::Any(&["protocol", "network", "socket", "wifi", "wi-fi"]), &[
             ("network-programming", 1.2, 0.2), ("parsing", 0.8, 0.), ("os::windows-apis", 0.9, 0.), ("rendering::data-formats", 0.4, 0.), ("command-line-utilities", 0.75, 0.)]),
-        (Cond::Any(&["protobuf", "proto"]), &[("network-programming", 1.2, 0.2), ("encoding", 1.2, 0.2), ("command-line-utilities", 0.75, 0.)]),
+        (Cond::Any(&["protobuf", "protocol-buffers", "proto"]), &[("network-programming", 1.2, 0.2), ("encoding", 1.2, 0.2), ("command-line-utilities", 0.75, 0.)]),
+        (Cond::All(&["protocol", "buffers"]), &[("network-programming", 1.2, 0.1), ("encoding", 1.2, 0.1)]),
         (Cond::Any(&["p2p", "digitalocean"]), &[("network-programming", 1.4, 0.2), ("command-line-utilities", 0.75, 0.), ("development-tools", 0.75, 0.), ("multimedia", 0.5, 0.)]),
 
         (Cond::All(&["graphics", "gpu"]), &[("rendering::graphics-api", 1.34, 0.1)]),

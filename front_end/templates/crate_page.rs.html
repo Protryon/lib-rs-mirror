@@ -194,7 +194,11 @@
                 }
               }
               <p>
-                @if let Some(dl) = c.downloads_per_month() {<b>@c.format_number(dl)</b> downloads per month}
+                @if let Some(dl) = c.downloads_per_month() {
+                  @if dl > 20 {
+                    <b>@c.format_number(dl)</b> downloads per month
+                  }
+                }
                 @if let Some((deps, direct)) = c.dependents_stats() {
                   <br>
                     @if deps != direct {

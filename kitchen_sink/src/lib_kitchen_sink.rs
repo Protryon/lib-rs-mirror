@@ -564,8 +564,13 @@ impl KitchenSink {
         let mut meta = tarball::read_repo(&checkout, tree_id)?;
         debug_assert_eq!(meta.manifest.package, manifest.package);
         let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
+
         // Allowing any other URL would allow spoofing
         package.repository = Some(repo.canonical_git_url().into_owned());
+        meta.readme.as_mut().map(|readme| {
+            readme.base_url = Some(repo.readme_base_url(&path_in_repo));
+            readme.base_image_url = Some(repo.readme_base_image_url(&path_in_repo));
+        });
 
         self.rich_crate_version_data_common(origin.clone(), meta, Some(path_in_repo), 0, false, HashSet::new())
     }

@@ -1,7 +1,7 @@
 use either::*;
 use failure;
 use kitchen_sink::RichCrate;
-use kitchen_sink::{self, stopped, Include, KitchenSink, MaintenanceStatus, Origin, RichCrateVersion};
+use kitchen_sink::{self, stopped, stop, Include, KitchenSink, MaintenanceStatus, Origin, RichCrateVersion};
 use parking_lot::Mutex;
 use rand::{seq::SliceRandom, thread_rng};
 use ranking::CrateTemporalInputs;
@@ -125,7 +125,7 @@ fn index_crate(crates: &KitchenSink, c: &Origin, renderer: &Renderer, search_sen
 
     let (downloads_per_month, score) = crate_overall_score(crates, &k, &v, renderer, contributors_count);
     crates.index_crate(&k, score)?;
-    search_sender.send((v.clone(), downloads_per_month, score)).expect("closed channel?");
+    search_sender.send((v.clone(), downloads_per_month, score)).map_err(|e| {stop();e}).expect("closed channel?");
     Ok(v)
 }
 
@@ -349,6 +349,7 @@ fn print_res<T>(res: Result<T, failure::Error>) {
     if let Err(e) = res {
         let s = e.to_string();
         if s.starts_with("Too many open files") {
+            stop();
             panic!(s);
         }
         eprintln!("••• Error: {}", s);
@@ -356,6 +357,7 @@ fn print_res<T>(res: Result<T, failure::Error>) {
             let s = c.to_string();
             eprintln!("•   error: -- {}", s);
             if s.starts_with("Too many open files") {
+                stop();
                 panic!(s);
             }
         }

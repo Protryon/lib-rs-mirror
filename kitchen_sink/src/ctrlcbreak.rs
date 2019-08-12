@@ -11,17 +11,19 @@ pub fn dont_hijack_ctrlc() {
     INIT.call_once(|| {});
 }
 
+pub fn stop() {
+    let stops = STOPPED.fetch_add(1, Ordering::SeqCst);
+    if stops > 1 {
+        eprintln!("STOPPING");
+        if stops > 3 {
+            process::exit(1);
+        }
+    }
+}
+
 pub fn stopped() -> bool {
     INIT.call_once(|| {
-        ctrlc::set_handler(move || {
-            let stops = STOPPED.fetch_add(1, Ordering::SeqCst);
-            if stops > 1 {
-                eprintln!("STOPPING");
-                if stops > 3 {
-                    process::exit(1);
-                }
-            }
-        })
+        ctrlc::set_handler(stop)
         .expect("Error setting Ctrl-C handler");
     });
     STOPPED.load(Ordering::Relaxed) > 0

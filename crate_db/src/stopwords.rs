@@ -75,9 +75,11 @@ lazy_static! {
         ("embedded", Some(&["no-std", "no_std", "feature:no_std"])),
         ("arm", Some(&["no-std", "no_std", "feature:no_std"])),
         ("float", Some(&["math"])),
-        ("emulator", Some(&["6502"])),
+        ("c64", Some(&["terminal", "core"])),
+        ("emulator", Some(&["6502", "core", "gpu", "color", "timer"])),
         ("garbage", Some(&["tracing"])),
         ("terminal", Some(&["math", "emulator"])),
+        ("terminal-emulator", Some(&["math", "emulator"])),
         ("editor", Some(&["terminal"])),
         ("build", Some(&["logic"])), // confuses categorization
         ("messaging", Some(&["matrix"])), // confuses categorization

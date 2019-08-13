@@ -19,7 +19,7 @@ Crates [published](https://doc.rust-lang.org/cargo/reference/publishing.html) to
 
 ## Contributing
 
-The site is open source. It aims to be friendly and will enforce [Code of Conduct](CODE_OF_CONDUCT.md) to Rust's high standards. Rust begginers are welcome. Contributions beyond just code, such as UX and design, are appreciated.
+The site is open source. It aims to be friendly and will enforce [Code of Conduct](CODE_OF_CONDUCT.md) to Rust's high standards. Rust beginners are welcome. Contributions beyond just code, such as UX and design, are appreciated.
 
 If you'd like to help improve it:
 

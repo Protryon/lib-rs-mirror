@@ -43,9 +43,9 @@ semver = "0.9.0"
 ctrlc = "3.1.1"
 flate2 = "1.0.6"
 string-interner = "0.7.0"
-fxhash = "0.2.1"
 parking_lot = "0.9"
 udedokei = { path = "../udedokei" }
 tar = "0.4.15"
 libflate = "0.1.14"
+ahash = "0.2.12"
 

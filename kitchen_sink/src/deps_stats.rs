@@ -1,11 +1,12 @@
 use crate::index::*;
 use crate::KitchenSinkErr;
 use crates_index::Crate;
-use fxhash::FxHashMap;
-use fxhash::FxHashSet;
 use parking_lot::Mutex;
 use rayon::prelude::*;
 use string_interner::Sym;
+
+type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::ABuildHasher>;
+type FxHashSet<V> = std::collections::HashSet<V, ahash::ABuildHasher>;
 
 pub type DepInfMap = FxHashMap<Box<str>, (DepInf, MiniVer)>;
 

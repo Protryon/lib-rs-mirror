@@ -46,7 +46,6 @@ use crate::tarball::CrateFile;
 use crates_index::Version;
 use crates_io_client::CrateOwner;
 use failure::ResultExt;
-use fxhash::FxHashMap;
 use github_info::GitCommitAuthor;
 use github_info::GitHubRepo;
 use itertools::Itertools;
@@ -73,6 +72,8 @@ use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
+
+type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::ABuildHasher>;
 
 pub type CError = failure::Error;
 pub type CResult<T> = Result<T, CError>;

@@ -5,7 +5,6 @@ use crate::KitchenSinkErr;
 use crates_index;
 use crates_index::Crate;
 use crates_index::Version;
-use fxhash::{FxHashMap, FxHashSet};
 use lazyonce::LazyOnce;
 use parking_lot::Mutex;
 use parking_lot::RwLock;
@@ -18,6 +17,9 @@ use std::sync::Arc;
 use std::time::Duration;
 use string_interner::StringInterner;
 use string_interner::Sym;
+
+type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::ABuildHasher>;
+type FxHashSet<V> = std::collections::HashSet<V, ahash::ABuildHasher>;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct MiniVer {

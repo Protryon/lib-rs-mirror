@@ -1,10 +1,11 @@
 use crate::KitchenSinkErr;
 use crate::Origin;
-use fxhash::FxHashSet;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 use std::path::PathBuf;
+
+type FxHashSet<V> = std::collections::HashSet<V, ahash::ABuildHasher>;
 
 pub struct GitIndex {
     #[allow(unused)]

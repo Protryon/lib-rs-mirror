@@ -575,18 +575,28 @@ impl KitchenSink {
                 KitchenSinkErr::CrateNotFoundInRepo(package.to_string(), repo.canonical_git_url().into_owned())
             })?;
 
+        let mut warnings = HashSet::new();
+
         let mut meta = tarball::read_repo(&checkout, tree_id)?;
         debug_assert_eq!(meta.manifest.package, manifest.package);
         let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
 
         // Allowing any other URL would allow spoofing
         package.repository = Some(repo.canonical_git_url().into_owned());
+
+        let has_readme = meta.readme.is_some();
+        if !has_readme {
+            let maybe_repo = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
+            warnings.insert(Warning::NoReadmeProperty);
+            warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()));
+        }
+
         meta.readme.as_mut().map(|readme| {
             readme.base_url = Some(repo.readme_base_url(&path_in_repo));
             readme.base_image_url = Some(repo.readme_base_image_url(&path_in_repo));
         });
 
-        self.rich_crate_version_data_common(origin.clone(), meta, Some(path_in_repo), 0, false, HashSet::new())
+        self.rich_crate_version_data_common(origin.clone(), meta, Some(path_in_repo), 0, false, warnings)
     }
 
     fn rich_crate_version_data_from_crates_io(&self, latest: &crates_index::Version) -> CResult<(RichCrateVersionCacheData, Warnings)> {

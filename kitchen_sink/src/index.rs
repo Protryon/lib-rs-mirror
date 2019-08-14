@@ -80,7 +80,7 @@ impl Index {
     pub fn crates_io_crates(&self) -> &FxHashMap<Box<str>, Crate> {
         self.indexed_crates.get(|| {
             self.crates_io_index.crates()
-                .map(|c| (c.name().into(), c))
+                .map(|c| (c.name().to_ascii_lowercase().into(), c))
                 .collect()
         })
     }

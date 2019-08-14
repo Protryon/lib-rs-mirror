@@ -246,6 +246,6 @@
 "gitlab:veloren/veloren/veloren-server",
 "gitlab:veloren/veloren/veloren-server-cli",
 "gitlab:veloren/veloren/veloren-voxygen",
-"gitlab:veloren/veloren/veloren-world"
-"gitlab:vzaa/craycray/craycray",
+"gitlab:veloren/veloren/veloren-world",
+"gitlab:vzaa/craycray/craycray"
 ]

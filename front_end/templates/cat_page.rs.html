@@ -85,7 +85,7 @@
                 <li>
                     <a href="@url.krate(c)">
                         <div class=h>
-                            <h4>@if let Origin::GitHub{ref repo,..} = c.origin() {@repo.owner/}@c.short_name()</h4>
+                            <h4>@if let Some((repo, _)) = c.origin().repo() {@repo.owner/}@c.short_name()</h4>
                             @if let Some(desc) = c.description() {
                               <p class=desc>@p.render_markdown_str(desc)</p>
                             }

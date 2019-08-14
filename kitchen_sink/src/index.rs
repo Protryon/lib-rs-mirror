@@ -86,7 +86,7 @@ impl Index {
     pub fn crate_exists(&self, origin: &Origin) -> bool {
         match origin {
             Origin::CratesIo(name) => self.crates_io_crate_by_name(name).is_ok(),
-            Origin::GitHub {..} => self.git_index.has(origin),
+            Origin::GitHub {..} | Origin::GitLab {..} => self.git_index.has(origin),
         }
     }
 

@@ -19,13 +19,15 @@ pub use repo_url::SimpleRepo;
 pub enum Origin {
     CratesIo(Box<str>),
     GitHub { repo: SimpleRepo, package: Box<str> },
+    GitLab { repo: SimpleRepo, package: Box<str> },
 }
 
 impl fmt::Debug for Origin {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Origin::CratesIo(name) => write!(f, "Origin( lib.rs/{} )", name),
-            Origin::GitHub {repo, package} => write!(f, "Origin( github.com/{}/{}#{} )", repo.owner, repo.repo, package),
+            Origin::GitHub {repo, package} => write!(f, "Origin( github.com/{}/{} {} )", repo.owner, repo.repo, package),
+            Origin::GitLab {repo, package} => write!(f, "Origin( gitlab.com/{}/{} {} )", repo.owner, repo.repo, package),
         }
     }
 }
@@ -37,6 +39,10 @@ impl Origin {
 
     pub fn from_github(repo: SimpleRepo, package: impl Into<Box<str>>) -> Self {
         Origin::GitHub { repo, package: package.into() }
+    }
+
+    pub fn from_gitlab(repo: SimpleRepo, package: impl Into<Box<str>>) -> Self {
+        Origin::GitLab { repo, package: package.into() }
     }
 
     pub fn from_repo(r: &Repo, package: &str) -> Option<Self> {
@@ -52,12 +58,16 @@ impl Origin {
         let host = n.next().unwrap();
         match host {
             "crates.io" => Self::from_crates_io_name(n.next().expect("parse")),
-            "github" => {
+            "github" | "gitlab" => {
                 let mut n = n.next().expect("parse").splitn(3, "/");
                 let owner = n.next().expect("parse").into();
                 let repo = n.next().expect("parse").into();
                 let package = n.next().expect("parse");
-                Self::from_github(SimpleRepo {owner, repo}, package)
+                if host == "github" {
+                    Self::from_github(SimpleRepo {owner, repo}, package)
+                } else {
+                    Self::from_gitlab(SimpleRepo {owner, repo}, package)
+                }
             },
             _ => panic!("bad str {}", s),
         }
@@ -67,13 +77,41 @@ impl Origin {
         match *self {
             Origin::CratesIo(ref s) => format!("crates.io:{}", s),
             Origin::GitHub { ref repo, ref package } => format!("github:{}/{}/{}", repo.owner, repo.repo, package),
+            Origin::GitLab { ref repo, ref package } => format!("gitlab:{}/{}/{}", repo.owner, repo.repo, package),
         }
     }
 
     pub fn short_crate_name(&self) -> &str {
         match *self {
             Origin::CratesIo(ref s) => s,
-            Origin::GitHub { ref package, .. } => package,
+            Origin::GitHub { ref package, .. } |
+            Origin::GitLab { ref package, .. } => package,
+        }
+    }
+
+    #[inline]
+    pub fn is_crates_io(&self) -> bool {
+        match self {
+            Origin::CratesIo(_) => true,
+            _ => false,
+        }
+    }
+
+    #[inline]
+    pub fn repo(&self) -> Option<(&SimpleRepo, &str)> {
+        match *self {
+            Origin::CratesIo(_) => None,
+            Origin::GitHub { ref package, ref repo } |
+            Origin::GitLab { ref package, ref repo } => Some((repo, package)),
+        }
+    }
+
+    #[inline]
+    pub fn into_repo(self) -> Option<(RepoHost, Box<str>)> {
+        match self {
+            Origin::CratesIo(_) => None,
+            Origin::GitHub { package, repo } => Some((RepoHost::GitHub(repo), package)),
+            Origin::GitLab { package, repo } => Some((RepoHost::GitLab(repo), package)),
         }
     }
 }

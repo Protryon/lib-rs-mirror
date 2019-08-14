@@ -427,7 +427,7 @@ lazy_static! {
         (Cond::Any(&["dot", "graph"]), &[("visualization", 1.3, 0.)]),
         (Cond::Any(&["gnuplot", "chart", "plot"]),
             &[("visualization", 1.3, 0.3), ("science::math", 0.75, 0.), ("science", 0.8, 0.), ("command-line-interface", 0.5, 0.), ("command-line-utilities", 0.75, 0.), ("caching", 0.5, 0.)]),
-        (Cond::Any(&["aws", "s3", "cpython", "interpreter", "pdf", "derive"]), &[("visualization", 0.8, 0.)]),
+        (Cond::Any(&["aws", "s3", "cpython", "interpreter", "pdf", "derive"]), &[("visualization", 0.8, 0.), ("filesystem", 0.8, 0.)]),
 
         (Cond::Any(&["security", "disassemlber"]), &[("emulators", 0.6, 0.), ("multimedia::encoding", 0.8, 0.), ("os::macos-apis", 0.5, 0.)]),
         (Cond::Any(&["interpreter", "jit", "zx", "gameboy", "super-nintendo", "emulator"]),
@@ -800,7 +800,7 @@ lazy_static! {
 
         (Cond::Any(&["cli"]), &[("command-line-utilities", 1.1, 0.), ("command-line-interface", 1.1, 0.), ("rust-patterns", 0.6, 0.)]),
         (Cond::Any(&["tui"]), &[("command-line-interface", 1.1, 0.05)]),
-        (Cond::Any(&["dep:clap", "dep:docopt", "dep:structopt"]), &[("command-line-utilities", 1.1, 0.), ("command-line-interface", 0.9, 0.)]),
+        (Cond::Any(&["dep:clap", "dep:docopt", "dep:structopt", "dep:ncurses"]), &[("command-line-utilities", 1.1, 0.), ("command-line-interface", 0.9, 0.)]),
         (Cond::All(&["curses", "interface"]), &[("command-line-interface", 1.1, 0.05)]),
         (Cond::All(&["terminal", "ui"]), &[("command-line-interface", 1.1, 0.)]),
         (Cond::Any(&["terminal", "ncurses", "curses", "ansi", "progressbar", "vt100", "ansi_term"]),

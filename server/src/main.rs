@@ -127,7 +127,8 @@ fn run_server() -> Result<(), failure::Error> {
             .resource("/index", |r| r.method(Method::GET).f(handle_search)) // old crates.rs/index url
             .resource("/keywords/{keyword}", |r| r.method(Method::GET).f(handle_keyword))
             .resource("/crates/{crate}", |r| r.method(Method::GET).f(handle_crate))
-            .resource("/gh/{owner}/{repo}/{crate}", |r| r.method(Method::GET).f(handle_gh_crate))
+            .resource("/gh/{owner}/{repo}/{crate}", |r| r.method(Method::GET).f(handle_github_crate))
+            .resource("/lab/{owner}/{repo}/{crate}", |r| r.method(Method::GET).f(handle_gitlab_crate))
             .resource("/atom.xml", |r| r.method(Method::GET).f(handle_feed))
             .resource("/sitemap.xml", |r| r.method(Method::GET).f(handle_sitemap))
             .handler("/", fs::StaticFiles::new(&public_document_root).expect("public directory")
@@ -278,21 +279,33 @@ fn handle_home(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> 
     .responder()
 }
 
-fn handle_gh_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
+fn handle_github_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
+    handle_git_crate(req, "gh")
+}
+fn handle_gitlab_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
+    handle_git_crate(req, "lab")
+}
+
+fn handle_git_crate(req: &HttpRequest<AServerState>, slug: &'static str) -> FutureResponse<HttpResponse> {
     let inf = req.match_info();
     let state = Arc::clone(req.state());
     let owner: String = inf.query("owner").expect("arg1");
     let repo: String = inf.query("repo").expect("arg2");
     let crate_name: String = inf.query("crate").expect("arg3");
-    println!("GH crate {}/{}/{}", owner, repo, crate_name);
+    println!("{} crate {}/{}/{}", slug, owner, repo, crate_name);
     if !is_alnum(&owner) || !is_alnum_dot(&repo) || !is_alnum(&crate_name) {
         return Box::new(future::result(render_404_page(&state, &crate_name)));
     }
 
-    let cache_file = state.page_cache_dir.join(format!("gh,{},{},{}.html", owner, repo, crate_name));
-    let origin = Origin::from_github(SimpleRepo::new(owner.as_str(), repo.as_str()), crate_name);
+    let cache_file = state.page_cache_dir.join(format!("{},{},{},{}.html", slug, owner, repo, crate_name));
+    let origin = match slug {
+        "gh" => Origin::from_github(SimpleRepo::new(owner.as_str(), repo.as_str()), crate_name),
+        _ => Origin::from_gitlab(SimpleRepo::new(owner.as_str(), repo.as_str()), crate_name),
+    };
     if !state.crates.load().crate_exists(&origin) {
-        return Box::new(future::ok(HttpResponse::TemporaryRedirect().header("Location", format!("https://github.com/{}/{}", owner, repo)).finish()));
+        let (repo, _) = origin.into_repo().expect("repohost");
+        let url = repo.canonical_http_url("").expect("repohost");
+        return Box::new(future::ok(HttpResponse::TemporaryRedirect().header("Location", url.into_owned()).finish()));
     }
 
     with_file_cache(cache_file, 9000, move || {

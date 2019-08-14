@@ -8,7 +8,7 @@ lazy_static! {
     "accidentally", "additional", "adds", "against", "all", "allow", "allows",
     "already", "also", "alternative", "always", "an", "and", "any", "appropriate",
     "arbitrary", "are", "as", "at", "available", "based", "be", "because", "been",
-    "both", "but", "by", "can", "certain", "changes", "comes", "contains", "cost",
+    "both", "but", "by", "can", "certain", "changes", "comes", "contains", "core", "cost",
     "crate", "crates.io", "current", "currently", "custom", "dependencies",
     "dependency", "developers", "do", "don't", "e.g", "easily", "easy", "either",
     "enables", "etc", "even", "every", "example", "examples", "features", "feel",

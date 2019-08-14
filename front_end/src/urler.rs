@@ -24,15 +24,18 @@ impl Urler {
     pub fn dependency(&self, dep: &RichDep) -> String {
         if let Some(git) = dep.dep.git() {
             if let Ok(repo) = Repo::new(git) {
-                if let RepoHost::GitHub(repo) = repo.host() {
-                    return format!("/gh/{}/{}/{}", encode(&repo.owner), encode(&repo.repo), encode(&dep.package));
-                } else {
-                    return repo.canonical_http_url("").into_owned();
+                return match repo.host() {
+                    RepoHost::GitHub(repo) => format!("/gh/{}/{}/{}", encode(&repo.owner), encode(&repo.repo), encode(&dep.package)),
+                    RepoHost::GitLab(repo) => format!("/lab/{}/{}/{}", encode(&repo.owner), encode(&repo.repo), encode(&dep.package)),
+                    _ => repo.canonical_http_url("").into_owned(),
                 }
             }
         } else if dep.dep.detail().map_or(false, |d| d.path.is_some()) {
             if let Some(Origin::GitHub{ref repo,..}) = self.own_crate {
                 return format!("/gh/{}/{}/{}", encode(&repo.owner), encode(&repo.repo), encode(&dep.package))
+            }
+            if let Some(Origin::GitLab{ref repo,..}) = self.own_crate {
+                return format!("/lab/{}/{}/{}", encode(&repo.owner), encode(&repo.repo), encode(&dep.package))
             }
         }
         format!("/crates/{}", encode(&dep.package))
@@ -46,6 +49,9 @@ impl Urler {
             },
             Origin::GitHub {repo, ..} => {
                 format!("https://deps.rs/repo/github/{}/{}", encode(&repo.owner), encode(&repo.repo))
+            },
+            Origin::GitLab {repo, ..} => {
+                format!("https://deps.rs/repo/gitlab/{}/{}", encode(&repo.owner), encode(&repo.repo))
             },
         }
     }
@@ -82,6 +88,9 @@ impl Urler {
             },
             Origin::GitHub {repo, package} => {
                 format!("/gh/{}/{}/{}", encode(&repo.owner), encode(&repo.repo), encode(package))
+            },
+            Origin::GitLab {repo, package} => {
+                format!("/lab/{}/{}/{}", encode(&repo.owner), encode(&repo.repo), encode(package))
             },
         }
     }

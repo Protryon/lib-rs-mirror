@@ -352,34 +352,44 @@ impl KitchenSink {
                         name: o.name,
                     }
                 }).collect(),
-                format!("{}/{}/{}", repo.owner, repo.repo, package),
+                format!("github/{}/{}", repo.owner, package),
                 versions))
+            },
+            Origin::GitLab {repo, package} => {
+                let host = RepoHost::GitLab(repo.clone()).try_into().map_err(|_| KitchenSinkErr::CrateNotFound(origin.clone())).context("ghrepo host bad")?;
+                let cachebust = self.cachebust_string_for_repo(&host).context("ghrepo")?;
+                let versions = self.get_repo_versions(origin, &host, &cachebust)?;
+                Ok(RichCrate::new(origin.clone(), vec![], format!("gitlab/{}/{}", repo.owner, package), versions))
             }
         }
     }
 
     fn get_repo_versions(&self, origin: &Origin, repo: &Repo, cachebust: &str) -> CResult<Vec<CrateVersion>> {
-        let (gh_repo, package) = match origin {
-            Origin::GitHub {repo, package} => (repo, package),
+        let package = match origin {
+            Origin::GitLab {package, ..} => package,
+            Origin::GitHub {repo, package} => {
+                let releases = self.gh.releases(repo, cachebust)?.ok_or_else(|| KitchenSinkErr::CrateNotFound(origin.clone())).context("releases not found")?;
+                let versions: Vec<_> = releases.into_iter().filter_map(|r| {
+                    let date = r.published_at.or(r.created_at)?;
+                    let num = r.tag_name?;
+                    let num = num.trim_start_matches(|c:char| !c.is_numeric());
+                    // verify that it semver-parses
+                    let _ = SemVer::parse(num).map_err(|e| eprintln!("{:?}: ignoring {}, {}", origin, num, e)).ok()?;
+                    Some(CrateVersion {
+                        num: num.to_string(),
+                        yanked: r.draft.unwrap_or(false),
+                        updated_at: date.clone(),
+                        created_at: date,
+                    })
+                }).collect();
+                if !versions.is_empty() {
+                    return Ok(versions);
+                }
+                package
+            },
             _ => unreachable!(),
         };
-        let releases = self.gh.releases(&gh_repo, cachebust)?.ok_or_else(|| KitchenSinkErr::CrateNotFound(origin.clone())).context("releases not found")?;
-        let versions: Vec<_> = releases.into_iter().filter_map(|r| {
-            let date = r.published_at.or(r.created_at)?;
-            let num = r.tag_name?;
-            let num = num.trim_start_matches(|c:char| !c.is_numeric());
-            // verify that it semver-parses
-            let _ = SemVer::parse(num).map_err(|e| eprintln!("{:?}: ignoring {}, {}", origin, num, e)).ok()?;
-            Some(CrateVersion {
-                num: num.to_string(),
-                yanked: r.draft.unwrap_or(false),
-                updated_at: date.clone(),
-                created_at: date,
-            })
-        }).collect();
-        if !versions.is_empty() {
-            return Ok(versions);
-        }
+
         let versions: Vec<_> = self.crate_db.crate_versions(origin)?.into_iter().map(|(num, timestamp)| {
             let date = Utc.timestamp(timestamp as _, 0).to_rfc3339();
             CrateVersion {
@@ -544,6 +554,9 @@ impl KitchenSink {
         let (repo, package) = match origin {
             Origin::GitHub {repo, package} => {
                 (RepoHost::GitHub(repo.clone()).try_into().expect("repohost"), &**package)
+            },
+            Origin::GitLab {repo, package} => {
+                (RepoHost::GitLab(repo.clone()).try_into().expect("repohost"), &**package)
             },
             _ => unreachable!()
         };
@@ -1155,7 +1168,7 @@ impl KitchenSink {
                 let (v, _warn) = self.rich_crate_version_data_from_crates_io(ver)?;
                 (v, ver.is_yanked())
             },
-            Origin::GitHub {..} => {
+            Origin::GitHub {..} | Origin::GitLab {..} => {
                 if !self.crate_exists(k.origin()) {
                     Err(KitchenSinkErr::GitCrateNotAllowed(k.origin().to_owned()))?
                 }
@@ -1626,6 +1639,7 @@ impl KitchenSink {
     fn crate_owners(&self, krate: &RichCrateVersion) -> CResult<Vec<CrateOwner>> {
         match krate.origin() {
             Origin::CratesIo(name) => self.crates_io_crate_owners(name, krate.version()),
+            Origin::GitLab {..} => Ok(vec![]),
             Origin::GitHub {repo, ..} => Ok(vec![
                 CrateOwner {
                     id: 0,

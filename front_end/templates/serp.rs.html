@@ -73,7 +73,7 @@
             @for (i, c) in p.good_results.iter().chain(p.bad_results).enumerate() {
                 <li>
                     <a href="@url.crate_by_origin(&c.origin)"><div class=h>
-                        <h4>@if let Origin::GitHub{ref repo,..} = c.origin {@repo.owner/}@c.crate_name</h4>
+                        <h4>@if let Some((repo, _)) = c.origin.repo() {@repo.owner/}@c.crate_name</h4>
                         <p class=desc>@p.render_markdown_str(&c.description)</p>
                     </div>
                     <div class=meta>

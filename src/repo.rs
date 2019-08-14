@@ -168,20 +168,8 @@ impl Repo {
 
     /// URL for browsing the repository via web browser
     pub fn canonical_http_url(&self, base_dir_in_repo: &str) -> Cow<'_, str> {
-        assert!(!base_dir_in_repo.starts_with('/'));
-        let slash = if base_dir_in_repo != "" {"/tree/master/"} else {""};
-        match self.host {
-            RepoHost::GitHub(SimpleRepo {ref owner, ref repo}) => {
-                format!("https://github.com/{}/{}{}{}", owner, repo, slash, base_dir_in_repo).into()
-            },
-            RepoHost::GitLab(SimpleRepo {ref owner, ref repo}) => {
-                format!("https://gitlab.com/{}/{}{}{}", owner, repo, slash, base_dir_in_repo).into()
-            },
-            RepoHost::BitBucket(SimpleRepo {ref owner, ref repo}) => {
-                format!("https://bitbucket.org/{}/{}", owner, repo).into() // FIXME: needs hash
-            },
-            RepoHost::Other => self.url.as_str().into(), // FIXME: how to add base dir?
-        }
+        self.host.canonical_http_url(base_dir_in_repo)
+            .unwrap_or_else(|| self.url.as_str().into()) // FIXME: how to add base dir?
     }
 
     pub fn canonical_git_url(&self) -> Cow<'_, str> {
@@ -212,6 +200,24 @@ impl RepoHost {
             },
             RepoHost::BitBucket(SimpleRepo {ref owner, ref repo}) => {
                 Some(format!("https://bitbucket.org/{}/{}", owner, repo))
+            },
+            RepoHost::Other => None,
+        }
+    }
+
+    /// URL for browsing the repository via web browser
+    pub fn canonical_http_url(&self, base_dir_in_repo: &str) -> Option<Cow<'_, str>> {
+        assert!(!base_dir_in_repo.starts_with('/'));
+        let slash = if base_dir_in_repo != "" {"/tree/master/"} else {""};
+        match self {
+            RepoHost::GitHub(SimpleRepo {ref owner, ref repo}) => {
+                Some(format!("https://github.com/{}/{}{}{}", owner, repo, slash, base_dir_in_repo).into())
+            },
+            RepoHost::GitLab(SimpleRepo {ref owner, ref repo}) => {
+                Some(format!("https://gitlab.com/{}/{}{}{}", owner, repo, slash, base_dir_in_repo).into())
+            },
+            RepoHost::BitBucket(SimpleRepo {ref owner, ref repo}) => {
+                Some(format!("https://bitbucket.org/{}/{}", owner, repo).into()) // FIXME: needs hash
             },
             RepoHost::Other => None,
         }

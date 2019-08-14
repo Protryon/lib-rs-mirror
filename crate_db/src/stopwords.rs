@@ -38,6 +38,7 @@ lazy_static! {
         ("game-engines", Some(&["game", "ffi"])),
         ("game-dev", Some(&["game", "games"])),
         ("gamedev", Some(&["game", "games"])),
+        ("game", Some(&["wasm", "webassembly"])), // wasm games are nice, but should be in games category
         ("opengl", Some(&["terminal", "console"])),
         ("protocol", Some(&["game", "games", "container"])),
         ("framework", Some(&["game", "games"])),

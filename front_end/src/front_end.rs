@@ -83,6 +83,7 @@ pub fn render_feed(out: &mut dyn Write, crates: &KitchenSink) -> Result<(), fail
 
 pub fn render_sitemap(sitemap: &mut impl Write, crates: &KitchenSink) -> Result<(), failure::Error> {
     let all_crates = crates.sitemap_crates()?;
+    let urler = Urler::new(None);
 
     sitemap.write_all(br#"<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">"#)?;
 
@@ -92,8 +93,8 @@ pub fn render_sitemap(sitemap: &mut impl Write, crates: &KitchenSink) -> Result<
         write!(
             sitemap,
             r#"
-<url><changefreq>{freq}</changefreq><priority>{pri:0.1}</priority><lastmod>{date}</lastmod><loc>https://lib.rs/crates/{name}</loc></url>"#,
-            name = origin.short_crate_name(),
+<url><changefreq>{freq}</changefreq><priority>{pri:0.1}</priority><lastmod>{date}</lastmod><loc>https://lib.rs{url}</loc></url>"#,
+            url = urler.crate_by_origin(&origin),
             date = Utc.timestamp(lastmod, 0).to_rfc3339(),
             pri = (rank * 2.).min(1.),
             freq = match age {

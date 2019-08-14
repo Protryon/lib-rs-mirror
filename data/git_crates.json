@@ -1,4 +1,5 @@
 [
+"github:1password/typeshare/typeshare",
 "github:aleshaleksey/azdice/azdice",
 "github:aleshaleksey/tgwm/q-moose",
 "github:alex/rust-asn1/asn1",
@@ -82,6 +83,9 @@
 "github:kvakvs/erlangrt/erlangrt",
 "github:kylewlacy/sorbet-cocoa/sorbet-cocoa",
 "github:libra/libra/client",
+"github:libra/libra/consensus",
+"github:libra/libra/libra_wallet",
+"github:libra/libra/storage_service",
 "github:lifthrasiir/angolmois-rust/angolmois",
 "github:limeth/ethaddrgen/ethaddrgen",
 "github:limeth/euclider/euclider",

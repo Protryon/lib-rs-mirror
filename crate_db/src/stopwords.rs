@@ -105,6 +105,7 @@ lazy_static! {
         ("tex", Some(&["font"])),
         ("regex", Some(&["text", "linear", "time", "search"])),
         ("language", Some(&["server"])),
+        ("server", Some(&["files"])),
         ("medical", Some(&["image"])),
         ("social", Some(&["media"])),
         ("codegen", Some(&["backend"])),

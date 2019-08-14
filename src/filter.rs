@@ -53,8 +53,9 @@ impl ImageOptimAPIFilter {
 impl ImageFilter for ImageOptimAPIFilter {
     fn filter_url<'a>(&self, url: &'a str) -> (Cow<'a, str>, Option<Cow<'a, str>>) {
         // let some badges through, because they're SVG (don't need 2x scaling),
-        // and show uncacheable info that needs to be up to date
-        if crate::is_badge_url(url) && url.contains(".svg") {
+        // and show uncacheable info that needs to be up to date.
+        // Can't let them all through, because of CSP.
+        if url.starts_with("https://img.shields.io/") && url.contains(".svg") {
             return (url.into(), None)
         }
         (

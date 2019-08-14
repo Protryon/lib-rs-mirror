@@ -465,7 +465,7 @@ impl KitchenSink {
     }
 
     fn crates_io_meta(&self, name: &str, refresh: bool) -> CResult<CratesIoCrate> {
-        let krate = self.index.crates_io_crate_by_name(name).context("rich_crate")?;
+        let krate = self.index.crates_io_crate_by_lowercase_name(name).context("rich_crate")?;
         let latest_in_index = krate.latest_version().version(); // most recently published version
         let meta = self.crates_io.krate(name, latest_in_index, refresh)
             .with_context(|_| format!("crates.io meta for {} {}", name, latest_in_index))?;
@@ -608,7 +608,7 @@ impl KitchenSink {
 
         let (crate_tarball, crates_io_meta) = rayon::join(
             || self.crates_io.crate_data(name, ver).context("crate_file"),
-            || self.crates_io_meta(name, true));
+            || self.crates_io_meta(&name.to_ascii_lowercase(), true));
 
         let crates_io_meta = crates_io_meta?.meta.krate;
         let crate_tarball = crate_tarball?.ok_or_else(|| KitchenSinkErr::DataNotFound(format!("{}-{}", name, ver)))?;
@@ -713,7 +713,7 @@ impl KitchenSink {
             // Delete the original docs.rs link, because we have our own
             // TODO: what if the link was to another crate or a subpage?
             if package.documentation.as_ref().map_or(false, |s| Self::is_docs_rs_link(s)) {
-                if self.has_docs_rs(&origin, &package.version) {
+                if self.has_docs_rs(&origin, &package.name, &package.version) {
                     package.documentation = None; // docs.rs is not proper docs
                 }
             }
@@ -981,9 +981,10 @@ impl KitchenSink {
         d.starts_with("docs.rs/") || d.starts_with("crates.fyi/")
     }
 
-    pub fn has_docs_rs(&self, origin: &Origin, ver: &str) -> bool {
+    /// name is case-sensitive!
+    pub fn has_docs_rs(&self, origin: &Origin, name: &str, ver: &str) -> bool {
         match origin {
-            Origin::CratesIo(name) => self.docs_rs.builds(name, ver).unwrap_or(true), // fail open
+            Origin::CratesIo(_) => self.docs_rs.builds(name, ver).unwrap_or(true), // fail open
             _ => false,
         }
     }
@@ -1003,7 +1004,7 @@ impl KitchenSink {
     pub fn all_dependencies_flattened(&self, origin: &Origin) -> Result<DepInfMap, KitchenSinkErr> {
         match origin {
             Origin::CratesIo(name) => {
-                self.index.all_dependencies_flattened(self.index.crates_io_crate_by_name(name)?)
+                self.index.all_dependencies_flattened(self.index.crates_io_crate_by_lowercase_name(name)?)
             },
             _ => {
                 eprintln!("deps unimplemented!()");
@@ -1809,6 +1810,8 @@ impl<'a> CrateAuthor<'a> {
 }
 
 #[test]
-fn crates() {
-    KitchenSink::new_default().expect("Test if configured");
+fn fetch_uppercase_name() {
+    let k = KitchenSink::new_default().expect("Test if configured");
+    let _ = k.rich_crate(&Origin::from_crates_io_name("Inflector")).unwrap();
+    let _ = k.rich_crate(&Origin::from_crates_io_name("inflector")).unwrap();
 }

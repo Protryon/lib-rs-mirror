@@ -62,12 +62,12 @@ impl Urler {
 
     pub fn crates_io_crate(&self, origin: &Origin) -> Option<String> {
         match origin {
-            Origin::CratesIo(name) => Some(self.crates_io_crate_by_name(name)),
+            Origin::CratesIo(name) => Some(self.crates_io_crate_by_lowercase_name(name)),
             _ => None,
         }
     }
 
-    fn crates_io_crate_by_name(&self, crate_name: &str) -> String {
+    fn crates_io_crate_by_lowercase_name(&self, crate_name: &str) -> String {
         format!("https://crates.io/crates/{}", encode(crate_name))
     }
 
@@ -81,7 +81,7 @@ impl Urler {
             Origin::CratesIo(crate_name) => {
                 match self.own_crate {
                     Some(Origin::CratesIo(ref own)) if own == crate_name => {
-                        self.crates_io_crate_by_name(crate_name)
+                        self.crates_io_crate_by_lowercase_name(crate_name)
                     },
                     _ => format!("/crates/{}", encode(crate_name)),
                 }

@@ -479,7 +479,7 @@ impl<'a> CratePage<'a> {
 
     /// docs.rs link, if available
     pub fn api_reference_url(&self) -> Option<String> {
-        if self.kitchen_sink.has_docs_rs(self.ver.origin(), self.ver.version()) {
+        if self.kitchen_sink.has_docs_rs(self.ver.origin(), self.ver.short_name(), self.ver.version()) {
             Some(format!("https://docs.rs/{}", self.ver.short_name()))
         } else {
             None

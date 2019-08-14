@@ -87,7 +87,7 @@ impl Index {
 
     pub fn crate_exists(&self, origin: &Origin) -> bool {
         match origin {
-            Origin::CratesIo(name) => self.crates_io_crate_by_name(name).is_ok(),
+            Origin::CratesIo(name) => self.crates_io_crate_by_lowercase_name(name).is_ok(),
             Origin::GitHub {..} | Origin::GitLab {..} => self.git_index.has(origin),
         }
     }
@@ -109,14 +109,16 @@ impl Index {
     }
 
     #[inline]
-    pub fn crates_io_crate_by_name(&self, name: &str) -> Result<&Crate, KitchenSinkErr> {
+    pub fn crates_io_crate_by_lowercase_name(&self, name: &str) -> Result<&Crate, KitchenSinkErr> {
+        debug_assert_eq!(name, name.to_ascii_lowercase());
         self.crates_io_crates()
         .get(name)
         .ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))
     }
 
     pub fn crate_version_latest_unstable(&self, name: &str) -> Result<&Version, KitchenSinkErr> {
-        Ok(Self::highest_crates_io_version(self.crates_io_crate_by_name(name)?, false))
+        debug_assert_eq!(name, name.to_ascii_lowercase());
+        Ok(Self::highest_crates_io_version(self.crates_io_crate_by_lowercase_name(name)?, false))
     }
 
     fn highest_crates_io_version(krate: &Crate, stable_only: bool) -> &Version {
@@ -186,7 +188,7 @@ impl Index {
 
         let mut set: FxHashMap<DepName, (_, _, SemVer, FxHashSet<String>)> = FxHashMap::with_capacity_and_hasher(60, Default::default());
         for d in ver.dependencies() {
-            let package = d.package().unwrap_or_else(|| d.name());
+            let package = d.package().unwrap_or_else(|| d.name()).to_ascii_lowercase();
 
             // people forget to include winapi conditionally
             let is_target_specific = package == "winapi" || d.target().is_some();
@@ -205,13 +207,13 @@ impl Index {
                 _ => continue,
             }
 
-            let enable_dep_features = to_enable.get(package);
+            let enable_dep_features = to_enable.get(&package);
             if d.is_optional() && enable_dep_features.is_none() {
                 continue;
             }
 
             let req = VersionReq::parse(d.requirement()).map_err(|_| KitchenSinkErr::SemverParsingError)?;
-            let krate = match self.crates_io_crate_by_name(package) {
+            let krate = match self.crates_io_crate_by_lowercase_name(&package) {
                 Ok(k) => k,
                 Err(e) => {
                     eprintln!("{}@{} depends on missing crate {} (@{}): {}", ver.name(), ver.version(), package, req, e);
@@ -289,7 +291,7 @@ impl Index {
             return Ok(Some((false, 0.)));
         }
 
-        let krate = self.crates_io_crate_by_name(crate_name)?;
+        let krate = self.crates_io_crate_by_lowercase_name(&crate_name.to_ascii_lowercase())?;
 
         let matches_latest = Self::highest_crates_io_version(krate, true).version().parse().ok()
             .map_or(false, |latest| requirement.matches(&latest));

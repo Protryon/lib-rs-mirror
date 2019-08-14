@@ -210,7 +210,7 @@ fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersi
     let mut temp_inp = CrateTemporalInputs {
         versions: all.versions(),
         is_app: k.is_app(),
-        has_docs_rs: crates.has_docs_rs(k.origin(), k.version()),
+        has_docs_rs: crates.has_docs_rs(k.origin(), k.short_name(), k.version()),
         is_nightly: k.is_nightly(),
         downloads_per_month,
         downloads_per_month_minus_most_downloaded_user: downloads_per_month,

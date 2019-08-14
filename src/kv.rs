@@ -3,7 +3,6 @@ use crate::SimpleCache;
 use flate2::read::DeflateDecoder;
 use flate2::write::DeflateEncoder;
 use flate2::Compression;
-use fxhash::FxHashMap;
 use parking_lot::RwLock;
 use parking_lot::RwLockReadGuard;
 use parking_lot::RwLockWriteGuard;
@@ -18,6 +17,8 @@ use std::io::BufWriter;
 use std::marker::PhantomData;
 use std::path::PathBuf;
 use tempfile::NamedTempFile;
+
+type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::ABuildHasher>;
 
 struct Inner {
     data: Option<FxHashMap<Box<str>, Box<[u8]>>>,

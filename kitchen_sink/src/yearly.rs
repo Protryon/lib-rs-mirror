@@ -105,7 +105,7 @@ impl<'de> BigArray<'de> for [u32; 366]
         impl<'de> Visitor<'de> for ArrayVisitor {
             type Value = [u32; 366];
 
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 formatter.write_str(concat!("an array of length ", 366))
             }
 
@@ -153,7 +153,7 @@ impl<'de> BigArrayBool<'de> for [bool; 366]
         impl<'de> Visitor<'de> for ArrayVisitor {
             type Value = [bool; 366];
 
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 formatter.write_str(concat!("an array of length ", 366))
             }
 
@@ -175,7 +175,7 @@ impl<'de> BigArrayBool<'de> for [bool; 366]
 }
 
 impl fmt::Debug for VersionMap {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("VersionMap {…}")
     }
 }

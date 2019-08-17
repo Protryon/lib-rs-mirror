@@ -36,7 +36,7 @@ impl From<cargo_toml::Error> for UnarchiverError {
     }
 }
 
-fn read_archive_files<R: Read>(archive: R, mut cb: impl FnMut(Entry<Decoder<R>>) -> Result<(), UnarchiverError>) -> Result<(), UnarchiverError> {
+fn read_archive_files<R: Read>(archive: R, mut cb: impl FnMut(Entry<'_, Decoder<R>>) -> Result<(), UnarchiverError>) -> Result<(), UnarchiverError> {
     let mut archive = Archive::new(Decoder::new(archive)?);
     let entries = archive.entries()?;
     for entry in entries {

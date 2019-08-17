@@ -83,7 +83,7 @@ pub struct Env {
     pub max_crates: u32,
 }
 
-fn cargo_toml_score(cr: &CrateVersionInputs) -> Score {
+fn cargo_toml_score(cr: &CrateVersionInputs<'_>) -> Score {
     let mut s = Score::new();
 
     s.frac("description len", 20, (cr.description.len() as f64 / 300.).min(1.));
@@ -261,7 +261,7 @@ fn authors_score(authors: &[Author], owners: &[CrateOwner], contributors: Option
     s
 }
 
-fn code_score(cr: &CrateVersionInputs) -> Score {
+fn code_score(cr: &CrateVersionInputs<'_>) -> Score {
     let mut s = Score::new();
     s.has("Non-trivial", 1, cr.total_code_lines > 700); // usually trivial/toy programs
     s.has("Non-giant", 1, cr.total_code_lines < 80000); // these should be split into crates
@@ -270,7 +270,7 @@ fn code_score(cr: &CrateVersionInputs) -> Score {
     s
 }
 
-pub fn crate_score_version(cr: &CrateVersionInputs) -> Score {
+pub fn crate_score_version(cr: &CrateVersionInputs<'_>) -> Score {
     let mut score = Score::new();
 
     score.group("Cargo.toml", 2, cargo_toml_score(cr));
@@ -282,7 +282,7 @@ pub fn crate_score_version(cr: &CrateVersionInputs) -> Score {
     score
 }
 
-pub fn crate_score_temporal(cr: &CrateTemporalInputs) -> Score {
+pub fn crate_score_temporal(cr: &CrateTemporalInputs<'_>) -> Score {
     let mut score = Score::new();
 
     let newest = cr.versions.iter().max_by_key(|v| &v.created_at).expect("at least 1 ver?");

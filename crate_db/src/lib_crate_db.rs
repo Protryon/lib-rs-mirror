@@ -219,7 +219,7 @@ impl CrateDb {
 
     /// Add data of the latest version of a crate to the index
     /// Score is a ranking of a crate (0 = bad, 1 = great)
-    pub fn index_latest(&self, c: CrateVersionData) -> FResult<()> {
+    pub fn index_latest(&self, c: CrateVersionData<'_>) -> FResult<()> {
         let origin = c.origin.to_str();
 
         let manifest = &c.manifest;
@@ -416,7 +416,7 @@ impl CrateDb {
     /// (rank-relevance, relevance, slug)
     ///
     /// Rank relevance is normalized and biased towards one top category
-    fn extract_crate_categories(&self, conn: &Connection, c: &CrateVersionData, keywords: impl Iterator<Item=String>, is_important_ish: bool) -> FResult<(Vec<(f64, f64, String)>, bool)> {
+    fn extract_crate_categories(&self, conn: &Connection, c: &CrateVersionData<'_>, keywords: impl Iterator<Item=String>, is_important_ish: bool) -> FResult<(Vec<(f64, f64, String)>, bool)> {
         let (explicit_categories, invalid_categories): (Vec<_>, Vec<_>) = c.category_slugs.iter().map(|c| c.to_string())
             .partition(|slug| {
                 categories::CATEGORIES.from_slug(&slug).next().is_some() // FIXME: that checks top level only
@@ -979,7 +979,7 @@ impl CrateDb {
     }
 
     // returns an array of lowercase phrases
-    fn extract_text_phrases(c: &CrateVersionData) -> Vec<(f64, String)> {
+    fn extract_text_phrases(c: &CrateVersionData<'_>) -> Vec<(f64, String)> {
         let mut out = Vec::new();
         let mut len = 0;
         if let Some(s) = &c.manifest.package().description {

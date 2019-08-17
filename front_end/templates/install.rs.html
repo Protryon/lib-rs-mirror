@@ -1,0 +1,138 @@
+@use crate::templates::base;
+@use crate::templates::labels;
+@use crate::templates::downloads;
+@use crate::templates::deps_list;
+@use crate::install_page::InstallPage;
+@use crate::date_now;
+@use crate::iter::*;
+@use crate::Urler;
+@use crate::CratePage;
+@use crate::Contributors;
+@use rich_crate::Include;
+@use rich_crate::Origin;
+@use rich_crate::Edition;
+@use std::ops::Div;
+@use udedokei::LanguageExt;
+
+@(url: &Urler, c: &InstallPage)
+
+@:base(&c.page(), {
+  <header id="package" @if c.ver.is_yanked() {class="yanked"} else {@if c.ver.is_nightly() {class="nightly"}}>
+    <div class="inner-col">
+    <div class="breadcrumbs">
+    <h1>
+      <a href="/"><span>Lib</span>.rs</a>
+    </h1>
+     › <a href="@url.krate(&c.ver)" rel="up">@c.ver.capitalized_name()</a>
+     › Install
+    </div>
+    <nav><ul>
+        <li class=active>Instructions</li>
+      @if let Some(url) = url.crates_io_crate(c.ver.origin()) {
+        <li><a href="@url">crates.io page</a></li>
+      }
+    </ul></nav>
+    </div>
+  </header>
+  <main>
+    <div class="inner-col">
+        @if c.ver.has_bin() && c.ver.has_lib() {
+            <p>@c.ver.capitalized_name() is both an executable binary that can be run, and a library that can be used in Rust programs.</p>
+        }
+        @if c.ver.is_proc_macro() {
+            <p>@c.ver.capitalized_name() is a procedural macro. It will run at compile time and transform your program's source code.</p>
+        }
+        @if c.ver.has_bin() {
+            @if let Some(bins) = Some(c.ver.bin_names()) {
+                @if bins.len() == 1 {
+                    <h2>Installing the @if bins[0] == c.ver.short_name() {command-line} else {<code>@bins[0]</code>} executable</h2>
+                } else {
+                    <h2>Installing @for bin in &bins {<code>@bin</code> } executables</h2>
+                }
+                <p>Assuming you have <a href="https://www.rust-lang.org/tools/install">Rust/Cargo installed</a>, run this command in a terminal:</p>
+                @if let Origin::CratesIo(name) = c.ver.origin() {
+                    <pre class="to-copy"><code><b>cargo install</b> -f @name</code></pre>
+                }
+                @if let Some((repo, package)) = c.ver.origin().clone().into_repo() {
+                    <pre class="to-copy"><code><b>cargo install</b> -f @package --git @repo.canonical_git_url().unwrap()</code></pre>
+                }
+                <p>It will make @if bins.len()==1 {the } @for bin in &bins {<code>@bin</code> } command@if bins.len()>1 {s} available in your <code>PATH</code> if you've allowed the <code>PATH</code> to be modified when <a href="https://www.rust-lang.org/tools/install">installing Rust</a>. <code>cargo uninstall @c.ver.short_name()</code> uninstalls.</p>
+            }
+        }
+        @if c.ver.has_lib() {
+            <h2>Adding <code>@c.ver.lib_name()</code> library as a dependency</h2>
+            @if c.ver.short_name() != "cargo-edit" {
+            <p>If you have <a href='@url.install(&Origin::from_crates_io_name("cargo-edit"))'>cargo-edit installed</a>, run this command in a terminal, in your project's directory:</p>
+            @if c.is_build {
+                @if let Origin::CratesIo(name) = c.ver.origin() {
+                    <pre class="to-copy"><code><b>cargo add</b> --build @name</code></pre>
+                }
+                @if let Some((repo, package)) = c.ver.origin().clone().into_repo() {
+                    <pre class="to-copy"><code><b>cargo add</b> --build @package --git @repo.canonical_git_url().unwrap()</code></pre>
+                }
+                <p>to add <code>@c.ver.lib_name()</code> as a build-time dependency. To add it as a run-time dependency, run:</p>
+            } else {@if c.is_dev {
+                @if let Origin::CratesIo(name) = c.ver.origin() {
+                    <pre class="to-copy"><code><b>cargo add</b> --dev @name</code></pre>
+                }
+                @if let Some((repo, package)) = c.ver.origin().clone().into_repo() {
+                    <pre class="to-copy"><code><b>cargo add</b> --dev @package --git @repo.canonical_git_url().unwrap()</code></pre>
+                }
+                <p>to add it a dev dependency (if it's used only in tests, not in the final product). To add it as a regular run-time dependency, run:</p>
+            }}
+            @if let Origin::CratesIo(name) = c.ver.origin() {
+                <pre class="to-copy"><code><b>cargo add</b> @name</code></pre>
+            }
+            @if let Some((repo, package)) = c.ver.origin().clone().into_repo() {
+                <pre class="to-copy"><code><b>cargo add</b> @package --git @repo.canonical_git_url().unwrap()</code></pre>
+            }
+            }
+            <p>To add it manually, edit your project's <code>Cargo.toml</code> file and add to the @if c.is_build {<code>[build-dependencies]</code> or} <code>[dependencies]</code> section:</p>
+            @if let Origin::CratesIo(name) = c.ver.origin() {
+                <pre class="to-copy"><code>@name = "@c.ver.version()"</code></pre>
+            }
+            @if let Some((repo, package)) = c.ver.origin().clone().into_repo() {
+                <pre class="to-copy"><code>@package = @"{" git = "@repo.canonical_git_url().unwrap()" @"}"</code></pre>
+            }
+            <p>The <code>@c.ver.lib_name()</code> library will automatically available globally.
+            @if let Some(url) = c.api_reference_url() {
+                Read the <a href="@url"><code>@c.ver.lib_name()</code> library documentation</a>.
+            }</p>
+        }
+        @if c.ver.is_proc_macro() && !c.ver.has_lib() {
+            <h2>Adding <code>@c.ver.short_name()</code> macro(s) as a dependency</h2>
+            <p>If you have <a href='@url.install(&Origin::from_crates_io_name("cargo-edit"))'>cargo-edit installed</a>, run this command in a terminal, in your project's directory:</p>
+            @if let Origin::CratesIo(name) = c.ver.origin() {
+                <pre class="to-copy"><code><b>cargo add</b> @name</code></pre>
+            }
+            @if let Some((repo, package)) = c.ver.origin().clone().into_repo() {
+                <pre class="to-copy"><code><b>cargo add</b> @package --git @repo.canonical_git_url().unwrap()</code></pre>
+            }
+            <p>To add it manually, edit your project's <code>Cargo.toml</code> file and add to the <code>[dependencies]</code> section:</p>
+            @if let Origin::CratesIo(name) = c.ver.origin() {
+                <pre class="to-copy"><code>@name = "@c.ver.version()"</code></pre>
+            }
+            @if let Some((repo, package)) = c.ver.origin().clone().into_repo() {
+                <pre class="to-copy"><code>@package = @"{" git = "@repo.canonical_git_url().unwrap()" @"}"</code></pre>
+            }
+            <p>You may need to import the macro(s) with <code>use @c.ver.lib_name()<tt>::*</tt></code>.</p>
+            @if let Some(url) = c.api_reference_url() {
+                Read the <a href="@url"><code>@c.ver.lib_name()</code> documentation</a>.
+            }</p>
+        }
+        <p><a href="@url.krate(&c.ver)" rel="up">Back to the crate overview</a>.</p>
+        <hr>
+        @if let Some(readme) = c.ver.readme() {
+          <section id=readme class="readme" vocab=""><aside><h2>Readme</h2>
+            @c.render_readme(readme)
+          </aside></section>
+        }
+    </div>
+  </main>
+
+  <footer>
+    <div class="inner-col">
+        <p>Back to <a href="@url.krate(&c.ver)" rel="up">@c.ver.capitalized_name()</a>.</p>
+    </div>
+  </footer>
+})

@@ -1,3 +1,4 @@
+use actix_web::dev::Params;
 use actix_web::http::*;
 use actix_web::*;
 use arc_swap::ArcSwap;
@@ -127,6 +128,7 @@ fn run_server() -> Result<(), failure::Error> {
             .resource("/index", |r| r.method(Method::GET).f(handle_search)) // old crates.rs/index url
             .resource("/keywords/{keyword}", |r| r.method(Method::GET).f(handle_keyword))
             .resource("/crates/{crate}", |r| r.method(Method::GET).f(handle_crate))
+            .resource("/install/{crate:.*}", |r| r.method(Method::GET).f(handle_install))
             .resource("/gh/{owner}/{repo}/{crate}", |r| r.method(Method::GET).f(handle_github_crate))
             .resource("/lab/{owner}/{repo}/{crate}", |r| r.method(Method::GET).f(handle_gitlab_crate))
             .resource("/atom.xml", |r| r.method(Method::GET).f(handle_feed))
@@ -315,6 +317,46 @@ fn handle_git_crate(req: &HttpRequest<AServerState>, slug: &'static str) -> Futu
     .from_err()
     .and_then(serve_cached)
     .responder()
+}
+
+fn get_origin_from_subpath(q: &Params) -> Option<Origin> {
+    let parts: String = q.query("crate").expect("route");
+    let mut parts = parts.splitn(4, '/');
+    let first = parts.next()?;
+    match parts.next() {
+        None => Some(Origin::from_crates_io_name(&first)),
+        Some(owner) => {
+            let repo = parts.next()?;
+            let package = parts.next()?;
+            match first {
+                "github" | "gh" => Some(Origin::from_github(SimpleRepo::new(owner, repo), package)),
+                "gitlab" | "lab" => Some(Origin::from_gitlab(SimpleRepo::new(owner, repo), package)),
+                _ => None,
+            }
+        }
+    }
+}
+
+fn handle_install(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
+    let state = req.state();
+    let origin = if let Some(o) = get_origin_from_subpath(req.match_info()) {o}
+    else {
+        return Box::new(future::result(render_404_page(&state, req.path().trim_start_matches("/install"))));
+    };
+
+    state.render_pool.spawn_fn({
+        let state = Arc::clone(state);
+        move || {
+            let crates = state.crates.load();
+            let ver = crates.rich_crate_version(&origin)?;
+            let mut page: Vec<u8> = Vec::with_capacity(50000);
+            front_end::render_install_page(&mut page, &ver, &crates, &state.markup)?;
+            Ok(page)
+        }})
+        .and_then(|page| {
+            serve_cached((page, 3600, false))
+        })
+        .responder()
 }
 
 fn handle_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {

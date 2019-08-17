@@ -56,6 +56,18 @@ impl Urler {
         }
     }
 
+    pub fn install(&self, origin: &Origin) -> String {
+        match origin {
+            Origin::CratesIo(name) => {
+                format!("/install/{}", encode(name))
+            },
+            Origin::GitHub {repo, package} | Origin::GitLab {repo, package} => {
+                let host = if let Origin::GitHub {..} = origin {"gh"} else {"lab"};
+                format!("/install/{}/{}/{}/{}", host, encode(&repo.owner), encode(&repo.repo), encode(package))
+            },
+        }
+    }
+
     pub fn reverse_deps(&self, krate: &RichCrateVersion) -> String {
         format!("https://crates.io/crates/{}/reverse_dependencies", encode(krate.short_name()))
     }

@@ -249,12 +249,25 @@ impl RichCrateVersion {
         self.derived.is_yanked
     }
 
+    pub fn lib_name(&self) -> &str {
+        self.manifest.lib.as_ref()
+            .and_then(|l| l.name.as_ref())
+            .map(|n| n.as_str())
+            .unwrap_or(self.short_name())
+    }
+
     pub fn has_lib(&self) -> bool {
         !self.is_proc_macro() && (self.derived.lib_file.is_some() || self.manifest.lib.is_some())
     }
 
     pub fn has_bin(&self) -> bool {
         self.manifest.has_bin()
+    }
+
+    pub fn bin_names(&self) -> Vec<&str> {
+        self.manifest.bin.iter().map(|bin| {
+            bin.name.as_ref().map(|n| n.as_str()).unwrap_or(self.short_name())
+        }).collect()
     }
 
     // has cargo-prefixed bin

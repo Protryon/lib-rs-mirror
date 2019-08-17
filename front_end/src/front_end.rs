@@ -12,6 +12,7 @@ mod home_page;
 mod iter;
 mod not_found_page;
 mod search_page;
+mod install_page;
 mod urler;
 use render_readme::Markup;
 pub use crate::not_found_page::*;
@@ -120,6 +121,17 @@ pub fn render_crate_page(out: &mut dyn Write, all: &RichCrate, ver: &RichCrateVe
     let c = CratePage::new(all, ver, kitchen_sink, renderer).context("New crate page")?;
     templates::crate_page(out, &urler, &c).context("crate page io")?;
     Ok(c.page_title())
+}
+
+/// See `install.rs.html`
+pub fn render_install_page(out: &mut dyn Write, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
+    if stopped() {
+        Err(KitchenSinkErr::Stopped)?;
+    }
+    let urler = Urler::new(None); // Don't set self-crate, because we want to link back to crate page
+    let c = crate::install_page::InstallPage::new(ver, kitchen_sink, renderer);
+    templates::install(out, &urler, &c).context("install page io")?;
+    Ok(())
 }
 
 /// See `crate_page.rs.html`

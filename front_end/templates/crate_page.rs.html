@@ -125,7 +125,7 @@
       }
     </p>
     <nav><ul>
-      <li class=active>About</li>
+      <li><a class="button" href="@url.install(c.ver.origin())">Install</a></li>
       @if let Some(doc) = c.api_reference_url() {
         <li><a href="@doc">API reference</a></li>
       }

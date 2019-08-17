@@ -1,8 +1,8 @@
 # Lib.rs (Crates.rs)
 
-[Crates.rs](https://lib.rs) is a fast, lightweight way to browse information about all applications and libraries written in [Rust](https://www.rust-lang.org/).
+[Lib.rs](https://lib.rs) is a fast, lightweight way to browse information about all applications and libraries written in [Rust](https://www.rust-lang.org/).
 
-Crates [published](https://doc.rust-lang.org/cargo/reference/publishing.html) to crates.**io** will automatically show up on crates.**rs**. Crates.rs is not a registry on its own, and it's not affiliated with crates.io or the Rust project.
+Crates [published](https://doc.rust-lang.org/cargo/reference/publishing.html) to crates.io will automatically show up on lib.rs. Lib.rs is not a registry on its own, and it's not affiliated with crates.io or the Rust project.
 
 ## Building
 
@@ -30,19 +30,19 @@ If you'd like to help improve it:
 ### Where to find the code?
 
  * If you want to change look'n'feel (CSS): [see the `style` subproject](https://gitlab.com/crates.rs/style).
- * If you want to change HTML of the templates: [see the `front_end` subproject](https://gitlab.com/crates.rs/front_end).
+ * If you want to change HTML of the templates: [see the `front_end` dir](https://gitlab.com/crates.rs/crates.rs/tree/master/front_end).
  * If you want to show new kind of data on the pages:
-     1. Fetch/compute that data in [one of the subprojects](https://gitlab.com/crates.rs) most relevant for that type of data (e.g. there's a subproject for [interacting with GitHub API](https://gitlab.com/crates.rs/github_info) if you want to get information from there).
-     2. Expose that data source [in the `kitchen_sink` subproject](https://gitlab.com/crates.rs/front_end) which connects all data sources together.
-     3. Put that data in the page helper objects (e.g. `CratePage`) [in the `front_end` subproject](https://gitlab.com/crates.rs/front_end).
+     1. Fetch/compute that data in [one of the subprojects](https://gitlab.com/crates.rs) most relevant for that type of data (e.g. there's a subproject for [interacting with GitHub API](https://gitlab.com/crates.rs/crates.rs/tree/master/github_info) if you want to get information from there).
+     2. Expose that data source [in the `kitchen_sink` dir](https://gitlab.com/crates.rs/crates.rs/tree/master/kitchen_sink) which connects all data sources together.
+     3. Put that data in the page helper objects (e.g. `CratePage`) [in the `front_end` dir](https://gitlab.com/crates.rs/crates.rs/tree/master/front_end).
      4. Use the data in HTML templates.
 
 ## Building step-by-step
 
- 1. [Get the initial data files](https://lib.rs/data) for the site (about 2GB).
+ 1. [Get the initial data files](https://lib.rs/data/data.tar.xz) for the site (about 200MB).
 
  2. Extract the data files in `.xz` format using [7zip](https://www.7-zip.org/download.html), [The Unarchiver (Mac)](https://theunarchiver.com/) or `unxz data/*.xz`.
-    * Put them all (`cache.db`, `crates.db`, `github.db`, `users.db`, `crate_data.db`) in the `data/` subdirectory of crates.rs checkout.
+    * Put them all (`crate_data.db`, `cratesio.rmpz`, etc.) in the `data/` subdirectory of crates.rs checkout.
 
  3. Generate front-end [styles](https://gitlab.com/crates.rs/style):
 
@@ -61,6 +61,13 @@ If you'd like to help improve it:
 
     If all goes well, this will create about 7000 HTML files in the `front_end/public/` directory.
 
+ 4. Alternatively, start a local server:
+
+     ```
+     cd ../server
+     cargo run
+     ```
+
  5. Serve the HTML and the styles together:
 
     ```sh
@@ -74,5 +81,4 @@ If you'd like to help improve it:
 
 * If you get "patch for … in … did not resolve to any crates." error when building, delete `Cargo.lock` files from the project.
 
-* If you get an error about missing table "cache", or missing column "origin", download the data files again.
 

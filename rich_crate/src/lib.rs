@@ -34,6 +34,7 @@ impl fmt::Debug for Origin {
 
 impl Origin {
     pub fn from_crates_io_name(name: &str) -> Self {
+        debug_assert!(!name.is_empty());
         Origin::CratesIo(name.to_ascii_lowercase().into())
     }
 
@@ -48,6 +49,7 @@ impl Origin {
     pub fn from_repo(r: &Repo, package: &str) -> Option<Self> {
         match r.host() {
             RepoHost::GitHub(r) => Some(Self::from_github(r.clone(), package)),
+            RepoHost::GitLab(r) => Some(Self::from_gitlab(r.clone(), package)),
             _ => None,
         }
     }

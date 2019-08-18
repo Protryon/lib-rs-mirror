@@ -212,7 +212,7 @@ lazy_static! {
             &[("science", 1.25, 0.2), ("science::ml", 1.3, 0.1), ("games", 0.5, 0.), ("os", 0.8, 0.), ("game-engines", 0.75, 0.), ("algorithms", 1.2, 0.1), ("command-line-utilities", 0.8, 0.), ("command-line-interface", 0.4, 0.)]),
         (Cond::Any(&["blas", "tensorflow", "tensor-flow", "word2vec", "torch", "genetic-algorithm", "mnist", "deep-learning", "neuralnetworks", "neuralnetwork", "machine-learning"]),
             &[("science::ml", 1.25, 0.3), ("science::math", 0.8, 0.), ("science", 0.7, 0.), ("web-programming::http-client", 0.8, 0.), ("games", 0.5, 0.), ("os", 0.8, 0.), ("game-engines", 0.75, 0.), ("algorithms", 1.2, 0.), ("command-line-utilities", 0.8, 0.), ("command-line-interface", 0.4, 0.)]),
-        (Cond::Any(&["neural-network", "backpropagation", "neural-networks", "deep-neural-networks", "reinforcement", "perceptron"]),
+        (Cond::Any(&["neural-network", "machinelearning", "backpropagation", "neural-networks", "deep-neural-networks", "reinforcement", "perceptron"]),
             &[("science::ml", 1.25, 0.3), ("science::math", 0.8, 0.), ("science", 0.7, 0.), ("web-programming::http-client", 0.8, 0.), ("games", 0.5, 0.), ("os", 0.8, 0.), ("game-engines", 0.75, 0.), ("algorithms", 1.2, 0.), ("command-line-utilities", 0.8, 0.), ("command-line-interface", 0.4, 0.)]),
         (Cond::Any(&["bayesian", "classifier", "classify", "markov", "ai", "cuda", "svm", "nn", "rnn", "tensor", "learning", "statistics"]),
             &[("science::ml", 1.2, 0.), ("science::math", 0.9, 0.), ("algorithms", 1.1, 0.), ("web-programming::http-client", 0.8, 0.), ("development-tools", 0.9, 0.), ("development-tools::build-utils", 0.6, 0.)]),

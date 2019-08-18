@@ -441,7 +441,7 @@ fn serve_cached<T>((page, cache_time, refresh): (Vec<u8>, u32, bool)) -> FutureR
     future::ok(HttpResponse::Ok()
         .content_type("text/html;charset=UTF-8")
         .header("Cache-Control", format!("public, max-age={}, stale-while-revalidate={}, stale-if-error={}", cache_time, cache_time*4, cache_time*10))
-        .if_true(refresh, |h| {h.header("Refresh", "4");})
+        .if_true(refresh, |h| {h.header("Refresh", "5");})
         .content_length(page.len() as u64)
         .body(page))
 }

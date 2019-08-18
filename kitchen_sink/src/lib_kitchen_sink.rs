@@ -501,7 +501,7 @@ impl KitchenSink {
                 }
                 match origin {
                     Origin::CratesIo(name) => {
-                        let ver = self.index.crate_version_latest_unstable(name).context("rich_crate_version1")?;
+                        let ver = self.index.crate_version_latest_unstable(name).with_context(|e| format!("rich_crate_version1: {}", e))?;
                         self.rich_crate_version_from_crates_io(ver).map(|(krate, _)| krate)?
                     },
                     o => {

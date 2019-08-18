@@ -61,7 +61,7 @@ impl Page {
 }
 
 /// See `cat_page.rs.html`
-pub fn render_category(out: &mut dyn Write, cat: &Category, crates: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
+pub fn render_category(out: &mut impl Write, cat: &Category, crates: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
     let urler = Urler::new(None);
     let page = cat_page::CatPage::new(cat, crates, renderer).context("can't prepare rendering of category page")?;
     templates::cat_page(out, &page, &urler)?;
@@ -69,14 +69,14 @@ pub fn render_category(out: &mut dyn Write, cat: &Category, crates: &KitchenSink
 }
 
 /// See `homepage.rs.html`
-pub fn render_homepage(out: &mut dyn Write, crates: &KitchenSink) -> Result<(), failure::Error> {
+pub fn render_homepage<W>(out: &mut W, crates: &KitchenSink) -> Result<(), failure::Error> where W: ?Sized, for<'a> &'a mut W: Write {
     let urler = Urler::new(None);
     templates::homepage(out, &home_page::HomePage::new(crates)?, &urler)?;
     Ok(())
 }
 
 /// See `atom.rs.html`
-pub fn render_feed(out: &mut dyn Write, crates: &KitchenSink) -> Result<(), failure::Error> {
+pub fn render_feed(out: &mut impl Write, crates: &KitchenSink) -> Result<(), failure::Error> {
     let urler = Urler::new(None);
     templates::atom(out, &home_page::HomePage::new(crates)?, &urler)?;
     Ok(())
@@ -112,7 +112,7 @@ pub fn render_sitemap(sitemap: &mut impl Write, crates: &KitchenSink) -> Result<
 }
 
 /// See `crate_page.rs.html`
-pub fn render_crate_page(out: &mut dyn Write, all: &RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<String, failure::Error> {
+pub fn render_crate_page<W: Write>(out: &mut W, all: &RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<String, failure::Error> {
     if stopped() {
         Err(KitchenSinkErr::Stopped)?;
     }
@@ -124,7 +124,7 @@ pub fn render_crate_page(out: &mut dyn Write, all: &RichCrate, ver: &RichCrateVe
 }
 
 /// See `install.rs.html`
-pub fn render_install_page(out: &mut dyn Write, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
+pub fn render_install_page(out: &mut impl Write, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
     if stopped() {
         Err(KitchenSinkErr::Stopped)?;
     }
@@ -135,7 +135,7 @@ pub fn render_install_page(out: &mut dyn Write, ver: &RichCrateVersion, kitchen_
 }
 
 /// See `crate_page.rs.html`
-pub fn render_static_page(out: &mut dyn Write, title: String, page: &Markup, renderer: &Renderer) -> Result<(), failure::Error> {
+pub fn render_static_page(out: &mut impl Write, title: String, page: &Markup, renderer: &Renderer) -> Result<(), failure::Error> {
     if stopped() {
         Err(KitchenSinkErr::Stopped)?;
     }

@@ -327,7 +327,7 @@
             }
             <nav aria-label="Dependencies">
             <ul class="@if normal.len() > 4 {long}">
-              @:deps_list(c, url, &normal, "")
+              @:deps_list(c, url, &normal, None)
               @if let Some(links) = c.ver.links() {
                 <li><span class="label label-build">links</span> <code>@links</code></li>
               }
@@ -336,8 +336,8 @@
               @if c.ver.has_buildrs() {
                 <li><span class="label label-build">build</span> <code>build.rs</code></li>
               }
-              @:deps_list(c, url, &build, "build")
-              @:deps_list(c, url, &dev, "dev")
+              @:deps_list(c, url, &build, Some("build"))
+              @:deps_list(c, url, &dev, Some("dev"))
             </ul>
             </nav>
           } else {

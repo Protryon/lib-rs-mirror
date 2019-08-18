@@ -3,11 +3,12 @@
 @use kitchen_sink::Target;
 @use crate::Urler;
 @use crate::CratePage;
-@(c: &CratePage, url: &Urler, set: &[RichDep], label: &str)
+
+@(c: &CratePage, url: &Urler, set: &[RichDep], label: Option<&str>)
 
 @for d in set.iter() {
     <li property="requirements" class="@if d.dep.optional() {optional}">
-      @if label != "" {
+      @if let Some(label) = label {
         <span class="label label-@label">
           @label
         </span>

@@ -1,18 +1,7 @@
 @use crate::templates::base;
-@use crate::templates::labels;
-@use crate::templates::downloads;
-@use crate::templates::deps_list;
 @use crate::install_page::InstallPage;
-@use crate::date_now;
-@use crate::iter::*;
 @use crate::Urler;
-@use crate::CratePage;
-@use crate::Contributors;
-@use rich_crate::Include;
 @use rich_crate::Origin;
-@use rich_crate::Edition;
-@use std::ops::Div;
-@use udedokei::LanguageExt;
 
 @(url: &Urler, c: &InstallPage)
 

@@ -25,6 +25,14 @@
   </header>
   <main>
     <div class="inner-col">
+        @if c.ver.is_yanked() {
+            <p>This crate is yanked (soft-deleted), so it can't be installed any more.</p>
+        } else {
+        @if c.ver.is_nightly() {
+            <p>This crate requires a nightly (unstable, experimental) compiler version. To switch to it, you must have Rust installed via <a href="https://rustup.rs">Rustup</a>, and run:</p>
+            <pre class="to-copy"><code>rustup default <b>nightly</b></code></pre>
+            <p>Run <code>rustup default stable</code> to switch back.</p>
+        }
         @if c.ver.has_bin() && c.ver.has_lib() {
             <p>@c.ver.capitalized_name() is both an executable binary that can be run, and a library that can be used in Rust programs.</p>
         }
@@ -108,7 +116,7 @@
             @if let Some(url) = c.api_reference_url() {
                 Read the <a href="@url"><code>@c.ver.lib_name()</code> documentation</a>.
             }</p>
-        }
+        }}
         <p><a href="@url.krate(&c.ver)" rel="up">Back to the crate overview</a>.</p>
         <hr>
         @if let Some(readme) = c.ver.readme() {

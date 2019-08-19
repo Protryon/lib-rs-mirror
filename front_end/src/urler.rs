@@ -44,8 +44,8 @@ impl Urler {
     /// Summary of all dependencies
     pub fn deps(&self, krate: &RichCrateVersion) -> String {
         match krate.origin() {
-            Origin::CratesIo(name) => {
-                format!("https://deps.rs/crate/{}/{}", encode(&name), encode(krate.version()))
+            Origin::CratesIo(_) => {
+                format!("https://deps.rs/crate/{}/{}", encode(&krate.short_name()), encode(krate.version()))
             },
             Origin::GitHub {repo, ..} => {
                 format!("https://deps.rs/repo/github/{}/{}", encode(&repo.owner), encode(&repo.repo))
@@ -58,8 +58,8 @@ impl Urler {
 
     pub fn install(&self, origin: &Origin) -> String {
         match origin {
-            Origin::CratesIo(name) => {
-                format!("/install/{}", encode(name))
+            Origin::CratesIo(lowercase_name) => {
+                format!("/install/{}", encode(lowercase_name))
             },
             Origin::GitHub {repo, package} | Origin::GitLab {repo, package} => {
                 let host = if let Origin::GitHub {..} = origin {"gh"} else {"lab"};
@@ -74,7 +74,7 @@ impl Urler {
 
     pub fn crates_io_crate(&self, origin: &Origin) -> Option<String> {
         match origin {
-            Origin::CratesIo(name) => Some(self.crates_io_crate_by_lowercase_name(name)),
+            Origin::CratesIo(lowercase_name) => Some(self.crates_io_crate_by_lowercase_name(lowercase_name)),
             _ => None,
         }
     }
@@ -90,12 +90,12 @@ impl Urler {
 
     pub fn crate_by_origin(&self, o: &Origin) -> String {
         match o {
-            Origin::CratesIo(crate_name) => {
+            Origin::CratesIo(lowercase_name) => {
                 match self.own_crate {
-                    Some(Origin::CratesIo(ref own)) if own == crate_name => {
-                        self.crates_io_crate_by_lowercase_name(crate_name)
+                    Some(Origin::CratesIo(ref own)) if own == lowercase_name => {
+                        self.crates_io_crate_by_lowercase_name(lowercase_name)
                     },
-                    _ => format!("/crates/{}", encode(crate_name)),
+                    _ => format!("/crates/{}", encode(lowercase_name)),
                 }
             },
             Origin::GitHub {repo, package} => {

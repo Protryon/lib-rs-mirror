@@ -47,8 +47,8 @@
                     <h2>Installing @for bin in &bins {<code>@bin</code> } executables</h2>
                 }
                 <p>Assuming you have <a href="https://www.rust-lang.org/tools/install">Rust/Cargo installed</a>, run this command in a terminal:</p>
-                @if let Origin::CratesIo(name) = c.ver.origin() {
-                    <pre class="to-copy"><code><b>cargo install</b> -f @name</code></pre>
+                @if let Origin::CratesIo(_) = c.ver.origin() {
+                    <pre class="to-copy"><code><b>cargo install</b> -f @c.ver.short_name()</code></pre>
                 }
                 @if let Some((repo, package)) = c.ver.origin().clone().into_repo() {
                     <pre class="to-copy"><code><b>cargo install</b> -f @package --git @repo.canonical_git_url().unwrap()</code></pre>
@@ -85,8 +85,8 @@
             }
             }
             <p>To add it manually, edit your project's <code>Cargo.toml</code> file and add to the @if c.is_build {<code>[build-dependencies]</code> or} <code>[dependencies]</code> section:</p>
-            @if let Origin::CratesIo(name) = c.ver.origin() {
-                <pre class="to-copy"><code>@name = "@c.ver.version()"</code></pre>
+            @if let Origin::CratesIo(_) = c.ver.origin() {
+                <pre class="to-copy"><code>@c.ver.short_name() = "@c.ver.version()"</code></pre>
             }
             @if let Some((repo, package)) = c.ver.origin().clone().into_repo() {
                 <pre class="to-copy"><code>@package = @"{" git = "@repo.canonical_git_url().unwrap()" @"}"</code></pre>
@@ -106,8 +106,8 @@
                 <pre class="to-copy"><code><b>cargo add</b> @package --git @repo.canonical_git_url().unwrap()</code></pre>
             }
             <p>To add it manually, edit your project's <code>Cargo.toml</code> file and add to the <code>[dependencies]</code> section:</p>
-            @if let Origin::CratesIo(name) = c.ver.origin() {
-                <pre class="to-copy"><code>@name = "@c.ver.version()"</code></pre>
+            @if let Origin::CratesIo(_) = c.ver.origin() {
+                <pre class="to-copy"><code>@c.ver.short_name() = "@c.ver.version()"</code></pre>
             }
             @if let Some((repo, package)) = c.ver.origin().clone().into_repo() {
                 <pre class="to-copy"><code>@package = @"{" git = "@repo.canonical_git_url().unwrap()" @"}"</code></pre>

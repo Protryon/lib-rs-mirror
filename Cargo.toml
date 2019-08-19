@@ -39,6 +39,7 @@ rmp = { git = "https://github.com/3Hren/msgpack-rust", rev = "b93ea78dcb1c0326a3
 rmp-serde = { git = "https://github.com/3Hren/msgpack-rust", rev = "b93ea78dcb1c0326a3195790cbbad9dda16e7027" }
 onig = { git = "https://github.com/kornelski/rust-onig", branch = "bindgen" }
 onig_sys = { git = "https://github.com/kornelski/rust-onig", branch = "bindgen" }
+ructe = { git = "https://github.com/kornelski/ructe", branch = "dyn" }
 
 [patch.'https://gitlab.com/crates.rs/crate_git_checkout.git']
 crate_git_checkout = { path = "crate_git_checkout" }

@@ -287,11 +287,9 @@ pub fn find_dependency_changes(repo: &Repository, mut cb: impl FnMut(HashSet<Str
         for (dep, state) in &mut newer_deps {
             // if it's Some(), it's going to be added in the future! so it's not there now
             // (as a side effect if dependency is added, removed, then re-added, it tracks only the most recent add/remove)
-            if state.since.is_none() {
-                if !older_deps.contains(dep) {
-                    added.insert(dep.clone());
-                    state.since = Some(age);
-                }
+            if state.since.is_none() && !older_deps.contains(dep) {
+                added.insert(dep.clone());
+                state.since = Some(age);
             }
         }
 

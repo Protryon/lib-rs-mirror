@@ -61,7 +61,7 @@ impl Origin {
         match host {
             "crates.io" => Self::from_crates_io_name(n.next().expect("parse")),
             "github" | "gitlab" => {
-                let mut n = n.next().expect("parse").splitn(3, "/");
+                let mut n = n.next().expect("parse").splitn(3, '/');
                 let owner = n.next().expect("parse").into();
                 let repo = n.next().expect("parse").into();
                 let package = n.next().expect("parse");

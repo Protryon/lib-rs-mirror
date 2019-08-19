@@ -1111,7 +1111,7 @@ fn chop3words(s: &str) -> &str {
             }
         }
     }
-    return s;
+    s
 }
 
 #[inline]

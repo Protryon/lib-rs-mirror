@@ -774,11 +774,11 @@ impl KitchenSink {
             // sometimes uncompressed sources without junk are smaller than tarball with junk
             crate_decompressed_size: (meta.decompressed_size as u32).max(crate_compressed_size),
             is_nightly: meta.is_nightly,
-            has_buildrs: has_buildrs,
-            has_code_of_conduct: has_code_of_conduct,
+            has_buildrs,
+            has_code_of_conduct,
             readme: meta.readme,
             lib_file: meta.lib_file.map(|s| s.into()),
-            path_in_repo: path_in_repo,
+            path_in_repo,
             github_description,
             github_keywords,
             keywords: derived_keywords,
@@ -973,7 +973,7 @@ impl KitchenSink {
         })
         .unwrap_or(false);
         self.url_check_cache.set(url, res).unwrap();
-        return res;
+        res
     }
 
     fn is_docs_rs_link(d: &str) -> bool {

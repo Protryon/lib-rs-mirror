@@ -253,7 +253,7 @@ impl RichCrateVersion {
         self.manifest.lib.as_ref()
             .and_then(|l| l.name.as_ref())
             .map(|n| n.as_str())
-            .unwrap_or(self.short_name())
+            .unwrap_or_else(|| self.short_name())
     }
 
     pub fn has_lib(&self) -> bool {
@@ -266,7 +266,7 @@ impl RichCrateVersion {
 
     pub fn bin_names(&self) -> Vec<&str> {
         self.manifest.bin.iter().map(|bin| {
-            bin.name.as_ref().map(|n| n.as_str()).unwrap_or(self.short_name())
+            bin.name.as_ref().map(|n| n.as_str()).unwrap_or_else(|| self.short_name())
         }).collect()
     }
 
@@ -386,17 +386,15 @@ impl ManifestExt for Manifest {
             for (name, dep) in src {
                 use std::collections::btree_map::Entry::*;
                 let package = dep.package().unwrap_or(&name);
-                match dest.entry(package.to_string()) {
-                    Vacant(e) => {
-                        e.insert(RichDep {
-                            package: package.to_string(),
-                            dep: dep.clone(),
-                            only_for_targets: vec![target.parse()?],
-                            only_for_features: Vec::new(),
-                            with_features: Vec::new(),
-                        });
-                    },
-                    _ => {}, // don't add platform info to existing cross-platform deps
+                if let Vacant(e) = dest.entry(package.to_string()) {
+                    e.insert(RichDep {
+                        package: package.to_string(),
+                        dep: dep.clone(),
+                        only_for_targets: vec![target.parse()?],
+                        only_for_features: Vec::new(),
+                        with_features: Vec::new(),
+                    });
+                    // otherwise don't add platform info to existing cross-platform deps
                 }
             }
             Ok(())

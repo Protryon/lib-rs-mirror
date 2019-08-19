@@ -30,7 +30,7 @@ lazy_static! {
     "while", "will", "wip", "with", "without", "working", "works", "writing",
     "written", "yet", "you", "your", "build status", "meritbadge", "common",
     "file was generated", "easy to use",
-    ].iter().map(|s|*s).collect();
+    ].iter().copied().collect();
 
     /// If one is present, ignore the others
     pub(crate) static ref COND_STOPWORDS: HashMap<&'static str, Option<&'static [&'static str]>> = [

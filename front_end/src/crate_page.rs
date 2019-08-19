@@ -613,7 +613,7 @@ impl<'a> CratePage<'a> {
 
     /// data for piechart
     pub fn langs_chart(&self, stats: &Stats, width_px: u32) -> Option<LanguageStats> {
-        let mut res: Vec<_> = stats.langs.iter().filter(|(lang, lines)| lines.code > 0 && lang.is_code()).map(|(a, b)| (a.clone(), b.clone())).collect();
+        let mut res: Vec<_> = stats.langs.iter().filter(|(lang, lines)| lines.code > 0 && lang.is_code()).map(|(a, b)| (*a, *b)).collect();
         if !res.is_empty() {
             res.sort_by_key(|(_, lines)| lines.code);
             let biggest = res.last().cloned().unwrap();

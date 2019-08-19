@@ -83,7 +83,7 @@ pub fn read_archive(archive: impl Read, name: &str, ver: &str) -> Result<CrateFi
             },
             _ => {},
         }
-        return Ok(());
+        Ok(())
     })?;
     collect.finish()
 }

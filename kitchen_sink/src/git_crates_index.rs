@@ -1,32 +1,27 @@
 use crate::KitchenSinkErr;
 use crate::Origin;
-use std::fs::File;
-use std::io::BufReader;
+use std::fs;
 use std::path::Path;
-use std::path::PathBuf;
 
 type FxHashSet<V> = std::collections::HashSet<V, ahash::ABuildHasher>;
 
 pub struct GitIndex {
-    #[allow(unused)]
-    path: PathBuf,
     index: FxHashSet<Origin>,
 }
 
 impl GitIndex {
     pub fn new(dir: &Path) -> Result<Self, KitchenSinkErr> {
-        let path = dir.join("git_crates.json");
-        let crates: Vec<String> = if path.exists() {
-            match File::open(&path) {
-                Ok(file) => serde_json::from_reader(BufReader::new(file)).map_err(|e| KitchenSinkErr::GitIndexParse(e.to_string()))?,
+        let path = dir.join("git_crates.txt");
+        let index = if path.exists() {
+            match fs::read_to_string(&path) {
+                Ok(file) => file.split('\n').map(|s| s.trim()).filter(|s| !s.is_empty()).map(Origin::from_str).collect(),
                 Err(e) => return Err(KitchenSinkErr::GitIndexFile(path, e.to_string())),
             }
         } else {
-            Vec::new()
+            Default::default()
         };
         Ok(Self {
-            path,
-            index: crates.into_iter().map(Origin::from_str).collect()
+            index,
         })
     }
 

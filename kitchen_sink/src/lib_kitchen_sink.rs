@@ -372,10 +372,10 @@ impl KitchenSink {
                 let releases = self.gh.releases(repo, cachebust)?.ok_or_else(|| KitchenSinkErr::CrateNotFound(origin.clone())).context("releases not found")?;
                 let versions: Vec<_> = releases.into_iter().filter_map(|r| {
                     let date = r.published_at.or(r.created_at)?;
-                    let num = r.tag_name?;
-                    let num = num.trim_start_matches(|c:char| !c.is_numeric());
+                    let num_full = r.tag_name?;
+                    let num = num_full.trim_start_matches(|c:char| !c.is_numeric());
                     // verify that it semver-parses
-                    let _ = SemVer::parse(num).map_err(|e| eprintln!("{:?}: ignoring {}, {}", origin, num, e)).ok()?;
+                    let _ = SemVer::parse(num).map_err(|e| eprintln!("{:?}: ignoring {}, {}", origin, num_full, e)).ok()?;
                     Some(CrateVersion {
                         num: num.to_string(),
                         yanked: r.draft.unwrap_or(false),
@@ -739,7 +739,11 @@ impl KitchenSink {
                     }
                     warnings.extend(self.remove_redundant_links(package, maybe_repo.as_ref()));
                 }
-                github_description = ghrepo.description;
+                if package.description.is_none() {
+                    package.description = ghrepo.description;
+                } else {
+                    github_description = ghrepo.description;
+                }
                 github_name = Some(ghrepo.name);
             }
         }

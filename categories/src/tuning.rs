@@ -379,7 +379,7 @@ lazy_static! {
         (Cond::Any(&["downsample", "dsp", "samplerate"]), &[("multimedia::audio", 1.2, 0.1), ("filesystem", 0.7, 0.)]),
         (Cond::Any(&["music", "chiptune", "synth", "chords", "audio", "sound", "sounds", "speech", "microphone"]),
             &[("multimedia::audio", 1.3, 0.3), ("command-line-utilities", 0.8, 0.), ("multimedia::images", 0.6, 0.), ("rendering::graphics-api", 0.75, 0.), ("cryptography::cryptocurrencies", 0.6, 0.), ("command-line-interface", 0.5, 0.), ("caching", 0.8, 0.)]),
-        (Cond::Any(&["flac", "vst", "vorbis", "midi", "pulseaudio", "mp3", "aac", "wav"]),
+        (Cond::Any(&["flac", "spotify", "vst", "vorbis", "midi", "pulseaudio", "mp3", "aac", "wav"]),
             &[("multimedia::audio", 1.3, 0.3), ("command-line-utilities", 0.8, 0.), ("multimedia::images", 0.6, 0.), ("rendering::graphics-api", 0.75, 0.), ("cryptography::cryptocurrencies", 0.6, 0.), ("command-line-interface", 0.5, 0.), ("caching", 0.8, 0.)]),
         (Cond::Any(&["nyquist"]), &[("multimedia::audio", 1.1, 0.1), ("game-engines", 0.8, 0.)]),
         (Cond::All(&["mod", "tracker"]), &[("multimedia::audio", 1.1, 0.)]),
@@ -747,6 +747,7 @@ lazy_static! {
         (Cond::Any(&["hash", "hashing", "sodium"]), &[("algorithms", 1.2, 0.1), ("cryptography", 1.1, 0.1), ("cryptography::cryptocurrencies", 0.7, 0.), ("no-std", 0.9, 0.), ("date-and-time", 0.5, 0.), ("memory-management", 0.7, 0.), ("development-tools", 0.7, 0.), ("command-line-utilities", 0.5, 0.)]),
         (Cond::All(&["hash", "function"]), &[("algorithms", 1.2, 0.1), ("cryptography", 1.1, 0.1)]),
         (Cond::Any(&["crc32", "fnv", "phf"]), &[("algorithms", 1.2, 0.1), ("cryptography", 0.4, 0.), ("data-structures", 0.9, 0.)]),
+        (Cond::Any(&["fetching"]), &[("encoding", 0.7, 0.), ("cryptography", 0.9, 0.)]),
 
         (Cond::Any(&["pickle", "serde"]), &[("encoding", 1.3, 0.1), ("embedded", 0.9, 0.), ("development-tools", 0.8, 0.),
             ("parsing", 0.9, 0.), ("parser-implementations", 1.2, 0.1), ("algorithms", 0.8, 0.)]),

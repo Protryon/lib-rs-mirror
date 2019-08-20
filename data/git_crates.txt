@@ -93,6 +93,8 @@ github:libra/libra/libra_node
 github:libra/libra/libra_wallet
 github:libra/libra/storage_service
 github:librespot-org/librespot/librespot
+github:librespot-org/librespot/librespot-audio
+github:librespot-org/librespot/librespot-connect
 github:lifthrasiir/angolmois-rust/angolmois
 github:limeth/ethaddrgen/ethaddrgen
 github:limeth/euclider/euclider
@@ -148,6 +150,7 @@ github:paritytech/polkadot/polkadot-service
 github:paritytech/substrate/substrate-cli
 github:pcwalton/sprocketnes/sprocketnes
 github:pingcap/tipb/tipb
+github:pop-os/firmware-manager/firmware-manager
 github:pop-os/system76-power/system76-power
 github:purpleprotocol/purple/purple
 github:rawrasaur/rust-jdbc/jdbc

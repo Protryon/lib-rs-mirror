@@ -222,18 +222,19 @@
                   @if lic.len() < 8 {
                     license
                   }
-                }
-                @if let Some(filename) = c.ver.license_file() {
-                  <b title="@filename">Custom license</b>
+                } else {
+                  @if let Some(filename) = c.ver.license_file() {
+                    <b title="@filename">Custom license</b>
+                  }
                 }
               </section>
 
-              @if let Some(((tarball, uncompressed), _, _)) = c.sizes {
+              @if let Some(sz) = &c.sizes {
                 <p>
-                  <span title="@c.format_kbytes(tarball) as tarball">@if tarball > 1000000 || uncompressed > 10000000 {
-                    <b>@c.format_kbytes(tarball.max(uncompressed))</b>
+                  <span title="@(c.format_kbytes(sz.tarball)) as tarball">@if sz.tarball > 1000000 || sz.uncompressed > 10000000 {
+                    <b>@c.format_kbytes(sz.tarball.max(sz.uncompressed))</b>
                   } else {
-                    @c.format_kbytes(tarball.max(uncompressed))
+                    @c.format_kbytes(sz.tarball.max(sz.uncompressed))
                   }</span>
                   @if let Some((total, _)) = c.lang_stats {
                     @if total >= 50 {
@@ -310,17 +311,17 @@
             } else {
               <h4>No runtime deps</h4>
             }
-            @if let Some(((main_tarball, _), _, deps)) = c.sizes {
-              @if deps.tarball > 1000000 || deps.tarball > main_tarball.div(2) {
+            @if let Some(sz) = &c.sizes {
+              @if sz.typical.tarball > 1000000 || sz.typical.tarball > sz.tarball.div(2) {
                 <p>
-                  <span title="amortized size; approx. @c.format_kbytes(deps.tarball) compressed">@if deps.tarball > 8000000 || deps.uncompressed > 50000000 {
-                    ~<b>@c.format_kbytes(deps.tarball.max(deps.uncompressed))</b>
+                  <span title="amortized size; approx. @c.format_kbytes(sz.typical.tarball) compressed">@if sz.typical.tarball > 8000000 || sz.typical.uncompressed > 50000000 {
+                    ~<b>@c.format_kbytes(sz.typical.tarball.max(sz.typical.uncompressed))</b>
                   } else {
-                    ~@c.format_kbytes(deps.tarball.max(deps.uncompressed))
+                    ~@c.format_kbytes(sz.typical.tarball.max(sz.typical.uncompressed))
                   }</span>
                   <br>
-                  @if deps.lines >= 10000 {
-                    @if let Some((val, unit)) = Some(c.format_knumber(deps.lines)) {
+                  @if sz.typical.lines >= 10000 {
+                    @if let Some((val, unit)) = Some(c.format_knumber(sz.typical.lines)) {
                       <span title="estimated">~@val@unit</span> <abbr title="approx. additional lines of code">SLoC</abbr>
                     }
                   }

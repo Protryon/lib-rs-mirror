@@ -367,6 +367,7 @@ impl ManifestExt for Manifest {
                 ))
     }
 
+    /// run dev build
     fn direct_dependencies(&self) -> Result<(Vec<RichDep>, Vec<RichDep>, Vec<RichDep>), CfgErr> {
         fn to_dep((name, dep): (&String, &Dependency)) -> (String, RichDep) {
             let package = dep.package().unwrap_or(&name).to_owned();

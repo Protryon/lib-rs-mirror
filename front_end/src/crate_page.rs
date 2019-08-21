@@ -31,6 +31,13 @@ use udedokei::LanguageExt;
 use udedokei::{Language, Lines, Stats};
 use url::Url;
 
+pub struct CrateSizes {
+    pub tarball: usize,
+    pub uncompressed: usize,
+    pub minimal: DepsSize,
+    pub typical: DepsSize,
+}
+
 /// Data sources used in `crate_page.rs.html`
 pub struct CratePage<'a> {
     pub all: &'a RichCrate,
@@ -40,7 +47,7 @@ pub struct CratePage<'a> {
     pub top_keyword: Option<(u32, String)>,
     pub all_contributors: (Vec<CrateAuthor<'a>>, Vec<CrateAuthor<'a>>, bool, usize),
     /// own, deps (tarball, uncompressed source); last one is sloc
-    pub sizes: Option<((usize, usize), DepsSize, DepsSize)>,
+    pub sizes: Option<CrateSizes>,
     pub lang_stats: Option<(usize, Stats)>,
 }
 
@@ -98,8 +105,8 @@ impl<'a> CratePage<'a> {
             sizes: None,
             lang_stats: None,
         };
-        let (own_size, deps_size_minimal, deps_size_typical, lang_stats) = page.crate_size(deps?)?;
-        page.sizes = Some((own_size, deps_size_minimal, deps_size_typical));
+        let (sizes, lang_stats) = page.crate_size(deps?)?;
+        page.sizes = Some(sizes);
 
         let total = lang_stats.langs.iter().filter(|(lang, _)| lang.is_code()).map(|(_, lines)| lines.code).sum::<u32>();
         page.lang_stats = Some((total as usize, lang_stats));
@@ -661,7 +668,7 @@ impl<'a> CratePage<'a> {
         )
     }
 
-    fn crate_size(&self, deps: DepInfMap) -> CResult<((usize, usize), DepsSize, DepsSize, Stats)> {
+    fn crate_size(&self, deps: DepInfMap) -> CResult<(CrateSizes, Stats)> {
         let tmp: Vec<_> = deps
             .into_par_iter()
             .filter_map(|(name, (depinf, semver))| {
@@ -741,7 +748,12 @@ impl<'a> CratePage<'a> {
             }
         });
 
-        Ok((main_crate_size, deps_size_minimal, deps_size_typical, main_lang_stats))
+        Ok((CrateSizes {
+            tarball: main_crate_size.0,
+            uncompressed: main_crate_size.1,
+            minimal: deps_size_minimal,
+            typical: deps_size_typical,
+        }, main_lang_stats))
     }
 
     fn get_crate_of_dependency(&self, name: &str, _semver: ()) -> CResult<RichCrateVersion> {

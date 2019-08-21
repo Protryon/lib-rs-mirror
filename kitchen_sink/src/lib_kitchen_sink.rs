@@ -1005,14 +1005,13 @@ impl KitchenSink {
         }
     }
 
-    pub fn all_dependencies_flattened(&self, origin: &Origin) -> Result<DepInfMap, KitchenSinkErr> {
-        match origin {
+    pub fn all_dependencies_flattened(&self, krate: &RichCrateVersion) -> Result<DepInfMap, KitchenSinkErr> {
+        match krate.origin() {
             Origin::CratesIo(name) => {
                 self.index.all_dependencies_flattened(self.index.crates_io_crate_by_lowercase_name(name)?)
             },
             _ => {
-                eprintln!("deps unimplemented!()");
-                return Ok(Default::default())
+                self.index.all_dependencies_flattened(krate)
             }
         }
     }

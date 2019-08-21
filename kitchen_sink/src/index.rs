@@ -2,13 +2,16 @@ use crate::deps_stats::DepsStats;
 use crate::git_crates_index::*;
 use crate::KitchenSink;
 use crate::KitchenSinkErr;
-use crates_index;
 use crates_index::Crate;
+use crates_index::Dependency;
 use crates_index::Version;
+use crates_index;
 use lazyonce::LazyOnce;
 use parking_lot::Mutex;
 use parking_lot::RwLock;
 use rich_crate::Origin;
+use rich_crate::RichCrateVersion;
+use rich_crate::RichDep;
 use semver::Version as SemVer;
 use semver::VersionReq;
 use std::iter;
@@ -39,6 +42,82 @@ impl MiniVer {
             pre: self.pre.clone().into(),
             build: if self.build > 0 { vec![semver::Identifier::Numeric(self.build.into())] } else { Vec::new() },
         }
+    }
+}
+
+pub(crate) trait FeatureGetter {
+    fn get(&self, key: &str) -> Option<&Vec<String>>;
+}
+impl FeatureGetter for std::collections::HashMap<String, Vec<String>> {
+    fn get(&self, key: &str) -> Option<&Vec<String>> {
+        self.get(key)
+    }
+}
+impl FeatureGetter for std::collections::BTreeMap<String, Vec<String>> {
+    fn get(&self, key: &str) -> Option<&Vec<String>> {
+        self.get(key)
+    }
+}
+
+pub(crate) trait IVersion {
+    type Features: FeatureGetter;
+    fn name(&self) -> &str;
+    fn version(&self) -> &str;
+    fn dependencies(&self) -> Fudge;
+    fn features(&self) -> &Self::Features;
+    fn is_yanked(&self) -> bool;
+}
+
+impl IVersion for Version {
+    type Features = std::collections::HashMap<String, Vec<String>>;
+    fn name(&self) -> &str {self.name()}
+    fn version(&self) -> &str {self.version()}
+    fn dependencies(&self) -> Fudge {Fudge::CratesIo(self.dependencies())}
+    fn features(&self) -> &Self::Features  {self.features()}
+    fn is_yanked(&self) -> bool {self.is_yanked()}
+}
+
+pub(crate) trait ICrate {
+    type Ver: IVersion;
+    fn latest_version_with_features(&self, all_optional: bool) -> (&Self::Ver, Box<[Box<str>]>);
+}
+
+impl ICrate for Crate {
+    type Ver = Version;
+    fn latest_version_with_features(&self, all_optional: bool) -> (&Self::Ver, Box<[Box<str>]>) {
+        let latest = Index::highest_crates_io_version(self, true);
+        let mut features = Vec::with_capacity(if all_optional { latest.features().len() } else { 0 });
+        if all_optional {
+            features.extend(latest.features().iter().filter(|(_, v)| !v.is_empty()).map(|(c, _)| c.to_string().into_boxed_str()));
+        };
+        let features = features.into_boxed_slice();
+        (latest, features)
+    }
+}
+
+pub(crate) enum Fudge<'a> {
+    CratesIo(&'a [Dependency]),
+    Manifest((Vec<RichDep>, Vec<RichDep>, Vec<RichDep>)),
+}
+
+impl IVersion for RichCrateVersion {
+    type Features = std::collections::BTreeMap<String, Vec<String>>;
+    fn name(&self) -> &str {self.short_name()}
+    fn version(&self) -> &str {self.version()}
+    fn dependencies(&self) -> Fudge {Fudge::Manifest(self.direct_dependencies().unwrap())}
+    fn features(&self) -> &Self::Features {self.features()}
+    fn is_yanked(&self) -> bool {self.is_yanked()}
+}
+
+impl ICrate for RichCrateVersion {
+    type Ver = RichCrateVersion;
+    fn latest_version_with_features(&self, all_optional: bool) -> (&Self::Ver, Box<[Box<str>]>) {
+        let mut features = Vec::with_capacity(if all_optional { self.features().len() } else { 0 });
+        if all_optional {
+            features.extend(self.features().iter().filter(|(_, v)| !v.is_empty()).map(|(c, _)| c.to_string().into_boxed_str()));
+        };
+        let features = features.into_boxed_slice();
+        (self, features)
     }
 }
 
@@ -134,12 +213,12 @@ impl Index {
             .unwrap_or_else(|| krate.latest_version()) // latest_version = most recently published version
     }
 
-    pub(crate) fn deps_of_crate(&self, krate: &Crate, DepQuery { default, all_optional, dev }: DepQuery) -> Result<Dep, KitchenSinkErr> {
-        let latest = Self::highest_crates_io_version(krate, true);
-        let mut features = Vec::with_capacity(if all_optional { latest.features().len() } else { 0 });
-        if all_optional {
-            features.extend(latest.features().iter().filter(|(_, v)| !v.is_empty()).map(|(c, _)| c.to_string().into_boxed_str()));
-        };
+    pub(crate) fn deps_of_crate(&self, krate: &impl ICrate, query: DepQuery) -> Result<Dep, KitchenSinkErr> {
+        let (latest, features) = krate.latest_version_with_features(query.all_optional);
+        self.deps_of_crate_int(latest, features, query)
+    }
+
+    fn deps_of_crate_int(&self, latest: &impl IVersion, features: Box<[Box<str>]>, DepQuery { default, all_optional, dev }: DepQuery) -> Result<Dep, KitchenSinkErr> {
         Ok(Dep {
             semver: semver_parse(latest.version()).into(),
             runtime: self.deps_of_ver(latest, Features {
@@ -147,19 +226,19 @@ impl Index {
                 default,
                 build: false,
                 dev,
-                features: features.clone().into_boxed_slice(),
+                features: features.clone(),
             })?,
             build: self.deps_of_ver(latest, Features {
                 all_targets: all_optional,
                 default,
                 build: true,
                 dev,
-                features: features.into_boxed_slice(),
+                features,
             })?,
         })
     }
 
-    pub(crate) fn deps_of_ver(&self, ver: &Version, wants: Features) -> Result<ArcDepSet, KitchenSinkErr> {
+    pub(crate) fn deps_of_ver<'a>(&self, ver: &'a impl IVersion, wants: Features) -> Result<ArcDepSet, KitchenSinkErr> {
         let key = (format!("{}-{}", ver.name(), ver.version()).into(), wants);
         if let Some(cached) = self.cache.read().get(&key) {
             return Ok(cached.clone());
@@ -187,37 +266,55 @@ impl Index {
             }
         }
 
+        let deps = ver.dependencies();
         let mut set: FxHashMap<DepName, (_, _, SemVer, FxHashSet<String>)> = FxHashMap::with_capacity_and_hasher(60, Default::default());
-        for d in ver.dependencies() {
-            let package = d.package().unwrap_or_else(|| d.name()).to_ascii_lowercase();
-
+        let mut iter1;
+        let mut iter2;
+        let deps: &mut dyn Iterator<Item=_> = match deps {
+            Fudge::CratesIo(dep) => {
+                iter1 = dep.iter().map(|d| {
+                    (d.crate_name().to_ascii_lowercase(), d.kind().unwrap_or("normal"), d.target().is_some(), d.is_optional(), d.requirement(), d.has_default_features(), d.features())
+                });
+                &mut iter1
+            },
+            Fudge::Manifest((ref run, ref dev, ref build)) => {
+                iter2 = run.iter().map(|r| (r, "normal"))
+                .chain(dev.iter().map(|r| (r, "dev")))
+                .chain(build.iter().map(|r| (r, "build")))
+                .map(|(r, kind)| {
+                    (r.package.to_ascii_lowercase(), kind, !r.only_for_targets.is_empty(), r.is_optional(), r.dep.req(), true, &r.with_features[..])
+                });
+                &mut iter2
+            },
+        };
+        for (crate_name, kind, target_specific, is_optional, requirement, has_default_features, features) in deps {
             // people forget to include winapi conditionally
-            let is_target_specific = package == "winapi" || d.target().is_some();
+            let is_target_specific = crate_name == "winapi" || target_specific;
             if !wants.all_targets && is_target_specific {
                 continue; // FIXME: allow common targets?
             }
             // hopefully nobody uses clippy at runtime, they just fail to make it dev dep
-            if !wants.dev && package == "clippy" && d.is_optional() {
+            if !wants.dev && crate_name == "clippy" && is_optional {
                 continue;
             }
 
-            match d.kind() {
-                Some("normal") | None => (),
-                Some("build") if wants.build => (),
-                Some("dev") if wants.dev => (),
+            match kind {
+                "normal" => (),
+                "build" if wants.build => (),
+                "dev" if wants.dev => (),
                 _ => continue,
             }
 
-            let enable_dep_features = to_enable.get(&package);
-            if d.is_optional() && enable_dep_features.is_none() {
+            let enable_dep_features = to_enable.get(&crate_name);
+            if is_optional && enable_dep_features.is_none() {
                 continue;
             }
 
-            let req = VersionReq::parse(d.requirement()).map_err(|_| KitchenSinkErr::SemverParsingError)?;
-            let krate = match self.crates_io_crate_by_lowercase_name(&package) {
+            let req = VersionReq::parse(requirement).map_err(|_| KitchenSinkErr::SemverParsingError)?;
+            let krate = match self.crates_io_crate_by_lowercase_name(&crate_name) {
                 Ok(k) => k,
                 Err(e) => {
-                    eprintln!("{}@{} depends on missing crate {} (@{}): {}", ver.name(), ver.version(), package, req, e);
+                    eprintln!("{}@{} depends on missing crate {} (@{}): {}", ver.name(), ver.version(), crate_name, req, e);
                     continue;
                 },
             };
@@ -228,20 +325,20 @@ impl Index {
                     req.matches(&semver)
                 })
                 .unwrap_or_else(|| {
-                    let ver = krate.latest_version(); // bad version, but it shouldn't happen anywya
-                    let semver = semver_parse(ver.version());
-                    (ver, semver)
+                    let fallback = krate.latest_version(); // bad version, but it shouldn't happen anyway
+                    let semver = semver_parse(fallback.version());
+                    (fallback, semver)
                 });
 
 
             let key = {
                 let mut inter = self.inter.write();
-                (inter.get_or_intern(package), inter.get_or_intern(matched.version()))
+                (inter.get_or_intern(crate_name), inter.get_or_intern(matched.version()))
             };
 
             let (_, _, _, all_features) = set.entry(key)
-                .or_insert_with(|| (d, matched.clone(), semver, FxHashSet::default()));
-            all_features.extend(d.features().iter().cloned());
+                .or_insert_with(|| (has_default_features, matched.clone(), semver, FxHashSet::default()));
+            all_features.extend(features.iter().cloned());
             if let Some(s) = enable_dep_features {
                 all_features.extend(s.iter().map(|s| s.to_string()));
             }
@@ -253,20 +350,20 @@ impl Index {
         let key = (key_id_part, wants.clone());
         self.cache.write().insert(key, result.clone());
 
-        let set: Result<_,_> = set.into_iter().map(|(k, (d, matched, semver, all_features))| {
+        let set: Result<_,_> = set.into_iter().map(|(k, (has_default_features, matched, semver, all_features))| {
             let all_features = all_features.into_iter().map(Into::into).collect::<Vec<_>>().into_boxed_slice();
             let runtime = self.deps_of_ver(&matched, Features {
                 all_targets: wants.all_targets,
                 build: false,
                 dev: false, // dev is only for top-level
-                default: d.has_default_features(),
+                default: has_default_features,
                 features: all_features.clone(),
             })?;
             let build = self.deps_of_ver(&matched, Features {
                 all_targets: wants.all_targets,
                 build: true,
                 dev: false, // dev is only for top-level
-                default: d.has_default_features(),
+                default: has_default_features,
                 features: all_features,
             })?;
             Ok((k, Dep {

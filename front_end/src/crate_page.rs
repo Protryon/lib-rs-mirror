@@ -87,7 +87,7 @@ impl<'a> CratePage<'a> {
             || kitchen_sink.top_keyword(all),
             || rayon::join(
                 || kitchen_sink.all_contributors(ver),
-                || kitchen_sink.all_dependencies_flattened(ver.origin())));
+                || kitchen_sink.all_dependencies_flattened(ver)));
         let mut page = Self {
             top_keyword: top_keyword?,
             all_contributors: all_contributors?,

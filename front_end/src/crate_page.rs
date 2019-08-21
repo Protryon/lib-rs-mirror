@@ -263,11 +263,51 @@ impl<'a> CratePage<'a> {
 
     pub fn format_kbytes(&self, bytes: usize) -> String {
         let (num, unit) = match bytes {
-            0..=800_000 => ((bytes + 999) / 1000, "KB"),
+            0..=100_000 => ((bytes + 999) / 1000, "KB"),
+            0..=800_000 => ((bytes + 3999) / 5000 * 5, "KB"),
             0..=9_999_999 => return format!("{}MB", ((bytes + 250_000) / 500_000) as f64 * 0.5),
             _ => ((bytes + 500_000) / 1_000_000, "MB"),
         };
         format!("{}{}", Numeric::english().format_int(num), unit)
+    }
+
+    fn format_number_frac(num: f64) -> String {
+        if num > 0.05 && num < 10. && num.fract() > 0.09 && num.fract() < 0.9 {
+            if num < 3. {
+                format!("{:.1}", num)
+            } else {
+                format!("{}", (num * 2.).round() / 2.)
+            }
+        } else {
+            Numeric::english().format_int(if num > 500. {
+                (num / 10.).round() * 10.
+            } else if num > 100. {
+                (num / 5.).round() * 5.
+            } else {
+                num.round()
+            })
+        }
+    }
+
+    pub fn format_kbytes_range(&self, a: usize, b: usize) -> String {
+        let min_bytes = a.min(b);
+        let max_bytes = a.max(b);
+
+        // if the range is small, just display the upper number
+        if min_bytes * 4 > max_bytes * 3 || max_bytes < 250_000 {
+            return self.format_kbytes(max_bytes);
+        }
+
+        let (denom, unit) = match max_bytes {
+            0..=800_000 => (1000., "KB"),
+            _ => (1_000_000., "MB"),
+        };
+        let mut low_val = min_bytes as f64 / denom;
+        let high_val = max_bytes as f64 / denom;
+        if low_val > 1. && high_val > 10. {
+            low_val = low_val.round(); // spread is so high that precision of low end isn't relevant
+        }
+        format!("{}–{}{}", Self::format_number_frac(low_val), Self::format_number_frac(high_val), unit)
     }
 
     /// Display number 0..1 as percent

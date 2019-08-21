@@ -315,9 +315,9 @@
               @if sz.typical.tarball > 1000000 || sz.typical.tarball > sz.tarball.div(2) {
                 <p>
                   <span title="amortized size; approx. @c.format_kbytes(sz.typical.tarball) compressed">@if sz.typical.tarball > 8000000 || sz.typical.uncompressed > 50000000 {
-                    ~<b>@c.format_kbytes(sz.typical.tarball.max(sz.typical.uncompressed))</b>
+                    ~<b>@c.format_kbytes_range(sz.minimal.uncompressed, sz.typical.tarball.max(sz.typical.uncompressed))</b>
                   } else {
-                    ~@c.format_kbytes(sz.typical.tarball.max(sz.typical.uncompressed))
+                    ~@c.format_kbytes_range(sz.minimal.uncompressed, sz.typical.tarball.max(sz.typical.uncompressed))
                   }</span>
                   <br>
                   @if sz.typical.lines >= 10000 {

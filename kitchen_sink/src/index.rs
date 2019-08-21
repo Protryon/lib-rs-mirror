@@ -160,10 +160,11 @@ impl Index {
     }
 
     pub(crate) fn deps_of_ver(&self, ver: &Version, wants: Features) -> Result<ArcDepSet, KitchenSinkErr> {
-        let key = (format!("{}-{}", ver.name(), ver.version()).into(), wants.clone());
+        let key = (format!("{}-{}", ver.name(), ver.version()).into(), wants);
         if let Some(cached) = self.cache.read().get(&key) {
             return Ok(cached.clone());
         }
+        let (key_id_part, wants) = key;
 
         let ver_features = ver.features(); // available features
         let mut to_enable = FxHashMap::with_capacity_and_hasher(wants.features.len(), Default::default());
@@ -249,6 +250,7 @@ impl Index {
         // break infinite recursion. Must be inserted first, since depth-first search
         // may end up requesting it.
         let result = Arc::new(Mutex::new(FxHashMap::default()));
+        let key = (key_id_part, wants.clone());
         self.cache.write().insert(key, result.clone());
 
         let set: Result<_,_> = set.into_iter().map(|(k, (d, matched, semver, all_features))| {

@@ -955,7 +955,7 @@ impl CrateDb {
                 SELECT origin, ranking, max(created) as last_update
                 FROM crates c
                 JOIN crate_versions v ON c.id = v.crate_id
-                WHERE ranking > 0.15
+                WHERE ranking > 0.2
                 GROUP BY c.id
             "#)?;
             let q = q.query_map(NO_PARAMS, |row| -> Result<(Origin, f64, i64)> {

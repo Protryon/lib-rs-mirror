@@ -97,7 +97,7 @@ pub fn render_sitemap(sitemap: &mut impl Write, crates: &KitchenSink) -> Result<
 <url><changefreq>{freq}</changefreq><priority>{pri:0.1}</priority><lastmod>{date}</lastmod><loc>https://lib.rs{url}</loc></url>"#,
             url = urler.crate_by_origin(&origin),
             date = Utc.timestamp(lastmod, 0).to_rfc3339(),
-            pri = (rank * 2.).min(1.),
+            pri = ((rank - 0.15) * 2.).min(1.),
             freq = match age {
                 x if x > 3600 * 24 * 30 * 18 => "yearly",
                 x if x > 3600 * 24 * 60 => "monthly",

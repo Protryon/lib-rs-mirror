@@ -1415,44 +1415,52 @@ impl KitchenSink {
         Ok(self.gh.user_orgs(github_login)?)
     }
 
+    /// Returns (contrib, github user)
+    fn contributors_from_repo(&self, crate_repo: &Repo) -> CResult<(bool, HashMap<String, (f64, User)>)> {
+        let mut hit_max_contributor_count = false;
+        match crate_repo.host() {
+            // TODO: warn on errors?
+            RepoHost::GitHub(ref repo) => {
+                // multiple crates share a repo, which causes cache churn when version "changes"
+                // so pick one of them and track just that one version
+                let cachebust = self.cachebust_string_for_repo(crate_repo).context("contrib")?;
+                let contributors = self.gh.contributors(repo, &cachebust).context("contributors")?.unwrap_or_default();
+                if contributors.len() >= 100 {
+                    hit_max_contributor_count = true;
+                }
+                let mut by_login = HashMap::new();
+                for contr in contributors {
+                    if let Some(author) = contr.author {
+                        if author.user_type == UserType::Bot {
+                            continue;
+                        }
+                        let count = contr.weeks.iter()
+                            .map(|w| {
+                                w.commits as f64 +
+                                ((w.added + w.deleted*2) as f64).sqrt()
+                            }).sum::<f64>();
+                        by_login.entry(author.login.to_lowercase())
+                            .or_insert((0., author)).0 += count;
+                    }
+                }
+                Ok((hit_max_contributor_count, by_login))
+            },
+            RepoHost::BitBucket(..) |
+            RepoHost::GitLab(..) |
+            RepoHost::Other => Ok((false, HashMap::new())), // TODO: could use git checkout...
+        }
+    }
+
     /// Merge authors, owners, contributors
     pub fn all_contributors<'a>(&self, krate: &'a RichCrateVersion) -> CResult<(Vec<CrateAuthor<'a>>, Vec<CrateAuthor<'a>>, bool, usize)> {
-        let mut hit_max_contributor_count = false;
-        let mut contributors_by_login = match krate.repository().as_ref() {
-            Some(crate_repo) => match crate_repo.host() {
-                // TODO: warn on errors?
-                RepoHost::GitHub(ref repo) => {
-                    // multiple crates share a repo, which causes cache churn when version "changes"
-                    // so pick one of them and track just that one version
-                    let cachebust = self.cachebust_string_for_repo(crate_repo).context("contrib")?;
-                    let contributors = self.gh.contributors(repo, &cachebust).context("contributors")?.unwrap_or_default();
-                    if contributors.len() >= 100 {
-                        hit_max_contributor_count = true;
-                    }
-                    let mut by_login = HashMap::new();
-                    for contr in contributors {
-                        if let Some(author) = contr.author {
-                            if author.user_type == UserType::Bot {
-                                continue;
-                            }
-                            let count = contr.weeks.iter()
-                                .map(|w| {
-                                    w.commits as f64 +
-                                    ((w.added + w.deleted*2) as f64).sqrt()
-                                }).sum::<f64>();
-                            by_login.entry(author.login.to_lowercase())
-                                .or_insert((0., author)).0 += count;
-                        }
-                    }
-                    by_login
-                },
-                RepoHost::BitBucket(..) |
-                RepoHost::GitLab(..) |
-                RepoHost::Other => HashMap::new(), // TODO: could use git checkout...
-            },
-            None => HashMap::new(),
-        };
+        let owners = self.crate_owners(krate)?;
 
+        let (hit_max_contributor_count, mut contributors_by_login) = match krate.repository().as_ref() {
+            // Only get contributors from github if the crate has been found in the repo,
+            // otherwise someone else's repo URL can be used to get fake contributor numbers
+            Some(crate_repo) => self.contributors_from_repo(crate_repo)?,
+            None => (false, HashMap::new()),
+        };
 
         let mut authors: HashMap<AuthorId, CrateAuthor<'_>> = krate.authors()
             .iter().enumerate().map(|(i,author)| {
@@ -1499,39 +1507,38 @@ impl KitchenSink {
                 (key, ca)
             }).collect();
 
-        if let Ok(owners) = self.crate_owners(krate) {
-            for owner in owners {
-                if let Ok(id) = self.owners_github_id(&owner) {
-                    match authors.entry(AuthorId::GitHub(id)) {
-                        Occupied(mut e) => {
-                            let e = e.get_mut();
-                            e.owner = true;
-                            if e.info.is_none() {
-                                e.info = Some(Cow::Owned(Author{
-                                    name: Some(owner.name().to_owned()),
-                                    email: None,
-                                    url: Some(owner.url.clone()),
-                                }));
-                            } else if let Some(ref mut gh) = e.github {
-                                if gh.name.is_none() {
-                                    gh.name = Some(owner.name().to_owned());
-                                }
+
+        for owner in owners {
+            if let Ok(id) = self.owners_github_id(&owner) {
+                match authors.entry(AuthorId::GitHub(id)) {
+                    Occupied(mut e) => {
+                        let e = e.get_mut();
+                        e.owner = true;
+                        if e.info.is_none() {
+                            e.info = Some(Cow::Owned(Author{
+                                name: Some(owner.name().to_owned()),
+                                email: None,
+                                url: Some(owner.url.clone()),
+                            }));
+                        } else if let Some(ref mut gh) = e.github {
+                            if gh.name.is_none() {
+                                gh.name = Some(owner.name().to_owned());
                             }
-                        },
-                        Vacant(e) => {
-                            e.insert(CrateAuthor {
-                                contribution: 0.,
-                                github: self.gh.user_by_id(id).ok().and_then(|a|a),
-                                info: Some(Cow::Owned(Author{
-                                    name: Some(owner.name().to_owned()),
-                                    email: None,
-                                    url: Some(owner.url.clone()),
-                                })),
-                                nth_author: None,
-                                owner: true,
-                            });
-                        },
-                    }
+                        }
+                    },
+                    Vacant(e) => {
+                        e.insert(CrateAuthor {
+                            contribution: 0.,
+                            github: self.gh.user_by_id(id).ok().and_then(|a|a),
+                            info: Some(Cow::Owned(Author{
+                                name: Some(owner.name().to_owned()),
+                                email: None,
+                                url: Some(owner.url.clone()),
+                            })),
+                            nth_author: None,
+                            owner: true,
+                        });
+                    },
                 }
             }
         }

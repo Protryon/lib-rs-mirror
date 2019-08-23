@@ -1416,11 +1416,15 @@ impl KitchenSink {
     }
 
     /// Returns (contrib, github user)
-    fn contributors_from_repo(&self, crate_repo: &Repo) -> CResult<(bool, HashMap<String, (f64, User)>)> {
+    fn contributors_from_repo(&self, crate_repo: &Repo, owners: &[CrateOwner], found_crate_in_repo: bool) -> CResult<(bool, HashMap<String, (f64, User)>)> {
         let mut hit_max_contributor_count = false;
         match crate_repo.host() {
             // TODO: warn on errors?
             RepoHost::GitHub(ref repo) => {
+                if !found_crate_in_repo && !owners.iter().any(|owner| owner.login.as_str() == &*repo.owner) {
+                    return Ok((false, HashMap::new()));
+                }
+
                 // multiple crates share a repo, which causes cache churn when version "changes"
                 // so pick one of them and track just that one version
                 let cachebust = self.cachebust_string_for_repo(crate_repo).context("contrib")?;
@@ -1458,7 +1462,7 @@ impl KitchenSink {
         let (hit_max_contributor_count, mut contributors_by_login) = match krate.repository().as_ref() {
             // Only get contributors from github if the crate has been found in the repo,
             // otherwise someone else's repo URL can be used to get fake contributor numbers
-            Some(crate_repo) => self.contributors_from_repo(crate_repo)?,
+            Some(crate_repo) => self.contributors_from_repo(crate_repo, &owners, krate.has_path_in_repo())?,
             None => (false, HashMap::new()),
         };
 

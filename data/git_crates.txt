@@ -22,6 +22,7 @@ github:bbodi/rust-voxlap/voxlap
 github:benanders/rjni/rjni
 github:benschza/pier/pier
 github:breeswish/slog-global/slog-global
+github:casbin/casbin-rs/casbin-rs
 github:cch123/asm-cli-rust/asm-cli-rust
 github:chainx-org/chainx/chainx
 github:changlan/kytan/kytan

@@ -179,6 +179,10 @@ impl RichCrateVersion {
         })
     }
 
+    pub fn has_path_in_repo(&self) -> bool {
+        self.derived.path_in_repo.is_some()
+    }
+
     pub fn readme(&self) -> Option<&Readme> {
         self.derived.readme.as_ref()
     }

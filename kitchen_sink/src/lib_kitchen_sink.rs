@@ -1421,7 +1421,7 @@ impl KitchenSink {
         match crate_repo.host() {
             // TODO: warn on errors?
             RepoHost::GitHub(ref repo) => {
-                if !found_crate_in_repo && !owners.iter().any(|owner| owner.login.as_str() == &*repo.owner) {
+                if !found_crate_in_repo && !owners.iter().any(|owner| owner.login.eq_ignore_ascii_case(&repo.owner)) {
                     return Ok((false, HashMap::new()));
                 }
 
@@ -1513,8 +1513,8 @@ impl KitchenSink {
 
 
         for owner in owners {
-            if let Ok(id) = self.owners_github_id(&owner) {
-                match authors.entry(AuthorId::GitHub(id)) {
+            if let Ok(user) = self.owners_github(&owner) {
+                match authors.entry(AuthorId::GitHub(user.id)) {
                     Occupied(mut e) => {
                         let e = e.get_mut();
                         e.owner = true;
@@ -1524,6 +1524,9 @@ impl KitchenSink {
                                 email: None,
                                 url: Some(owner.url.clone()),
                             }));
+                        }
+                        if e.github.is_none() {
+                            e.github = Some(user);
                         } else if let Some(ref mut gh) = e.github {
                             if gh.name.is_none() {
                                 gh.name = Some(owner.name().to_owned());
@@ -1533,7 +1536,7 @@ impl KitchenSink {
                     Vacant(e) => {
                         e.insert(CrateAuthor {
                             contribution: 0.,
-                            github: self.gh.user_by_id(id).ok().and_then(|a|a),
+                            github: Some(user),
                             info: Some(Cow::Owned(Author{
                                 name: Some(owner.name().to_owned()),
                                 email: None,
@@ -1560,27 +1563,31 @@ impl KitchenSink {
 
         let mut authors_by_name = HashMap::<String, CrateAuthor<'_>>::new();
         for (_, a) in authors {
-            match authors_by_name.entry(a.name().to_lowercase()) {
+            let mut lc_ascii_name = deunicode::deunicode(a.name());
+            lc_ascii_name.make_ascii_lowercase();
+            match authors_by_name.entry(lc_ascii_name) {
                 Occupied(mut e) => {
                     let e = e.get_mut();
-                    // TODO: should keep both otherwise
-                    // if both have gh, they're different users
-                    if e.github.is_some() != a.github.is_some() {
-                        // merge
-                        if a.owner {
-                            e.owner = true;
-                        }
-                        if e.info.is_none() {
-                            e.info = a.info;
-                        }
-                        if e.nth_author.is_none() {
-                            e.nth_author = a.nth_author;
-                        }
-                        e.contribution = e.contribution.max(a.contribution);
-                        if e.github.is_none() {
-                            e.github = a.github;
+                    if let (Some(e), Some(a)) = (e.github.as_ref(), a.github.as_ref()) {
+                         // different users? may fail on stale/renamed login name
+                        if !e.login.eq_ignore_ascii_case(&a.login) {
+                            continue;
                         }
                     }
+                    if e.github.is_none() {
+                        e.github = a.github;
+                    }
+                    // merge
+                    if a.owner {
+                        e.owner = true;
+                    }
+                    if e.info.is_none() {
+                        e.info = a.info;
+                    }
+                    if e.nth_author.is_none() {
+                        e.nth_author = a.nth_author;
+                    }
+                    e.contribution = e.contribution.max(a.contribution);
                 },
                 Vacant(e) => {
                     e.insert(a);
@@ -1642,7 +1649,7 @@ impl KitchenSink {
         Ok((authors, owners, owners_partial, if hit_max_contributor_count { 100 } else { contributors }))
     }
 
-    fn owners_github_id(&self, owner: &CrateOwner) -> CResult<u32> {
+    fn owners_github(&self, owner: &CrateOwner) -> CResult<User> {
         // this is silly, but crates.io doesn't keep the github ID explicitly
         // (the id field is crates-io's field), but it does keep the avatar URL
         // which contains github's ID
@@ -1652,12 +1659,15 @@ impl KitchenSink {
             }
             if let Some(c) = R.captures(avatar) {
                 let id = c.get(1).expect("regex").as_str();
-                return Ok(id.parse().expect("regex"))
+                let id = id.parse().expect("regex");
+                if let Some(user) = self.gh.user_by_id(id)? {
+                    return Ok(user);
+                }
             }
         }
         // This is a bit weak, since logins are not permanent
         if let Some(user) = self.gh.user_by_login(owner.github_login().ok_or(KitchenSinkErr::OwnerWithoutLogin)?)? {
-            return Ok(user.id);
+            return Ok(user);
         }
         Err(KitchenSinkErr::OwnerWithoutLogin)?
     }

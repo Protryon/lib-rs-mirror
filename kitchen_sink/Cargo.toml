@@ -48,4 +48,5 @@ udedokei = { path = "../udedokei" }
 tar = "0.4.15"
 libflate = "0.1.14"
 ahash = "0.2.12"
+deunicode = "1.0.0"
 

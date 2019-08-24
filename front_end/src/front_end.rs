@@ -14,21 +14,22 @@ mod not_found_page;
 mod search_page;
 mod install_page;
 mod urler;
-use render_readme::Markup;
 pub use crate::not_found_page::*;
 pub use crate::search_page::*;
 
-use crate::crate_page::*;
-use crate::urler::Urler;
 use categories::Category;
 use chrono::prelude::*;
-use failure;
+use crate::crate_page::*;
+use crate::urler::Urler;
 use failure::ResultExt;
+use failure;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::{stopped, KitchenSinkErr};
+use render_readme::Markup;
 use render_readme::Renderer;
 use rich_crate::RichCrate;
 use rich_crate::RichCrateVersion;
+use std::borrow::Cow;
 use std::io::Write;
 
 include!(concat!(env!("OUT_DIR"), "/templates.rs"));
@@ -160,6 +161,28 @@ pub fn render_static_page(out: &mut impl Write, title: String, page: &Markup, re
         search_meta: true,
     }, templates::Html(html))?;
     Ok(())
+}
+
+pub fn limit_text_len<'t>(text: &'t str, len_min: usize, len_max: usize) -> Cow<'t, str> {
+    assert!(len_min <= len_max);
+    if text.len() <= len_max {
+        return text.into();
+    }
+    let mut cut = &text[..len_max];
+    let optional = &cut[len_min..];
+    if let Some(pos) = optional.find(&['.',',','!','\n','?',')',']'][..]).or_else(|| optional.find(' ')) {
+        cut = cut[..len_min + pos + 1].trim_end_matches(&['.',',','!','\n','?',' '][..]);
+    };
+    return format!("{}…", cut).into();
+}
+
+#[test]
+fn limit_text_len_test() {
+    assert_eq!("hello world", limit_text_len("hello world", 100, 200));
+    assert_eq!("hel…", limit_text_len("hello world", 1, 3));
+    assert_eq!("hello…", limit_text_len("hello world", 1, 10));
+    assert_eq!("hello world…", limit_text_len("hello world! long", 1, 15));
+    assert_eq!("hello (world)…", limit_text_len("hello (world) long! lorem ipsum", 1, 15));
 }
 
 /// Ructe doesn't like complex expressions…

@@ -5,6 +5,7 @@
 @use rich_crate::Origin;
 @use crate::Urler;
 @use crate::iter::*;
+@use crate::limit_text_len;
 
 @(p: &CatPage, url: &Urler)
 
@@ -87,7 +88,7 @@
                         <div class=h>
                             <h4>@if let Some((repo, _)) = c.origin().repo() {@repo.owner/}@c.short_name()</h4>
                             @if let Some(desc) = c.description() {
-                              <p class=desc>@p.render_markdown_str(desc)</p>
+                              <p class=desc>@p.render_markdown_str(&limit_text_len(desc, 180, 220))</p>
                             }
                         </div>
                         <div class=meta>

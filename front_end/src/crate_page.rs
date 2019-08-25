@@ -177,7 +177,7 @@ impl<'a> CratePage<'a> {
         self.kitchen_sink.crates_io_dependents_stats_of(self.ver.origin()).expect("deps").map(|d| (
             d.runtime.def as u32 + d.runtime.opt as u32 +
             d.build.def as u32  + d.build.opt as u32 +
-            d.dev as u32, d.direct as u32))
+            d.dev as u32, d.direct.all() as u32))
         .filter(|d| d.0 > 0)
     }
 

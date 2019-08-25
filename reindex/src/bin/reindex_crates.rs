@@ -223,7 +223,7 @@ fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersi
     let mut direct_rev_deps = 0;
     let mut indirect_reverse_optional_deps = 0;
     if let Some(deps) = crates.crates_io_dependents_stats_of(k.origin()).expect("depsstats") {
-        direct_rev_deps = deps.direct as u32;
+        direct_rev_deps = deps.direct.all();
         indirect_reverse_optional_deps = (deps.runtime.def as u32 + deps.runtime.opt as u32)
             .max(deps.dev as u32)
             .max(deps.build.def as u32 + deps.build.opt as u32);

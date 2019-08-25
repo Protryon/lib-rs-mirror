@@ -873,8 +873,14 @@ impl KitchenSink {
     pub fn is_build_or_dev(&self, k: &Origin) -> Result<(bool, bool), KitchenSinkErr> {
         Ok(self.crates_io_dependents_stats_of(k)?
         .map(|d| {
-            let is_build = d.build.def > 3 * (d.runtime.def + d.runtime.opt + 5);
-            let is_dev = !is_build && d.dev > (3 * d.runtime.def + d.runtime.opt + 3 * d.build.def + d.build.opt + 5);
+            // direct deps are more relevant, but sparse data gives wrong results
+            let direct_weight = 1 + d.direct.all()/4;
+
+            let build = d.direct.build as u32 * direct_weight + d.build.def as u32 * 2 + d.build.opt as u32;
+            let runtime = d.direct.runtime as u32 * direct_weight + d.runtime.def as u32 * 2 + d.runtime.opt as u32;
+            let dev = d.direct.dev as u32 * direct_weight + d.dev as u32 * 2;
+            let is_build = build > 3 * (runtime + 15); // fudge factor, don't show anything if data is uncertain
+            let is_dev = !is_build && dev > (3 * runtime + 3 * build + 15);
             (is_build, is_dev)
         })
         .unwrap_or((false, false)))
@@ -1202,9 +1208,9 @@ impl KitchenSink {
         for (deps, overall_weight) in all_deps.iter() {
             for dep in deps {
                 if let Some(rev) = raw_deps_stats.counts.get(dep.package.as_str()) {
-                    let right_popularity = rev.direct > 1 && rev.direct < 150 && rev.runtime.def < 500 && rev.runtime.opt < 800;
+                    let right_popularity = rev.direct.all() > 1 && rev.direct.all() < 150 && rev.runtime.def < 500 && rev.runtime.opt < 800;
                     if Self::dep_interesting_for_index(dep.package.as_str()).unwrap_or(right_popularity) {
-                        let weight = overall_weight / (1 + rev.direct) as f32;
+                        let weight = overall_weight / (1 + rev.direct.all()) as f32;
                         weighed_deps.push((dep.package.as_str(), weight));
                     }
                 }
@@ -1831,6 +1837,14 @@ impl<'a> CrateAuthor<'a> {
             "?anon?"
         }
     }
+}
+
+#[test]
+fn is_build_or_dev_test() {
+    let c = KitchenSink::new_default().expect("uhg");
+    assert_eq!((false, false), c.is_build_or_dev(&Origin::from_crates_io_name("semver")).unwrap());
+    assert_eq!((false, true), c.is_build_or_dev(&Origin::from_crates_io_name("version-sync")).unwrap());
+    assert_eq!((true, false), c.is_build_or_dev(&Origin::from_crates_io_name("cc")).unwrap());
 }
 
 #[test]

@@ -21,12 +21,25 @@ pub struct RevDepCount {
 }
 
 #[derive(Debug, Clone, Default)]
+pub struct DirectDepCount {
+    pub runtime: u16,
+    pub build: u16,
+    pub dev: u16,
+}
+
+impl DirectDepCount {
+    pub fn all(&self) -> u32 {
+        self.runtime as u32 + self.build as u32 + self.dev as u32
+    }
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct RevDependencies {
     /// Default, optional
     pub runtime: RevDepCount,
     pub build: RevDepCount,
     pub dev: u16,
-    pub direct: u16,
+    pub direct: DirectDepCount,
     pub versions: FxHashMap<MiniVer, u16>,
     pub rev_dep_names: CompactStringSet,
 }
@@ -153,11 +166,10 @@ impl Index {
                 let t = n.versions.entry(semver).or_insert(0);
                 *t = t.checked_add(1).expect("overflow");
                 if depinf.direct {
-                    n.direct = n.direct.checked_add(1).expect("overflow");
-                    n.rev_dep_names.push(&name);
                 }
                 match depinf.ty {
                     DepTy::Runtime => {
+                        if depinf.direct {n.direct.runtime = n.direct.runtime.checked_add(1).expect("overflow"); }
                         if depinf.default {
                             n.runtime.def = n.runtime.def.checked_add(1).expect("overflow");
                         } else {
@@ -165,6 +177,7 @@ impl Index {
                         }
                     },
                     DepTy::Build => {
+                        if depinf.direct {n.direct.build = n.direct.build.checked_add(1).expect("overflow"); }
                         if depinf.default {
                             n.build.def = n.build.def.checked_add(1).expect("overflow");
                         } else {
@@ -172,6 +185,7 @@ impl Index {
                         }
                     },
                     DepTy::Dev => {
+                        if depinf.direct {n.direct.dev = n.direct.dev.checked_add(1).expect("overflow"); }
                         n.dev = n.dev.checked_add(1).expect("overflow");
                     },
                 }

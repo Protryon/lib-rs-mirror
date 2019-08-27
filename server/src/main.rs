@@ -242,7 +242,7 @@ fn handle_category(req: &HttpRequest<AServerState>, cat: &'static Category) -> F
     let crates = state.crates.load();
     crates.prewarm();
     let cache_file = state.page_cache_dir.join(format!("_{}.html", cat.slug));
-    with_file_cache(cache_file, 7200, move || {
+    with_file_cache(cache_file, 1800, move || {
         Arc::clone(&state).render_pool.spawn_fn(move || {
             let mut page: Vec<u8> = Vec::with_capacity(150000);
             front_end::render_category(&mut page, cat, &crates, &state.markup).expect("render");
@@ -310,7 +310,7 @@ fn handle_git_crate(req: &HttpRequest<AServerState>, slug: &'static str) -> Futu
         return Box::new(future::ok(HttpResponse::TemporaryRedirect().header("Location", url.into_owned()).finish()));
     }
 
-    with_file_cache(cache_file, 9000, move || {
+    with_file_cache(cache_file, 86400, move || {
         render_crate_page(&state, origin)
             .timeout(Duration::from_secs(60))
             .map_err(map_err)})
@@ -369,7 +369,7 @@ fn handle_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse>
         return Box::new(future::result(render_404_page(&state, &crate_name)));
     }
     let cache_file = state.page_cache_dir.join(format!("{}.html", crate_name));
-    with_file_cache(cache_file, 1800, move || {
+    with_file_cache(cache_file, 900, move || {
         render_crate_page(&state, origin)
             .timeout(Duration::from_secs(30))
             .map_err(map_err)})
@@ -480,9 +480,10 @@ fn handle_keyword(req: &HttpRequest<AServerState>) -> FutureResponse<HttpRespons
 }
 
 fn serve_cached<T>((page, cache_time, refresh): (Vec<u8>, u32, bool)) -> FutureResult<HttpResponse, T> {
+    let err_max = (cache_time*10).max(3600*24*2);
     future::ok(HttpResponse::Ok()
         .content_type("text/html;charset=UTF-8")
-        .header("Cache-Control", format!("public, max-age={}, stale-while-revalidate={}, stale-if-error={}", cache_time, cache_time*4, cache_time*10))
+        .header("Cache-Control", format!("public, max-age={}, stale-while-revalidate={}, stale-if-error={}", cache_time, cache_time*3, err_max))
         .if_true(refresh, |h| {h.header("Refresh", "5");})
         .content_length(page.len() as u64)
         .body(page))

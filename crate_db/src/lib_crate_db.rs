@@ -104,8 +104,7 @@ impl CrateDb {
         db.execute_batch("
             PRAGMA cache_size = 500000;
             PRAGMA threads = 4;
-            PRAGMA synchronous = 0;
-            PRAGMA journal_mode = TRUNCATE;")?;
+            PRAGMA synchronous = 0;")?;
         Ok(db)
     }
 

@@ -11,3 +11,4 @@ data/staging
 *.rmpz
 front_end/public/atom.xml
 front_end/public/crates
+tarballs-tmp

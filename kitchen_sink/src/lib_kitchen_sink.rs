@@ -599,6 +599,13 @@ impl KitchenSink {
         self.rich_crate_version_data_common(origin.clone(), meta, Some(path_in_repo), 0, false, warnings)
     }
 
+    pub fn tarball(&self, name: &str, ver: &str) -> CResult<Vec<u8>> {
+        let tarball = self.crates_io.crate_data(name, ver)
+            .context("crate_file")?
+            .ok_or_else(|| KitchenSinkErr::DataNotFound(format!("{}-{}", name, ver)))?;
+        Ok(tarball)
+    }
+
     fn rich_crate_version_data_from_crates_io(&self, latest: &crates_index::Version) -> CResult<(RichCrateVersionCacheData, Warnings)> {
         let mut warnings = HashSet::new();
 
@@ -607,11 +614,11 @@ impl KitchenSink {
         let origin = Origin::from_crates_io_name(name);
 
         let (crate_tarball, crates_io_meta) = rayon::join(
-            || self.crates_io.crate_data(name, ver).context("crate_file"),
+            || self.tarball(name, ver),
             || self.crates_io_meta(&name.to_ascii_lowercase(), true));
 
         let crates_io_meta = crates_io_meta?.meta.krate;
-        let crate_tarball = crate_tarball?.ok_or_else(|| KitchenSinkErr::DataNotFound(format!("{}-{}", name, ver)))?;
+        let crate_tarball = crate_tarball?;
         let crate_compressed_size = crate_tarball.len();
         let mut meta = crate::tarball::read_archive(&crate_tarball[..], name, ver)?;
         drop(crate_tarball);

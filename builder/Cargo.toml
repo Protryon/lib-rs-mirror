@@ -1,0 +1,13 @@
+[package]
+name = "builder"
+version = "0.1.0"
+authors = ["Kornel <kornel@geekhood.net>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+kitchen_sink = { path = "../kitchen_sink", version = "0.8" }
+rusqlite = "0.20.0"
+parking_lot = "0.9.0"
+chrono = "0.4.7"

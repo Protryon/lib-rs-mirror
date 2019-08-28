@@ -7,7 +7,7 @@ RUN rustup component add clippy
 RUN rustup toolchain add 1.24.1
 RUN rustup toolchain add 1.34.2
 RUN rustup toolchain list
-RUN cargo install -f lts # 12
+RUN cargo install -f lts # 1.3
 
 RUN mkdir -p /tmp/cargo-target-dir /tmp/cargo-prewarm
 COPY prewarm_Cargo.toml /tmp/cargo-prewarm/Cargo.toml

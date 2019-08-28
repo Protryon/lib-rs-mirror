@@ -12,3 +12,4 @@ data/staging
 front_end/public/atom.xml
 front_end/public/crates
 tarballs-tmp
+data/docker/

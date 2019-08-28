@@ -9,7 +9,8 @@ RUN rustup toolchain add 1.34.2
 RUN rustup toolchain list
 RUN cargo install -f lts # 12
 
-RUN mkdir /tmp/cargo-target-dir /tmp/cargo-prewarm
+RUN mkdir -p /tmp/cargo-target-dir /tmp/cargo-prewarm
+COPY prewarm_Cargo.toml /tmp/cargo-prewarm/Cargo.toml
 ENV CARGO_TARGET_DIR=/tmp/cargo-target-dir
 RUN CARGO_MANIFEST_DIR=/tmp/cargo-prewarm cargo lts 1.34.2
 RUN cargo fetch --manifest-path=/tmp/cargo-prewarm/Cargo.toml

@@ -11,7 +11,7 @@ assets = [
     ["target/release/crates-server", "usr/bin/", "755"],
     ["../data/page/*", "/var/lib/crates-server/page/", "644"],
     ["../data/git_crates.txt", "/var/lib/crates-server/", "644"],
-    ["../builder/docker/", "/var/lib/crates-server/", "755"],
+    ["../builder/docker/*", "/var/lib/crates-server/", "755"],
 ]
 
 [dependencies]

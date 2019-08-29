@@ -4,8 +4,8 @@ RUN apt-get update && apt-get install -y time pkg-config git build-essential
 RUN git config --global user.email "lts@lib.rs"
 RUN git config --global user.name "LTS"
 RUN rustup component add clippy
-RUN rustup toolchain add 1.24.1
-RUN rustup toolchain add 1.34.2
+RUN rustup toolchain add 1.24.1 && rm -rf ~/.rustup/toolchains/*/share/doc/
+RUN rustup toolchain add 1.34.2 && rm -rf ~/.rustup/toolchains/*/share/doc/
 RUN rustup toolchain list
 RUN cargo install -f lts # 1.3
 

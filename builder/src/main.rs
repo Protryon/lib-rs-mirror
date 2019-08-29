@@ -1,9 +1,13 @@
+mod db;
+mod parse;
+
+use chrono::prelude::*;
+use crate::db::Compat;
 use kitchen_sink::*;
+use parse::*;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
-use chrono::prelude::*;
-mod db;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let crates = kitchen_sink::KitchenSink::new_default()?;
@@ -19,33 +23,53 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             break;
         }
         let origin = Origin::from_crates_io_name(name);
-        let all = crates.rich_crate(&origin)?;
-        let k = crates.rich_crate_version(&origin)?;
-
-        let (d1,d2,d3) = k.direct_dependencies()?;
-        if d1.len() + d2.len() + d3.len() > 4 {
-            eprintln!("Too many deps {}", k.short_name());
+        if let Err(e) = analyze_crate(&origin, &db, &crates, &docker_root, tarball_reldir, &tarball_absdir) {
+            eprintln!("•• {}: {}", name, e);
             continue;
-        }
-
-        let res = db.get_raw_build_info(&origin, k.version())?;
-        if res.is_some() {
-            println!("Already tried {}", k.short_name());
-            continue;
-        }
-
-        match do_builds(&crates, &all, &k, &tarball_reldir, &tarball_absdir, &docker_root) {
-            Ok((stdout, stderr)) => {
-                db.set_raw_build_info(&origin, k.version(), &stdout, &stderr)?;
-            },
-            Err(e) => {
-                eprintln!("•• {}: {}", name, e);
-            },
         }
     }
     Ok(())
 }
 
+fn analyze_crate(origin: &Origin, db: &db::BuildDb, crates: &KitchenSink, docker_root: &Path, tarball_reldir: &Path, tarball_absdir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let all = crates.rich_crate(origin)?;
+    let k = crates.rich_crate_version(origin)?;
+
+    if k.edition() == Edition::E2018 {
+        db.set_compat(k.origin(), k.version(), "1.30.1", Compat::Incompatible)?;
+        return Ok(());
+    }
+
+    let compat_info = db.get_compat(k.origin(), k.version())?;
+    if !compat_info.is_empty() {
+        println!("got it {:?}", compat_info);
+        return Ok(());
+    }
+
+    let (d1,d2,d3) = k.direct_dependencies()?;
+    if d1.len() + d2.len() + d3.len() > 4 {
+        eprintln!("Too many deps {}", k.short_name());
+        return Ok(());
+    }
+
+    let res = db.get_raw_build_info(origin, k.version())?;
+    let builds = match res {
+        Some(res) => res,
+        None => {
+            let (stdout, stderr) = do_builds(&crates, &all, &k, &tarball_reldir, &tarball_absdir, &docker_root)?;
+            db.set_raw_build_info(origin, k.version(), &stdout, &stderr)?;
+            (stdout, stderr)
+        },
+    };
+    for f in parse_analyses(&builds.0, &builds.1) {
+        if let Some(rustc_version) = f.rustc_version {
+            for (name, version, compat) in f.crates {
+                db.set_compat(&Origin::from_crates_io_name(&name), &version, &rustc_version, compat)?;
+            }
+        }
+    }
+    Ok(())
+}
 
 fn do_builds(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersion, tarball_reldir: &Path, tarball_absdir: &Path, docker_root: &Path) -> Result<(String, String), Box<dyn std::error::Error>> {
     let tarball_data = crates.tarball(k.short_name(), k.version())?;
@@ -81,6 +105,7 @@ fn do_builds(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersion, tarbal
     let out = Command::new("docker")
         .current_dir(docker_root)
         .arg("run")
+        .arg("--rm")
         .arg("-m1500m")
         .arg("testing1")
         .arg("/tmp/run-crate-tests.sh")

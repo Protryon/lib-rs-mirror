@@ -1193,7 +1193,7 @@ impl KitchenSink {
         let (v, is_yanked) = match origin {
             Origin::CratesIo(ref name) => {
                 let ver = self.index.crate_version_latest_unstable(name).context("rich_crate_version2")?;
-                let (v, _warn) = self.rich_crate_version_data_from_crates_io(ver)?;
+                let (v, _warn) = self.rich_crate_version_data_from_crates_io(ver).context("rich_crate_version_data_from_crates_io")?;
                 (v, ver.is_yanked())
             },
             Origin::GitHub {..} | Origin::GitLab {..} => {

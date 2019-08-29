@@ -77,7 +77,10 @@ fn do_builds(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersion, tarbal
     // has to be relative, because docker
     let tarball_relpath = tarball_reldir.join(&filename);
     let tarball_abspath = tarball_absdir.join(&filename);
-    fs::write(tarball_abspath, tarball_data)?;
+    fs::write(&tarball_abspath, tarball_data)?;
+    scopeguard::guard((), |_| {
+        let _ = fs::remove_file(tarball_abspath);
+    });
 
     let version_info = all.versions().iter().find(|v| v.num == k.version()).ok_or("Bad version")?;
     // use cargo-lts to rewind deps to a week after publication of this crate

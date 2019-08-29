@@ -17,6 +17,7 @@ RUN cargo fetch --manifest-path=/tmp/cargo-prewarm/Cargo.toml
 RUN CARGO_MANIFEST_DIR=/tmp/cargo-prewarm cargo lts 1.24.1
 RUN rm /tmp/cargo-prewarm/Cargo.lock
 RUN cargo fetch --manifest-path=/tmp/cargo-prewarm/Cargo.toml
+RUN touch /usr/local/cargo/registry/cache/github.com-1ecc6299db9ec823/hey-this-is-here
 ENV CARGO_MANIFEST_DIR=/crate
 COPY run.sh /tmp/run-crate-tests.sh
 RUN chmod 0550 /tmp/run-crate-tests.sh

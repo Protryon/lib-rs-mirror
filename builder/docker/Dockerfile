@@ -22,3 +22,4 @@ ENV CARGO_MANIFEST_DIR=/crate
 COPY run.sh /tmp/run-crate-tests.sh
 RUN chmod 0550 /tmp/run-crate-tests.sh
 
+RUN rustup toolchain add nightly

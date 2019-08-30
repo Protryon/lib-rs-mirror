@@ -1,10 +1,21 @@
 #!/bin/bash
 set -exuo pipefail
 
-echo "----SNIP----"; echo >&2 "----SNIP----";
+for crate in "$@"
+do
+    echo > Cargo.toml "
+[package]
+name = "\""______"\""
+version = "\""0.0.0"\""
 
-rustup show
-time cargo check --locked --message-format=json
+[lib]
+path = "\""/dev/null"\""
+
+[dependencies]
+$crate
+"
+
+cargo fetch
 
 echo "----SNIP----"; echo >&2 "----SNIP----";
 
@@ -20,4 +31,4 @@ time cargo check --locked --message-format=json
 
 echo "----SNIP----"; echo >&2 "----SNIP----";
 
-cargo +stable clippy
+done

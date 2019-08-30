@@ -9,15 +9,25 @@ pub struct CompilerMessageInner {
 }
 
 #[derive(Deserialize)]
+pub struct CompilerMessageTarget {
+    #[serde(default)]
+    kind: Vec<String>,
+    edition: Option<String>,
+}
+
+#[derive(Deserialize)]
 pub struct CompilerMessage {
+    target: Option<CompilerMessageTarget>,
     message: Option<CompilerMessageInner>,
     reason: Option<String>,
     package_id: String,
+    #[serde(default)]
+    filenames: Vec<String>,
 }
 
 #[derive(Default, Debug)]
 pub struct Findings {
-    pub crates: HashSet<(String, String, Compat)>,
+    pub crates: HashSet<(Option<&'static str>, String, String, Compat)>,
     pub rustc_version: Option<String>,
     pub check_time: Option<f32>,
 }
@@ -48,13 +58,23 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
         if line.starts_with('{') {
             if let Ok(msg) = serde_json::from_str::<CompilerMessage>(line) {
                 if let Some((name, ver)) = parse_package_id(&msg.package_id) {
+                    if name == "______" || name == "_____" {
+                        continue;
+                    }
                     let level = msg.message.as_ref().map(|m| m.level.as_str()).unwrap_or("");
                     let reason = msg.reason.as_ref().map(|s| s.as_str()).unwrap_or("");
+                    // not an achievement, ignore
+                    if msg.filenames.iter().any(|f| f.contains("/build-script-build")) {
+                        continue;
+                    }
+                    if msg.target.as_ref().and_then(|t| t.edition.as_ref()).map_or(false, |e| e == "2018") {
+                        findings.crates.insert((Some("1.30.1"), name.clone(), ver.clone(), Compat::Incompatible));
+                    }
                     if level == "error" {
-                        findings.crates.insert((name, ver, Compat::Incompatible));
+                        findings.crates.insert((None, name, ver, Compat::Incompatible));
                     }
                     else if reason == "compiler-artifact" {
-                        findings.crates.insert((name, ver, Compat::VerifiedWorks));
+                        findings.crates.insert((None, name, ver, Compat::VerifiedWorks));
                     } else {
                         if level != "warning" && reason != "build-script-executed" && !(level == "" && reason == "compiler-message") {
                             eprintln!("unknown line {} {} {}", level, reason, line);

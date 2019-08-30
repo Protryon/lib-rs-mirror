@@ -22,13 +22,3 @@ ENV CARGO_MANIFEST_DIR=/crate
 COPY run.sh /tmp/run-crate-tests.sh
 RUN chmod 0550 /tmp/run-crate-tests.sh
 
-ARG crate_tarball
-RUN test -n "$crate_tarball"
-COPY ${crate_tarball} /tmp/crate.tar.gz
-RUN tar -xvz --one-file-system --no-acls --no-same-permissions --no-same-owner --exclude-vcs --group=nobody --no-wildcards --exclude='.*' --exclude='*/.*' --no-xattrs --strip-components=1 -f /tmp/crate.tar.gz
-RUN rm -rf rust-toolchain Cargo.lock .cargo
-RUN ls -lAR
-ARG deps_date
-RUN cargo lts ${deps_date}
-RUN cargo generate-lockfile
-RUN cargo fetch --locked

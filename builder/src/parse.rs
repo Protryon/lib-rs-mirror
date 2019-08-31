@@ -51,7 +51,7 @@ fn parse_package_id(id: &str) -> Option<(String, String)> {
 
 fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
     let mut findings = Findings::default();
-    let user_time = Regex::new(r"^user +(\d+)m(\d+\.\d+)s$").expect("regex");
+    let user_time = Regex::new(r"^user\s+(\d+)m(\d+\.\d+)s$").expect("regex");
     let compiler = Regex::new(r"(?:^|.*unchanged - )rustc (1\.\d+\.\d+) \([a-f0-9]+ 20").expect("regex");
 
     for line in stdout.split('\n') {

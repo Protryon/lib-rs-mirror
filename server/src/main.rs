@@ -129,6 +129,7 @@ fn run_server() -> Result<(), failure::Error> {
             .resource("/keywords/{keyword}", |r| r.method(Method::GET).f(handle_keyword))
             .resource("/crates/{crate}", |r| r.method(Method::GET).f(handle_crate))
             .resource("/install/{crate:.*}", |r| r.method(Method::GET).f(handle_install))
+            .resource("/debug/{crate:.*}", |r| r.method(Method::GET).f(handle_debug))
             .resource("/gh/{owner}/{repo}/{crate}", |r| r.method(Method::GET).f(handle_github_crate))
             .resource("/lab/{owner}/{repo}/{crate}", |r| r.method(Method::GET).f(handle_gitlab_crate))
             .resource("/atom.xml", |r| r.method(Method::GET).f(handle_feed))
@@ -335,6 +336,24 @@ fn get_origin_from_subpath(q: &Params) -> Option<Origin> {
             }
         }
     }
+}
+
+fn handle_debug(req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
+    if !cfg!(debug_assertions) {
+        Err(failure::err_msg("off"))?
+    }
+
+    let state = req.state();
+    let origin = get_origin_from_subpath(req.match_info()).ok_or_else(|| failure::err_msg("404"))?;
+    let mut page: Vec<u8> = Vec::with_capacity(50000);
+    let crates = state.crates.load();
+    let ver = crates.rich_crate_version(&origin)?;
+    front_end::render_debug_page(&mut page, &ver, &crates)?;
+    Ok(HttpResponse::Ok()
+        .content_type("text/html;charset=UTF-8")
+        .header("Cache-Control", "no-cache")
+        .content_length(page.len() as u64)
+        .body(page))
 }
 
 fn handle_install(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {

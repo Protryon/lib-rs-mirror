@@ -1,0 +1,33 @@
+@use semver::Version as SemVer;
+@use kitchen_sink::Compat;
+
+@(compat_table: (Vec<SemVer>, Vec<(SemVer, Vec<Option<Compat>>)>))
+
+<h1>test</h1>
+
+<table>
+    <thead><tr><th></th>
+        @for v in compat_table.0.into_iter().rev() {
+            <th>@v</th>
+        }
+    </tr></thead>
+    <tbody>
+        @for (v, row) in compat_table.1.into_iter().rev() {
+            <tr>
+                <th>@v</th>
+                @for c in row.into_iter().rev() {
+                    <td>
+                        @if let Some(c) = c {
+                            @if c == Compat::VerifiedWorks {
+                                ✅
+                            }
+                            @if c == Compat::Incompatible {
+                                ❌
+                            }
+                        }
+                    </td>
+               }
+            </tr>
+        }
+    </tbody>
+</table>

@@ -31,6 +31,8 @@ use rich_crate::RichCrate;
 use rich_crate::RichCrateVersion;
 use std::borrow::Cow;
 use std::io::Write;
+use std::collections::{BTreeMap, BTreeSet};
+use semver::Version as SemVer;
 
 include!(concat!(env!("OUT_DIR"), "/templates.rs"));
 
@@ -132,6 +134,35 @@ pub fn render_install_page(out: &mut impl Write, ver: &RichCrateVersion, kitchen
     let urler = Urler::new(None); // Don't set self-crate, because we want to link back to crate page
     let c = crate::install_page::InstallPage::new(ver, kitchen_sink, renderer);
     templates::install(out, &urler, &c).context("install page io")?;
+    Ok(())
+}
+
+pub fn render_debug_page(out: &mut impl Write, ver: &RichCrateVersion, kitchen_sink: &KitchenSink) -> Result<(), failure::Error> {
+    let mut by_crate_ver = BTreeMap::new();
+    let mut rustc_versions = BTreeSet::new();
+
+    let compat = kitchen_sink.rustc_compatibility(ver.origin())?;
+    dbg!(&compat);
+
+    for c in &compat {
+        let rustc_version = SemVer::parse(&c.rustc_version)?;
+        let t = by_crate_ver.entry(SemVer::parse(&c.crate_version)?).or_insert_with(BTreeMap::new);
+        t.insert(rustc_version.clone(), c.compat);
+        rustc_versions.insert(rustc_version);
+    }
+
+    let rustc_versions = rustc_versions.into_iter().collect::<Vec<_>>();
+
+    let mut table = Vec::with_capacity(by_crate_ver.len());
+    for (crate_ver, compat) in by_crate_ver {
+        let mut row = Vec::with_capacity(rustc_versions.len());
+        for rustc_version in &rustc_versions {
+            row.push(compat.get(rustc_version).copied());
+        }
+        table.push((crate_ver, row));
+    }
+
+    templates::debug(out, (rustc_versions, table))?;
     Ok(())
 }
 

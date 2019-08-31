@@ -23,6 +23,7 @@ use crate::crate_page::*;
 use crate::urler::Urler;
 use failure::ResultExt;
 use failure;
+use kitchen_sink::Compat;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::{stopped, KitchenSinkErr};
 use render_readme::Markup;
@@ -137,6 +138,11 @@ pub fn render_install_page(out: &mut impl Write, ver: &RichCrateVersion, kitchen
     Ok(())
 }
 
+pub struct CompatRange {
+    oldest_ok: SemVer,
+    newest_bad: SemVer,
+}
+
 pub fn render_debug_page(out: &mut impl Write, ver: &RichCrateVersion, kitchen_sink: &KitchenSink) -> Result<(), failure::Error> {
     let mut by_crate_ver = BTreeMap::new();
     let mut rustc_versions = BTreeSet::new();
@@ -146,23 +152,28 @@ pub fn render_debug_page(out: &mut impl Write, ver: &RichCrateVersion, kitchen_s
 
     for c in &compat {
         let rustc_version = SemVer::parse(&c.rustc_version)?;
-        let t = by_crate_ver.entry(SemVer::parse(&c.crate_version)?).or_insert_with(BTreeMap::new);
-        t.insert(rustc_version.clone(), c.compat);
-        rustc_versions.insert(rustc_version);
-    }
+        rustc_versions.insert(rustc_version.clone());
 
-    let rustc_versions = rustc_versions.into_iter().collect::<Vec<_>>();
-
-    let mut table = Vec::with_capacity(by_crate_ver.len());
-    for (crate_ver, compat) in by_crate_ver {
-        let mut row = Vec::with_capacity(rustc_versions.len());
-        for rustc_version in &rustc_versions {
-            row.push(compat.get(rustc_version).copied());
+        let t = by_crate_ver.entry(SemVer::parse(&c.crate_version)?).or_insert_with(|| CompatRange {
+            oldest_ok: "999.999.999".parse().unwrap(),
+            newest_bad: "0.0.0".parse().unwrap(),
+        });
+        match c.compat {
+            Compat::VerifiedWorks | Compat::ProbablyWorks => {
+                if t.oldest_ok > rustc_version {
+                    t.oldest_ok = rustc_version;
+                }
+            },
+            Compat::Incompatible | Compat::BrokenDeps => {
+                if t.newest_bad < rustc_version {
+                    t.newest_bad = rustc_version;
+                }
+            },
         }
-        table.push((crate_ver, row));
     }
 
-    templates::debug(out, (rustc_versions, table))?;
+    let rustc_versions = rustc_versions.into_iter().rev().collect::<Vec<_>>();
+    templates::debug(out, (rustc_versions, by_crate_ver))?;
     Ok(())
 }
 

@@ -1,27 +1,28 @@
 @use semver::Version as SemVer;
-@use kitchen_sink::Compat;
+@use crate::CompatRange;
+@use std::collections::BTreeMap;
 
-@(compat_table: (Vec<SemVer>, Vec<(SemVer, Vec<Option<Compat>>)>))
+@(table: (Vec<SemVer>, BTreeMap<SemVer, CompatRange>))
 
 <h1>test</h1>
 
 <table>
     <thead><tr><th></th>
-        @for v in compat_table.0.into_iter().rev() {
-            <th>@v</th>
+        @for rustc_ver in &table.0 {
+            <th>@rustc_ver</th>
         }
     </tr></thead>
     <tbody>
-        @for (v, row) in compat_table.1.into_iter().rev() {
+        @for (v, row) in table.1.into_iter().rev() {
             <tr>
                 <th>@v</th>
-                @for c in row.into_iter().rev() {
+                @for rustc_ver in &table.0 {
                     <td>
-                        @if let Some(c) = c {
-                            @if c == Compat::VerifiedWorks {
-                                ✅
-                            }
-                            @if c == Compat::Incompatible {
+                        @if rustc_ver >= &row.oldest_ok {
+                            ✅
+                        }
+                        else {
+                            @if rustc_ver <= &row.newest_bad {
                                 ❌
                             }
                         }

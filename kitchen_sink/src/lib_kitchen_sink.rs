@@ -15,9 +15,11 @@ mod tarball;
 mod ctrlcbreak;
 pub use crate::ctrlcbreak::*;
 
+pub use crate_db::builddb::CompatibilityInfo;
+pub use crate_db::builddb::Compat;
 pub use crates_index::Crate as CratesIndexCrate;
-pub use crates_io_client::CrateDepKind;
 pub use crates_io_client::CrateDependency;
+pub use crates_io_client::CrateDepKind;
 pub use crates_io_client::CrateMetaVersion;
 pub use crates_io_client::CratesIoCrate;
 pub use crates_io_client::OwnerKind;
@@ -27,7 +29,6 @@ pub use github_info::UserType;
 pub use rich_crate::Edition;
 pub use rich_crate::Include;
 pub use rich_crate::MaintenanceStatus;
-use rich_crate::ManifestExt;
 pub use rich_crate::Markup;
 pub use rich_crate::Origin;
 pub use rich_crate::RichCrate;
@@ -35,14 +36,15 @@ pub use rich_crate::RichCrateVersion;
 pub use rich_crate::RichDep;
 pub use rich_crate::{Cfg, Target};
 pub use semver::Version as SemVer;
+use rich_crate::ManifestExt;
 
 use cargo_toml::Manifest;
 use cargo_toml::Package;
 use categories::Category;
-use chrono::prelude::*;
 use chrono::DateTime;
-use crate_db::{CrateDb, CrateVersionData, RepoChange};
+use chrono::prelude::*;
 use crate::tarball::CrateFile;
+use crate_db::{CrateDb, CrateVersionData, RepoChange, builddb::BuildDb};
 use crates_index::Version;
 use crates_io_client::CrateOwner;
 use failure::ResultExt;
@@ -1391,6 +1393,11 @@ impl KitchenSink {
             }
         }
         Ok(self.gh.user_by_login(github_login)?) // errs on 404
+    }
+
+    pub fn rustc_compatibility(&self, origin: &Origin) -> CResult<Vec<CompatibilityInfo>> {
+        let db = BuildDb::new(self.main_cache_dir().join("builds.db"))?;
+        Ok(db.get_compat(origin)?)
     }
 
     /// List of all notable crates

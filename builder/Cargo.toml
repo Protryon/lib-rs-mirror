@@ -17,3 +17,4 @@ serde_json = "1.0.17"
 serde_derive = "1.0.45"
 scopeguard = "1.0.0"
 rand = "0.7.0"
+crate_db = { path = "../crate_db", version = "0.4.5" }

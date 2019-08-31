@@ -1,4 +1,4 @@
-use kitchen_sink::Origin;
+use rich_crate::Origin;
 
 use parking_lot::Mutex;
 use rusqlite::*;
@@ -6,6 +6,13 @@ use std::path::Path;
 
 pub struct BuildDb {
     pub(crate) conn: Mutex<Connection>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CompatibilityInfo {
+    pub rustc_version: String,
+    pub crate_version: String,
+    pub compat: Compat,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
@@ -40,19 +47,23 @@ impl BuildDb {
         })
     }
 
-    pub fn get_compat(&self, origin: &Origin, ver: &str) -> Result<Vec<(String, Compat)>> {
+    pub fn get_compat(&self, origin: &Origin) -> Result<Vec<CompatibilityInfo>> {
         let conn = self.conn.lock();
-        let mut get = conn.prepare_cached(r"SELECT rustc_version, compat FROM build_results WHERE origin = ?1 AND version = ?2")?;
+        let mut get = conn.prepare_cached(r"SELECT rustc_version, version, compat FROM build_results WHERE origin = ?1")?;
         let origin_str = origin.to_str();
-        let res = get.query_map(&[origin_str.as_str(), ver], |row| {
-            let compat = match row.get_raw(1).as_str().expect("strtype") {
+        let res = get.query_map(&[origin_str.as_str()], |row| {
+            let compat = match row.get_raw(2).as_str().expect("strtype") {
                 "Y" => Compat::VerifiedWorks,
                 "y" => Compat::ProbablyWorks,
                 "n" => Compat::BrokenDeps,
                 "N" => Compat::Incompatible,
                 _ => panic!("wat?"),
             };
-            Ok((row.get(0)?, compat))
+            Ok(CompatibilityInfo {
+                rustc_version: row.get(0)?,
+                crate_version: row.get(1)?,
+                compat
+            })
         })?;
         res.collect()
     }

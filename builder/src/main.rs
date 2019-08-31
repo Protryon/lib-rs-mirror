@@ -1,11 +1,7 @@
+use std::collections::HashMap;
 
-use rand::thread_rng;
-use rand::seq::SliceRandom;
-
-mod db;
+use crate_db::builddb::*;
 mod parse;
-
-
 
 use kitchen_sink::*;
 use parse::*;
@@ -16,7 +12,7 @@ use std::process::Command;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let crates = kitchen_sink::KitchenSink::new_default()?;
 
-    let db = db::BuildDb::new(crates.main_cache_dir().join("builds.db"))?;
+    let db = BuildDb::new(crates.main_cache_dir().join("builds.db"))?;
     let docker_root = crates.main_cache_dir().join("docker");
     prepare_docker(&docker_root)?;
 
@@ -32,16 +28,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn analyze_crate(all: &CratesIndexCrate, db: &db::BuildDb, crates: &KitchenSink, docker_root: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn analyze_crate(all: &CratesIndexCrate, db: &BuildDb, crates: &KitchenSink, docker_root: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let ref origin = Origin::from_crates_io_name(all.name());
-    let ver = all.latest_version();
 
-    let compat_info = db.get_compat(origin, ver.version())?;
+    let compat_info = db.get_compat(origin)?;
     if !compat_info.is_empty() {
-        println!("{} got it {:?}", ver.name(), compat_info);
+        println!("{} got it {:?}", all.name(), compat_info);
         return Ok(());
     }
 
+    let ver = all.latest_version();
     let res = db.get_raw_build_info(origin, ver.version())?;
     let builds = match res {
         Some(res) => res,
@@ -79,10 +75,12 @@ fn prepare_docker(docker_root: &Path) -> Result<(), Box<dyn std::error::Error>> 
 }
 
 fn do_builds(_crates: &KitchenSink, all: &CratesIndexCrate, docker_root: &Path) -> Result<(String, String), Box<dyn std::error::Error>> {
-
-    let mut rng = thread_rng();
-    let ver = all.versions();
-    let versions = ver.choose_multiple(&mut rng, (ver.len()/3).max(1).min(8));
+    let mut versions = HashMap::new();
+    for ver in all.versions().iter().filter(|v| !v.is_yanked()).filter_map(|v| SemVer::parse(v.version()).ok()) {
+        let unstable = ver.major == 0;
+        let major = if unstable {ver.minor} else {ver.major};
+        versions.insert((unstable, major), ver); // later wins
+    }
 
     let mut cmd = Command::new("docker");
     cmd
@@ -92,8 +90,8 @@ fn do_builds(_crates: &KitchenSink, all: &CratesIndexCrate, docker_root: &Path) 
         .arg("-m1500m")
         .arg("testing1")
         .arg("/tmp/run-crate-tests.sh");
-    for ver in versions {
-        cmd.arg(format!("{}=\"{}\"\n", all.name(), ver.version()));
+    for ver in versions.values().take(15) {
+        cmd.arg(format!("{}=\"{}\"\n", all.name(), ver));
     }
     let out = cmd
         .output()?;

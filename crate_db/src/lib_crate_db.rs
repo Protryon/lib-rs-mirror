@@ -24,6 +24,8 @@ use std::path::Path;
 use thread_local::ThreadLocal;
 type FResult<T> = std::result::Result<T, failure::Error>;
 
+pub mod builddb;
+
 mod schema;
 mod stopwords;
 use crate::stopwords::{COND_STOPWORDS, STOPWORDS};

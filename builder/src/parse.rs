@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use regex::Regex;
-use crate::db::Compat;
+use crate_db::builddb::Compat;
 use serde_derive::*;
 
 #[derive(Deserialize)]
@@ -11,7 +11,7 @@ pub struct CompilerMessageInner {
 #[derive(Deserialize)]
 pub struct CompilerMessageTarget {
     #[serde(default)]
-    kind: Vec<String>,
+    // kind: Vec<String>,
     edition: Option<String>,
 }
 

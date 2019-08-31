@@ -1,5 +1,5 @@
 [package]
-version = "0.3.2"
+version = "0.3.3"
 edition = "2018"
 name = "search_index"
 authors = ["Kornel <kornel@geekhood.net>"]
@@ -9,7 +9,7 @@ name = "search_index"
 path = "src/lib_search_index.rs"
 
 [dependencies]
-tantivy = "0.10"
+tantivy = { git = "https://github.com/tantivy-search/tantivy" }
 rich_crate = { path = "../rich_crate" }
 rayon = "1.0.3"
 rand = "0.7"

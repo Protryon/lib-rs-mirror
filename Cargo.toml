@@ -36,8 +36,6 @@ debug = true
 cargo_toml = { path = "cargo_toml" }
 cargo_author = { path = "cargo_author" }
 lazyonce = { path = "lazyonce" }
-rmp = { git = "https://github.com/3Hren/msgpack-rust", rev = "b93ea78dcb1c0326a3195790cbbad9dda16e7027" }
-rmp-serde = { git = "https://github.com/3Hren/msgpack-rust", rev = "b93ea78dcb1c0326a3195790cbbad9dda16e7027" }
 onig = { git = "https://github.com/kornelski/rust-onig" }
 onig_sys = { git = "https://github.com/kornelski/rust-onig" }
 

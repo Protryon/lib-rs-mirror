@@ -16,9 +16,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let docker_root = crates.main_cache_dir().join("docker");
     prepare_docker(&docker_root)?;
 
+    let filter = std::env::args().skip(1).next();
+
     for (_, all) in crates.all_crates_io_crates() {
         if stopped() {
             break;
+        }
+        if let Some(f) = &filter {
+            if !all.name().contains(f) {
+                continue;
+            }
         }
         if let Err(e) = analyze_crate(&all, &db, &crates, &docker_root) {
             eprintln!("•• {}: {}", all.name(), e);
@@ -32,21 +39,16 @@ fn analyze_crate(all: &CratesIndexCrate, db: &BuildDb, crates: &KitchenSink, doc
     let ref origin = Origin::from_crates_io_name(all.name());
 
     let compat_info = db.get_compat(origin)?;
-    if !compat_info.is_empty() {
+    if compat_info.iter().any(|c| c.crate_version == "1.24.1") {
         println!("{} got it {:?}", all.name(), compat_info);
         return Ok(());
     }
 
     let ver = all.latest_version();
-    let res = db.get_raw_build_info(origin, ver.version())?;
-    let builds = match res {
-        Some(res) => res,
-        None => {
-            let (stdout, stderr) = do_builds(&crates, &all, &docker_root)?;
-            db.set_raw_build_info(origin, ver.version(), &stdout, &stderr)?;
-            (stdout, stderr)
-        },
-    };
+
+    let (stdout, stderr) = do_builds(&crates, &all, &docker_root)?;
+    db.set_raw_build_info(origin, ver.version(), &stdout, &stderr)?;
+
     for f in parse_analyses(&builds.0, &builds.1) {
         println!("{:#?}", f);
         if let Some(rustc_version) = f.rustc_version {

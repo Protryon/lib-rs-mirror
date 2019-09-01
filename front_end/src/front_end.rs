@@ -148,25 +148,23 @@ pub fn render_debug_page(out: &mut impl Write, ver: &RichCrateVersion, kitchen_s
     let mut rustc_versions = BTreeSet::new();
 
     let compat = kitchen_sink.rustc_compatibility(ver.origin())?;
-    dbg!(&compat);
 
     for c in &compat {
-        let rustc_version = SemVer::parse(&c.rustc_version)?;
-        rustc_versions.insert(rustc_version.clone());
+        rustc_versions.insert(c.rustc_version.clone());
 
-        let t = by_crate_ver.entry(SemVer::parse(&c.crate_version)?).or_insert_with(|| CompatRange {
+        let t = by_crate_ver.entry(&c.crate_version).or_insert_with(|| CompatRange {
             oldest_ok: "999.999.999".parse().unwrap(),
             newest_bad: "0.0.0".parse().unwrap(),
         });
         match c.compat {
             Compat::VerifiedWorks | Compat::ProbablyWorks => {
-                if t.oldest_ok > rustc_version {
-                    t.oldest_ok = rustc_version;
+                if t.oldest_ok > c.rustc_version {
+                    t.oldest_ok = c.rustc_version.clone();
                 }
             },
             Compat::Incompatible | Compat::BrokenDeps => {
-                if t.newest_bad < rustc_version {
-                    t.newest_bad = rustc_version;
+                if t.newest_bad < c.rustc_version {
+                    t.newest_bad = c.rustc_version.clone();
                 }
             },
         }

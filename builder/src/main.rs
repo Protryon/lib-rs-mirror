@@ -39,7 +39,7 @@ fn analyze_crate(all: &CratesIndexCrate, db: &BuildDb, crates: &KitchenSink, doc
     let ref origin = Origin::from_crates_io_name(all.name());
 
     let compat_info = db.get_compat(origin)?;
-    if compat_info.iter().any(|c| c.crate_version == "1.24.1") {
+    if compat_info.iter().any(|c| c.crate_version.minor == 24) { // look for missing 1.24 tests
         println!("{} got it {:?}", all.name(), compat_info);
         return Ok(());
     }

@@ -2,7 +2,7 @@
 @use crate::CompatRange;
 @use std::collections::BTreeMap;
 
-@(table: (Vec<SemVer>, BTreeMap<SemVer, CompatRange>))
+@(table: (Vec<SemVer>, BTreeMap<&SemVer, CompatRange>))
 
 <h1>test</h1>
 

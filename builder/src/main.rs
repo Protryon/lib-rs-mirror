@@ -44,12 +44,14 @@ fn analyze_crate(all: &CratesIndexCrate, db: &BuildDb, crates: &KitchenSink, doc
         return Ok(());
     }
 
+    println!("checking {}", all.name());
     let ver = all.latest_version();
 
     let (stdout, stderr) = do_builds(&crates, &all, &docker_root)?;
+    println!("{}\n{}\n", stdout, stderr);
     db.set_raw_build_info(origin, ver.version(), &stdout, &stderr)?;
 
-    for f in parse_analyses(&builds.0, &builds.1) {
+    for f in parse_analyses(&stdout, &stderr) {
         println!("{:#?}", f);
         if let Some(rustc_version) = f.rustc_version {
             for (rustc_override, name, version, compat) in f.crates {

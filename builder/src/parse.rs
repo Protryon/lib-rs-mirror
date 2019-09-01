@@ -95,6 +95,9 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
             findings.check_time = Some((m * 60) as f32 + s);
         }
     }
+    if findings.crates.is_empty() {
+        return None;
+    }
     Some(findings)
 }
 
@@ -183,5 +186,10 @@ exit failure
 "##;
 
     let res = parse_analyses(out, err);
-    panic!("{:#?}", res);
+    assert!(res[0].crates.get(&(None, "vector2d".into(), "2.2.0".into(), Compat::VerifiedWorks)).is_some());
+    assert!((res[0].check_time.unwrap() - 0.880) < 0.001);
+    assert!(res[0].crates.get(&(Some("1.30.1"), "proc_vector2d".into(), "1.0.2".into(), Compat::Incompatible)).is_some());
+    assert!(res[1].crates.get(&(None, "vector2d".into(), "2.2.0".into(), Compat::VerifiedWorks)).is_some());
+    assert!(res[1].crates.get(&(Some("1.30.1"), "proc_vector2d".into(), "1.0.2".into(), Compat::Incompatible)).is_some());
+    assert!(res[2].crates.get(&(None, "proc_vector2d".into(), "1.0.2".into(), Compat::Incompatible)).is_some());
 }

@@ -15,7 +15,7 @@ path = "\""/dev/null"\""
 $crate
 "
 
-cargo +nightly generate-lockfile -Z minimal-versions -Z no-index-update -Z avoid-dev-deps
+cargo +nightly generate-lockfile -Z minimal-versions -Z avoid-dev-deps
 cargo +nightly fetch --locked -Z avoid-dev-deps
 
 echo "----SNIP----"; echo >&2 "----SNIP----";

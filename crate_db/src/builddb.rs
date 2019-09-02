@@ -155,7 +155,12 @@ impl BuildDb {
 
     pub fn set_compat(&self, origin: &Origin, ver: &str, rustc_version: &str, compat: Compat) -> Result<()> {
         let conn = self.conn.lock();
-        let mut ins = conn.prepare_cached(r"INSERT OR REPLACE INTO build_results(origin, version, rustc_version, compat) VALUES(?1, ?2, ?3, ?4)")?;
+        // these are weak info, so don't replace good info with them
+        let mut ins = conn.prepare_cached(if compat == Compat::ProbablyWorks || compat == Compat::BrokenDeps {
+            r"INSERT OR IGNORE INTO build_results(origin, version, rustc_version, compat) VALUES(?1, ?2, ?3, ?4)"
+        } else {
+            "INSERT OR REPLACE INTO build_results(origin, version, rustc_version, compat) VALUES(?1, ?2, ?3, ?4)"
+        })?;
         let origin_str = origin.to_str();
         let result_str = compat.as_str();
         ins.execute(&[origin_str.as_str(), ver, rustc_version, result_str])?;

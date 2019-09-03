@@ -1,7 +1,7 @@
 FROM rust:latest
 WORKDIR /crate
 RUN mkdir -p /usr/local/cargo/registry/cache/github.com-1ecc6299db9ec823/hey-crate-cache-is-here
-RUN apt-get update && apt-get install -y time pkg-config git build-essential
+RUN apt-get update && apt-get install -y time pkg-config git cmake build-essential
 RUN git config --global user.email "lts@lib.rs"
 RUN git config --global user.name "LTS"
 RUN rustup component add clippy

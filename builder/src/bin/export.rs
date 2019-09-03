@@ -11,6 +11,15 @@ fn main() {
     let db = BuildDb::new(crates.main_cache_dir().join("builds.db")).unwrap();
     let mut outputs = BTreeSet::new();
 
+    println!("9.9.9 winapi <=0.1.17");
+    println!("9.9.9 libc ^0.1.0");
+    println!("9.9.9 semver <=0.1.5");
+    println!("9.9.9 gcc <=0.3.0");
+    println!("9.9.9 lazy_static <=0.1.0");
+    println!("9.9.9 rustc-serialize <=0.3.21");
+    println!("9.9.9 rand <=0.3.8");
+    println!("9.9.9 pkg-config <=0.3.2");
+
     for (origin, rows) in db.get_all_compat().unwrap() {
         if !origin.is_crates_io() {
             continue;
@@ -46,6 +55,6 @@ fn main() {
         }
     }
     for (rust_ver, name, bork) in outputs {
-        println!("{} {} {}", rust_ver, name, bork);
+        println!("{} {} >={}", rust_ver, name, bork);
     }
 }

@@ -15,20 +15,20 @@ path = "\""/dev/null"\""
 $crate
 "
 
-cargo +nightly generate-lockfile -Z minimal-versions -Z avoid-dev-deps
+cargo +nightly generate-lockfile -Z avoid-dev-deps
 cargo +nightly fetch --locked -Z avoid-dev-deps
 
 echo "----SNIP----"; echo >&2 "----SNIP----";
 
 rustup default 1.34.2
 rustc --version
-time cargo check --locked --message-format=json
+time cargo check --locked --message-format=json || continue;
 
 echo "----SNIP----"; echo >&2 "----SNIP----";
 
 rustup default 1.24.1
 rustc --version
-time cargo check --locked --message-format=json
+time cargo check --locked --message-format=json || continue;
 
 echo "----SNIP----"; echo >&2 "----SNIP----";
 

@@ -15,8 +15,8 @@ path = "\""/dev/null"\""
 $crate
 "
 
-cargo +nightly generate-lockfile -Z avoid-dev-deps
-cargo +nightly fetch --locked -Z avoid-dev-deps
+cargo +nightly generate-lockfile -Z avoid-dev-deps || continue; # just a deps issue
+cargo +nightly fetch --locked -Z avoid-dev-deps || continue; # network prob?
 
 echo "----SNIP----"; echo >&2 "----SNIP----";
 

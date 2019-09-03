@@ -57,7 +57,8 @@ fn analyze_crate(all: &CratesIndexCrate, db: &BuildDb, crates: &KitchenSink, doc
         if let Some(rustc_version) = f.rustc_version {
             for (rustc_override, name, version, compat) in f.crates {
                 let rustc_version = rustc_override.unwrap_or(&rustc_version);
-                db.set_compat(&Origin::from_crates_io_name(&name), &version, rustc_version, compat)?;
+                let certain = rustc_override.is_some(); // that's for 2018 edition
+                db.set_compat(&Origin::from_crates_io_name(&name), &version, rustc_version, compat, certain)?;
             }
         }
     }

@@ -203,10 +203,16 @@ pub fn render_static_page(out: &mut impl Write, title: String, page: &Markup, re
     Ok(())
 }
 
-pub fn limit_text_len<'t>(text: &'t str, len_min: usize, len_max: usize) -> Cow<'t, str> {
+pub fn limit_text_len<'t>(text: &'t str, mut len_min: usize, mut len_max: usize) -> Cow<'t, str> {
     assert!(len_min <= len_max);
     if text.len() <= len_max {
         return text.into();
+    }
+    while !text.is_char_boundary(len_max) {
+        len_max += 1;
+    }
+    while !text.is_char_boundary(len_min) {
+        len_min += 1;
     }
     let mut cut = &text[..len_max];
     let optional = &cut[len_min..];
@@ -220,6 +226,7 @@ pub fn limit_text_len<'t>(text: &'t str, len_min: usize, len_max: usize) -> Cow<
 fn limit_text_len_test() {
     assert_eq!("hello world", limit_text_len("hello world", 100, 200));
     assert_eq!("hel…", limit_text_len("hello world", 1, 3));
+    assert_eq!("こん…", limit_text_len("こんにちは、世界", 3, 5));
     assert_eq!("hello…", limit_text_len("hello world", 1, 10));
     assert_eq!("hello world…", limit_text_len("hello world! long", 1, 15));
     assert_eq!("hello (world)…", limit_text_len("hello (world) long! lorem ipsum", 1, 15));

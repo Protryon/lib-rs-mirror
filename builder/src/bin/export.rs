@@ -20,28 +20,30 @@ fn main() {
     println!("9.9.9 rand <=0.3.8");
     println!("9.9.9 pkg-config <=0.3.2");
 
-    for (origin, rows) in db.get_all_compat().unwrap() {
-        if !origin.is_crates_io() {
+    for c in db.get_all_compat().unwrap() {
+        if !c.origin.is_crates_io() || c.origin.short_crate_name() != "getopts" {
             continue;
         }
 
-        let mut combined = HashMap::with_capacity(rows.len());
-        if rows.iter().all(|(_, compat)| compat.newest_ok.is_none()) {
+        let mut combined = HashMap::with_capacity(c.rustc_versions.len());
+        if c.rustc_versions.iter().all(|(_, compat)| compat.crate_newest_ok.is_none()) {
             // Can't build it at all, so it's probably our env that's broken, not the crate
             continue;
         }
-        for (rust_ver, compat) in rows {
-            if let Some(bork) = compat.oldest_bad {
-                if compat.newest_ok.map_or(false, |n| n > bork) {
-                    // invalid data (old version didn't build, but a newer does build)
-                    continue;
+        for (rust_ver, compat) in c.rustc_versions {
+            if let Some(bork) = compat.crate_oldest_bad {
+                if let Some(n) = compat.crate_newest_ok {
+                    if n > bork {
+                        // invalid data (old version didn't build, but a newer does build)
+                        continue;
+                    }
                 }
-                match combined.entry(bork) {
+                match combined.entry(bork.clone()) {
                     Entry::Vacant(e) => {
                         e.insert(rust_ver);
                     },
                     Entry::Occupied(mut e) => {
-                        if e.get() > &rust_ver {
+                        if e.get() < &rust_ver {
                             e.insert(rust_ver);
                         }
                     },
@@ -49,9 +51,12 @@ fn main() {
             }
         }
         // sort
-        let name: Arc<str> = origin.short_crate_name().into();
+        let name: Arc<str> = c.origin.short_crate_name().into();
         for (bork, rust_ver) in combined {
             outputs.insert((rust_ver, name.clone(), bork));
+        }
+        if let Some(oldbork) = c.old_crates_broken_up_to {
+            println!("9.9.9 {} <={}", name, oldbork);
         }
     }
     for (rust_ver, name, bork) in outputs {

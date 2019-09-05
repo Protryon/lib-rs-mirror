@@ -53,6 +53,11 @@ github:eirproject/eir/libeir_util
 github:electric-capital/crypto-ecosystems/crypto-ecosystems
 github:emu-rs/rustual-boy/rustual-boy-cli
 github:emu-rs/rustual-boy/rustual-boy-core
+github:facebook/hhvm/hack_facts
+github:facebook/hhvm/hack_facts_ffi
+github:facebook/hhvm/hack_ocamlrep
+github:facebook/hhvm/hack_ocamlrep_derive
+github:facebook/hhvm/hack_oxidized
 github:facebookexperimental/mononoke/hgcli
 github:facebookexperimental/mononoke/mercurial
 github:facebookexperimental/mononoke/server
@@ -101,6 +106,8 @@ github:joyent/rust-cueball/cueball
 github:joystream/substrate-runtime-joystream/joystream-node-runtime
 github:joystream/substrate-runtime-joystream/joystream-node-runtime-wasm
 github:jussiniinikoski/wasm-pdf/wasm-pdf
+github:katharostech/arsenal/arsenal_blender_core
+github:katharostech/arsenal/arsenal_runtime
 github:kbknapp/docli-rs/docli
 github:kiss-ui/kiss-ui/kiss-ui
 github:kitech/qt.rs/qt5
@@ -222,6 +229,7 @@ github:pop-os/token_expander/token-expander
 github:purpleprotocol/purple/purple
 github:rawrasaur/rust-jdbc/jdbc
 github:redisjson/redisdoc/redisjson
+github:redox-os/relibc/relibc
 github:remacs/remacs/remacs-bindings
 github:remacs/remacs/remacs-lib
 github:robey/c3r3s/fling
@@ -231,6 +239,7 @@ github:rsaarelm/magog/vitral
 github:ruffle-rs/ruffle/ruffle_core
 github:ruffle-rs/ruffle/ruffle_desktop
 github:ruffle-rs/ruffle/ruffle_web
+github:rust-analyzer/rust-analyzer/ra_cli
 github:rust-lang/rustlings/rustlings
 github:sandstorm-io/collections-app/sandstorm-collections-app
 github:schulke-214/connect-four/connect-four

@@ -221,7 +221,7 @@ lazy_static! {
         (Cond::Any(&["polynomial", "numerics", "gaussian", "mathematics", "voronoi", "gmp", "bignum", "prime", "primes", "linear-algebra", "numpy", "lexicographic", "algebra", "euler", "bijective"]),
             &[("science::math", 1.25, 0.3), ("algorithms", 1.2, 0.1), ("web-programming::http-client", 0.9, 0.), ("rendering::graphics-api", 0.8, 0.), ("games", 0.5, 0.), ("os", 0.8, 0.),("game-engines", 0.75, 0.), ("command-line-utilities", 0.8, 0.), ("command-line-interface", 0.4, 0.)]),
         (Cond::Any(&["arithmetic", "arithmetics", "histogram", "arbitrary-precision", "algebraic"]),
-            &[("science::math", 1.25, 0.1), ("algorithms", 1.2, 0.)]),
+            &[("science::math", 1.25, 0.15), ("algorithms", 1.2, 0.), ("text-processing", 0.8, 0.)]),
         (Cond::Any(&["precision"]), &[("science::math", 1.1, 0.)]),
         (Cond::All(&["discrete", "transforms"]),
             &[("science::math", 1.25, 0.1), ("algorithms", 1.1, 0.), ("simulation", 0.9, 0.)]),

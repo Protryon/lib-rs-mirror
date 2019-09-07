@@ -30,6 +30,7 @@ pub struct CompatRange {
 pub struct RustcCompatRange {
     // crate version
     pub crate_newest_ok: Option<SemVer>,
+    pub crate_newest_bad: Option<SemVer>,
     pub crate_oldest_bad: Option<SemVer>,
 }
 
@@ -148,23 +149,28 @@ impl BuildDb {
                         old_crates_broken_up_to = Some(crate_ver);
                     }
                 }
-                if c.oldest_ok != max_ver {rustc_versions.insert(&c.oldest_ok);}
-                if c.newest_bad != min_ver {rustc_versions.insert(&c.newest_bad);}
-                if c.newest_ok != min_ver {rustc_versions.insert(&c.newest_ok);}
+                if c.oldest_ok != max_ver {rustc_versions.insert((c.oldest_ok.major, c.oldest_ok.minor));}
+                if c.newest_bad != min_ver {rustc_versions.insert((c.newest_bad.major, c.newest_bad.minor));}
+                if c.newest_ok != min_ver {rustc_versions.insert((c.newest_ok.major, c.newest_ok.minor));}
             }
             // if everything is broken, we just don't know if it's a pre-1.0 problem or bad crate.
             // assume only 0.x crates are rotten. If someone released 1.x then it should have been usable!
             if !seen_any_ok_build || old_crates_broken_up_to.map_or(false, |v| v.major > 0) {
                 old_crates_broken_up_to = None;
             }
-            let rustc_versions = rustc_versions.into_iter().map(|rv| {
+            let rustc_versions = rustc_versions.into_iter().map(|(rmajor, rminor)| {
+                let rv = SemVer::new(rmajor, rminor, 0);
+                let rv_patch = SemVer::new(rmajor, rminor, 999); // unify 1.24.0 and 1.24.1
                 let crate_oldest_bad = compat.iter()
                     .filter(|(crate_ver, _)| old_crates_broken_up_to.map_or(true, |b| *crate_ver > b))
-                    .filter(|(_, rustc)| rv <= &rustc.newest_bad).map(|(crate_ver, _)| crate_ver).min();
+                    .filter(|(_, rustc)| rv <= rustc.newest_bad).map(|(crate_ver, _)| crate_ver).min();
+                let crate_newest_bad = compat.iter()
+                    .filter(|(_, rustc)| rv <= rustc.newest_bad).map(|(crate_ver, _)| crate_ver).max();
                 let crate_newest_ok = compat.iter()
                     .filter(|(crate_ver, _)| old_crates_broken_up_to.map_or(true, |b| *crate_ver > b))
-                    .filter(|(_, rustc)| rv >= &rustc.oldest_ok).map(|(crate_ver, _)| crate_ver).max();
-                (rv.clone(), RustcCompatRange {
+                    .filter(|(_, rustc)| rv_patch >= rustc.oldest_ok).map(|(crate_ver, _)| crate_ver).max();
+                (rv, RustcCompatRange {
+                    crate_newest_bad: crate_newest_bad.cloned(),
                     crate_oldest_bad: crate_oldest_bad.cloned(),
                     crate_newest_ok: crate_newest_ok.cloned(),
                 })

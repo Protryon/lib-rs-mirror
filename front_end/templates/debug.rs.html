@@ -18,12 +18,20 @@
                 <th>@v</th>
                 @for rustc_ver in &table.0 {
                     <td>
-                        @if rustc_ver >= &row.oldest_ok {
-                            ✅
-                        }
-                        else {
-                            @if rustc_ver <= &row.newest_bad {
+                        @if rustc_ver >= &row.oldest_ok && rustc_ver <= &row.newest_bad {
+                            ?
+                        } else {
+                            @if rustc_ver == &row.oldest_ok {
+                                ✅
+                            }
+                            @if rustc_ver > &row.oldest_ok {
+                                ✓
+                            }
+                            @if rustc_ver == &row.newest_bad {
                                 ❌
+                            }
+                            @if rustc_ver < &row.newest_bad {
+                                𐄂
                             }
                         }
                     </td>

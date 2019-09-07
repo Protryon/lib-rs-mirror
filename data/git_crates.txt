@@ -10,6 +10,9 @@ github:aleshaleksey/azdice/azdice
 github:aleshaleksey/tgwm/q-moose
 github:alex/rust-asn1/asn1
 github:amar-laksh/workstation/workstation
+github:amethyst/evoli/evolution-island
+github:amethyst/space-menace/space-menace
+github:amethyst/space_shooter_rs/space_shooter
 github:andars/pebble.rs/pebble
 github:andschwa/rust-genetic-algorithm/rust-genetic-algorithm
 github:arthrp/consoletimer/consoletimer
@@ -18,18 +21,6 @@ github:artichoke/artichoke/artichoke-backend
 github:artichoke/artichoke/artichoke-core
 github:artichoke/artichoke/artichoke-frontend
 github:artichoke/artichoke/artichoke-vfs
-github:skytrias/everpuzzle/everpuzzle
-github:amethyst/space_shooter_rs/space_shooter
-github:maringa-gamedev/rust-igmc-2018/rust-igmc-2018
-github:kuspa/rockraiders/rock_raiders
-github:kuy/elevato-rs/elevators
-github:totorigolo/fuite-rs/fuite
-github:jharrilim/pong-amethyst/pong-amethyst
-github:henninglive/boids-rs/boids
-github:jakbyte/krafter/krafter
-github:mdreem/dreetris/dreetris
-github:amethyst/space-menace/space-menace
-github:amethyst/evoli/evolution-island
 github:artichoke/artichoke/artichoke-wasm
 github:atom-archive/xray/xray_cli
 github:atom-archive/xray/xray_core
@@ -42,6 +33,10 @@ github:benanders/rjni/rjni
 github:benschza/pier/pier
 github:bitshifter/mathbench-rs/mathbench
 github:breeswish/slog-global/slog-global
+github:caelunshun/feather/feather-blocks
+github:caelunshun/feather/feather-codegen
+github:caelunshun/feather/feather-server
+github:caelunshun/feather/feather_api
 github:casbin/casbin-rs/casbin-rs
 github:cch123/asm-cli-rust/asm-cli-rust
 github:chainx-org/chainx/chainx
@@ -95,7 +90,9 @@ github:guywaldman/ravro/ravro
 github:habitat-sh/habitat/hab
 github:habitat-sh/habitat/habitat-launcher
 github:habitat-sh/habitat/habitat_api_client
+github:henninglive/boids-rs/boids
 github:holochain/holochain-rust/holochain
+github:holochain/holochain-rust/holochain_common
 github:hyperledger/indy-sdk/indy-cli
 github:hyperledger/indy-sdk/libindy
 github:hyperledger/indy-sdk/libvcx
@@ -112,7 +109,9 @@ github:intecture/api/intecture_api
 github:intecture/api/intecture_bindings
 github:intel/cloud-hypervisor/cloud-hypervisor
 github:ioncodes/snesutilities/snesutils
+github:jakbyte/krafter/krafter
 github:jedisct1/flowgger/flowgger
+github:jharrilim/pong-amethyst/pong-amethyst
 github:johalun/echo/module
 github:joyent/rust-cueball/cueball
 github:joystream/substrate-runtime-joystream/joystream-node-runtime
@@ -131,6 +130,8 @@ github:koute/pinky/mos6502
 github:koute/pinky/nes
 github:kpcyrd/mini-docker-rust/mini-docker-rust
 github:kud1ing/tinkerpop-rs/tinkerpop-rs
+github:kuspa/rockraiders/rock_raiders
+github:kuy/elevato-rs/elevators
 github:kvakvs/erlangrt/erlangrt
 github:kylewlacy/sorbet-cocoa/sorbet-cocoa
 github:kzen-networks/multi-party-eddsa/multi-party-ed25519
@@ -164,7 +165,9 @@ github:m4b/dryad/dryad
 github:maikklein/rlsl/rlsl
 github:maps4print/azul/azul-core
 github:maps4print/azul/azul-css
+github:maringa-gamedev/rust-igmc-2018/rust-igmc-2018
 github:mathall/rim/rim
+github:mdreem/dreetris/dreetris
 github:mesalock-linux/mesalink/mesalink
 github:mgattozzi/haskellrs/haskellrs
 github:mgattozzi/rushs/rushs
@@ -282,6 +285,7 @@ github:servo/webxr/webxr-api
 github:sfikas/rusteval/rusteval
 github:sigp/milagro_bls/milagro_bls
 github:simias/rustation/rustation
+github:skytrias/everpuzzle/everpuzzle
 github:snowplow/factotum/factotum
 github:sorpaas/rux/kernel
 github:spejss/image-processing-cli-in-rust/ipcli
@@ -301,6 +305,7 @@ github:timberio/vector/journald
 github:timberio/vector/tracing-limit
 github:timberio/vector/tracing-metrics
 github:timberio/vector/vector
+github:totorigolo/fuite-rs/fuite
 github:twinklebear/tray_rust/tray_rust
 github:twitter/rezolus/rezolus
 github:udoprog/oxidizebot/oxidize

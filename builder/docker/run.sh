@@ -1,6 +1,8 @@
 #!/bin/bash
 set -exuo pipefail
 
+for rustv in 1.34.2 1.24.1
+do
 for crate in "$@"
 do
     echo > Cargo.toml "
@@ -16,20 +18,13 @@ $crate
 "
 
 cargo +nightly generate-lockfile -Z avoid-dev-deps || continue; # just a deps issue
-cargo +nightly fetch --locked -Z avoid-dev-deps || continue; # network prob?
+cargo +nightly fetch --locked -Z avoid-dev-deps -Z no-index-update || continue; # network prob?
 
 echo "----SNIP----"; echo >&2 "----SNIP----";
 
-rustup default 1.34.2
+rustup default $rustv
 rustc --version
 time cargo check --locked --message-format=json || continue;
 
-echo "----SNIP----"; echo >&2 "----SNIP----";
-
-rustup default 1.24.1
-rustc --version
-time cargo check --locked --message-format=json || continue;
-
-echo "----SNIP----"; echo >&2 "----SNIP----";
-
+done
 done

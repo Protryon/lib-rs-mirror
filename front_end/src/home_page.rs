@@ -14,6 +14,7 @@ use rich_crate::RichCrateVersion;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::PathBuf;
+use locale::Numeric;
 
 /// The list on the homepage looks flat, but it's actually a tree.
 ///
@@ -34,6 +35,10 @@ pub struct HomePage<'a> {
 impl<'a> HomePage<'a> {
     pub fn new(crates: &'a KitchenSink) -> Result<Self, failure::Error> {
         Ok(Self { crates })
+    }
+
+    pub fn total_crates(&self) -> String {
+        Numeric::english().format_int(self.crates.all_crates().count())
     }
 
     /// List of all categories, sorted, with their most popular and newest crates.

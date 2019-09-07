@@ -1,6 +1,6 @@
 [package]
 name = "crates-server"
-version = "0.7.2"
+version = "0.7.3"
 authors = ["Kornel <kornel@geekhood.net>"]
 edition = "2018"
 description = "Crates.rs web server"
@@ -33,3 +33,4 @@ categories = { path = "../categories" }
 rayon = "1.0.3"
 arc-swap = "0.4"
 signal-hook = "0.1.10"
+locale = "0.2.2"

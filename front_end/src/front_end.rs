@@ -191,7 +191,7 @@ pub fn render_static_page(out: &mut impl Write, title: String, page: &Markup, re
         alternate: None,
         alternate_type: None,
         canonical: None,
-        critical_css_data: None,
+        critical_css_data: Some("main li {margin-top:0.5em;margin-bottom:0.5em}"),
         created: None,
         description: None,
         item_description: None,

@@ -24,6 +24,7 @@ use tokio::prelude::FutureExt;
 use repo_url::SimpleRepo;
 use urlencoding::decode;
 use urlencoding::encode;
+use locale::Numeric;
 
 mod writer;
 use crate::writer::*;
@@ -175,9 +176,13 @@ fn handle_static_page(state: &ServerState, path: &str) -> Result<Option<HttpResp
 
     let mut chars = path.chars();
     let path_capitalized = chars.next().into_iter().flat_map(|c| c.to_uppercase()).chain(chars).collect();
+    let crates = state.crates.load();
+    let crate_num = crates.all_crates_io_crates().len();
+    let total_crate_num = crates.all_crates().count();
 
     let md = std::fs::read_to_string(md_path)?
-        .replace("$CRATE_NUM", &format!("{}", state.crates.load().all_crates_io_crates().len()));
+        .replace("$CRATE_NUM", &Numeric::english().format_int(crate_num))
+        .replace("$TOTAL_CRATE_NUM", &Numeric::english().format_int(total_crate_num));
     let mut page = Vec::with_capacity(md.len()*2);
     front_end::render_static_page(&mut page, path_capitalized, &Markup::Markdown(md), &state.markup)?;
     Ok(Some(HttpResponse::Ok()

@@ -117,13 +117,9 @@ impl<'a> CatPage<'a> {
             item_name: Some(self.cat.name.clone()),
             item_description: Some(self.cat.short_description.clone()),
             keywords: Some(self.keywords.join(", ")),
-            created: None,
-            alternate: None,
-            alternate_type: None,
-            canonical: None,
             noindex: false,
             search_meta: true,
-            critical_css_data: None,
+            ..Default::default()
         }
     }
 

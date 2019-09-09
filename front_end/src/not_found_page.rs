@@ -19,16 +19,10 @@ impl NotFoundPage<'_> {
         Page {
             title: "Crate not found".into(),
             description: Some("Error".into()),
-            item_name: None,
-            item_description: None,
-            keywords: None,
-            created: None,
-            alternate: None,
-            alternate_type: None,
-            canonical: None,
             noindex: true,
             search_meta: true,
             critical_css_data: Some(include_str!("../../style/public/search.css")),
+            ..Default::default()
         }
     }
 

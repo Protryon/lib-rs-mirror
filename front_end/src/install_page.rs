@@ -27,17 +27,11 @@ impl<'a> InstallPage<'a> {
     pub fn page(&self) -> Page {
         Page {
             title: self.page_title(),
-            keywords: None,
-            created: None,
-            description: None,
             item_name: Some(self.ver.short_name().to_string()),
             item_description: self.ver.description().map(|d| d.to_string()),
-            alternate: None,
-            alternate_type: None,
-            canonical: None,
             noindex: true,
             search_meta: false,
-            critical_css_data: None,
+            ..Default::default()
         }
     }
 

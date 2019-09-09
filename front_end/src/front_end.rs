@@ -38,6 +38,7 @@ use semver::Version as SemVer;
 include!(concat!(env!("OUT_DIR"), "/templates.rs"));
 
 /// Metadata used in the base template, mostly for `<meta>`
+#[derive(Default)]
 pub struct Page {
     title: String,
     description: Option<String>,
@@ -51,6 +52,7 @@ pub struct Page {
     noindex: bool,
     search_meta: bool,
     critical_css_data: Option<&'static str>,
+    local_css_data: Option<&'static str>,
 }
 
 impl Page {
@@ -61,6 +63,10 @@ impl Page {
     pub fn critical_css(&self) -> templates::Html<&'static str> {
         let data = self.critical_css_data.unwrap_or(include_str!("../../style/public/critical.css"));
         templates::Html(data)
+    }
+
+    pub fn local_css_data(&self) -> Option<templates::Html<&'static str>> {
+        self.local_css_data.map(|data| templates::Html(data))
     }
 }
 
@@ -188,17 +194,10 @@ pub fn render_static_page(out: &mut impl Write, title: String, page: &Markup, re
 
     templates::static_page(out, &Page {
         title,
-        alternate: None,
-        alternate_type: None,
-        canonical: None,
         critical_css_data: Some("main li {margin-top:0.5em;margin-bottom:0.5em}"),
-        created: None,
-        description: None,
-        item_description: None,
-        item_name: None,
-        keywords: None,
         noindex: false,
         search_meta: true,
+        ..Default::default()
     }, templates::Html(html))?;
     Ok(())
 }

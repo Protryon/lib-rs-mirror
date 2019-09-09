@@ -189,16 +189,13 @@ impl<'a> HomePage<'a> {
         Page {
             title: "Lib.rs — home for Rust crates".to_owned(),
             description: Some("List of Rust libraries and applications. An unofficial experimental opinionated alternative to crates.io".to_owned()),
-            item_name: None,
-            item_description: None,
-            keywords: None,
-            created: None,
             alternate: Some("https://lib.rs/atom.xml".to_string()),
             alternate_type: Some("application/atom+xml"),
             canonical: Some("https://lib.rs".to_string()),
             noindex: false,
             search_meta: true,
             critical_css_data: Some(include_str!("../../style/public/home.css")),
+            ..Default::default()
         }
     }
 }

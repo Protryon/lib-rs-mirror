@@ -15,6 +15,7 @@
     <link rel=preload as=font href="/fira/va9E4kDNxMZdWfMOD5Vvl4jLazX3dA.woff2" crossorigin="anonymous">
 
     <style>@props.critical_css()</style>
+    @if let Some(l) = props.local_css_data() {<style>@l</style>}
     <link rel=stylesheet href="/index.css?ia" crossorigin="anonymous">
 
     @if props.noindex {

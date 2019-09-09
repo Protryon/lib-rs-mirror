@@ -194,7 +194,7 @@ pub fn render_static_page(out: &mut impl Write, title: String, page: &Markup, re
 
     templates::static_page(out, &Page {
         title,
-        critical_css_data: Some("main li {margin-top:0.5em;margin-bottom:0.5em}"),
+        local_css_data: Some("main li {margin-top:0.5em;margin-bottom:0.5em}"),
         noindex: false,
         search_meta: true,
         ..Default::default()

@@ -43,6 +43,7 @@ github:chainx-org/chainx/chainx
 github:changlan/kytan/kytan
 github:citybound/citybound/citybound
 github:cristicbz/rust-doom/rs_doom
+github:dani-garcia/bitwarden_rs/bitwarden_rs
 github:darrint/device-blocker/device-blocker
 github:dcampbell24/iup-rust/iup
 github:deniskolodin/rust-app-engine/rust-app-engine
@@ -109,6 +110,7 @@ github:intecture/api/intecture_api
 github:intecture/api/intecture_bindings
 github:intel/cloud-hypervisor/cloud-hypervisor
 github:ioncodes/snesutilities/snesutils
+github:ixy-languages/ixy.rs/ixy
 github:jakbyte/krafter/krafter
 github:jedisct1/flowgger/flowgger
 github:jharrilim/pong-amethyst/pong-amethyst
@@ -294,6 +296,8 @@ github:subzerocloud/pg-amqp-bridge/pg-amqp-bridge
 github:tailhook/marafet/marafet
 github:tailhook/marafet/marafet_css
 github:tailhook/vagga/vagga
+github:tauri-apps/tauri/tauri
+github:tauri-apps/tauri/tauri-ui
 github:thebracket/rltk_rs/rltk
 github:thepowersgang/rust_os/kernel
 github:thinkofname/rust-quake/quake

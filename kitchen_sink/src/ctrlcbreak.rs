@@ -2,10 +2,10 @@ use crate::KitchenSinkErr;
 use ctrlc;
 use std::process;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Once, ONCE_INIT};
+use std::sync::Once;
 
 static STOPPED: AtomicUsize = AtomicUsize::new(0);
-static INIT: Once = ONCE_INIT;
+static INIT: Once = Once::new();
 
 pub fn dont_hijack_ctrlc() {
     INIT.call_once(|| {});

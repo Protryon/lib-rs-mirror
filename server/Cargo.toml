@@ -1,6 +1,6 @@
 [package]
 name = "crates-server"
-version = "0.7.4"
+version = "0.7.5"
 authors = ["Kornel <kornel@geekhood.net>"]
 edition = "2018"
 description = "Crates.rs web server"
@@ -16,7 +16,7 @@ assets = [
 
 [dependencies]
 actix-web = "0.7.16"
-env_logger = "0.6.0"
+env_logger = "0.7"
 log = "0.4.6"
 futures-cpupool = "0.1.8"
 futures = "0.1.25"

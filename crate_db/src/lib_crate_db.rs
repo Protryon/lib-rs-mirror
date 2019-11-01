@@ -80,10 +80,10 @@ impl CrateDb {
 
     #[inline]
     fn with_connection<F, T>(&self, context: &'static str, cb: F) -> FResult<T> where F: FnOnce(&mut Connection) -> FResult<T> {
-        let conn = self.conn.get_or(|| Box::new(self.connect().map(|conn| {
+        let conn = self.conn.get_or(|| self.connect().map(|conn| {
             let _ = conn.busy_timeout(std::time::Duration::from_secs(3));
             RefCell::new(conn)
-        })));
+        }));
         match conn {
             Ok(conn) => Ok(cb(&mut *conn.borrow_mut()).context(context)?),
             Err(err) => bail!("{} (in {})", err, context),

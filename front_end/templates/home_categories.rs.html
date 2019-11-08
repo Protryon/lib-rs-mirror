@@ -27,7 +27,7 @@
             </ul>
         </li>
         @if !cat.sub.is_empty() {
-            @:home_categories(&cat.sub, url, false)
+            @:home_categories_html(&cat.sub, url, false)
         }
     }
 

@@ -14,17 +14,17 @@
     @if let Cfg::All(ref v) = *(*cfg) {
         <span class="cfg any" title="any">
         @for v in v {
-            <span class="cfg not">not @:target_cfg(v)</span>
+            <span class="cfg not">not @:target_cfg_html(v)</span>
         }
         </span>
     } else {
-        <span class="cfg not">not @:target_cfg(cfg)</span>
+        <span class="cfg not">not @:target_cfg_html(cfg)</span>
     }
 
 }
 @if let Cfg::All(v) = cfg {
-    <span class="cfg all" title="all">@for v in v {@:target_cfg(v)}</span>
+    <span class="cfg all" title="all">@for v in v {@:target_cfg_html(v)}</span>
 }
 @if let Cfg::Any(v) = cfg {
-    <span class="cfg any" title="any">@for v in v {@:target_cfg(v)}</span>
+    <span class="cfg any" title="any">@for v in v {@:target_cfg_html(v)}</span>
 }

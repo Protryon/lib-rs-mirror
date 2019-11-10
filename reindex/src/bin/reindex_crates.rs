@@ -277,7 +277,7 @@ fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersi
     }
 
     // k bye
-    if k.is_yanked() {
+    if k.is_yanked() || is_squatspam(&k) {
         score *= 0.001;
     }
 
@@ -311,6 +311,31 @@ fn is_autopublished(k: &RichCrateVersion) -> bool {
     k.description().map_or(false, |d| d.starts_with("Automatically published "))
 }
 
+fn is_squatspam(k: &RichCrateVersion) -> bool {
+    if k.version().contains("reserved") || k.version().contains("placeholder") {
+        return true;
+    }
+    if let Some(desc) = k.description() {
+        let desc = desc.trim_matches(|c: char| !c.is_ascii_alphabetic()).to_ascii_lowercase();
+        return desc.contains("this crate is a placeholder") ||
+            desc.contains("reserving this crate") ||
+            desc.contains("want to use this name") ||
+            desc.contains("this is a dummy package") ||
+            desc == "reserved" ||
+            desc.starts_with("placeholder") ||
+            desc.ends_with(" placeholder") ||
+            desc.starts_with("a placeholder") ||
+            desc.starts_with("reserved for ") ||
+            desc.starts_with("stub to squat") ||
+            desc.starts_with("reserved name") ||
+            desc.starts_with("reserved package") ||
+            desc.starts_with("an empty crate") ||
+            desc.starts_with("Empty crate,") ||
+            desc.starts_with("reserve the name");
+    }
+    false
+}
+
 fn is_deprecated(k: &RichCrateVersion) -> bool {
     if k.version().contains("deprecated") || kitchen_sink::is_deprecated(k.short_name()) {
         return true;
@@ -326,15 +351,10 @@ fn is_deprecated(k: &RichCrateVersion) -> bool {
             desc.contains("this crate has been abandoned") ||
             desc.contains("do not use") ||
             desc.contains("this crate is a placeholder") ||
-            desc.contains("reserving this crate") ||
             desc.contains("this is a dummy package") ||
-            desc == "reserved" ||
-            desc.starts_with("placeholder") ||
-            desc.starts_with("a placeholder") ||
-            desc.starts_with("reserved for ") ||
-            desc.starts_with("reserved name") ||
             desc.starts_with("an empty crate") ||
             desc.starts_with("discontinued") ||
+            desc.starts_with("wip. ") ||
             desc.starts_with("renamed to ") ||
             desc.starts_with("crate renamed to ") ||
             desc.starts_with("temporary fork") ||

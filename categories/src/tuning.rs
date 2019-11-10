@@ -77,6 +77,7 @@ lazy_static! {
             ("command-line-utilities", 0.6, 0.), ("development-tools", 0.9, 0.), ("science::math", 0.6, 0.)]),
         (Cond::Any(&["arch-linux", "unix", "coreutils", "archlinux", "docker", "pacman", "systemd", "posix", "x11", "epoll"]),
             &[("os::unix-apis", 1.2, 0.2), ("no-std", 0.5, 0.), ("multimedia::audio", 0.8, 0.), ("os::windows-apis", 0.7, 0.), ("cryptography", 0.8, 0.), ("cryptography::cryptocurrencies", 0.6, 0.)]),
+        (Cond::Any(&["users"]), &[("os::unix-apis", 1.1, 0.), ("caching", 0.8, 0.)]),
         (Cond::Any(&["docker", "docker-compose", "containerize", "containerized"]),
             &[("development-tools", 1.2, 0.1), ("web-programming", 1.1, 0.02), ("os::macos-apis", 0.9, 0.), ("config", 0.9, 0.), ("os::windows-apis", 0.1, 0.), ("command-line-utilities", 1.1, 0.02)]),
         (Cond::Any(&["kubernetes", "containerized", "k8s", "devops", "hypervisor"]),
@@ -353,7 +354,7 @@ lazy_static! {
         (Cond::Any(&["boolean", "search"]), &[("development-tools::testing", 0.9, 0.), ("multimedia::images", 0.8, 0.), ("multimedia::audio", 0.8, 0.),
             ("internationalization", 0.8, 0.), ("rendering::data-formats", 0.8, 0.)]),
         (Cond::Any(&["fuzzy"]), &[("algorithms", 1.1, 0.), ("multimedia::audio", 0.8, 0.), ("internationalization", 0.8, 0.), ("rendering::data-formats", 0.8, 0.)]),
-        (Cond::Any(&["text"]), &[("development-tools::testing", 0.9, 0.), ("multimedia::images", 0.8, 0.), ("multimedia::audio", 0.8, 0.),
+        (Cond::Any(&["text"]), &[("development-tools::testing", 0.9, 0.), ("caching", 0.8, 0.), ("multimedia::images", 0.8, 0.), ("multimedia::audio", 0.8, 0.),
             ("rendering::data-formats", 0.9, 0.)]),
 
         (Cond::Any(&["ai", "piston", "logic", "2d", "graphic"]), &[("web-programming::http-client", 0.5, 0.), ("web-programming::websocket", 0.5, 0.)]),
@@ -372,7 +373,7 @@ lazy_static! {
             ("network-programming", 0.9, 0.), ("web-programming", 0.8, 0.), ("web-programming::http-server", 0.7, 0.)]),
         (Cond::Any(&["gettext"]), &[("internationalization", 1.3, 0.2)]),
         (Cond::Any(&["math"]), &[("rendering", 0.75, 0.), ("command-line-utilities", 0.75, 0.)]),
-        (Cond::Any(&["rendering"]), &[("rendering::data-formats", 0.2, 0.), ("value-formatting", 0.8, 0.), ("hardware-support", 0.7, 0.)]),
+        (Cond::Any(&["rendering"]), &[("rendering::data-formats", 0.2, 0.), ("caching", 0.8, 0.), ("value-formatting", 0.8, 0.), ("hardware-support", 0.7, 0.)]),
 
         (Cond::Any(&["speech-recognition"]), &[("science", 1.3, 0.1),("multimedia::audio", 1.3, 0.1)]),
         (Cond::Any(&["tts", "speech"]), &[("multimedia::audio", 1.1, 0.), ("internationalization", 0.6, 0.)]),
@@ -456,7 +457,7 @@ lazy_static! {
         (Cond::Any(&["protocol-specification"]), &[("gui", 0.5, 0.), ("algorithms", 0.8, 0.), ("command-line-utilities", 0.75, 0.)]),
         (Cond::Any(&["dsl", "embedded", "rtos"]), &[("gui", 0.75, 0.), ("command-line-utilities", 0.75, 0.)]),
         (Cond::Any(&["idl", "asmjs", "webasm"]), &[("gui", 0.5, 0.), ("command-line-utilities", 0.75, 0.)]),
-        (Cond::Any(&["javascript"]), &[("gui", 0.9, 0.), ("command-line-utilities", 0.8, 0.), ("multimedia::encoding", 0.7, 0.), ("visualization", 0.8, 0.), ("cryptography::cryptocurrencies", 0.6, 0.)]),
+        (Cond::Any(&["javascript"]), &[("gui", 0.9, 0.), ("caching", 0.9, 0.), ("command-line-utilities", 0.8, 0.), ("multimedia::encoding", 0.7, 0.), ("visualization", 0.8, 0.), ("cryptography::cryptocurrencies", 0.6, 0.)]),
 
         (Cond::Any(&["concurrency", "spinlock", "semaphore", "parallel", "multithreaded", "barrier", "thread-local", "parallelism", "parallelizm", "coroutines", "threads", "threadpool", "fork-join", "parallelization", "actor"]),
             &[("concurrency", 1.35, 0.1), ("command-line-utilities", 0.8, 0.), ("games", 0.5, 0.), ("memory-management", 0.8, 0.), ("caching", 0.8, 0.), ("os", 0.8, 0.), ("parsing", 0.9, 0.), ("simulation", 0.8, 0.)]),
@@ -532,7 +533,7 @@ lazy_static! {
         (Cond::NotAny(&["database", "db", "databases", "datastore", "persistence", "wal", "queryable", "indexed", "columnar", "persistent", "relational", "dbms", "migrations", "key-value", "kv", "kvs", "sql", "nosql", "geoip", "key-value", "orm", "schema", "lmdb", "odbc", "transactions", "transactional",
             "sqlite3", "leveldb", "postgres", "postgresql", "dynamodb", "mysql", "hadoop", "sqlite", "mongo", "mongodb", "mongo-db", "memcached", "elasticsearch", "tkiv", "cassandra", "rocksdb"]),
             &[("database-implementations", 0.8, 0.), ("database", 0.8, 0.)]),
-        (Cond::Any(&["database", "databases", "datastore", "write-ahead-log"]), &[("database-implementations", 1.3, 0.3), ("cryptography::cryptocurrencies", 0.9, 0.), ("multimedia::encoding", 0.8, 0.),("database", 1.3, 0.1), ("caching", 0.88, 0.), ("development-tools", 0.9, 0.)]),
+        (Cond::Any(&["database", "databases", "datastore", "write-ahead-log"]), &[("database-implementations", 1.3, 0.3), ("cryptography::cryptocurrencies", 0.9, 0.), ("multimedia::encoding", 0.8, 0.),("database", 1.3, 0.1), ("caching", 0.8, 0.), ("development-tools", 0.9, 0.)]),
         (Cond::All(&["personal", "information", "management"]), &[("database-implementations", 1.5, 0.3)]),
         (Cond::All(&["imag"]), &[("game-engines", 0.8, 0.)]),
         (Cond::All(&["rpm", "redis"]), &[("database-implementations", 1.25, 0.1), ("os", 0.5, 0.), ("parsing", 0.5, 0.), ("os::unix-apis", 0.7, 0.)]),
@@ -660,7 +661,7 @@ lazy_static! {
             &[("data-structures", 1.2, 0.1), ("algorithms", 1.1, 0.1), ("science::math", 0.8, 0.), ("os", 0.9, 0.), ("games", 0.8, 0.), ("memory-management", 0.75, 0.), ("multimedia::video", 0.8, 0.)]),
         (Cond::Any(&["concurrent", "mpsc", "mpmc", "spsc", "producer", "condition",  "mutex", "futex"]), &[
             ("concurrency", 1.3, 0.15), ("algorithms", 1.1, 0.1), ("data-structures", 0.9, 0.)]),
-        (Cond::All(&["concurrent", "queue"]), &[("concurrency", 1.3, 0.15), ("data-structures", 0.8, 0.)]),
+        (Cond::All(&["concurrent", "queue"]), &[("concurrency", 1.3, 0.15), ("caching", 0.8, 0.), ("data-structures", 0.8, 0.)]),
         (Cond::Any(&["scheduler", "publisher", "lock", "deque", "channel"]), &[("concurrency", 1.3, 0.15), ("algorithms", 0.9, 0.), ("os", 1.1, 0.), ("data-structures", 0.8, 0.)]),
         (Cond::Any(&["persistent", "immutable"]), &[("algorithms", 1.25, 0.2), ("data-structures", 1.3, 0.1), ("database-implementations", 1.1, 0.1)]),
 
@@ -690,7 +691,7 @@ lazy_static! {
         (Cond::Any(&["lock-free"]),
                 &[("data-structures", 1.25, 0.1), ("concurrency", 1.1, 0.), ("algorithms", 1.1, 0.), ("science::math", 0.8, 0.), ("caching", 0.8, 0.), ("command-line-interface", 0.4, 0.), ("os", 0.9, 0.), ("command-line-utilities", 0.4, 0.)]),
         (Cond::Any(&["queue", "collection", "sort"]),
-                &[("data-structures", 1.25, 0.1), ("algorithms", 1.1, 0.), ("science::math", 0.8, 0.), ("caching", 0.8, 0.), ("command-line-interface", 0.4, 0.), ("os", 0.9, 0.), ("command-line-utilities", 0.4, 0.)]),
+                &[("data-structures", 1.25, 0.1), ("algorithms", 1.1, 0.), ("caching", 0.9, 0.), ("science::math", 0.8, 0.), ("caching", 0.8, 0.), ("command-line-interface", 0.4, 0.), ("os", 0.9, 0.), ("command-line-utilities", 0.4, 0.)]),
 
         (Cond::Any(&["macro", "macros", "dsl", "procedural-macros", "proc-macro", "proc-macros", "derive", "proc_macro", "custom-derive"]), &[
             ("development-tools::procedural-macro-helpers", 1.4, 0.2), ("rust-patterns", 1.2, 0.1), ("cryptography", 0.7, 0.),
@@ -798,7 +799,7 @@ lazy_static! {
         (Cond::Any(&["editor", "vim", "emacs", "vscode", "sublime"]), &[("text-editors", 1.2, 0.2), ("games", 0.4, 0.), ("rendering::engine", 0.7, 0.)]),
         (Cond::Any(&["obj", "loop", "lattice", "api", "bin", "framework", "stopwatch", "sensor", "github", "algorithm", "protocol"]),
             &[("games", 0.5, 0.), ("development-tools::profiling", 0.8, 0.), ("data-structures", 0.9, 0.)]),
-        (Cond::All(&["text", "editor"]), &[("text-editors", 1.4, 0.4), ("text-processing", 0.8, 0.), ("parsing", 0.5, 0.), ("internationalization", 0.1, 0.)]),
+        (Cond::All(&["text", "editor"]), &[("text-editors", 1.4, 0.4), ("caching", 0.8, 0.), ("text-processing", 0.8, 0.), ("parsing", 0.5, 0.), ("internationalization", 0.1, 0.)]),
         (Cond::Any(&["repl", "pack"]), &[("parsing", 0.9, 0.)]),
 
         (Cond::Any(&["cli"]), &[("command-line-utilities", 1.1, 0.), ("command-line-interface", 1.1, 0.), ("rust-patterns", 0.6, 0.)]),
@@ -921,6 +922,8 @@ lazy_static! {
         (Cond::Any(&["encryption", "e2e", "end-to-end", "e2ee", "keygen", "decryption", "password"]), &[("cryptography", 1.25, 0.2)]),
         (Cond::Any(&["overhead", "byte", "zero-copy"]), &[("algorithms", 1.05, 0.), ("memory-management", 1.02, 0.), ("games", 0.8, 0.)]),
         (Cond::Any(&["buffer", "buffered", "ringbuffer", "clone-on-write"]), &[("algorithms", 1.25, 0.2), ("memory-management", 1.25, 0.), ("caching", 1.2, 0.), ("network-programming", 0.25, 0.)]),
+        (Cond::NotAny(&["intern", "interning", "write-once", "lru", "proxy", "memoize", "memoization", "memcached", "cache", "caching", "memory-cache", "cached"]),
+            &[("caching", 0.6, 0.)]),
         (Cond::Any(&["memcached", "cache", "caching", "memory-cache"]),
             &[("caching", 1.3, 0.2), ("memory-management", 1.1, 0.), ("data-structures", 0.7, 0.), ("date-and-time", 0.7, 0.),
              ("embedded", 0.9, 0.), ("cryptography", 0.6, 0.), ("encoding", 0.8, 0.), ("algorithms", 0.7, 0.)]),

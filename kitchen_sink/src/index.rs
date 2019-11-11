@@ -451,6 +451,8 @@ pub fn is_deprecated(name: &str) -> bool {
         "flate2-crc" | "complex" | "simple_stats" | "concurrent" | "feed" |
         "isatty" | "thread-scoped" | "target_build_utils" | "chan" | "chan-signal" |
         "glsl-to-spirv" => true,
+        // fundamentally unsound
+        "str-concat" => true,
         _ => false,
     }
 }

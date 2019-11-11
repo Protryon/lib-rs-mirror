@@ -327,6 +327,7 @@ fn is_squatspam(k: &RichCrateVersion) -> bool {
             desc.starts_with("a placeholder") ||
             desc.starts_with("reserved for ") ||
             desc.starts_with("stub to squat") ||
+            desc.starts_with("claiming it before someone") ||
             desc.starts_with("reserved name") ||
             desc.starts_with("reserved package") ||
             desc.starts_with("an empty crate") ||
@@ -337,7 +338,7 @@ fn is_squatspam(k: &RichCrateVersion) -> bool {
 }
 
 fn is_deprecated(k: &RichCrateVersion) -> bool {
-    if k.version().contains("deprecated") || kitchen_sink::is_deprecated(k.short_name()) {
+    if k.version().contains("deprecated") || kitchen_sink::is_deprecated(k.short_name()) || k.version() == "0.0.0" || k.version() == "0.0.1" {
         return true;
     }
     if k.maintenance() == MaintenanceStatus::Deprecated {

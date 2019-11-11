@@ -178,7 +178,10 @@ impl Index {
     }
 
     pub fn deps_stats(&self) -> Result<&DepsStats, KitchenSinkErr> {
-        match self.deps_stats.try_get_for(Duration::from_secs(10), || self.get_deps_stats()) {
+        match self.deps_stats.try_get_for(Duration::from_secs(10), || {
+            let pool = rayon::ThreadPoolBuilder::new().build().unwrap();
+            pool.install(|| self.get_deps_stats())
+        }) {
             Some(res) => Ok(res),
             None => {
                 eprintln!("rayon deadlock");

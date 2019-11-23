@@ -46,6 +46,8 @@ lazy_static! {
         ("mock", Some(&["macro", "derive", "plugin", "cargo"])),
 
         ("caching", Some(&["allocator"])),
+        ("distributed", Some(&["filesystem", "file"])),
+        ("container", Some(&["filesystem", "file"])),
         ("aws", Some(&["ecs"])), // not game engine
         ("raspberry", Some(&["osx", "windows"])),
         ("linux", Some(&["windows", "winsdk", "macos", "mac", "osx"])),

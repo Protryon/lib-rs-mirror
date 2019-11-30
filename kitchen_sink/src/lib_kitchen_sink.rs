@@ -27,7 +27,6 @@ pub use github_info::User;
 pub use github_info::UserOrg;
 pub use github_info::UserType;
 pub use rich_crate::Edition;
-pub use rich_crate::Include;
 pub use rich_crate::MaintenanceStatus;
 pub use rich_crate::Markup;
 pub use rich_crate::Origin;
@@ -1078,7 +1077,7 @@ impl KitchenSink {
     /// Returns (nth, slug)
     pub fn top_category<'crat>(&self, krate: &'crat RichCrateVersion) -> Option<(u32, Cow<'crat, str>)> {
         let crate_origin = krate.origin();
-        krate.category_slugs(Include::Cleaned)
+        krate.category_slugs()
         .filter_map(|slug| {
             self.top_crates_in_category(&slug).ok()
             .and_then(|cat| {

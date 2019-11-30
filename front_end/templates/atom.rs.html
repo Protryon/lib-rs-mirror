@@ -1,6 +1,5 @@
 @use crate::home_page::HomePage;
 @use crate::Urler;
-@use rich_crate::Include;
 
 @(home: &HomePage, url: &Urler)
 
@@ -27,7 +26,7 @@
           @if let Some(d) = ver.description() {
               <summary type="text">@d</summary>
           }
-          @for slug in ver.category_slugs(Include::Cleaned) {
+          @for slug in ver.category_slugs() {
             <category term="@slug" />
           }
           @if let Some(lic) = ver.license() {

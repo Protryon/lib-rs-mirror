@@ -26,12 +26,6 @@ pub struct RichCrateVersion {
     manifest: Manifest,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum Include {
-    Cleaned,
-    AuthoritativeOnly,
-}
-
 /// Data for a specific version of a crate.
 ///
 /// Crates.rs uses this only for the latest version of a crate.
@@ -88,16 +82,10 @@ impl RichCrateVersion {
         &self.derived.capitalized_name
     }
 
-    pub fn category_slugs(&self, include: Include) -> impl Iterator<Item = Cow<'_, str>> {
-        match include {
-            Include::Cleaned => Categories::fixed_category_slugs(if let Some(ref assigned_categories) = self.derived.categories {
-                &assigned_categories
-            } else {
-                &self.package().categories
-            }),
-            Include::AuthoritativeOnly => Categories::fixed_category_slugs(&self.package().categories),
-        }
-        .into_iter()
+    pub fn category_slugs(&self) -> impl Iterator<Item = Cow<'_, str>> {
+        Categories::fixed_category_slugs(
+            self.derived.categories.as_ref().unwrap_or(&self.package().categories)
+        ).into_iter()
     }
 
     pub fn license(&self) -> Option<&str> {

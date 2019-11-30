@@ -1,7 +1,7 @@
 use either::*;
 use failure;
 use kitchen_sink::RichCrate;
-use kitchen_sink::{self, stopped, stop, Include, KitchenSink, MaintenanceStatus, Origin, RichCrateVersion};
+use kitchen_sink::{self, stopped, stop, KitchenSink, MaintenanceStatus, Origin, RichCrateVersion};
 use parking_lot::Mutex;
 use rand::{seq::SliceRandom, thread_rng};
 use ranking::CrateTemporalInputs;

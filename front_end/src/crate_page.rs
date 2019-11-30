@@ -13,7 +13,6 @@ use kitchen_sink::{DepTy, KitchenSink, Origin};
 use locale::Numeric;
 use rayon::prelude::*;
 use render_readme::Renderer;
-use rich_crate::Include;
 use rich_crate::Readme;
 use rich_crate::RepoHost;
 use rich_crate::RichCrate;
@@ -131,7 +130,7 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn page_title(&self) -> String {
-        let slugs: Vec<_> = self.ver.category_slugs(Include::Cleaned).collect();
+        let slugs: Vec<_> = self.ver.category_slugs().collect();
         let kind = if self.ver.has_bin() {
             if slugs.iter().any(|s| s == "development-tools::cargo-plugins") {
                 "Rust/Cargo add-on"
@@ -596,7 +595,7 @@ impl<'a> CratePage<'a> {
     pub fn category_slugs_unique(&self) -> Vec<Vec<&Category>> {
         let mut seen = HashSet::new();
         self.ver
-            .category_slugs(Include::Cleaned)
+            .category_slugs()
             .map(|slug| {
                 CATEGORIES
                     .from_slug(slug)

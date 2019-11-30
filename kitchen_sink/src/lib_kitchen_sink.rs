@@ -685,26 +685,28 @@ impl KitchenSink {
         let maybe_repo = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
         // Guess keywords if none were specified
         // TODO: also ignore useless keywords that are unique db-wide
-        if package.keywords.is_empty() {
-            let gh = match maybe_repo.as_ref() {
-                Some(repo) => if let RepoHost::GitHub(ref gh) = repo.host() {
-                    self.gh.topics(gh, &self.cachebust_string_for_repo(repo).context("fetch topics")?)?
-                } else {None},
-                _ => None,
-            };
-            if let Some(mut topics) = gh {
-                topics.retain(|t| match t.as_str() {
-                    "rust" | "rs" | "rustlang" | "rust-lang" | "crate" | "crates" | "library" => false,
-                    t if t.starts_with("rust-") => false,
-                    _ => true,
-                });
-                if !topics.is_empty() {
-                    github_keywords = Some(topics);
+        let gh = match maybe_repo.as_ref() {
+            Some(repo) => if let RepoHost::GitHub(ref gh) = repo.host() {
+                self.gh.topics(gh, &self.cachebust_string_for_repo(repo).context("fetch topics")?)?
+            } else {None},
+            _ => None,
+        };
+        if let Some(mut topics) = gh {
+            for t in &mut topics {
+                if t.starts_with("rust-") {
+                    *t = t.trim_start_matches("rust-").into();
                 }
             }
-            if github_keywords.is_none() {
-                derived_keywords = Some(self.crate_db.keywords(&origin).context("keywordsdb")?);
+            topics.retain(|t| match t.as_str() {
+                "rust" | "rs" | "rustlang" | "rust-lang" | "crate" | "crates" | "library" => false,
+                _ => true,
+            });
+            if !topics.is_empty() {
+                github_keywords = Some(topics);
             }
+        }
+        if package.keywords.is_empty() {
+            derived_keywords = Some(self.crate_db.keywords(&origin).context("keywordsdb")?);
         }
 
         let mut derived_categories = None;

@@ -226,7 +226,9 @@ impl CrateDb {
         let manifest = &c.manifest;
         let package = manifest.package.as_ref().expect("package");
         let mut insert_keyword = KeywordInsert::new()?;
-        for (i, k) in package.keywords.iter().enumerate() {
+        let all_explicit_keywords = package.keywords.iter()
+            .chain(c.derived.github_keywords.iter().flatten());
+        for (i, k) in all_explicit_keywords.enumerate() {
             print!("#{}, ", k);
             let mut w: f64 = 100./(6+i*2) as f64;
             if STOPWORDS.get(k.as_str()).is_some() {

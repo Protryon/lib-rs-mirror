@@ -30,7 +30,6 @@ pub struct RichCrateVersion {
 pub enum Include {
     Cleaned,
     AuthoritativeOnly,
-    RawCargoTomlOnly,
 }
 
 /// Data for a specific version of a crate.
@@ -97,10 +96,6 @@ impl RichCrateVersion {
                 &self.package().categories
             }),
             Include::AuthoritativeOnly => Categories::fixed_category_slugs(&self.package().categories),
-            Include::RawCargoTomlOnly => {
-                let tmp: Vec<_> = self.package().categories.iter().map(From::from).collect();
-                tmp
-            },
         }
         .into_iter()
     }
@@ -125,14 +120,9 @@ impl RichCrateVersion {
     }
 
     /// Either original keywords or guessed ones
-    pub fn keywords(&self, include: Include) -> impl Iterator<Item = &str> {
-        match include {
-            Include::RawCargoTomlOnly => &self.package().keywords,
-            Include::AuthoritativeOnly => {
-                if self.package().keywords.is_empty() { self.derived.github_keywords.as_ref() } else { None }.unwrap_or(&self.package().keywords)
-            },
-            Include::Cleaned => self.derived.keywords.as_ref().unwrap_or(&self.package().keywords),
-        }
+    pub fn keywords(&self) -> impl Iterator<Item = &str> {
+        self.derived.keywords.as_ref()
+        .unwrap_or(&self.package().keywords)
         .iter()
         .map(|s| s.as_str())
     }
@@ -293,8 +283,8 @@ impl RichCrateVersion {
     }
 
     pub fn is_no_std(&self) -> bool {
-        self.category_slugs(Include::RawCargoTomlOnly).any(|c| c == "no-std")
-            || self.keywords(Include::RawCargoTomlOnly).any(|k| k == "no-std" || k == "no_std")
+        self.package().categories.iter().any(|c| c == "no-std")
+            || self.package().keywords.iter().any(|k| k == "no-std" || k == "no_std")
             || self.features().iter().any(|(k,_)| k == "no-std" || k == "no_std")
     }
 

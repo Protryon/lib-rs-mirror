@@ -130,7 +130,7 @@ fn index_crate(crates: &KitchenSink, c: &Origin, renderer: &Renderer, search_sen
 }
 
 fn index_search(indexer: &mut Indexer, renderer: &Renderer, k: &RichCrateVersion, downloads_per_month: usize, score: f64) -> Result<(), failure::Error> {
-    let keywords: Vec<_> = k.keywords(Include::Cleaned).collect();
+    let keywords: Vec<_> = k.keywords().collect();
 
     let mut lib_tmp = None;
     let readme = k.readme().map(|readme| &readme.markup).or_else(|| {

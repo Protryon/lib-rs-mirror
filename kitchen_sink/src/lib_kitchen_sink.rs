@@ -1757,7 +1757,7 @@ impl KitchenSink {
 
     /// True if there are multiple crates with that keyword. Populated first.
     pub fn keywords_populated(&self, krate: &RichCrateVersion) -> Vec<(String, bool)> {
-        let mut keywords: Vec<_> = krate.keywords(Include::Cleaned)
+        let mut keywords: Vec<_> = krate.keywords()
         .map(|k| {
             let populated = self.crate_db.crates_with_keyword(&k.to_lowercase()).unwrap() >= 3;
             (k.to_owned(), populated)

@@ -114,7 +114,7 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn page(&self, url: &Urler) -> Page {
-        let keywords = self.ver.keywords(Include::Cleaned).collect::<Vec<_>>().join(", ");
+        let keywords = self.ver.keywords().collect::<Vec<_>>().join(", ");
         Page {
             title: self.page_title(),
             keywords: if keywords != "" { Some(keywords) } else { None },

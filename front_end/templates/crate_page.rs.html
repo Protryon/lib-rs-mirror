@@ -27,7 +27,7 @@
     </h1>
      ›
     @if c.ver.has_categories() {
-      <span class="categories @if c.ver.keywords(Include::Cleaned).next().is_some() {has-keywords}" role="navigaton" aria-label="Categories">
+      <span class="categories @if c.ver.keywords().next().is_some() {has-keywords}" role="navigaton" aria-label="Categories">
       @for (last, (major, cat)) in c.category_slugs_unique().iter().enumerate().identify_last() {
         @for (last, (i, subcat)) in cat.iter().enumerate().identify_last() {
           @if major < 2 {

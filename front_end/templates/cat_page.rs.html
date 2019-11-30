@@ -97,7 +97,7 @@
                               <span class=downloads title="@downloads recent downloads">@if let Some((num,unit)) = Some(p.downloads(*downloads)) {@num<b>@unit</b>}</span>
                             }
                             @:labels(c, (false, false))
-                            @for k in c.keywords(Include::Cleaned) {
+                            @for k in c.keywords() {
                                 <span class=k><span>#</span>@k</span>
                             }
                         </div>

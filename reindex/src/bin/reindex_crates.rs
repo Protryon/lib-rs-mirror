@@ -62,7 +62,7 @@ fn main() {
 
     let seen_repos = &Mutex::new(HashSet::new());
     let _ = pre.join().unwrap();
-    rayon::scope(move |s1| {
+    rayon::scope(move |scope| {
         let c = if everything {
             let mut c: Vec<_> = crates.all_crates().collect::<Vec<_>>();
             c.shuffle(&mut thread_rng());
@@ -72,39 +72,48 @@ fn main() {
         } else {
             Either::Right(crates.all_new_crates().unwrap().into_iter().map(|c| c.origin().clone()))
         };
-        for (i, k) in c.into_iter().enumerate() {
+        for (i, origin) in c.into_iter().enumerate() {
             if stopped() {
                 return;
             }
             let crates = Arc::clone(&crates);
             let renderer = Arc::clone(&renderer);
             let tx = tx.clone();
-            s1.spawn(move |s2| {
+            scope.spawn(move |scope| {
                 if stopped() {
                     return;
                 }
                 print!("{} ", i);
-                match index_crate(&crates, &k, &renderer, &tx) {
-                    Ok(v) => {
-                        if repos {
-                            s2.spawn(move |_| {
-                                if let Some(ref repo) = v.repository() {
-                                    {
-                                        let mut s = seen_repos.lock();
-                                        let url = repo.canonical_git_url().to_string();
-                                        if s.contains(&url) {
-                                            return;
-                                        }
-                                        println!("Indexing {}", url);
-                                        s.insert(url);
-                                    }
-                                    print_res(crates.index_repo(repo, v.version()));
-                                }
-                            })
-                        }
+                match crates.index_crate_highest_version(&origin) {
+                    Ok(()) => {},
+                    err => {
+                        print_res(err);
+                        return;
                     },
-                    err => print_res(err),
                 }
+                scope.spawn(move |scope| {
+                    match index_crate(&crates, &origin, &renderer, &tx) {
+                        Ok(v) => {
+                            if repos {
+                                scope.spawn(move |_| {
+                                    if let Some(ref repo) = v.repository() {
+                                        {
+                                            let mut s = seen_repos.lock();
+                                            let url = repo.canonical_git_url().to_string();
+                                            if s.contains(&url) {
+                                                return;
+                                            }
+                                            println!("Indexing {}", url);
+                                            s.insert(url);
+                                        }
+                                        print_res(crates.index_repo(repo, v.version()));
+                                    }
+                                })
+                            }
+                        },
+                        err => print_res(err),
+                    }
+                });
             });
         }
         drop(tx);
@@ -113,20 +122,13 @@ fn main() {
     index_thread.join().unwrap().unwrap();
 }
 
-fn index_crate(crates: &KitchenSink, c: &Origin, renderer: &Renderer, search_sender: &mpsc::SyncSender<(RichCrateVersion, usize, f64)>) -> Result<RichCrateVersion, failure::Error> {
-    let k = crates.rich_crate(c)?;
-    crates.index_crate_highest_version(c)?;
-    let v = crates.rich_crate_version(c)?;
-    let contrib_info = crates.all_contributors(&v).map_err(|e| eprintln!("{}", e)).ok();
-    let contributors_count = if let Some((authors, _owner_only, _, extra_contributors)) = &contrib_info {
-        (authors.len() + extra_contributors) as u32
-    } else {
-        k.owners().len() as u32
-    };
+fn index_crate(crates: &KitchenSink, origin: &Origin, renderer: &Renderer, search_sender: &mpsc::SyncSender<(RichCrateVersion, usize, f64)>) -> Result<RichCrateVersion, failure::Error> {
+    let k = crates.rich_crate(origin)?;
+    let v = crates.rich_crate_version(origin)?;
 
-    let (downloads_per_month, score) = crate_overall_score(crates, &k, &v, renderer, contributors_count);
-    crates.index_crate(&k, score)?;
+    let (downloads_per_month, score) = crate_overall_score(crates, &k, &v, renderer);
     search_sender.send((v.clone(), downloads_per_month, score)).map_err(|e| {stop();e}).expect("closed channel?");
+    crates.index_crate(&k, score)?;
     Ok(v)
 }
 
@@ -147,8 +149,14 @@ fn index_search(indexer: &mut Indexer, renderer: &Renderer, k: &RichCrateVersion
 }
 
 
+fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) -> (usize, f64) {
+    let contrib_info = crates.all_contributors(&k).map_err(|e| eprintln!("{}", e)).ok();
+    let contributors_count = if let Some((authors, _owner_only, _, extra_contributors)) = &contrib_info {
+        (authors.len() + extra_contributors) as u32
+    } else {
+        all.owners().len() as u32
+    };
 
-fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer, contributors_count: u32) -> (usize, f64) {
     let readme = k.readme().map(|readme| {
         renderer.page_node(&readme.markup, None, false, None)
     });

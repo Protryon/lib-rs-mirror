@@ -95,7 +95,7 @@ impl CrateDb {
         let mut conn = self.exclusive_conn.lock();
         let conn = conn.get_or_insert_with(|| self.connect().unwrap());
 
-        let tx = conn.transaction()?;
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let res = cb(&tx).context(context)?;
         tx.commit().context(context)?;
         Ok(res)

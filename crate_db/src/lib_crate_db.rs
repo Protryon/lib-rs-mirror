@@ -2,7 +2,7 @@ use categories;
 use chrono::prelude::*;
 use failure::*;
 use heck::KebabCase;
-use parking_lot::Mutex;
+use parking_lot::{RwLock, Mutex};
 use rich_crate::Derived;
 use rich_crate::Manifest;
 use rich_crate::ManifestExt;
@@ -33,6 +33,8 @@ use crate::stopwords::{COND_STOPWORDS, STOPWORDS};
 
 pub struct CrateDb {
     url: String,
+    // Sqlite is awful with "database table is locked"
+    concurrency_control: RwLock<()>,
     conn: ThreadLocal<std::result::Result<RefCell<Connection>, rusqlite::Error>>,
     exclusive_conn: Mutex<Option<Connection>>,
     tag_synonyms: HashMap<Box<str>, (Box<str>, u8)>,
@@ -74,12 +76,15 @@ impl CrateDb {
             tag_synonyms,
             url: format!("file:{}?cache=shared", path.display()),
             conn: ThreadLocal::new(),
+            concurrency_control: RwLock::new(()),
             exclusive_conn: Mutex::new(None),
         })
     }
 
     #[inline]
-    fn with_connection<F, T>(&self, context: &'static str, cb: F) -> FResult<T> where F: FnOnce(&mut Connection) -> FResult<T> {
+    fn with_read<F, T>(&self, context: &'static str, cb: F) -> FResult<T> where F: FnOnce(&mut Connection) -> FResult<T> {
+        let mut _sqlite_sucks = self.concurrency_control.read();
+
         let conn = self.conn.get_or(|| self.connect().map(|conn| {
             let _ = conn.busy_timeout(std::time::Duration::from_secs(3));
             RefCell::new(conn)
@@ -91,7 +96,9 @@ impl CrateDb {
     }
 
     #[inline]
-    fn with_tx<F, T>(&self, context: &'static str, cb: F) -> FResult<T> where F: FnOnce(&Connection) -> FResult<T> {
+    fn with_write<F, T>(&self, context: &'static str, cb: F) -> FResult<T> where F: FnOnce(&Connection) -> FResult<T> {
+        let mut _sqlite_sucks = self.concurrency_control.write();
+
         let mut conn = self.exclusive_conn.lock();
         let conn = conn.get_or_insert_with(|| self.connect().unwrap());
 
@@ -121,7 +128,7 @@ impl CrateDb {
             is_yanked: bool,
             has_code_of_conduct: bool,
         }
-        self.with_connection("rich_crate_version_data", |conn| {
+        self.with_read("rich_crate_version_data", |conn| {
             let args: &[&dyn ToSql] = &[&origin.to_str()];
             let (manifest, readme, row, language_stats): (Manifest, _, Row, _) = conn.query_row("SELECT * FROM crates c JOIN crate_derived d ON (c.id = d.crate_id)
                 WHERE origin = ?1", args, |row| {
@@ -198,14 +205,14 @@ impl CrateDb {
     }
 
     pub fn latest_crate_update_timestamp(&self) -> FResult<Option<u32>> {
-        self.with_connection("latest_crate_update_timestamp", |conn| {
+        self.with_read("latest_crate_update_timestamp", |conn| {
             let nope: [u8; 0] = [];
             Ok(none_rows(conn.query_row("SELECT max(created) FROM crate_versions", nope.iter(), |row| row.get(0)))?)
         })
     }
 
     pub fn crate_versions(&self, origin: &Origin) -> FResult<Vec<(String, u32)>> {
-        self.with_connection("crate_versions", |conn| {
+        self.with_read("crate_versions", |conn| {
             let mut q = conn.prepare("SELECT v.version, v.created FROM crates c JOIN crate_versions v ON v.crate_id = c.id WHERE c.origin = ?1")?;
             let res = q.query_map(&[&origin.to_str()][..], |row| {
                 Ok((row.get(0)?, row.get(1)?))
@@ -311,7 +318,7 @@ impl CrateDb {
         }
         let next_timestamp = (Utc::now().timestamp() + 3600 * 24 * 31) as u32;
 
-        self.with_tx("insert_crate", |tx| {
+        self.with_write("insert_crate", |tx| {
             let mut insert_crate = tx.prepare_cached("INSERT OR IGNORE INTO crates (origin, recent_downloads, ranking) VALUES (?1, ?2, ?3)")?;
             let mut mark_updated = tx.prepare_cached("UPDATE crates SET next_update = ?2 WHERE id = ?1")?;
             let mut insert_repo = tx.prepare_cached("INSERT OR REPLACE INTO crate_repos (crate_id, repo) VALUES (?1, ?2)")?;
@@ -478,7 +485,7 @@ impl CrateDb {
     ///    interesting relationship information for crates.
     pub fn index_repo_crates(&self, repo: &Repo, paths_and_names: impl Iterator<Item = (impl AsRef<str>, impl AsRef<str>)>) -> FResult<()> {
         let repo = repo.canonical_git_url();
-        self.with_tx("index_repo_crates", |tx| {
+        self.with_write("index_repo_crates", |tx| {
             let mut insert_repo = tx.prepare_cached("INSERT OR IGNORE INTO repo_crates (repo, path, crate_name) VALUES (?1, ?2, ?3)")?;
             for (path, name) in paths_and_names {
                 let name = name.as_ref();
@@ -490,7 +497,7 @@ impl CrateDb {
     }
 
     pub fn crates_in_repo(&self, repo: &Repo) -> FResult<Vec<Origin>> {
-        self.with_connection("crates_in_repo", |conn| {
+        self.with_read("crates_in_repo", |conn| {
             let mut q = conn.prepare_cached("
                 SELECT crate_name
                 FROM repo_crates
@@ -507,7 +514,7 @@ impl CrateDb {
 
     /// Returns crate name (not origin)
     pub fn parent_crate(&self, repo: &Repo, child_name: &str) -> FResult<Option<Origin>> {
-        self.with_connection("parent_crate", |conn| {
+        self.with_read("parent_crate", |conn| {
             let mut paths = conn.prepare_cached("SELECT path, crate_name FROM repo_crates WHERE repo = ?1 LIMIT 100")?;
             let mut paths: HashMap<String, String> = paths
                 .query_map(&[&repo.canonical_git_url()], |r| Ok((r.get_unwrap(0), r.get_unwrap(1))))?
@@ -559,7 +566,7 @@ impl CrateDb {
 
     pub fn index_repo_changes(&self, repo: &Repo, changes: &[RepoChange]) -> FResult<()> {
         let repo = repo.canonical_git_url();
-        self.with_tx("index_repo_changes", |tx| {
+        self.with_write("index_repo_changes", |tx| {
             let mut insert_change = tx.prepare_cached("INSERT OR IGNORE INTO repo_changes (repo, crate_name, replacement, weight) VALUES (?1, ?2, ?3, ?4)")?;
             for change in changes {
                 match *change {
@@ -578,7 +585,7 @@ impl CrateDb {
     }
 
     pub fn path_in_repo(&self, repo: &Repo, crate_name: &str) -> FResult<Option<String>> {
-        self.with_connection("path_in_repo", |conn| self.path_in_repo_tx(conn, repo, crate_name))
+        self.with_read("path_in_repo", |conn| self.path_in_repo_tx(conn, repo, crate_name))
     }
 
     pub fn path_in_repo_tx(&self, conn: &Connection, repo: &Repo, crate_name: &str) -> FResult<Option<String>> {
@@ -590,7 +597,7 @@ impl CrateDb {
 
     /// Update download counts of the crate
     pub fn index_versions(&self, all: &RichCrate, score: f64, downloads_recent: Option<usize>) -> FResult<()> {
-        self.with_tx("index_versions", |tx| {
+        self.with_write("index_versions", |tx| {
             let mut get_crate_id = tx.prepare_cached("SELECT id FROM crates WHERE origin = ?1")?;
             let mut insert_version = tx.prepare_cached("INSERT OR IGNORE INTO crate_versions (crate_id, version, created) VALUES (?1, ?2, ?3)")?;
 
@@ -620,7 +627,7 @@ impl CrateDb {
         if !assigned.is_empty() {
             Ok(assigned)
         } else {
-            self.with_connection("guess_crate_categories", |conn| {
+            self.with_read("guess_crate_categories", |conn| {
                 self.guess_crate_categories_tx(&conn, origin, keywords.map(|k| k.to_lowercase()).collect(), 0.1)
             })
         }
@@ -628,7 +635,7 @@ impl CrateDb {
 
     /// Assigned categories with their weights
     fn crate_categories(&self, origin: &Origin) -> FResult<Vec<(f64, String)>> {
-        self.with_connection("crate_categories", |conn| {
+        self.with_read("crate_categories", |conn| {
             let mut query = conn.prepare_cached(r#"
                 SELECT c.relevance_weight, c.slug
                 FROM crates k
@@ -675,7 +682,7 @@ impl CrateDb {
     ///
     /// Returns (top n-th for the keyword, the keyword)
     pub fn top_keyword(&self, origin: &Origin) -> FResult<Option<(u32, String)>> {
-        self.with_connection("top_keyword", |conn| {
+        self.with_read("top_keyword", |conn| {
             let mut query = conn.prepare_cached(r#"
             select top, keyword from (
                 select count(*) as total, sum(case when oc.ranking >= c.ranking then 1 else 0 end) as top, k.keyword from crates c
@@ -700,7 +707,7 @@ impl CrateDb {
     ///
     /// NB: must be lowercase
     pub fn crates_with_keyword(&self, keyword: &str) -> FResult<u32> {
-        self.with_connection("crates_with_keyword", |conn| {
+        self.with_read("crates_with_keyword", |conn| {
             let mut query = conn.prepare_cached("SELECT count(*) FROM crate_keywords
                 WHERE explicit AND keyword_id = (SELECT id FROM keywords WHERE keyword = ?1)")?;
             Ok(none_rows(query.query_row(&[&keyword], |row| row.get(0)))?.unwrap_or(0))
@@ -709,7 +716,7 @@ impl CrateDb {
 
     /// Categories similar to the given category
     pub fn related_categories(&self, slug: &str) -> FResult<Vec<String>> {
-        self.with_connection("related_categories", |conn| {
+        self.with_read("related_categories", |conn| {
             let mut query = conn.prepare_cached(r#"
                 select sum(c2.relevance_weight * c1.relevance_weight) as w, c2.slug
                 from categories c1
@@ -727,7 +734,7 @@ impl CrateDb {
     }
 
     pub fn replacement_crates(&self, crate_name: &str) -> FResult<Vec<String>> {
-        self.with_connection("replacement_crates", |conn| {
+        self.with_read("replacement_crates", |conn| {
             let mut query = conn.prepare_cached(r#"
                 SELECT sum(weight) as w, replacement
                 FROM repo_changes
@@ -744,7 +751,7 @@ impl CrateDb {
     }
 
     pub fn related_crates(&self, origin: &Origin, min_recent_downloads: u32) -> FResult<Vec<Origin>> {
-        self.with_connection("related_crates", |conn| {
+        self.with_read("related_crates", |conn| {
             let mut query = conn.prepare_cached(r#"
                 SELECT sum(k2.weight * k1.weight) as w, c2.origin
                 FROM crates c1
@@ -769,7 +776,7 @@ impl CrateDb {
 
     /// Find keywords that may be most relevant to the crate
     pub fn keywords(&self, origin: &Origin) -> FResult<Vec<String>> {
-        self.with_connection("keywords", |conn| {
+        self.with_read("keywords", |conn| {
             self.keywords_tx(conn, origin)
         })
     }
@@ -809,7 +816,7 @@ impl CrateDb {
 
     /// Find most relevant/popular keywords in the category
     pub fn top_keywords_in_category(&self, slug: &str) -> FResult<Vec<String>> {
-        self.with_connection("top_keywords_in_category", |conn| {
+        self.with_read("top_keywords_in_category", |conn| {
             let mut query = conn.prepare_cached(r#"
                 select sum(k.weight * c.relevance_weight), kk.keyword from categories c
                     join crate_keywords k using(crate_id)
@@ -831,7 +838,7 @@ impl CrateDb {
     ///
     /// TODO: there should be a time decay, otherwise old crates will get penalized for churn
     pub fn removals(&self) -> FResult<HashMap<Origin, f64>> {
-        self.with_connection("removals", |conn| {
+        self.with_read("removals", |conn| {
             let mut query = conn.prepare("
                 SELECT crate_name, sum(weight * (0.5+r.ranking/2)) AS w
                 FROM (
@@ -856,7 +863,7 @@ impl CrateDb {
     /// Most popular crates in the category
     /// Returns weight/importance as well
     pub fn top_crates_in_category_partially_ranked(&self, slug: &str, limit: u32) -> FResult<Vec<(Origin, f64)>> {
-        self.with_connection("top_crates_in_category_partially_ranked", |conn| {
+        self.with_read("top_crates_in_category_partially_ranked", |conn| {
             // sort by relevance to the category, downrank for being crappy (later also downranked for being removed from crates)
             // low number of downloads is mostly by rank, rather than downloads
             let mut query = conn.prepare_cached(
@@ -877,7 +884,7 @@ impl CrateDb {
     }
 
     pub fn top_crates_uncategorized(&self, limit: u32) -> FResult<Vec<(Origin, f64)>> {
-        self.with_connection("top_crates_uncategorized", |conn| {
+        self.with_read("top_crates_uncategorized", |conn| {
             // sort by relevance to the category, downrank for being crappy (later also downranked for being removed from crates)
             // low number of downloads is mostly by rank, rather than downloads
             let mut query = conn.prepare_cached(
@@ -901,7 +908,7 @@ impl CrateDb {
     ///
     /// Returns `origin` strings
     pub fn recently_updated_crates_in_category(&self, slug: &str) -> FResult<Vec<Origin>> {
-        self.with_connection("recently_updated_crates_in_category", |conn| {
+        self.with_read("recently_updated_crates_in_category", |conn| {
             let mut query = conn.prepare_cached(r#"
                 select max(created) + 3600*24*7 * c.rank_weight * k.ranking, -- week*rank ~= best this week
                     k.origin
@@ -926,7 +933,7 @@ impl CrateDb {
     ///
     /// Returns `origin` strings
     pub fn recently_updated_crates(&self) -> FResult<Vec<Origin>> {
-        self.with_connection("recently_updated_crates", |conn| {
+        self.with_read("recently_updated_crates", |conn| {
             let mut query = conn.prepare_cached(r#"
                 select max(created) + 3600*24*7 * k.ranking, -- week*rank ~= best this week
                     k.origin
@@ -948,7 +955,7 @@ impl CrateDb {
     /// List of all notable crates
     /// Returns origin, rank, last updated unix timestamp
     pub fn sitemap_crates(&self) -> FResult<Vec<(Origin, f64, i64)>> {
-        self.with_connection("sitemap_crates", |conn| {
+        self.with_read("sitemap_crates", |conn| {
             let mut q = conn.prepare(r#"
                 SELECT origin, ranking, max(created) as last_update
                 FROM crates c
@@ -965,7 +972,7 @@ impl CrateDb {
 
     /// Number of crates in every category
     pub fn category_crate_counts(&self) -> FResult<HashMap<String, u32>> {
-        self.with_connection("category_crate_counts", |conn| {
+        self.with_read("category_crate_counts", |conn| {
             let mut q = conn.prepare(r#"
                 select c.slug, count(*) as cnt from categories c group by c.slug
             "#)?;

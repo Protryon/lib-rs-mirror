@@ -240,7 +240,7 @@ fn cratesioclient() {
 
     client.crate_meta("capi", "0.0.1").expect("cargo-deb");
     let owners = client.crate_owners("cargo-deb", "1.10.0").expect("crate_owners").expect("found some");
-    assert_eq!(2, owners.len(), "that will fail when metadata updates");
+    assert_eq!(3, owners.len(), "that will fail when metadata updates");
     match CratesIoClient::new(Path::new("../data"), 1.).expect("new").cache_only(true).crate_data("fail404", "999").unwrap() {
         None => {},
         Some(e) => panic!("{:?}", e),

@@ -59,7 +59,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
         self.set_(key.into().into_boxed_str(), value.borrow())
     }
 
-    fn lock_for_write(&self) -> Result<RwLockWriteGuard<Inner>, Error> {
+    fn lock_for_write(&self) -> Result<RwLockWriteGuard<'_, Inner>, Error> {
         let mut inner = self.data.write();
         if inner.data.is_none() {
             inner.data = Some(self.load_data()?);
@@ -67,7 +67,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
         Ok(inner)
     }
 
-    fn lock_for_read(&self) -> Result<RwLockReadGuard<Inner>, Error> {
+    fn lock_for_read(&self) -> Result<RwLockReadGuard<'_, Inner>, Error> {
         loop {
             let inner = self.data.read();
             if inner.data.is_some() {

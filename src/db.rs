@@ -43,7 +43,7 @@ impl SimpleCache {
 
     #[inline]
     fn with_connection<F, T>(&self, cb: F) -> Result<T, Error> where F: FnOnce(&Connection) -> Result<T, Error> {
-        let conn = self.conn.get_or(|| Box::new(self.connect()));
+        let conn = self.conn.get_or(|| self.connect());
         match conn {
             Ok(conn) => cb(conn),
             Err(err) => Err(Error::Other(err.to_string())),

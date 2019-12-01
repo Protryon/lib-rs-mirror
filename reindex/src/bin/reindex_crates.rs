@@ -115,7 +115,8 @@ fn main() {
 
 fn index_crate(crates: &KitchenSink, c: &Origin, renderer: &Renderer, search_sender: &mpsc::SyncSender<(RichCrateVersion, usize, f64)>) -> Result<RichCrateVersion, failure::Error> {
     let k = crates.rich_crate(c)?;
-    let v = crates.index_crate_highest_version(&k)?;
+    crates.index_crate_highest_version(c)?;
+    let v = crates.rich_crate_version(c)?;
     let contrib_info = crates.all_contributors(&v).map_err(|e| eprintln!("{}", e)).ok();
     let contributors_count = if let Some((authors, _owner_only, _, extra_contributors)) = &contrib_info {
         (authors.len() + extra_contributors) as u32

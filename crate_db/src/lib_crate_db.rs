@@ -11,6 +11,7 @@ use rich_crate::Origin;
 use rich_crate::Readme;
 use rich_crate::Repo;
 use rich_crate::RichCrate;
+use rich_crate::CrateVersionSourceData;
 use rusqlite::*;
 use rusqlite::NO_PARAMS;
 use rusqlite::types::ToSql;
@@ -38,13 +39,12 @@ pub struct CrateDb {
 }
 
 pub struct CrateVersionData<'a> {
-    pub manifest: &'a Manifest,
-    pub derived: &'a Derived,
     pub origin: &'a Origin,
+    pub derived: &'a CrateVersionSourceData,
+    pub manifest: &'a Manifest,
     pub deps_stats: &'a [(&'a str, f32)],
     pub is_build: bool,
     pub is_dev: bool,
-    pub is_yanked: bool,
     pub authors: &'a [rich_crate::Author],
     pub category_slugs: Vec<Cow<'a, str>>,
     pub repository: Option<&'a Repo>,
@@ -115,7 +115,6 @@ impl CrateDb {
             capitalized_name: String,
             crate_compressed_size: u32,
             crate_decompressed_size: u32,
-            github_keywords: Option<Vec<String>>,
             lib_file: Option<String>,
             has_buildrs: bool,
             is_nightly: bool,
@@ -152,7 +151,6 @@ impl CrateDb {
                         capitalized_name: row.get("capitalized_name")?,
                         crate_compressed_size: row.get("crate_compressed_size")?,
                         crate_decompressed_size: row.get("crate_decompressed_size")?,
-                        github_keywords: row.get_raw("github_keywords").as_str().ok().map(|k| k.split(",").map(String::from).collect()),
                         has_buildrs: row.get("has_buildrs")?,
                         is_nightly: row.get("is_nightly")?,
                         is_yanked: row.get("is_yanked")?,
@@ -188,8 +186,6 @@ impl CrateDb {
                 capitalized_name: row.capitalized_name,
                 crate_compressed_size: row.crate_compressed_size,
                 crate_decompressed_size: row.crate_decompressed_size,
-                github_description: None,
-                github_keywords: row.github_keywords,
                 keywords: keywords_derived,
                 lib_file: row.lib_file,
                 has_buildrs: row.has_buildrs,
@@ -324,9 +320,9 @@ impl CrateDb {
             let mut insert_category = tx.prepare_cached("INSERT OR IGNORE INTO categories (crate_id, slug, rank_weight, relevance_weight) VALUES (?1, ?2, ?3, ?4)")?;
             let mut get_crate_id = tx.prepare_cached("SELECT id, recent_downloads FROM crates WHERE origin = ?1")?;
             let mut insert_derived = tx.prepare_cached("INSERT OR REPLACE INTO crate_derived (
-                 crate_id, readme, readme_format, readme_base_url, readme_base_image_url, crate_compressed_size, crate_decompressed_size, github_keywords, capitalized_name, lib_file, has_buildrs, is_nightly, is_yanked, has_code_of_conduct, manifest, language_stats)
+                 crate_id, readme, readme_format, readme_base_url, readme_base_image_url, crate_compressed_size, crate_decompressed_size, capitalized_name, lib_file, has_buildrs, is_nightly, is_yanked, has_code_of_conduct, manifest, language_stats)
                 VALUES (
-                :crate_id,:readme,:readme_format,:readme_base_url,:readme_base_image_url,:crate_compressed_size,:crate_decompressed_size,:github_keywords,:capitalized_name,:lib_file,:has_buildrs,:is_nightly,:is_yanked,:has_code_of_conduct,:manifest,:language_stats)
+                :crate_id,:readme,:readme_format,:readme_base_url,:readme_base_image_url,:crate_compressed_size,:crate_decompressed_size,:capitalized_name,:lib_file,:has_buildrs,:is_nightly,:is_yanked,:has_code_of_conduct,:manifest,:language_stats)
                 ")?;
 
             let args: &[&dyn ToSql] = &[&origin, &0, &0];
@@ -355,7 +351,6 @@ impl CrateDb {
                 (":readme_base_image_url", &readme_base_image_url),
                 (":crate_compressed_size", &c.derived.crate_compressed_size),
                 (":crate_decompressed_size", &c.derived.crate_decompressed_size),
-                (":github_keywords", &c.derived.github_keywords.as_ref().map(|s| s.join(","))),
                 (":capitalized_name", &c.derived.capitalized_name),
                 (":lib_file", &c.derived.lib_file),
                 (":has_buildrs", &c.derived.has_buildrs),
@@ -408,7 +403,7 @@ impl CrateDb {
             }
             // yanked crates may contain garbage, or needlessly come up in similar crates
             // so knock all keywords' importance if it's yanked
-            insert_keyword.commit(&tx, crate_id, if c.is_yanked {0.1} else {1.})?;
+            insert_keyword.commit(&tx, crate_id, if c.derived.is_yanked {0.1} else {1.})?;
 
             mark_updated.execute(&[&crate_id, &next_timestamp]).context("mark updated crate")?;
             println!("{}", out);
@@ -1132,7 +1127,7 @@ fn try_indexing() {
 
     let db = CrateDb::new_with_synonyms(t.as_ref(), Path::new("../data/tag-synonyms.csv")).unwrap();
     let origin = Origin::from_crates_io_name("cratedbtest");
-    let derived = Derived {
+    let derived = CrateVersionSourceData {
         capitalized_name: "captname".into(),
         ..Default::default()
     };
@@ -1149,7 +1144,6 @@ categories = ["1", "two", "GAMES", "science", "::science::math::"]
         deps_stats: &[],
         is_build: false,
         is_dev: false,
-        is_yanked: false,
         authors: &[],
         category_slugs: Vec::new(),
         repository: None,
@@ -1161,8 +1155,6 @@ categories = ["1", "two", "GAMES", "science", "::science::math::"]
     assert_eq!(manifest.package().keywords, new_manifest.package().keywords);
     assert_eq!(manifest.package().categories, new_manifest.package().categories);
 
-    assert_eq!(new_derived.github_keywords, derived.github_keywords);
-    assert_eq!(new_derived.github_description, derived.github_description);
     assert_eq!(new_derived.language_stats, derived.language_stats);
     assert_eq!(new_derived.crate_compressed_size, derived.crate_compressed_size);
     assert_eq!(new_derived.crate_decompressed_size, derived.crate_decompressed_size);
@@ -1170,7 +1162,6 @@ categories = ["1", "two", "GAMES", "science", "::science::math::"]
     assert_eq!(new_derived.capitalized_name, derived.capitalized_name);
     assert_eq!(new_derived.readme, derived.readme);
     assert_eq!(new_derived.lib_file, derived.lib_file);
-    assert_eq!(new_derived.path_in_repo, derived.path_in_repo);
     assert_eq!(new_derived.has_buildrs, derived.has_buildrs);
     assert_eq!(new_derived.has_code_of_conduct, derived.has_code_of_conduct);
     assert_eq!(new_derived.is_yanked, derived.is_yanked);

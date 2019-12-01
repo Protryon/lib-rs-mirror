@@ -61,7 +61,6 @@ impl CrateDb {
                 readme_base_image_url TEXT,
                 crate_compressed_size INTEGER NOT NULL,
                 crate_decompressed_size INTEGER NOT NULL,
-                github_keywords TEXT,
                 capitalized_name TEXT NOT NULL,
                 lib_file        TEXT,
                 has_buildrs     INTEGER, -- bool

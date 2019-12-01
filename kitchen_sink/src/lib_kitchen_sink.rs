@@ -44,7 +44,6 @@ use chrono::DateTime;
 use chrono::prelude::*;
 use crate::tarball::CrateFile;
 use crate_db::{CrateDb, CrateVersionData, RepoChange, builddb::BuildDb};
-use crates_index::Version;
 use crates_io_client::CrateOwner;
 use failure::ResultExt;
 use github_info::GitCommitAuthor;
@@ -58,7 +57,7 @@ use repo_url::RepoHost;
 use repo_url::SimpleRepo;
 use rich_crate::Author;
 use rich_crate::CrateVersion;
-use rich_crate::Derived;
+use rich_crate::CrateVersionSourceData;
 use rich_crate::DownloadWeek;
 use rich_crate::Readme;
 use semver::VersionReq;
@@ -145,7 +144,6 @@ pub struct KitchenSink {
     crate_db: CrateDb,
     user_db: user_db::UserDb,
     gh: github_info::GitHub,
-    crate_derived_cache: TempCache<(String, RichCrateVersionCacheData, Warnings)>,
     loaded_rich_crate_version_cache: RwLock<FxHashMap<Origin, RichCrateVersion>>,
     category_crate_counts: LazyOnce<Option<HashMap<String, u32>>>,
     removals: LazyOnce<HashMap<Origin, f64>>,
@@ -153,12 +151,6 @@ pub struct KitchenSink {
     git_checkout_path: PathBuf,
     main_cache_dir: PathBuf,
     yearly: AllDownloads,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-struct RichCrateVersionCacheData {
-    derived: Derived,
-    manifest: Manifest,
 }
 
 impl KitchenSink {
@@ -178,12 +170,10 @@ impl KitchenSink {
     pub fn new(data_path: &Path, github_token: &str, crates_io_tps: f32) -> CResult<Self> {
         let main_cache_dir = data_path.to_owned();
 
-        let ((crates_io, gh), (index, crate_derived_cache)) = rayon::join(|| rayon::join(
+        let ((crates_io, gh), index) = rayon::join(|| rayon::join(
                 || crates_io_client::CratesIoClient::new(data_path, crates_io_tps),
                 || github_info::GitHub::new(&data_path.join("github.db"), github_token)),
-            || rayon::join(
-                || Index::new(data_path),
-                || TempCache::new(&data_path.join("crate_derived2.db"))));
+            || Index::new(data_path));
         Ok(Self {
             crates_io: crates_io.context("cratesio")?,
             index: index.context("index")?,
@@ -192,7 +182,6 @@ impl KitchenSink {
             crate_db: CrateDb::new(Self::assert_exists(data_path.join("crate_data.db"))?).context("db")?,
             user_db: user_db::UserDb::new(Self::assert_exists(data_path.join("users.db"))?).context("udb")?,
             gh: gh.context("gh")?,
-            crate_derived_cache: crate_derived_cache.context("derived")?,
             loaded_rich_crate_version_cache: RwLock::new(FxHashMap::default()),
             git_checkout_path: data_path.join("git"),
             category_crate_counts: LazyOnce::new(),
@@ -494,51 +483,21 @@ impl KitchenSink {
             return Ok(krate.clone());
         }
 
-        let krate = match self.crate_db.rich_crate_version_data(origin) {
-            Ok((manifest, derived)) => RichCrateVersion::new(origin.clone(), manifest, derived),
+        let (manifest, derived) = match self.crate_db.rich_crate_version_data(origin) {
+            Ok(v) => v,
             Err(e) => {
-                for e in e.iter_chain() {
-                    eprintln!("{}: {}", origin.to_str(), e);
-                }
-                match origin {
-                    Origin::CratesIo(name) => {
-                        let ver = self.index.crate_version_latest_unstable(name).with_context(|e| format!("rich_crate_version1: {}", e))?;
-                        self.rich_crate_version_from_crates_io(ver).map(|(krate, _)| krate)?
-                    },
-                    o => {
-                        let d = self.rich_crate_version_from_repo(o).map(|(krate, _)| krate)?;
-                        RichCrateVersion::new(origin.clone(), d.manifest, d.derived)
-                    }
+                eprintln!("getting {:?}: {}", origin, e);
+                self.index_crate_highest_version(origin)?;
+                match self.crate_db.rich_crate_version_data(origin) {
+                    Ok(v) => v,
+                    Err(e) => Err(e)?,
                 }
             },
         };
 
+        let krate = RichCrateVersion::new(origin.clone(), manifest, derived);
         self.loaded_rich_crate_version_cache.write().insert(origin.clone(), krate.clone());
         Ok(krate)
-    }
-
-    /// With warnings
-    fn rich_crate_version_from_crates_io(&self, krate: &Version) -> CResult<(RichCrateVersion, Warnings)> {
-        if stopped() {Err(KitchenSinkErr::Stopped)?;}
-
-        let key = (krate.name(), krate.version());
-        let cached = match self.crate_derived_cache.get(key.0)? {
-            Some((ver, res, warn)) => {
-                if key.1 != ver {
-                    None
-                } else {
-                    Some((res, warn))
-                }
-            },
-            None => None,
-        };
-
-        let (d, warn) = if let Some(res) = cached {res} else {
-            let (d, warn) = self.rich_crate_version_data_from_crates_io(krate).with_context(|_| format!("failed geting rich crate data for {}", key.0))?;
-            self.crate_derived_cache.set(key.0, (key.1.to_string(), d.clone(), warn.clone()))?;
-            (d, warn)
-        };
-        Ok((RichCrateVersion::new(Origin::from_crates_io_name(krate.name()), d.manifest, d.derived), warn))
     }
 
     pub fn changelog_url(&self, k: &RichCrateVersion) -> Option<String> {
@@ -552,7 +511,7 @@ impl KitchenSink {
         None
     }
 
-    fn rich_crate_version_from_repo(&self, origin: &Origin) -> CResult<(RichCrateVersionCacheData, Warnings)> {
+    fn rich_crate_version_from_repo(&self, origin: &Origin) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
         let (repo, package) = match origin {
             Origin::GitHub {repo, package} => {
                 (RepoHost::GitHub(repo.clone()).try_into().expect("repohost"), &**package)
@@ -597,7 +556,7 @@ impl KitchenSink {
             readme.base_image_url = Some(repo.readme_base_image_url(&path_in_repo));
         });
 
-        self.rich_crate_version_data_common(origin.clone(), meta, Some(path_in_repo), 0, false, warnings)
+        self.rich_crate_version_data_common(origin.clone(), meta, 0, false, warnings)
     }
 
     pub fn tarball(&self, name: &str, ver: &str) -> CResult<Vec<u8>> {
@@ -607,7 +566,7 @@ impl KitchenSink {
         Ok(tarball)
     }
 
-    fn rich_crate_version_data_from_crates_io(&self, latest: &crates_index::Version) -> CResult<(RichCrateVersionCacheData, Warnings)> {
+    fn rich_crate_version_data_from_crates_io(&self, latest: &crates_index::Version) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
         let mut warnings = HashSet::new();
 
         let name = latest.name();
@@ -666,20 +625,14 @@ impl KitchenSink {
             }
         }
 
-        let path_in_repo = match maybe_repo.as_ref() {
-            Some(repo) => self.crate_db.path_in_repo(repo, name)?,
-            None => None,
-        };
-
-        self.rich_crate_version_data_common(origin, meta, path_in_repo, crate_compressed_size as u32, latest.is_yanked(), warnings)
+        self.rich_crate_version_data_common(origin, meta, crate_compressed_size as u32, latest.is_yanked(), warnings)
     }
 
     ///// Fixing and faking the data
-    fn rich_crate_version_data_common(&self, origin: Origin, mut meta: CrateFile, path_in_repo: Option<String>, crate_compressed_size: u32, is_yanked: bool, mut warnings: Warnings) -> CResult<(RichCrateVersionCacheData, Warnings)> {
+    fn rich_crate_version_data_common(&self, origin: Origin, mut meta: CrateFile, crate_compressed_size: u32, is_yanked: bool, mut warnings: Warnings) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
         Self::override_bad_categories(&mut meta.manifest);
 
         let mut github_keywords = None;
-        let mut derived_keywords = None;
 
         let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
         let maybe_repo = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
@@ -704,19 +657,6 @@ impl KitchenSink {
             if !topics.is_empty() {
                 github_keywords = Some(topics);
             }
-        }
-        if package.keywords.is_empty() {
-            derived_keywords = Some(self.crate_db.keywords(&origin).context("keywordsdb")?);
-        }
-
-        let mut derived_categories = None;
-        // Guess categories if none were specified
-        if categories::Categories::filtered_category_slugs(&package.categories).next().is_none() {
-            derived_categories = Some({
-                let keywords_iter = package.keywords.iter().map(|s| s.as_str());
-                self.crate_db.guess_crate_categories(&origin, keywords_iter).context("catdb")?
-                    .into_iter().map(|(_, c)| c).collect()
-            });
         }
 
         if let Origin::CratesIo(_) = &origin {
@@ -781,7 +721,7 @@ impl KitchenSink {
 
         let has_buildrs = meta.has("build.rs");
         let has_code_of_conduct = meta.has("CODE_OF_CONDUCT.md") || meta.has("docs/CODE_OF_CONDUCT.md") || meta.has(".github/CODE_OF_CONDUCT.md");
-        let derived = Derived {
+        let src = CrateVersionSourceData {
             capitalized_name,
             language_stats: meta.language_stats,
             crate_compressed_size,
@@ -792,18 +732,12 @@ impl KitchenSink {
             has_code_of_conduct,
             readme: meta.readme,
             lib_file: meta.lib_file.map(|s| s.into()),
-            path_in_repo,
             github_description,
             github_keywords,
-            keywords: derived_keywords,
-            categories: derived_categories,
             is_yanked,
         };
 
-        Ok((RichCrateVersionCacheData {
-            derived,
-            manifest: meta.manifest,
-        }, warnings))
+        Ok((src, meta.manifest, warnings))
     }
 
     fn override_bad_categories(manifest: &mut Manifest) {
@@ -1189,22 +1123,19 @@ impl KitchenSink {
         Ok(())
     }
 
-    pub fn index_crate_highest_version(&self, k: &RichCrate) -> CResult<RichCrateVersion> {
+    pub fn index_crate_highest_version(&self, origin: &Origin) -> CResult<()> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
 
-        let origin = k.origin();
-        let (v, is_yanked) = match origin {
+        let (src, manifest, _warn) = match origin {
             Origin::CratesIo(ref name) => {
                 let ver = self.index.crate_version_latest_unstable(name).context("rich_crate_version2")?;
-                let (v, _warn) = self.rich_crate_version_data_from_crates_io(ver).context("rich_crate_version_data_from_crates_io")?;
-                (v, ver.is_yanked())
+                self.rich_crate_version_data_from_crates_io(ver).context("rich_crate_version_data_from_crates_io")?
             },
             Origin::GitHub {..} | Origin::GitLab {..} => {
-                if !self.crate_exists(k.origin()) {
-                    Err(KitchenSinkErr::GitCrateNotAllowed(k.origin().to_owned()))?
+                if !self.crate_exists(origin) {
+                    Err(KitchenSinkErr::GitCrateNotAllowed(origin.to_owned()))?
                 }
-                let (v, _warn) = self.rich_crate_version_from_repo(&origin)?;
-                (v, false)
+                self.rich_crate_version_from_repo(&origin)?
             },
         };
 
@@ -1212,7 +1143,7 @@ impl KitchenSink {
         // but we're taking only niche deps to group similar niche crates together
         let raw_deps_stats = self.index.deps_stats()?;
         let mut weighed_deps = Vec::<(&str, f32)>::new();
-        let all_deps = v.manifest.direct_dependencies()?;
+        let all_deps = manifest.direct_dependencies()?;
         let all_deps = [(all_deps.0, 1.0), (all_deps.2, 0.33)];
         // runtime and (lesser) build-time deps
         for (deps, overall_weight) in all_deps.iter() {
@@ -1227,8 +1158,8 @@ impl KitchenSink {
             }
         }
         let (is_build, is_dev) = self.is_build_or_dev(origin)?;
-        let package = v.manifest.package();
-        let readme_text = v.derived.readme.as_ref().map(|r| render_readme::Renderer::new(None).visible_text(&r.markup));
+        let package = manifest.package();
+        let readme_text = src.readme.as_ref().map(|r| render_readme::Renderer::new(None).visible_text(&r.markup));
         let repository = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
         let authors = package.authors.iter().map(|a| Author::new(a)).collect::<Vec<_>>();
         self.crate_db.index_latest(CrateVersionData {
@@ -1238,13 +1169,11 @@ impl KitchenSink {
             origin,
             repository: repository.as_ref(),
             deps_stats: &weighed_deps,
-            is_yanked,
             is_build, is_dev,
-            manifest: &v.manifest,
-            derived: &v.derived,
+            manifest: &manifest,
+            derived: &src,
         })?;
-        self.crate_derived_cache.delete(k.name()).context("clear cache 2")?;
-        Ok(RichCrateVersion::new(origin.clone(), v.manifest, v.derived))
+        Ok(())
     }
 
     fn capitalized_name<'a>(name: &str, source_words: impl Iterator<Item = &'a str>) -> String {

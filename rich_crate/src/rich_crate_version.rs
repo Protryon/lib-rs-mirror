@@ -470,6 +470,22 @@ impl RichDep {
 pub struct Derived {
     pub categories: Option<Vec<String>>,
     pub keywords: Option<Vec<String>>,
+    pub path_in_repo: Option<String>,
+    pub language_stats: udedokei::Stats,
+    pub crate_compressed_size: u32,
+    pub crate_decompressed_size: u32,
+    pub is_nightly: bool,
+    pub capitalized_name: String,
+    pub readme: Option<Readme>,
+    pub lib_file: Option<String>,
+    pub has_buildrs: bool,
+    pub has_code_of_conduct: bool,
+    pub is_yanked: bool,
+}
+
+/// Metadata guessed
+#[derive(Debug, Clone, Default)]
+pub struct CrateVersionSourceData {
     pub github_keywords: Option<Vec<String>>,
     pub github_description: Option<String>,
     pub language_stats: udedokei::Stats,
@@ -479,7 +495,6 @@ pub struct Derived {
     pub capitalized_name: String,
     pub readme: Option<Readme>,
     pub lib_file: Option<String>,
-    pub path_in_repo: Option<String>,
     pub has_buildrs: bool,
     pub has_code_of_conduct: bool,
     pub is_yanked: bool,

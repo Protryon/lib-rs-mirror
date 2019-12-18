@@ -794,8 +794,8 @@ lazy_static! {
         (Cond::Any(&["performance", "bitflags", "storage", "terminal", "rpc"]),
             &[("value-formatting", 0.25, 0.), ("development-tools", 0.8, 0.), ("network-programming", 0.7, 0.), ("science::math", 0.8, 0.)]),
 
-        (Cond::NotAny(&["mailer", "pgp", "mime", "pop3", "ssmtp", "smtp", "imap", "email", "e-mail"]), &[("email", 0.7, 0.)]),
-        (Cond::Any(&["mailer", "pop3", "ssmtp", "smtp", "imap", "email", "e-mail"]), &[("email", 1.2, 0.3), ("parsing", 0.9, 0.), ("no-std", 0.7, 0.), ("algorithms", 0.8, 0.),
+        (Cond::NotAny(&["mailer", "pgp", "mime", "pop3", "ssmtp", "smtp", "imap", "email", "e-mail", "sendmail"]), &[("email", 0.7, 0.)]),
+        (Cond::Any(&["mailer", "pop3", "ssmtp", "smtp", "sendmail", "imap", "email", "e-mail"]), &[("email", 1.2, 0.3), ("parsing", 0.9, 0.), ("no-std", 0.7, 0.), ("algorithms", 0.8, 0.),
             ("development-tools::cargo-plugins", 0.6, 0.), ("filesystem", 0.7, 0.), ("data-structures", 0.8, 0.), ("command-line-utilities", 0.75, 0.)]),
         (Cond::Any(&["editor", "vim", "emacs", "vscode", "sublime"]), &[("text-editors", 1.2, 0.2), ("games", 0.4, 0.), ("rendering::engine", 0.7, 0.)]),
         (Cond::Any(&["obj", "loop", "lattice", "api", "bin", "framework", "stopwatch", "sensor", "github", "algorithm", "protocol"]),

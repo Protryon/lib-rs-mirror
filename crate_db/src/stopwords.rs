@@ -131,6 +131,7 @@ lazy_static! {
         ("cryptography", Some(&["no-std", "no_std"])), // it's a nice feature, but not defining one
         ("websocket", Some(&["http", "cli", "tokio", "client", "io", "network", "servo", "web"])), // there's a separate category for it
         ("rest", Some(&["api"])),
+        ("cargo-subcommand", None),
 
         ("google", None), // there's a ton of auto-generated crates
         ("ethereum", None), // there's a ton of auto-generated crates

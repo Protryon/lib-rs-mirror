@@ -10,8 +10,8 @@ name ="user_db"
 path = "src/lib_user_db.rs"
 
 [dependencies]
-rusqlite = "0.20"
+rusqlite = "0.21.0"
 github_info = { path = "../github_info", version = "0.8.0" }
 repo_url = { git = "https://gitlab.com/crates.rs/repo_url.git" }
-failure = "0.1.1"
-parking_lot = "0.9"
+failure = "0.1.6"
+parking_lot = "0.10.0"

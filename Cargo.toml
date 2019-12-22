@@ -10,11 +10,11 @@ name = "crate_git_checkout"
 path = "src/crate_git_checkout.rs"
 
 [dependencies]
-git2 = "0.10"
+git2 = "0.11.0"
 cargo_toml = "0.8.0"
 render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git" }
 repo_url = { git = "https://gitlab.com/crates.rs/repo_url.git" }
-failure = "0.1.3"
+failure = "0.1.6"
 urlencoding = "1.0.0"
-lazy_static = "1.2.0"
-either = "1.5.0"
+lazy_static = "1.4.0"
+either = "1.5.3"

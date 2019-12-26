@@ -58,7 +58,6 @@ use repo_url::SimpleRepo;
 use rich_crate::Author;
 use rich_crate::CrateVersion;
 use rich_crate::CrateVersionSourceData;
-use rich_crate::DownloadWeek;
 use rich_crate::Readme;
 use semver::VersionReq;
 use simple_cache::TempCache;
@@ -133,6 +132,13 @@ pub enum KitchenSinkErr {
     DepsStatsNotAvailable,
     #[fail(display = "Git crate '{:?}' can't be indexed, because it's not on the list", _0)]
     GitCrateNotAllowed(Origin),
+}
+
+#[derive(Debug, Clone)]
+pub struct DownloadWeek {
+    pub date: Date<Utc>,
+    pub total: usize,
+    pub downloads: HashMap<Option<usize>, usize>,
 }
 
 /// This is a collection of various data sources. It mostly acts as a starting point and a factory for other objects.
@@ -319,7 +325,7 @@ impl KitchenSink {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
         match origin {
             Origin::CratesIo(name) => {
-                let meta = self.crates_io_meta(name, false)?;
+                let meta = self.crates_io_meta(name)?;
                 let versions = meta.meta.versions().map(|c| CrateVersion {
                     num: c.num,
                     updated_at: c.updated_at,
@@ -447,22 +453,22 @@ impl KitchenSink {
     fn downloads_recent(&self, origin: &Origin) -> CResult<Option<usize>> {
         Ok(match origin {
             Origin::CratesIo(name) => {
-                let meta = self.crates_io_meta(name, true)?;
+                let meta = self.crates_io_meta(name)?;
                 meta.meta.krate.recent_downloads
             },
             _ => None,
         })
     }
 
-    fn crates_io_meta(&self, name: &str, refresh: bool) -> CResult<CratesIoCrate> {
+    fn crates_io_meta(&self, name: &str) -> CResult<CratesIoCrate> {
         let krate = self.index.crates_io_crate_by_lowercase_name(name).context("rich_crate")?;
         let latest_in_index = krate.latest_version().version(); // most recently published version
-        let meta = self.crates_io.krate(name, latest_in_index, refresh)
+        let meta = self.crates_io.krate(name, latest_in_index)
             .with_context(|_| format!("crates.io meta for {} {}", name, latest_in_index))?;
         let mut meta = meta.ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?;
         if !meta.meta.versions.iter().any(|v| v.num == latest_in_index) {
             eprintln!("Crate data missing latest version {}@{}", name, latest_in_index);
-            meta = self.crates_io.krate(name, &format!("{}-try-again", latest_in_index), true)?
+            meta = self.crates_io.krate(name, &format!("{}-try-again", latest_in_index))?
                 .ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?;
             if !meta.meta.versions.iter().any(|v| v.num == latest_in_index) {
                 eprintln!("Error: crate data is borked {}@{}. Has only: {:?}", name, latest_in_index, meta.meta.versions.iter().map(|v| &v.num).collect::<Vec<_>>());
@@ -575,7 +581,7 @@ impl KitchenSink {
 
         let (crate_tarball, crates_io_meta) = rayon::join(
             || self.tarball(name, ver),
-            || self.crates_io_meta(&name.to_ascii_lowercase(), true));
+            || self.crates_io_meta(&name.to_ascii_lowercase()));
 
         let crates_io_meta = crates_io_meta?.meta.krate;
         let crate_tarball = crate_tarball?;
@@ -1061,67 +1067,13 @@ impl KitchenSink {
     /// Maintenance: add crate to local db index
     pub fn index_crate(&self, k: &RichCrate, score: f64) -> CResult<()> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
-        let (res1, res2) = rayon::join(|| -> CResult<()> {
-            let origin = k.origin();
-            if let Origin::CratesIo(name) = origin {
-                let meta = self.crates_io_meta(name, true)?;
-                self.index_crate_downloads(name, &meta)?;
-            }
-            Ok(())
-        }, || self.crate_db.index_versions(k, score, self.downloads_recent(k.origin())?));
-        res1?;
-        res2?;
+        self.crate_db.index_versions(k, score, self.downloads_recent(k.origin())?)?;
         Ok(())
     }
 
-    pub fn index_crate_downloads(&self, crates_io_name: &str, crates_io_data: &CratesIoCrate) -> CResult<()> {
-        let mut modified = false;
-        let mut curr_year = Utc::today().year() as u16;
-        let mut curr_year_data = self.yearly.get_crate_year(crates_io_name, curr_year)?.unwrap_or_default();
 
-        let dd = crates_io_data.daily_downloads();
-        let mut by_day = FxHashMap::<_, Vec<_>>::default();
-        for dl in dd {
-            by_day.entry(dl.date).or_insert_with(Default::default).push(dl);
-        }
-        // The latest day in the data is going to be incomplete, so throw it out
-        if let Some(max_date) = by_day.keys().max().cloned() {
-            by_day.remove(&max_date);
-        }
-        for (day, dls) in by_day {
-            let day_of_year = day.ordinal0() as usize;
-            let y = day.year() as u16;
-            if y != curr_year {
-                if modified {
-                    modified = false;
-                    self.yearly.set_crate_year(crates_io_name, curr_year, &curr_year_data)?;
-                }
-                curr_year = y;
-                curr_year_data = self.yearly.get_crate_year(crates_io_name, curr_year)?.unwrap_or_default();
-            }
 
-            // crates.io data gets worse as it gets older, so the first one was the best
-            if curr_year_data.is_set[day_of_year] {
-                continue;
-            }
 
-            modified = true;
-            curr_year_data.is_set[day_of_year] = true;
-            for ver in curr_year_data.versions.values_mut() {
-                ver.0[day_of_year] = 0; // clear that day only
-            }
-
-            for dl in dls {
-                let ver = dl.version.map(|v| v.num.clone().into_boxed_str());
-                let ver_year = curr_year_data.versions.entry(ver).or_insert_with(|| DailyDownloads([0; 366]));
-                ver_year.0[day_of_year] += dl.downloads as u32;
-            }
-        }
-        if modified {
-            self.yearly.set_crate_year(crates_io_name, curr_year, &curr_year_data)?;
-        }
-        Ok(())
-    }
 
     pub fn index_crate_highest_version(&self, origin: &Origin) -> CResult<()> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}

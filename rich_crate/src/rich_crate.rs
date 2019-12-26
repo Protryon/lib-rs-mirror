@@ -1,6 +1,5 @@
 use crate::Origin;
 pub use crates_io_client::CrateOwner;
-pub use crates_io_client::DownloadWeek;
 
 /// Struct representing all versions of the crate
 /// (metadata that is version-independent or for all versions).

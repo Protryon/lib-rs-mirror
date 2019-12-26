@@ -1,5 +1,5 @@
 use lab::Lab;
-use rich_crate::DownloadWeek;
+use kitchen_sink::DownloadWeek;
 
 /// Data for SVG on the crate page showing weekly download counts
 ///

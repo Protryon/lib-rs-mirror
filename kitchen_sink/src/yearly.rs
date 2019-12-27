@@ -12,16 +12,8 @@ pub struct DailyDownloads(
     pub [u32; 366]
 );
 
-#[derive(Serialize, Deserialize, Clone)]
-pub struct VersionMap {
-    /// None means "other" in addition to versions explictly listed that day
-    pub versions: HashMap<Option<Box<str>>, DailyDownloads>,
-    #[serde(with = "BigArrayBool")]
-    pub is_set: [bool; 366],
-}
-
 pub struct AllDownloads {
-    by_year: Mutex<HashMap<u16, TempCache<VersionMap>>>,
+    by_year: Mutex<HashMap<u16, TempCache<DailyDownloads>>>,
     base_path: PathBuf,
 }
 
@@ -36,28 +28,23 @@ impl AllDownloads {
     }
 
     /// Crates.io crate name
-    pub fn get_crate_year(&self, crate_name: &str, year: u16) -> Result<Option<VersionMap>, simple_cache::Error> {
+    pub fn get_crate_year(&self, crate_name: &str, year: u16) -> Result<Option<DailyDownloads>, simple_cache::Error> {
         let mut t = self.by_year.lock();
         let cache = match t.entry(year) {
             Occupied(e) => e.into_mut(),
             Vacant(e) => {
-                e.insert(TempCache::new(self.base_path.join(format!("{}.rmpz", year)))?)
+                e.insert(TempCache::new(self.base_path.join(format!("{}-small.rmpz", year)))?)
             },
         };
         Ok(cache.get(crate_name)?)
     }
 
-    pub fn set_crate_year(&self, crate_name: &str, year: u16, v: &VersionMap) -> Result<(), simple_cache::Error> {
-        for ver in v.versions.values() {
-            assert!(ver.0.iter().cloned().zip(v.is_set.iter().cloned())
-                .filter(|&(dl, _)| dl > 0)
-                .all(|(_, is_set)| is_set));
-        }
+    pub fn set_crate_year(&self, crate_name: &str, year: u16, v: &DailyDownloads) -> Result<(), simple_cache::Error> {
         let mut t = self.by_year.lock();
         let cache = match t.entry(year) {
             Occupied(e) => e.into_mut(),
             Vacant(e) => {
-                e.insert(TempCache::new(self.base_path.join(format!("{}.rmpz", year)))?)
+                e.insert(TempCache::new(self.base_path.join(format!("{}-small.rmpz", year)))?)
             },
         };
         cache.set(crate_name, v)?;
@@ -65,14 +52,6 @@ impl AllDownloads {
     }
 }
 
-impl Default for VersionMap {
-    fn default() -> Self {
-        Self {
-            is_set: [false; 366],
-            versions: Default::default(),
-        }
-    }
-}
 
 // Serde workaround
 use serde::de::{Deserializer, Error, SeqAccess, Visitor};
@@ -174,8 +153,8 @@ impl<'de> BigArrayBool<'de> for [bool; 366]
     }
 }
 
-impl fmt::Debug for VersionMap {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("VersionMap {…}")
+impl Default for DailyDownloads {
+    fn default() -> Self {
+        Self([0; 366])
     }
 }

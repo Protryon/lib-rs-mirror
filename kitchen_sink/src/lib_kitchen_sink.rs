@@ -261,7 +261,7 @@ impl KitchenSink {
         let mut curr_year_data = self.yearly.get_crate_year(k.name(), curr_year as _)?.unwrap_or_default();
 
         let day_of_year = now.ordinal0();
-        let missing_data_days = curr_year_data.is_set[0..day_of_year as usize].iter().cloned().rev().take_while(|s| !s).count();
+        let missing_data_days = curr_year_data.0[0..day_of_year as usize].iter().cloned().rev().take_while(|&s| s == 0).count();
 
         if missing_data_days > 0 {
             now = now - chrono::Duration::days(missing_data_days as _);
@@ -280,12 +280,10 @@ impl KitchenSink {
                     curr_year = year;
                     curr_year_data = self.yearly.get_crate_year(k.name(), curr_year as _)?.unwrap_or_default();
                 }
-                if curr_year_data.is_set[day_of_year] {
+                if curr_year_data.0[day_of_year] > 0 {
                     any_set = true;
                 }
-                for dl in curr_year_data.versions.values() {
-                    total += dl.0[day_of_year] as usize;
-                }
+                total += curr_year_data.0[day_of_year] as usize;
             }
             if any_set {
                 res.push(DownloadWeek {
@@ -1071,9 +1069,33 @@ impl KitchenSink {
         Ok(())
     }
 
+    pub fn index_crate_downloads(&self, crates_io_name: &str, by_day: &HashMap<Date<Utc>, u32>) -> CResult<()> {
+        if stopped() {Err(KitchenSinkErr::Stopped)?;}
+        let mut modified = false;
+        let mut curr_year = Utc::today().year() as u16;
+        let mut curr_year_data = self.yearly.get_crate_year(crates_io_name, curr_year)?.unwrap_or_default();
+        for (day, &dls) in by_day {
+            let day_of_year = day.ordinal0() as usize;
+            let y = day.year() as u16;
+            if y != curr_year {
+                if modified {
+                    modified = false;
+                    self.yearly.set_crate_year(crates_io_name, curr_year, &curr_year_data)?;
+                }
+                curr_year = y;
+                curr_year_data = self.yearly.get_crate_year(crates_io_name, curr_year)?.unwrap_or_default();
+            }
 
-
-
+            if curr_year_data.0[day_of_year] != dls {
+                modified = true;
+                curr_year_data.0[day_of_year] = dls;
+            }
+        }
+        if modified {
+            self.yearly.set_crate_year(crates_io_name, curr_year, &curr_year_data)?;
+        }
+        Ok(())
+    }
 
     pub fn index_crate_highest_version(&self, origin: &Origin) -> CResult<()> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}

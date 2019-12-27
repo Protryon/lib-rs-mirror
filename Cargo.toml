@@ -7,6 +7,7 @@ members = [
 "categories",
 "crate_db",
 "crates_io_client",
+"datadump",
 "docs_rs_client",
 "front_end",
 "github_info",

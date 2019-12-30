@@ -1,5 +1,6 @@
 use chrono::prelude::*;
 use std::io::Read;
+use std::io::BufReader;
 use std::fs::File;
 use libflate::gzip::Decoder;
 use tar::Archive;
@@ -11,7 +12,7 @@ const NUM_CRATES: usize = 40000;
 type BoxErr = Box<dyn std::error::Error + Sync + Send>;
 
 pub fn main() -> Result<(), BoxErr> {
-    let mut a = Archive::new(Decoder::new(File::open("db-dump.tar.gz")?)?);
+    let mut a = Archive::new(Decoder::new(BufReader::new(File::open("db-dump.tar.gz")?))?);
     let ksink = KitchenSink::new_default()?;
 
     let mut crate_owners = None;
@@ -63,7 +64,7 @@ pub fn main() -> Result<(), BoxErr> {
             if let (Some(crates), Some(versions)) = (&crates, &versions) {
                 if let Some(downloads) = downloads.take() {
                     eprintln!("Indexing {} crates, {} versions, {} downloads", crates.len(), versions.len(), downloads.len());
-                    index_downloads(crates, versions, &downloads, &ksink);
+                    index_downloads(crates, versions, &downloads, &ksink)?;
                 }
             }
         }
@@ -71,6 +72,7 @@ pub fn main() -> Result<(), BoxErr> {
     Ok(())
 }
 
+#[inline(never)]
 fn index_downloads(crates: &CratesMap, versions: &VersionsMap, downloads: &VersionDownloads, ksink: &KitchenSink) -> Result<(), BoxErr> {
     for (crate_id, name) in crates {
         let mut by_day = HashMap::new();
@@ -98,6 +100,7 @@ struct CrateOwnerRow {
     owner_kind: u8,
 }
 
+#[inline(never)]
 fn parse_crate_owners(file: impl Read) -> Result<HashMap<u32, CrateOwnerRow>, BoxErr> {
     let mut csv = csv::ReaderBuilder::new().has_headers(true).flexible(false).from_reader(file);
     let mut out = HashMap::with_capacity(NUM_CRATES);
@@ -118,11 +121,13 @@ struct TeamRow {
     name: String,
 }
 
+#[inline(never)]
 fn parse_teams(file: impl Read) -> Result<HashMap<u32, TeamRow>, BoxErr> {
     let mut csv = csv::ReaderBuilder::new().has_headers(true).flexible(false).from_reader(file);
     let mut out = HashMap::with_capacity(NUM_CRATES);
-    for r in csv.deserialize::<TeamRow>() {
+    for r in csv.records() {
         let r = r?;
+        let r = r.deserialize::<TeamRow>(None).map_err(|e| format!("{}: {:?}", e, r))?;
         out.insert(r.id, r);
     }
     Ok(out)
@@ -131,18 +136,20 @@ fn parse_teams(file: impl Read) -> Result<HashMap<u32, TeamRow>, BoxErr> {
 #[derive(Deserialize)]
 struct UserRow {
     avatar: String,
-    github_id: u32,
+    github_id: i32, // -1 happens :(
     login: String,
     id: u32,
     name: String,
 }
 
+#[inline(never)]
 fn parse_users(file: impl Read) -> Result<HashMap<u32, UserRow>, BoxErr> {
     let mut csv = csv::ReaderBuilder::new().has_headers(true).flexible(false).from_reader(file);
     let mut out = HashMap::with_capacity(NUM_CRATES);
-    for r in csv.deserialize::<UserRow>() {
+    for r in csv.records() {
         let r = r?;
-        out.insert(r.id, r);
+        let row = r.deserialize::<UserRow>(None).map_err(|e| format!("{}: {:?}", e, r))?;
+        out.insert(row.id, row);
     }
     Ok(out)
 }
@@ -165,6 +172,7 @@ struct CrateVersionRow {
 
 type VersionsMap = HashMap<u32, Vec<CrateVersionRow>>;
 
+#[inline(never)]
 fn parse_versions(mut file: impl Read) -> Result<VersionsMap, BoxErr> {
     let mut csv = csv::ReaderBuilder::new().has_headers(true).flexible(false).from_reader(file);
     let mut out = HashMap::with_capacity(NUM_CRATES);
@@ -178,6 +186,7 @@ fn parse_versions(mut file: impl Read) -> Result<VersionsMap, BoxErr> {
 
 type VersionDownloads = HashMap<u32, Vec<(Date<Utc>, u32)>>;
 
+#[inline(never)]
 fn parse_version_downloads(mut file: impl Read) -> Result<VersionDownloads, BoxErr> {
     let mut csv = csv::ReaderBuilder::new().has_headers(true).flexible(false).from_reader(file);
     let mut out = HashMap::with_capacity(NUM_CRATES);
@@ -196,6 +205,7 @@ fn parse_version_downloads(mut file: impl Read) -> Result<VersionDownloads, BoxE
     Ok(out)
 }
 
+#[inline(never)]
 fn parse_metadata(mut file: impl Read) -> Result<u64, BoxErr> {
     let mut s = String::with_capacity(60);
     file.read_to_string(&mut s)?;
@@ -204,6 +214,7 @@ fn parse_metadata(mut file: impl Read) -> Result<u64, BoxErr> {
 
 type CratesMap = HashMap<u32, String>;
 
+#[inline(never)]
 fn parse_crates(file: impl Read) -> Result<CratesMap, BoxErr> {
     let mut csv = csv::ReaderBuilder::new().has_headers(true).flexible(false).from_reader(file);
     let mut out = HashMap::with_capacity(NUM_CRATES);

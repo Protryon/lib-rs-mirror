@@ -1,12 +1,6 @@
 use github_rs;
 use serde;
 
-#[macro_use] extern crate serde_derive;
-use serde_json;
-
-use simple_cache;
-#[macro_use] extern crate quick_error;
-
 use std::path::Path;
 
 use github_rs::client;
@@ -19,11 +13,13 @@ use std::thread;
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 use urlencoding::encode;
+use serde_derive::*;
 
 mod model;
 pub use crate::model::*;
 
 pub type CResult<T> = Result<T, Error>;
+use quick_error::quick_error;
 
 quick_error! {
     #[derive(Debug)]

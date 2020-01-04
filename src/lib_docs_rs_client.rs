@@ -1,7 +1,7 @@
-#[macro_use] extern crate serde_derive;
 pub use simple_cache::Error;
 use simple_cache::TempCache;
 use std::path::Path;
+use serde_derive::*;
 
 pub struct DocsRsClient {
     cache: TempCache<Option<Vec<BuildStatus>>>,

@@ -397,6 +397,7 @@ gitlab:hagrid-keyserver/hagrid/hagrid
 gitlab:hagrid-keyserver/hagrid/hagrid-database
 gitlab:hagrid-keyserver/hagrid/hagridctl
 gitlab:hpdeifel/aurs/alpm_sys
+gitlab:https://gitlab.com/kinseytamsin/rlox
 gitlab:ilari_l/btls/acmeclient-authmod-btls-alpn
 gitlab:ilari_l/btls/btls
 gitlab:ilari_l/btls/btls-aux-aead

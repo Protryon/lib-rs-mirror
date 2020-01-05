@@ -453,6 +453,8 @@ pub fn is_deprecated(name: &str) -> bool {
         "glsl-to-spirv" => true,
         // fundamentally unsound
         "str-concat" => true,
+        // uses old winapi
+        "user32-sys" | "shell32-sys" | "advapi32-sys" | "gdi32-sys" | "ole32-sys" | "ws2_32-sys" | "kernel32-sys" => true,
         _ => false,
     }
 }

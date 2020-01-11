@@ -25,15 +25,15 @@ The algorithm has been designed based on research for [RFC 1824](https://github.
 
 Crates are sorted by their overall quality score, which is a weighed combination of:
 
- * Crate's popularity measured by number of downloads, direct and indirect reverse dependencies. The numbers are filtered to reduce noise and corrected for biases that affect application crates and dependencies of dependencies.
- * Crate's usage trend — is it gaining or losing users.
- * Availability of crate's documentation, examples, and length and quality of the README.
+ * The crate's popularity measured by number of downloads, direct and indirect reverse dependencies. The numbers are filtered to reduce noise and corrected for biases that affect application crates and dependencies of dependencies.
+ * The crate's usage trend — is it gaining or losing users.
+ * Availability of the crate's documentation, examples, and length and quality of the README.
  * Stability estimated from release history, number of breaking versions, patch versions, and use of nightly features.
  * Presence of tests, CI, code comments.
- * Accuracy and completeness of crate's metadata.
+ * Accuracy and completeness of the crate's metadata.
  * Number of authors and contributors.
- * Weight of crate's unique dependencies (discounting weight of popular dependecies that projets are likely to have already).
- * Whether crate is actively maintained or at least stable and done, based on release frequency, age, maintenance status, use of deprecated/outdated dependencies, non-0.x releases, etc.
+ * Weight of the crate's unique dependencies (discounting weight of popular dependecies that projets are likely to have already).
+ * Whether the crate is actively maintained or at least stable and done, based on release frequency, age, maintenance status, use of deprecated/outdated dependencies, non-0.x releases, etc.
 
 The score is combined with relevance of crate's keywords to a given category or search query.
 
@@ -46,7 +46,7 @@ Versions are considered out of date not merely when they're less than the latest
 Crate pages highlight out-of-date dependency versions:
 
 * If there's no version number, the crate uses the latest, most popular version of the dependency.
-* If there's a verison number in black, the crate uses the latest version of the dependency, which is newer than the most popular version of the dependency.
+* If there's a version number in black, the crate uses the latest version of the dependency, which is newer than the most popular version of the dependency.
 * If there's a version number in orange, the crate uses slightly out-of-date version of the dependency.
 * If there's a version number in bold dark red, the crate uses outdated or deprecated version of the dependency.
 

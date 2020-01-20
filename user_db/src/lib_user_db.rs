@@ -19,7 +19,7 @@ impl UserDb {
         let db = Self::db(path.as_ref())?;
         db.execute_batch("
             PRAGMA synchronous = 0;
-            PRAGMA journal_mode = TRUNCATE;")?;
+            PRAGMA journal_mode = WAL;")?;
         Ok(Self {
             conn: Mutex::new(db),
         })

@@ -35,7 +35,7 @@ impl SimpleCache {
             "
             CREATE TABLE IF NOT EXISTS cache2 (key TEXT NOT NULL PRIMARY KEY, ver TEXT NOT NULL, data BLOB NOT NULL);
             PRAGMA synchronous = 0;
-            PRAGMA JOURNAL_MODE = OFF;
+            PRAGMA JOURNAL_MODE = WAL;
             PRAGMA read_uncommitted;",
         )?;
         Ok(conn)

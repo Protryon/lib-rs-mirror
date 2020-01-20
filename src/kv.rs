@@ -18,7 +18,7 @@ use std::marker::PhantomData;
 use std::path::PathBuf;
 use tempfile::NamedTempFile;
 
-type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::ABuildHasher>;
+type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 
 struct Inner {
     data: Option<FxHashMap<Box<str>, Box<[u8]>>>,

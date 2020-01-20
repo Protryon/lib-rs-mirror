@@ -3,7 +3,7 @@ use crate::Origin;
 use std::fs;
 use std::path::Path;
 
-type FxHashSet<V> = std::collections::HashSet<V, ahash::ABuildHasher>;
+type FxHashSet<V> = std::collections::HashSet<V, ahash::RandomState>;
 
 pub struct GitIndex {
     index: FxHashSet<Origin>,

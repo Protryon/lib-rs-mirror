@@ -72,7 +72,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
 
-type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::ABuildHasher>;
+type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 
 pub type CError = failure::Error;
 pub type CResult<T> = Result<T, CError>;

@@ -21,8 +21,8 @@ use std::time::Duration;
 use string_interner::StringInterner;
 use string_interner::Sym;
 
-type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::ABuildHasher>;
-type FxHashSet<V> = std::collections::HashSet<V, ahash::ABuildHasher>;
+type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
+type FxHashSet<V> = std::collections::HashSet<V, ahash::RandomState>;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct MiniVer {

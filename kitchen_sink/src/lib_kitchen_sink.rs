@@ -335,7 +335,9 @@ impl KitchenSink {
             Origin::GitHub {repo, package} => {
                 let host = RepoHost::GitHub(repo.clone()).try_into().map_err(|_| KitchenSinkErr::CrateNotFound(origin.clone())).context("ghrepo host bad")?;
                 let cachebust = self.cachebust_string_for_repo(&host).context("ghrepo")?;
-                let gh = self.gh.repo(repo, &cachebust)?.ok_or_else(|| KitchenSinkErr::CrateNotFound(origin.clone())).context("ghrepo not found")?;
+                let gh = self.gh.repo(repo, &cachebust)?
+                    .ok_or_else(|| KitchenSinkErr::CrateNotFound(origin.clone()))
+                    .context(format!("ghrepo {:?} not found", repo))?;
                 let versions = self.get_repo_versions(origin, &host, &cachebust)?;
                 Ok(RichCrate::new(origin.clone(), gh.owner.into_iter().map(|o| {
                     CrateOwner {
@@ -979,9 +981,9 @@ impl KitchenSink {
         let _ = self.index.deps_stats();
     }
 
-    pub fn crates_io_dependents_stats_of(&self, origin: &Origin) -> Result<Option<RevDependencies>, KitchenSinkErr> {
+    pub fn crates_io_dependents_stats_of(&self, origin: &Origin) -> Result<Option<&RevDependencies>, KitchenSinkErr> {
         match origin {
-            Origin::CratesIo(crate_name) => Ok(self.index.deps_stats()?.counts.get(crate_name).cloned()),
+            Origin::CratesIo(crate_name) => Ok(self.index.deps_stats()?.counts.get(crate_name)),
             _ => Ok(None),
         }
     }

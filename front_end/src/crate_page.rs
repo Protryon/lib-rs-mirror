@@ -171,11 +171,15 @@ impl<'a> CratePage<'a> {
         self.kitchen_sink.is_build_or_dev(self.ver.origin()).expect("deps")
     }
 
-    pub fn dependents_stats(&self) -> Option<(u32, u32)> {
-        self.kitchen_sink.crates_io_dependents_stats_of(self.ver.origin()).expect("deps").map(|d| (
-            d.runtime.def as u32 + d.runtime.opt as u32 +
-            d.build.def as u32  + d.build.opt as u32 +
-            d.dev as u32, d.direct.all() as u32))
+    pub fn dependents_stats(&self) -> Option<(u32, u32, Option<&str>)> {
+        self.kitchen_sink.crates_io_dependents_stats_of(self.ver.origin())
+        .map_err(|e| eprintln!("{}", e))
+        .ok().and_then(|x| x)
+        .map(|d| (
+            d.runtime.def as u32 + d.runtime.opt as u32 + d.build.def as u32 + d.build.opt as u32 + d.dev as u32,
+            d.direct.all() as u32,
+            d.rev_dep_names.iter().next()
+        ))
         .filter(|d| d.0 > 0)
     }
 

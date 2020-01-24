@@ -148,24 +148,28 @@ impl Index {
 
     pub(crate) fn get_deps_stats(&self) -> DepsStats {
         let crates = self.crates_io_crates();
-        let crates: Vec<FxHashMap<_,_>> = crates
+        let crates: Vec<(&str, FxHashMap<_,_>)> = crates
         .par_iter()
         .filter_map(|(_, c)| {
             self.all_dependencies_flattened(c)
             .ok()
             .filter(|collected| !collected.is_empty())
+            .map(|dep| {
+                (c.name(), dep)
+            })
         }).collect();
 
         self.clear_cache();
 
         let total = crates.len();
         let mut counts = FxHashMap::with_capacity_and_hasher(total, Default::default());
-        for deps in crates {
+        for (parent_name, deps) in crates {
             for (name, (depinf, semver)) in deps {
                 let n = counts.entry(name.clone()).or_insert_with(RevDependencies::default);
                 let t = n.versions.entry(semver).or_insert(0);
                 *t = t.checked_add(1).expect("overflow");
                 if depinf.direct {
+                    n.rev_dep_names.push(parent_name);
                 }
                 match depinf.ty {
                     DepTy::Runtime => {

@@ -204,12 +204,26 @@
                     <b>@c.format_number(dl)</b> downloads per month
                   }
                 }
-                @if let Some((deps, direct)) = c.dependents_stats() {
+                @if let Some((deps, direct, name)) = c.dependents_stats() {
                   <br>
-                    @if deps != direct {
-                      Used in <b>@c.format_number(deps)</b> crate@if deps != 1 {s} (<a href="@url.reverse_deps(&c.ver)">@c.format_number(direct)&nbsp;directly</a>)
+                    @if deps == 1 && direct == 1 {
+                      @if let Some(name) = name {
+                        Used in <a href="@url.crate_by_origin(&Origin::from_crates_io_name(name))">@name</a>
+                      }
                     } else {
-                      Used in <a href="@url.reverse_deps(&c.ver)"><b>@c.format_number(deps)</b>&nbsp;crate@if deps != 1 {s}</a>
+                      @if deps != direct {
+                        Used in <b>@c.format_number(deps)</b> crate@if deps != 1 {s}
+                          @if direct == 1 {
+                            @if let Some(name) = name {
+                              (via <a href="@url.crate_by_origin(&Origin::from_crates_io_name(name))">@name</a>)
+                            }
+                          } else {
+                             (<a href="@url.reverse_deps(&c.ver)">@c.format_number(direct)&nbsp;directly</a>)
+                          }
+
+                      } else {
+                        Used in <a href="@url.reverse_deps(&c.ver)"><b>@c.format_number(deps)</b>&nbsp;crate@if deps != 1 {s}</a>
+                      }
                     }
                 }
               </p>

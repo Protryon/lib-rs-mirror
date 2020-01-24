@@ -25,13 +25,12 @@ use repo_url::SimpleRepo;
 use urlencoding::decode;
 use urlencoding::encode;
 use locale::Numeric;
-
+use cap::Cap;
 mod writer;
 use crate::writer::*;
 
-use std::alloc::System;
 #[global_allocator]
-static A: System = System;
+static ALLOCATOR: Cap<std::alloc::System> = Cap::new(std::alloc::System, 1*1024*1024*1024);
 
 static HUP_SIGNAL: AtomicU32 = AtomicU32::new(0);
 

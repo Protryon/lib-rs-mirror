@@ -86,9 +86,13 @@ impl ICrate for Crate {
     type Ver = Version;
     fn latest_version_with_features(&self, all_optional: bool) -> (&Self::Ver, Box<[Box<str>]>) {
         let latest = Index::highest_crates_io_version(self, true);
-        let mut features = Vec::with_capacity(if all_optional { latest.features().len() } else { 0 });
+        let mut features = Vec::with_capacity(if all_optional {
+            latest.features().len() + latest.dependencies().iter().filter(|d| d.is_optional()).count()
+        } else { 0 });
         if all_optional {
             features.extend(latest.features().iter().filter(|(_, v)| !v.is_empty()).map(|(c, _)| c.to_string().into_boxed_str()));
+            // optional dependencis make implicit features
+            features.extend(latest.dependencies().iter().filter(|d| d.is_optional()).map(|d| d.name().to_string().into_boxed_str()));
         };
         let features = features.into_boxed_slice();
         (latest, features)

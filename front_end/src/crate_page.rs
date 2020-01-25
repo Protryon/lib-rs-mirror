@@ -29,6 +29,13 @@ use std::hash::Hash;
 use udedokei::LanguageExt;
 use udedokei::{Language, Lines, Stats};
 use url::Url;
+use std::cmp::Ordering;
+
+pub struct CrateLicense {
+    pub origin: Origin,
+    pub license: Box<str>,
+    pub optional: bool,
+}
 
 pub struct CrateSizes {
     pub tarball: usize,
@@ -48,6 +55,7 @@ pub struct CratePage<'a> {
     /// own, deps (tarball, uncompressed source); last one is sloc
     pub sizes: Option<CrateSizes>,
     pub lang_stats: Option<(usize, Stats)>,
+    pub viral_license: Option<CrateLicense>,
 }
 
 /// Helper used to find most "interesting" versions
@@ -103,9 +111,11 @@ impl<'a> CratePage<'a> {
             markup,
             sizes: None,
             lang_stats: None,
+            viral_license: None,
         };
-        let (sizes, lang_stats) = page.crate_size(deps?)?;
+        let (sizes, lang_stats, viral_license) = page.crate_size_and_viral_license(deps?)?;
         page.sizes = Some(sizes);
+        page.viral_license = viral_license;
 
         let total = lang_stats.langs.iter().filter(|(lang, _)| lang.is_code()).map(|(_, lines)| lines.code).sum::<u32>();
         page.lang_stats = Some((total as usize, lang_stats));
@@ -710,7 +720,9 @@ impl<'a> CratePage<'a> {
         )
     }
 
-    fn crate_size(&self, deps: DepInfMap) -> CResult<(CrateSizes, Stats)> {
+    /// analyze dependencies checking their weight and their license
+    fn crate_size_and_viral_license(&self, deps: DepInfMap) -> CResult<(CrateSizes, Stats, Option<CrateLicense>)> {
+        let mut viral_license: Option<CrateLicense> = None;
         let tmp: Vec<_> = deps
             .into_par_iter()
             .filter_map(|(name, (depinf, semver))| {
@@ -729,7 +741,7 @@ impl<'a> CratePage<'a> {
                     },
                 };
 
-                let commonality = self.kitchen_sink.index.version_commonality(&name, &semver).expect("depsstats").unwrap_or(0.);
+                let commonality = self.kitchen_sink.index.version_global_popularity(&name, &semver).expect("depsstats").unwrap_or(0.);
                 let is_heavy_build_dep = match &*name {
                     "bindgen" | "clang-sys" | "cmake" | "cc" if depinf.default => true, // you deserve full weight of it
                     _ => false,
@@ -762,6 +774,28 @@ impl<'a> CratePage<'a> {
         let mut deps_size_minimal = DepsSize::default();
 
         tmp.into_iter().for_each(|(depinf, krate, weight, weight_minimal)| {
+            if let Some(dep_license) = krate.license() {
+                // if the parent crate itself is copyleft
+                // then there's no need to raise alerts about copyleft dependencies.
+                if viral_license.is_some() || compare_virality(dep_license, self.ver.license()) == Ordering::Greater {
+                    let prev_license = viral_license.as_ref().map(|c| &*c.license);
+                    let virality = compare_virality(dep_license, prev_license);
+                    let existing_is_optional = viral_license.as_ref().map_or(false, |d| d.optional);
+                    let new_is_optional = !depinf.default || depinf.ty == DepTy::Build;
+                    // Prefer showing non-optional, direct dependency
+                    if virality
+                        .then(if !new_is_optional && existing_is_optional {Ordering::Greater} else {Ordering::Equal})
+                        .then(if depinf.direct {Ordering::Greater} else {Ordering::Equal})
+                        == Ordering::Greater {
+                        viral_license = Some(CrateLicense {
+                            origin: krate.origin().clone(),
+                            optional: new_is_optional,
+                            license: dep_license.into(),
+                        });
+                    }
+                }
+            }
+
             let crate_size = krate.crate_size();
             let tarball_weighed = (crate_size.0 as f32 * weight) as usize;
             let uncompr_weighed = (crate_size.1 as f32 * weight) as usize;
@@ -795,7 +829,7 @@ impl<'a> CratePage<'a> {
             uncompressed: main_crate_size.1,
             minimal: deps_size_minimal,
             typical: deps_size_typical,
-        }, main_lang_stats))
+        }, main_lang_stats, viral_license))
     }
 
     fn get_crate_of_dependency(&self, name: &str, _semver: ()) -> CResult<RichCrateVersion> {
@@ -864,6 +898,58 @@ impl ReleaseCounts {
             (format!("{} release{}", self.total, plural(self.total)), if label != "" { Some(format!("({} {})", n, label)) } else { None })
         }
     }
+}
+
+fn is_permissive_license(l: &str) -> bool {
+    l.starts_with("MIT") || l.starts_with("Apache") || l.starts_with("BSD") || l.starts_with("Zlib") ||
+    l.starts_with("IJG") || l.starts_with("CC0") || l.starts_with("ISC") || l.starts_with("FTL")
+}
+
+// FIXME: this is very lousy parsing, but crates-io allows non-SPDX syntax, so I can't use a proper SPDX parser.
+fn virality_score(license: &str) -> u8 {
+    license.split("AND").filter_map(|l| {
+        l.split('/').flat_map(|l| l.split("OR"))
+        .filter_map(|l| {
+            let l = l.trim_start();
+            if is_permissive_license(l) {
+                Some(0)
+            } else if l.starts_with("AGPL") {
+                Some(6)
+            } else if l.starts_with("GPL") {
+                Some(5)
+            } else if l.starts_with("CC-") {
+                Some(4)
+            } else if l.starts_with("MPL") {
+                Some(3)
+            } else if l.starts_with("LGPL") {
+                Some(2)
+            } else if l.starts_with("GFDL") {
+                Some(1)
+            } else {
+                None
+            }
+        }).min()
+    }).max().unwrap_or(0)
+}
+
+#[test]
+fn test_vir() {
+    assert_eq!(6, virality_score("AGPL AND MIT"));
+    assert_eq!(0, virality_score("FTL / GPL-2.0"));
+    assert_eq!(0, virality_score("AGPL OR MIT"));
+    assert_eq!(0, virality_score("MIT/Apache/LGPL"));
+    assert_eq!(2, virality_score("MPL/LGPL"));
+    assert_eq!(2, virality_score("Apache/MIT AND LGPL"));
+    assert_eq!(Ordering::Greater, compare_virality("LGPL", Some("MIT")));
+    assert_eq!(Ordering::Greater, compare_virality("AGPL", Some("LGPL")));
+    assert_eq!(Ordering::Equal, compare_virality("GPL-3.0", Some("GPL-2.0")));
+    assert_eq!(Ordering::Less, compare_virality("CC0-1.0 OR GPL", Some("MPL-2.0")));
+}
+
+fn compare_virality(license: &str, other_license: Option<&str>) -> Ordering {
+    let score = virality_score(license);
+    let other_score = other_license.map(virality_score).unwrap_or(0);
+    score.cmp(&other_score)
 }
 
 #[test]

@@ -140,7 +140,9 @@ fn cargo_toml_score(cr: &CrateVersionInputs<'_>) -> Score {
         cr.license.contains("GPL") || cr.license.contains("CC-BY-SA") || cr.license.contains("MPL")
     } else {
         // for libs assume developer freedom > user freedom
-        cr.license.contains("MIT") || cr.license.contains("BSD") || cr.license.contains("Apache") || cr.license.contains("CC0")
+        cr.license.contains("MIT") || cr.license.contains("BSD") ||
+        cr.license.contains("Apache") || cr.license.contains("CC0") ||
+        cr.license.contains("IJG") || cr.license.contains("Zlib")
     });
 
     s

@@ -232,12 +232,22 @@
               <section id="license">
                 @if let Some(lic) = c.ver.license_name() {
                   <b property="license">@lic</b>
-                  @if lic.len() < 8 {
+                  @if lic.len() < 8 && c.viral_license.is_none() {
                     license
                   }
                 } else {
                   @if let Some(filename) = c.ver.license_file() {
                     <b title="@filename">Custom license</b>
+                  }
+                }
+                @if let Some(ref vir) = c.viral_license {
+                  and
+                  @if vir.optional {
+                    maybe
+                  }
+                  <a href="@url.crate_by_origin(&vir.origin)">@vir.license</a>
+                  @if !vir.optional && vir.license.len() < 8 {
+                    licenses
                   }
                 }
               </section>

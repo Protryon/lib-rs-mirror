@@ -424,7 +424,7 @@ impl Index {
     }
 
     /// How likely it is that this exact crate will be installed in any project
-    pub fn version_commonality(&self, crate_name: &str, version: &MiniVer) -> Result<Option<f32>, KitchenSinkErr> {
+    pub fn version_global_popularity(&self, crate_name: &str, version: &MiniVer) -> Result<Option<f32>, KitchenSinkErr> {
         match crate_name {
             // bindings' SLoC looks heavier than actual overhead of standard system libs
             "libc" | "winapi" | "kernel32-sys" | "winapi-i686-pc-windows-gnu" | "winapi-x86_64-pc-windows-gnu" => return Ok(Some(0.99)),

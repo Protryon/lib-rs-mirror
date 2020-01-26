@@ -128,6 +128,7 @@ fn run_server() -> Result<(), failure::Error> {
             .resource("/index", |r| r.method(Method::GET).f(handle_search)) // old crates.rs/index url
             .resource("/keywords/{keyword}", |r| r.method(Method::GET).f(handle_keyword))
             .resource("/crates/{crate}", |r| r.method(Method::GET).f(handle_crate))
+            .resource("/crates/{crate}/rev", |r| r.method(Method::GET).f(handle_crate_reverse_dependencies))
             .resource("/install/{crate:.*}", |r| r.method(Method::GET).f(handle_install))
             .resource("/debug/{crate:.*}", |r| r.method(Method::GET).f(handle_debug))
             .resource("/gh/{owner}/{repo}/{crate}", |r| r.method(Method::GET).f(handle_github_crate))
@@ -401,6 +402,23 @@ fn handle_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse>
     .responder()
 }
 
+fn handle_crate_reverse_dependencies(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
+    let crate_name: String = req.match_info().query("crate").expect("arg");
+    println!("rev deps for {:?}", crate_name);
+    let state = Arc::clone(req.state());
+    let crates = state.crates.load();
+    let origin = Origin::from_crates_io_name(&crate_name);
+    if !is_alnum(&crate_name) || !crates.crate_exists(&origin) {
+        return Box::new(future::result(render_404_page(&state, &crate_name)));
+    }
+    render_crate_reverse_dependencies(&state, origin)
+    .timeout(Duration::from_secs(20))
+    .map_err(map_err)
+    .from_err()
+    .and_then(serve_cached)
+    .responder()
+}
+
 /// takes path to storage, freshness in seconds, and a function to call on cache miss
 /// returns (page, fresh in seconds)
 fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: impl FnOnce() -> F) -> impl Future<Item=(Vec<u8>, u32, bool), Error=failure::Error>
@@ -455,6 +473,18 @@ fn render_crate_page(state: &AServerState, origin: Origin) -> impl Future<Item =
         let mut page: Vec<u8> = Vec::with_capacity(50000);
         front_end::render_crate_page(&mut page, &all, &ver, &crates, &state2.markup)?;
         Ok(page)
+    })
+}
+
+fn render_crate_reverse_dependencies(state: &AServerState, origin: Origin) -> impl Future<Item = (Vec<u8>, u32, bool), Error = failure::Error> {
+    let state2 = Arc::clone(state);
+    state.render_pool.spawn_fn(move || {
+        let crates = state2.crates.load();
+        crates.prewarm();
+        let ver = crates.rich_crate_version(&origin)?;
+        let mut page: Vec<u8> = Vec::with_capacity(50000);
+        front_end::render_crate_reverse_dependencies(&mut page, &ver, &crates, &state2.markup)?;
+        Ok((page, 24*3600, false))
     })
 }
 

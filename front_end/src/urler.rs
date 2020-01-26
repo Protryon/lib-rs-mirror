@@ -68,8 +68,15 @@ impl Urler {
         }
     }
 
-    pub fn reverse_deps(&self, krate: &RichCrateVersion) -> String {
-        format!("https://crates.io/crates/{}/reverse_dependencies", encode(krate.short_name()))
+    pub fn reverse_deps(&self, origin: &Origin) -> String {
+        match origin {
+            Origin::CratesIo(lowercase_name) => {
+                format!("/crates/{}/rev", encode(lowercase_name))
+            },
+            Origin::GitHub {package, ..} | Origin::GitLab {package, ..} => {
+                format!("/crates/{}/rev", encode(package)) // FIXME: that's bogus, return None
+            },
+        }
     }
 
     pub fn crates_io_crate(&self, origin: &Origin) -> Option<String> {

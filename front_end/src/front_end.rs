@@ -14,6 +14,7 @@ mod not_found_page;
 mod search_page;
 mod install_page;
 mod urler;
+mod reverse_dependencies;
 pub use crate::not_found_page::*;
 pub use crate::search_page::*;
 
@@ -131,6 +132,17 @@ pub fn render_crate_page<W: Write>(out: &mut W, all: &RichCrate, ver: &RichCrate
     let c = CratePage::new(all, ver, kitchen_sink, renderer).context("New crate page")?;
     templates::crate_page(out, &urler, &c).context("crate page io")?;
     Ok(c.page_title())
+}
+
+/// See `reverse_dependencies.rs.html`
+pub fn render_crate_reverse_dependencies<W: Write>(out: &mut W, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
+    if stopped() {
+        Err(KitchenSinkErr::Stopped)?;
+    }
+    let urler = Urler::new(None);
+    let c = reverse_dependencies::CratePageRevDeps::new(ver, kitchen_sink, renderer)?;
+    templates::reverse_dependencies(out, &urler, &c)?;
+    Ok(())
 }
 
 /// See `install.rs.html`

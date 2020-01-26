@@ -218,11 +218,11 @@
                               (via <a href="@url.crate_by_origin(&Origin::from_crates_io_name(name))">@name</a>)
                             }
                           } else {
-                             (<a href="@url.reverse_deps(&c.ver)">@c.format_number(direct)&nbsp;directly</a>)
+                             (<a href="@url.reverse_deps(c.ver.origin())">@c.format_number(direct)&nbsp;directly</a>)
                           }
 
                       } else {
-                        Used in <a href="@url.reverse_deps(&c.ver)"><b>@c.format_number(deps)</b>&nbsp;crate@if deps != 1 {s}</a>
+                        Used in <a href="@url.reverse_deps(c.ver.origin())"><b>@c.format_number(deps)</b>&nbsp;crate@if deps != 1 {s}</a>
                       }
                     }
                 }

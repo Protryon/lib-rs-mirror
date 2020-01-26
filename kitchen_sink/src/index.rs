@@ -4,7 +4,7 @@ use crate::KitchenSink;
 use crate::KitchenSinkErr;
 use crates_index::Crate;
 use crates_index::Dependency;
-use crates_index::Version;
+pub use crates_index::Version;
 use crates_index;
 use lazyonce::LazyOnce;
 use parking_lot::Mutex;
@@ -202,9 +202,9 @@ impl Index {
         .ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))
     }
 
-    pub fn crate_version_latest_unstable(&self, name: &str) -> Result<&Version, KitchenSinkErr> {
+    pub fn crate_highest_version(&self, name: &str, stable_only: bool) -> Result<&Version, KitchenSinkErr> {
         debug_assert_eq!(name, name.to_ascii_lowercase());
-        Ok(Self::highest_crates_io_version(self.crates_io_crate_by_lowercase_name(name)?, false))
+        Ok(Self::highest_crates_io_version(self.crates_io_crate_by_lowercase_name(name)?, stable_only))
     }
 
     fn highest_crates_io_version(krate: &Crate, stable_only: bool) -> &Version {

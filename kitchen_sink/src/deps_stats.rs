@@ -20,6 +20,12 @@ pub struct RevDepCount {
     pub opt: u16,
 }
 
+impl RevDepCount {
+    pub fn all(&self) -> u32 {
+        self.def as u32 + self.opt as u32
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct DirectDepCount {
     pub runtime: u16,

@@ -1104,7 +1104,7 @@ impl KitchenSink {
 
         let (src, manifest, _warn) = match origin {
             Origin::CratesIo(ref name) => {
-                let ver = self.index.crate_version_latest_unstable(name).context("rich_crate_version2")?;
+                let ver = self.index.crate_highest_version(name, false).context("rich_crate_version2")?;
                 self.rich_crate_version_data_from_crates_io(ver).context("rich_crate_version_data_from_crates_io")?
             },
             Origin::GitHub {..} | Origin::GitLab {..} => {
@@ -1325,7 +1325,7 @@ impl KitchenSink {
             .into_iter()
             .filter_map(|origin| {
                 match origin {
-                    Origin::CratesIo(name) => self.index.crate_version_latest_unstable(&name).ok(),
+                    Origin::CratesIo(name) => self.index.crate_highest_version(&name, false).ok(),
                     _ => None,
                 }
             })

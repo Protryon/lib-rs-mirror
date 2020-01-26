@@ -215,7 +215,7 @@
                         Used in <b>@c.format_number(deps)</b> crate@if deps != 1 {s}
                           @if direct == 1 {
                             @if let Some(name) = name {
-                              (via <a href="@url.crate_by_origin(&Origin::from_crates_io_name(name))">@name</a>)
+                              (via <a href="@url.reverse_deps(&Origin::from_crates_io_name(name))">@name</a>)
                             }
                           } else {
                              (<a href="@url.reverse_deps(c.ver.origin())">@c.format_number(direct)&nbsp;directly</a>)

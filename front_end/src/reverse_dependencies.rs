@@ -102,13 +102,16 @@ impl<'a> CratePageRevDeps<'a> {
     }
 
     // version, deps, normalized popularity 0..100
-    pub fn version_breakdown(&self) -> Vec<(SemVer, u16, f32)> {
+    pub fn version_breakdown(&self) -> Vec<(SemVer, u16, f32, f32)> {
         let mut ver: Vec<_> = self.stats.map(|s| s.versions.iter().map(|(k, v)| {
-            (k.to_semver(), *v, 0.)
+            (k.to_semver(), *v, 0., 0.)
         }).collect()).unwrap_or_default();
 
-        let max = ver.iter().map(|(_, n, _)| *n).max().unwrap_or(1) as f32;
-        ver.iter_mut().for_each(|i| i.2 = i.1 as f32 / max * 100.0);
+        let max = ver.iter().map(|(_, n, _, _)| *n).max().unwrap_or(1) as f32;
+        for i in ver.iter_mut() {
+            i.2 = i.1 as f32 / max * 100.0;
+            i.3 = 3. + 5. * (i.1 as f32 + 1.).log10().ceil(); // approx visual width of the number
+        }
         ver.sort_by(|a, b| b.0.cmp(&a.0));
         ver
     }

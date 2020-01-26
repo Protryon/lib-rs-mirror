@@ -53,6 +53,7 @@ pub struct Page {
     noindex: bool,
     search_meta: bool,
     critical_css_data: Option<&'static str>,
+    critical_css_dev_url: Option<&'static str>,
     local_css_data: Option<&'static str>,
 }
 
@@ -62,6 +63,13 @@ impl Page {
     }
 
     pub fn critical_css(&self) -> templates::Html<&'static str> {
+        #[cfg(debug_assertions)]
+        {
+            if let Some(url) = self.critical_css_dev_url {
+                // it's super ugly hack, but just for dev
+                return templates::Html(Box::leak(format!("</style><link rel=stylesheet href='{}'><style>", url).into_boxed_str()))
+            }
+        }
         let data = self.critical_css_data.unwrap_or(include_str!("../../style/public/critical.css"));
         templates::Html(data)
     }

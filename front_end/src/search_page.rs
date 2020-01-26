@@ -81,6 +81,7 @@ impl SearchPage<'_> {
             noindex: true,
             search_meta: true,
             critical_css_data: Some(include_str!("../../style/public/search.css")),
+            critical_css_dev_url: Some("/search.css"),
             ..Default::default()
         }
     }

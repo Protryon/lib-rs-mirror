@@ -112,6 +112,8 @@ impl<'a> CratePageRevDeps<'a> {
             item_description: self.ver.description().map(|d| d.to_string()),
             noindex: true,
             search_meta: false,
+            critical_css_data: Some(include_str!("../../style/public/revdeps.css")),
+            critical_css_dev_url: Some("/revdeps.css"),
             ..Default::default()
         }
     }

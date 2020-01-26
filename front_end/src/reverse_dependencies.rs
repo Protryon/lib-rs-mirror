@@ -15,32 +15,34 @@ use std::fmt::Display;
 pub struct CratePageRevDeps<'a> {
     pub ver: &'a RichCrateVersion,
     pub deps: Vec<RevDepInf<'a>>,
-    pub stats: &'a RevDependencies,
+    pub stats: Option<&'a RevDependencies>,
+    pub has_download_columns: bool,
 }
 
 pub struct RevDepInf<'a> {
     pub origin: Origin,
     pub downloads: usize,
-    pub rev_dep: &'a kitchen_sink::Version,
+    pub depender: &'a kitchen_sink::Version,
     pub is_optional: bool,
     pub matches_latest: bool,
     pub kind: &'a str,
     pub req: VersionReq,
+    pub rev_dep_count: u32,
 }
 
 impl<'a> CratePageRevDeps<'a> {
     pub fn new(ver: &'a RichCrateVersion, kitchen_sink: &'a KitchenSink, _markup: &'a Renderer) -> CResult<Self> {
-        let deps = kitchen_sink.index.deps_stats()?;
+        let all_deps_stats = kitchen_sink.index.deps_stats()?;
         let own_name = ver.short_name();
         // RichCrateVersion may be unstable
         let latest_stable_semver = kitchen_sink.index.crate_highest_version(&own_name.to_lowercase(), true)?.version().parse()?;
-        let stats = deps.counts.get(own_name).ok_or_else(|| failure::err_msg("bad crate name"))?;
+        let stats = all_deps_stats.counts.get(own_name);
 
-        let mut deps: Vec<_> = stats.rev_dep_names.iter().par_bridge().map(|rev_dep| {
+        let mut deps: Vec<_> = stats.map(|s| s.rev_dep_names.iter().par_bridge().map(|rev_dep| {
             let origin = Origin::from_crates_io_name(rev_dep);
             let downloads = kitchen_sink.downloads_per_month(&origin).ok().and_then(|x| x).unwrap_or(0);
-            let rev_dep = kitchen_sink.index.crate_highest_version(&rev_dep.to_lowercase(), true).expect("rev dep integrity");
-            let (is_optional, req, kind) = rev_dep.dependencies().iter().filter(|d| {
+            let depender = kitchen_sink.index.crate_highest_version(&rev_dep.to_lowercase(), true).expect("rev dep integrity");
+            let (is_optional, req, kind) = depender.dependencies().iter().filter(|d| {
                 own_name == d.crate_name()
             })
             .next()
@@ -54,24 +56,30 @@ impl<'a> CratePageRevDeps<'a> {
 
             RevDepInf {
                 origin,
-                rev_dep, downloads, is_optional, req, kind,
+                depender, downloads, is_optional, req, kind,
                 matches_latest,
+                rev_dep_count: 0,
             }
-        }).collect();
+        }).collect()).unwrap_or_default();
 
         // sort by downloads if > 100, then by name
         deps.sort_by(|a, b| {
             b.downloads.max(100).cmp(&a.downloads.max(100))
             .then_with(|| {
-                a.rev_dep.name().cmp(b.rev_dep.name())
+                a.depender.name().cmp(b.depender.name())
             })
         });
         deps.truncate(1000);
+        for d in deps.iter_mut() {
+            d.rev_dep_count = all_deps_stats.counts.get(d.depender.name()).map(|s| s.direct.all()).unwrap_or(0);
+        }
+        let has_download_columns = deps.iter().any(|d| d.rev_dep_count > 0 || d.downloads > 100);
 
         Ok(Self {
             ver,
             deps,
             stats,
+            has_download_columns,
         })
     }
 
@@ -95,9 +103,9 @@ impl<'a> CratePageRevDeps<'a> {
 
     // version, deps, normalized popularity 0..100
     pub fn version_breakdown(&self) -> Vec<(SemVer, u16, f32)> {
-        let mut ver: Vec<_> = self.stats.versions.iter().map(|(k, v)| {
+        let mut ver: Vec<_> = self.stats.map(|s| s.versions.iter().map(|(k, v)| {
             (k.to_semver(), *v, 0.)
-        }).collect();
+        }).collect()).unwrap_or_default();
 
         let max = ver.iter().map(|(_, n, _)| *n).max().unwrap_or(1) as f32;
         ver.iter_mut().for_each(|i| i.2 = i.1 as f32 / max * 100.0);

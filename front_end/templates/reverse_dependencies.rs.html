@@ -18,41 +18,48 @@
   </header>
   <main>
     <div class="inner-col">
-      <p>
-        @if p.stats.runtime.all() > 0 {
-          <a href="@url.krate(&p.ver)" rel="up">@p.ver.capitalized_name()</a> is included in @p.format_number(p.stats.runtime.all()) crate@if p.stats.runtime.all() != 1 {s}@if p.stats.runtime.all() > u32::from(p.stats.direct.runtime) {
-            (@if p.stats.runtime.opt > 0 {of which @p.format_number(p.stats.runtime.opt) optionally, }@p.format_number(p.stats.direct.runtime) directly)}.
-        }
-
-        @if p.stats.build.all() > 0 {
-          It's used at build time in @p.format_number(p.stats.build.all()) crate@if p.stats.build.all() != 1 {s}@if p.stats.build.all() > u32::from(p.stats.direct.build) {
-            (@if p.stats.build.opt > 0 {of which @p.format_number(p.stats.build.opt) optionally, }@p.format_number(p.stats.direct.build) directly)}.
-        }
-
-        @if p.stats.dev > 0 {
-          It's used as a dev dependency in @p.format_number(p.stats.dev) crate@if p.stats.dev != 1 {s}@if p.stats.dev > p.stats.direct.dev && p.stats.direct.dev > 0 {
-          (@p.format_number(p.stats.direct.dev) directly)}.
-        }
-      </p>
-
-      @if p.stats.versions.len() > 1 {
-        <table class="version-pop">
-          <thead><th>Number of dependers</th><th>@p.ver.capitalized_name() version</th></thead>
-          @for (ver, num, perc) in p.version_breakdown() {
-            <tr><td>@if perc <= 10.0 {@num} <span style="width:@perc%">@if perc > 10.0 {@num}</span></td><th>@ver</th></tr>
+      @if let Some(stats) = p.stats {
+        <p>
+          @if stats.runtime.all() > 0 {
+            <a href="@url.krate(&p.ver)" rel="up">@p.ver.capitalized_name()</a> is used at run time in <b>@p.format_number(stats.runtime.all())</b> crate@if stats.runtime.all() != 1 {s}@if stats.runtime.all() > u32::from(stats.direct.runtime) {
+              (@if stats.runtime.opt > 0 {of which @p.format_number(stats.runtime.opt) optionally, }@p.format_number(stats.direct.runtime) directly)}.
           }
-        </table>
+
+          @if stats.build.all() > 0 {
+            It's used at build time in <b>@p.format_number(stats.build.all())</b> crate@if stats.build.all() != 1 {s}@if stats.build.all() > u32::from(stats.direct.build) {
+              (@if stats.build.opt > 0 {of which @p.format_number(stats.build.opt) optionally, }@p.format_number(stats.direct.build) directly)}.
+          }
+
+          @if stats.dev > 0 {
+            It's used only as a dev dependency in <b>@p.format_number(stats.dev)</b> crate@if stats.dev != 1 {s}@if stats.dev > stats.direct.dev && stats.direct.dev > 0 {
+            (@p.format_number(stats.direct.dev) directly)}.
+          }
+        </p>
+
+        @if stats.versions.len() > 1 {
+          <table class="version-pop">
+            <thead><th>Number of dependers</th><th>@p.ver.capitalized_name() version</th></thead>
+            @for (ver, num, perc) in p.version_breakdown() {
+              <tr><td>@if perc <= 10.0 {@num} <span style="width:@perc%">@if perc > 10.0 {@num}</span></td><th>@ver</th></tr>
+            }
+          </table>
+        }
       }
 
       @if !p.deps.is_empty() {
-        <table class="reverse-deps">
-          <thead><th></th><th>Depender <small>(with downloads)</small></th><th colspan="2">@p.ver.capitalized_name() version</th></thead>
+        <table class="reverse-deps @if !p.has_download_columns {no-dl-columns}">
+          <thead>
+              <tr><th colspan="3">Depender
+                @if p.has_download_columns {<small>(with downloads and own rev deps)</small>}
+              </th> <th colspan="2">@p.ver.capitalized_name() version</th></tr>
+          </thead>
           @for r in &p.deps {
             <tr>
               <td>@if r.downloads > 100 {
                 <span class=downloads>@if let Some((num,unit)) = Some(p.downloads(r.downloads)) {@num<b>@unit</b>}</span>
               }</td>
-              <td><a href="@url.crate_by_origin(&r.origin)">@r.rev_dep.name()</a> <a class="more" href="@url.reverse_deps(&r.origin)">↑</a> </td>
+              <td>@if r.rev_dep_count > 0 {<a href="@url.reverse_deps(&r.origin)">@r.rev_dep_count</a>}</td>
+              <td><a href="@url.crate_by_origin(&r.origin)">@r.depender.name()</a></td>
               <td>@if r.is_optional {<span class=feature>optional</span>}
              @if r.kind != "normal" && r.kind != "" {<span class="label label-@r.kind">@r.kind</span>}</td>
               <td @if !r.matches_latest {class="outdated"}>@r.req</td>
@@ -60,7 +67,7 @@
           }
         </table>
       } else {
-        <p>This crate isn't used by any other public crates.</p>
+        <p>This crate isn't used by any other public crates. <a href="@url.krate(&p.ver)" rel="up">Go back to @p.ver.capitalized_name()</a>.</p>
       }
     </div>
   </main>

@@ -353,10 +353,16 @@ fn is_deprecated(k: &RichCrateVersion) -> bool {
     if k.maintenance() == MaintenanceStatus::Deprecated {
         return true;
     }
-    if let Some(desc) = k.description() {
-        let desc = desc.trim_matches(|c: char| !c.is_ascii_alphabetic()).to_ascii_lowercase();
-        return desc.starts_with("deprecated") || desc.starts_with("unsafe and deprecated") ||
+    if let Some(orig_desc) = k.description() {
+        let orig_desc = orig_desc.trim_matches(|c: char| !c.is_ascii_alphabetic());
+        let desc = orig_desc.to_ascii_lowercase();
+        return orig_desc.starts_with("WIP") || orig_desc.ends_with("WIP") ||
+            desc.starts_with("deprecated") ||
+            desc.starts_with("unfinished") ||
+            desc.starts_with("an unfinished") ||
+            desc.starts_with("unsafe and deprecated") ||
             desc.starts_with("crate is abandoned") ||
+            desc.starts_with("abandoned") ||
             desc.contains("this crate is abandoned") ||
             desc.contains("this crate has been abandoned") ||
             desc.contains("do not use") ||
@@ -365,6 +371,7 @@ fn is_deprecated(k: &RichCrateVersion) -> bool {
             desc.starts_with("an empty crate") ||
             desc.starts_with("discontinued") ||
             desc.starts_with("wip. ") ||
+            desc.starts_with("very early wip") ||
             desc.starts_with("renamed to ") ||
             desc.starts_with("crate renamed to ") ||
             desc.starts_with("temporary fork") ||

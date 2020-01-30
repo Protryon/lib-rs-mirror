@@ -33,6 +33,7 @@ github:benanders/rjni/rjni
 github:benschza/pier/pier
 github:bitshifter/mathbench-rs/mathbench
 github:breeswish/slog-global/slog-global
+github:bytecodealliance/wasmtime/wasmtime-cli
 github:caelunshun/feather/feather-blocks
 github:caelunshun/feather/feather-codegen
 github:caelunshun/feather/feather-server
@@ -46,7 +47,9 @@ github:cristicbz/rust-doom/rs_doom
 github:dani-garcia/bitwarden_rs/bitwarden_rs
 github:darrint/device-blocker/device-blocker
 github:dcampbell24/iup-rust/iup
+github:deislabs/krustlet/krustlet
 github:deniskolodin/rust-app-engine/rust-app-engine
+github:dessalines/lemmy/lemmy_server
 github:eirproject/eir/libeir_diagnostics
 github:eirproject/eir/libeir_hir
 github:eirproject/eir/libeir_intern
@@ -87,6 +90,7 @@ github:garkimasera/rusted-ruins/rusted-ruins
 github:gekkio/mooneye-gb/mooneye-gb
 github:getzola/zola/zola
 github:google/rust-shell/shell
+github:greshake/i3status-rust/i3status-rs
 github:guywaldman/ravro/ravro
 github:habitat-sh/habitat/hab
 github:habitat-sh/habitat/habitat-launcher
@@ -94,6 +98,7 @@ github:habitat-sh/habitat/habitat_api_client
 github:henninglive/boids-rs/boids
 github:holochain/holochain-rust/holochain
 github:holochain/holochain-rust/holochain_common
+github:huggingface/tokenizers/tokenizers-python
 github:hyperledger/indy-sdk/indy-cli
 github:hyperledger/indy-sdk/libindy
 github:hyperledger/indy-sdk/libvcx
@@ -124,6 +129,7 @@ github:jussiniinikoski/wasm-pdf/wasm-pdf
 github:katharostech/arsenal/arsenal_blender_core
 github:katharostech/arsenal/arsenal_runtime
 github:kbknapp/docli-rs/docli
+github:kethku/neovide/neovide
 github:kiss-ui/kiss-ui/kiss-ui
 github:kitech/qt.rs/qt5
 github:klutzy/suruga/suruga
@@ -311,6 +317,7 @@ github:subzerocloud/pg-amqp-bridge/pg-amqp-bridge
 github:tailhook/marafet/marafet
 github:tailhook/marafet/marafet_css
 github:tailhook/vagga/vagga
+github:tanakh/cargo-atcoder/cargo-atcoder
 github:tauri-apps/tauri/tauri
 github:tauri-apps/tauri/tauri-ui
 github:thebracket/rltk_rs/rltk
@@ -384,6 +391,7 @@ github:xiph/rav1e/avformat-sys
 github:xiph/rav1e/rav1e
 github:y2z/monolith/monolith
 github:yaa110/rubigo/rubigo
+github:yoric/yaiouom/yaiouom-checker
 github:zacstewart/comm-gtk/comm-gtk
 github:zacstewart/comm/comm
 github:zesterer/atto/atto

@@ -7,7 +7,6 @@ description = "Crate struct enriched with additional crates.rs metadata"
 license = "Apache-2.0 OR MIT"
 
 [dependencies]
-crates-index = "0.13.4"
 crates_io_client = { git = "https://gitlab.com/crates.rs/crates_io_client.git", version = "0.7.0" }
 render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git", version = "0.6.0" }
 categories = { path = "../categories" }

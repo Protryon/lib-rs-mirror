@@ -14,7 +14,6 @@ simple_cache = { git = "https://gitlab.com/crates.rs/simple_cache.git", version 
 serde = "1.0.104"
 serde_derive = "1.0.104"
 serde_json = "1.0.44"
-file = "1.1.2"
 urlencoding = "1.0.0"
 quick-error = "1.2.2"
 hyper = "0.12.0"

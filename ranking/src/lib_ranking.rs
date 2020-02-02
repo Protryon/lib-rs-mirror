@@ -286,6 +286,8 @@ pub fn crate_score_version(cr: &CrateVersionInputs<'_>) -> Score {
 
 pub fn crate_score_temporal(cr: &CrateTemporalInputs<'_>) -> Score {
     let mut score = Score::new();
+    // if it's bin+lib, treat it as a lib.
+    let is_app_only = cr.is_app && cr.number_of_direct_reverse_deps == 0;
 
     let newest = cr.versions.iter().max_by_key(|v| &v.created_at).expect("at least 1 ver?");
     let freshness_score = match newest.created_at.parse::<DateTime<Utc>>() {
@@ -304,7 +306,7 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs<'_>) -> Score {
             let age = (Utc::now() - latest_date).num_days();
             let days_past_expiration_date = (age - expected_update_interval).max(0);
             // score decays for a ~year after the crate should have been updated
-            let decay_days = expected_update_interval/2 + if cr.is_nightly {60} else if cr.is_app {300} else {200};
+            let decay_days = expected_update_interval/2 + if cr.is_nightly {60} else if is_app_only {300} else {200};
             (decay_days - days_past_expiration_date).max(0) as f64 / (decay_days as f64)
         },
         Err(e) => {
@@ -319,10 +321,10 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs<'_>) -> Score {
 
     // Low numbers are just bots/noise.
     let downloads = (cr.downloads_per_month as f64 - 100.).max(0.) + 100.;
-    let downloads_cleaned = (cr.downloads_per_month_minus_most_downloaded_user as f64 / if cr.is_app {1.} else {2.} - 50.).max(0.) + 50.;
+    let downloads_cleaned = (cr.downloads_per_month_minus_most_downloaded_user as f64 / if is_app_only {1.} else {2.} - 50.).max(0.) + 50.;
     // distribution of downloads follows power law.
     // apps have much harder to get high download numbers.
-    let pop = (downloads.log2() - 6.6) / (if cr.is_app {3.} else {5.});
+    let pop = (downloads.log2() - 6.6) / (if is_app_only {4.} else {5.});
     let pop_cleaned = downloads_cleaned.log2() - 5.6;
     assert!(pop > 0.);
     assert!(pop_cleaned > 0.);
@@ -335,13 +337,13 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs<'_>) -> Score {
     score.has("Any traction", 2, (cr.downloads_per_month as f64 * freshness_score) > 1000.);
 
     // Don't expect apps to have rev deps (omitting these entirely proprtionally increases importance of other factors)
-    if !cr.is_app || cr.number_of_direct_reverse_deps > 1 {
+    if !is_app_only {
         score.score_f("Direct rev deps", 10., (cr.number_of_direct_reverse_deps as f64).sqrt());
         let indirect = 1. + cr.number_of_indirect_reverse_optional_deps as f64 / 3.;
         score.score_f("Indirect rev deps", 10., indirect.log2());
     }
 
-    if !cr.is_app || cr.has_docs_rs {
+    if !is_app_only || cr.has_docs_rs {
         score.has("docs.rs", 1, cr.has_docs_rs);
     }
     score

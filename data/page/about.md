@@ -12,6 +12,7 @@ Lib.rs is a catalog of programs and libraries written in the [Rust programming l
    * Shows size of each crate and its dependencies.
    * Highlights which crates require nightly compiler or use non-Rust code.
    * Automatically finds and credits co-authors based on git history.
+   * Detailed reverse dependencies page, including version fragmentation.
  * It has an advanced ranking algorithm which promotes stable, regularly updated, popuplar crates, and hides spam and abandoned crates.
  * It has short URLs to open a crate page `lib.rs/crate-name` and search `lib.rs?keyword`.
  * Shows similar/related crates on each crate page, which helps discovering better alternatives.
@@ -32,7 +33,7 @@ Crates are sorted by their overall quality score, which is a weighed combination
  * Presence of tests, CI, code comments.
  * Accuracy and completeness of the crate's metadata.
  * Number of authors and contributors.
- * Weight of the crate's unique dependencies (discounting weight of popular dependecies that projets are likely to have already).
+ * Weight of the crate's unique dependencies (taking into account that some crates are very common and shared between projects).
  * Whether the crate is actively maintained or at least stable and done, based on release frequency, age, maintenance status, use of deprecated/outdated dependencies, non-0.x releases, etc.
 
 The score is combined with relevance of crate's keywords to a given category or search query.

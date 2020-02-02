@@ -7,6 +7,8 @@ data/git
 data/tantivy
 data/staging
 *.db-journal
+*.db-wal
+*.db-shm
 *.rmp
 *.rmpz
 front_end/public/atom.xml

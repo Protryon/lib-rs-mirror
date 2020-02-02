@@ -1630,7 +1630,7 @@ impl KitchenSink {
             }
         }
         let total_count = self.category_crate_count(slug)?;
-        let wanted_num = ((total_count/3+25)/50 * 50).max(100);
+        let wanted_num = ((total_count/2+25)/50 * 50).max(100);
         let mut cache = self.top_crates_cached.write();
         use std::collections::hash_map::Entry::*;
         Ok(match cache.entry(slug.to_owned()) {

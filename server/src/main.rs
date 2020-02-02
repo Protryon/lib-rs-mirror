@@ -1,33 +1,34 @@
-use actix_web::dev::Params;
-use actix_web::http::*;
-use actix_web::*;
+use actix_web::dev::Url;
+use actix_web::http::header::HeaderValue;
+use actix_web::HttpResponse;
+use actix_web::middleware;
+use actix_web::{web, App, HttpRequest, HttpServer};
 use arc_swap::ArcSwap;
-use categories::Category;
+use cap::Cap;
 use categories::CATEGORIES;
+use categories::Category;
+use crate::writer::*;
 use env_logger;
 use failure::ResultExt;
 use front_end;
-use futures::future::FutureResult;
-use futures::future::{self, Future};
-use futures_cpupool::CpuPool;
-use kitchen_sink;
+use futures::future::Future;
+use futures::future::FutureExt;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::Origin;
+use kitchen_sink;
+use locale::Numeric;
 use render_readme::{Highlighter, ImageOptimAPIFilter, Renderer, Markup};
+use repo_url::SimpleRepo;
 use search_index::CrateSearchIndex;
 use std::env;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{Duration, SystemTime};
-use tokio::prelude::FutureExt;
-use repo_url::SimpleRepo;
 use urlencoding::decode;
 use urlencoding::encode;
-use locale::Numeric;
-use cap::Cap;
+
 mod writer;
-use crate::writer::*;
 
 #[global_allocator]
 static ALLOCATOR: Cap<std::alloc::System> = Cap::new(std::alloc::System, 1*1024*1024*1024);
@@ -35,8 +36,6 @@ static ALLOCATOR: Cap<std::alloc::System> = Cap::new(std::alloc::System, 1*1024*
 static HUP_SIGNAL: AtomicU32 = AtomicU32::new(0);
 
 struct ServerState {
-    render_pool: CpuPool,
-    search_pool: CpuPool,
     markup: Renderer,
     index: CrateSearchIndex,
     crates: ArcSwap<KitchenSink>,
@@ -44,7 +43,7 @@ struct ServerState {
     data_dir: PathBuf,
 }
 
-type AServerState = Arc<ServerState>;
+type AServerState = web::Data<ServerState>;
 
 fn main() {
     if let Err(e) = run_server() {
@@ -58,14 +57,13 @@ fn main() {
 fn run_server() -> Result<(), failure::Error> {
     unsafe {
         signal_hook::register(signal_hook::SIGHUP, || HUP_SIGNAL.store(1, Ordering::SeqCst))
-    }.expect("signal handler");
+    }?;
     unsafe {
         signal_hook::register(signal_hook::SIGUSR1, || HUP_SIGNAL.store(1, Ordering::SeqCst))
-    }.expect("signal handler");
+    }?;
 
     env_logger::init();
     kitchen_sink::dont_hijack_ctrlc();
-    let sys = actix::System::new("crates-server");
 
     let public_document_root: PathBuf = env::var_os("DOCUMENT_ROOT").map(From::from).unwrap_or_else(|| "../style/public".into());
     let page_cache_dir: PathBuf = "/var/tmp/crates-server".into();
@@ -83,9 +81,7 @@ fn run_server() -> Result<(), failure::Error> {
 
     let index = CrateSearchIndex::new(&data_dir)?;
 
-    let state = Arc::new(ServerState {
-        render_pool: CpuPool::new(8), // may be network-blocked, so not num CPUs
-        search_pool: CpuPool::new_num_cpus(),
+    let state = web::Data::new(ServerState {
         markup,
         index,
         crates: ArcSwap::from_pointee(crates),
@@ -119,32 +115,35 @@ fn run_server() -> Result<(), failure::Error> {
         }
     });
 
-    server::new(move || {
-        App::with_state(state.clone())
-            .middleware(StandardHeaders)
-            .middleware(middleware::Logger::default())
-            .resource("/", |r| r.method(Method::GET).f(handle_home))
-            .resource("/search", |r| r.method(Method::GET).f(handle_search))
-            .resource("/index", |r| r.method(Method::GET).f(handle_search)) // old crates.rs/index url
-            .resource("/keywords/{keyword}", |r| r.method(Method::GET).f(handle_keyword))
-            .resource("/crates/{crate}", |r| r.method(Method::GET).f(handle_crate))
-            .resource("/crates/{crate}/rev", |r| r.method(Method::GET).f(handle_crate_reverse_dependencies))
-            .resource("/install/{crate:.*}", |r| r.method(Method::GET).f(handle_install))
-            .resource("/debug/{crate:.*}", |r| r.method(Method::GET).f(handle_debug))
-            .resource("/gh/{owner}/{repo}/{crate}", |r| r.method(Method::GET).f(handle_github_crate))
-            .resource("/lab/{owner}/{repo}/{crate}", |r| r.method(Method::GET).f(handle_gitlab_crate))
-            .resource("/atom.xml", |r| r.method(Method::GET).f(handle_feed))
-            .resource("/sitemap.xml", |r| r.method(Method::GET).f(handle_sitemap))
-            .handler("/", fs::StaticFiles::new(&public_document_root).expect("public directory")
-                .default_handler(default_handler))
+    let server = HttpServer::new(move || {
+        App::new()
+            .app_data(state.clone())
+            .wrap(middleware::DefaultHeaders::new().header("Server", HeaderValue::from_static(concat!("actix-web/2.0 lib.rs/", env!("CARGO_PKG_VERSION")))))
+            .wrap(middleware::Logger::default())
+            .route("/search", web::get().to(handle_search))
+            .route("/", web::get().to(handle_home))
+            .route("/index", web::get().to(handle_search)) // old crates.rs/index url
+            .route("/keywords/{keyword}", web::get().to(handle_keyword))
+            .route("/crates/{crate}", web::get().to(handle_crate))
+            .route("/crates/{crate}/rev", web::get().to(handle_crate_reverse_dependencies))
+            .route("/install/{crate:.*}", web::get().to(handle_install))
+            .route("/debug/{crate:.*}", web::get().to(handle_debug))
+            .route("/gh/{owner}/{repo}/{crate}", web::get().to(handle_github_crate))
+            .route("/lab/{owner}/{repo}/{crate}", web::get().to(handle_gitlab_crate))
+            .route("/atom.xml", web::get().to(handle_feed))
+            .route("/sitemap.xml", web::get().to(handle_sitemap))
+            .service(actix_files::Files::new("/", &public_document_root))
+            .default_service(web::route().to(default_handler))
     })
     .bind("127.0.0.1:32531")
     .expect("Can not bind to 127.0.0.1:32531")
-    .shutdown_timeout(1)
-    .start();
+    .shutdown_timeout(1);
 
-    println!("Started HTTP server {} on http://127.0.0.1:32531", env!("CARGO_PKG_VERSION"));
-    let _ = sys.run();
+    actix_rt::System::new("actix-server").block_on(async {
+        println!("Starting HTTP server {} on http://127.0.0.1:32531", env!("CARGO_PKG_VERSION"));
+        server.run().await
+    })?;
+
     println!("bye!");
     Ok(())
 }
@@ -163,7 +162,7 @@ fn find_category<'a>(slugs: impl Iterator<Item=&'a str>) -> Option<&'static Cate
     found
 }
 
-fn handle_static_page(state: &ServerState, path: &str) -> Result<Option<HttpResponse>> {
+fn handle_static_page(state: &ServerState, path: &str) -> Result<Option<HttpResponse>, failure::Error> {
     let path = &path[1..]; // remove leading /
     if !is_alnum(path) {
         return Ok(None);
@@ -192,41 +191,41 @@ fn handle_static_page(state: &ServerState, path: &str) -> Result<Option<HttpResp
         .body(page)))
 }
 
-fn default_handler(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
-    let state = req.state();
+async fn default_handler(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
+    let state: &AServerState = req.app_data().expect("appdata");
     let path = req.uri().path();
     assert!(path.starts_with('/'));
     if path.ends_with('/') {
-        return Box::new(future::ok(HttpResponse::PermanentRedirect().header("Location", path.trim_end_matches('/')).body("")));
+        return Ok(HttpResponse::PermanentRedirect().header("Location", path.trim_end_matches('/')).body(""));
     }
 
     if let Some(cat) = find_category(path.split('/').skip(1)) {
-        return handle_category(req, cat);
+        return handle_category(req, cat).await;
     }
 
     match handle_static_page(state, path) {
         Ok(None) => {},
-        Ok(Some(page)) => return Box::new(future::ok(page)),
-        Err(err) => return Box::new(future::err(err)),
+        Ok(Some(page)) => return Ok(page),
+        Err(err) => return Err(err),
     }
 
     let crates = state.crates.load();
     let name = path.trim_matches('/');
     if let Ok(k) = crates.rich_crate(&Origin::from_crates_io_name(name)) {
-        return Box::new(future::ok(HttpResponse::PermanentRedirect().header("Location", format!("/crates/{}", encode(k.name()))).body("")));
+        return Ok(HttpResponse::PermanentRedirect().header("Location", format!("/crates/{}", encode(k.name()))).body(""));
     }
     let inverted_hyphens: String = name.chars().map(|c| if c == '-' {'_'} else if c == '_' {'-'} else {c.to_ascii_lowercase()}).collect();
     if let Ok(k) = crates.rich_crate(&Origin::from_crates_io_name(&inverted_hyphens)) {
-        return Box::new(future::ok(HttpResponse::TemporaryRedirect().header("Location", format!("/crates/{}", encode(k.name()))).body("")));
+        return Ok(HttpResponse::TemporaryRedirect().header("Location", format!("/crates/{}", encode(k.name()))).body(""));
     }
     if crates.is_it_a_keyword(&inverted_hyphens) {
-        return Box::new(future::ok(HttpResponse::TemporaryRedirect().header("Location", format!("/keywords/{}", encode(&inverted_hyphens))).body("")));
+        return Ok(HttpResponse::TemporaryRedirect().header("Location", format!("/keywords/{}", encode(&inverted_hyphens))).body(""));
     }
 
-    Box::new(future::result(render_404_page(state, path)))
+    render_404_page(state, path)
 }
 
-fn render_404_page(state: &AServerState, path: &str) -> Result<HttpResponse> {
+fn render_404_page(state: &AServerState, path: &str) -> Result<HttpResponse, failure::Error> {
     let decoded = decode(path).ok();
     let rawtext = decoded.as_ref().map(|d| d.as_str()).unwrap_or(path);
 
@@ -243,90 +242,79 @@ fn render_404_page(state: &AServerState, path: &str) -> Result<HttpResponse> {
         .body(page))
 }
 
-fn handle_category(req: &HttpRequest<AServerState>, cat: &'static Category) -> FutureResponse<HttpResponse> {
-    let state = Arc::clone(req.state());
+async fn handle_category(req: HttpRequest, cat: &'static Category) -> Result<HttpResponse, failure::Error> {
+    let state: &AServerState = req.app_data().expect("appdata");
+    let state = state.clone();
     let crates = state.crates.load();
     crates.prewarm();
     let cache_file = state.page_cache_dir.join(format!("_{}.html", cat.slug));
-    with_file_cache(cache_file, 1800, move || {
-        Arc::clone(&state).render_pool.spawn_fn(move || {
+    Ok(serve_cached(with_file_cache(cache_file, 1800, move || {
+        run_timeout(30, move || {
             let mut page: Vec<u8> = Vec::with_capacity(150000);
-            front_end::render_category(&mut page, cat, &crates, &state.markup).expect("render");
-            Ok(page)
+            front_end::render_category(&mut page, cat, &crates, &state.markup)?;
+            Ok::<_, failure::Error>(page)
         })
-    })
-    .from_err()
-    .and_then(serve_cached)
-    .responder()
+    }).await?).await)
 }
 
-fn handle_home(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
+async fn handle_home(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
+    println!("home route");
     let query = req.query_string().trim_start_matches('?');
     if !query.is_empty() && query.find('=').is_none() {
-        return future::ok(HttpResponse::TemporaryRedirect().header("Location", format!("/search?q={}", query)).finish()).responder();
+        return Ok(HttpResponse::TemporaryRedirect().header("Location", format!("/search?q={}", query)).finish());
     }
 
-    let state = Arc::clone(req.state());
+    let state: &AServerState = req.app_data().expect("appdata");
+    let state = state.clone();
     let cache_file = state.page_cache_dir.join("_.html");
-    with_file_cache(cache_file, 3600, move || {
-        state.render_pool.spawn_fn({
-            let state = state.clone();
-            move || {
-                let crates = state.crates.load();
-                crates.prewarm();
-                let mut page: Vec<u8> = Vec::with_capacity(50000);
-                front_end::render_homepage(&mut page, &crates)?;
-                Ok(page)
-            }
+    Ok(serve_cached(with_file_cache(cache_file, 3600, move || {
+        run_timeout(300, move || {
+            let crates = state.crates.load();
+            crates.prewarm();
+            let mut page: Vec<u8> = Vec::with_capacity(50000);
+            front_end::render_homepage(&mut page, &crates)?;
+            Ok::<_, failure::Error>(page)
         })
-        .timeout(Duration::from_secs(300))
-        .map_err(map_err)
-    })
-    .from_err()
-    .and_then(serve_cached)
-    .responder()
+    }).await?).await)
 }
 
-fn handle_github_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
-    handle_git_crate(req, "gh")
+async fn handle_github_crate(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
+    handle_git_crate(req, "gh").await
 }
-fn handle_gitlab_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
-    handle_git_crate(req, "lab")
+async fn handle_gitlab_crate(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
+    handle_git_crate(req, "lab").await
 }
 
-fn handle_git_crate(req: &HttpRequest<AServerState>, slug: &'static str) -> FutureResponse<HttpResponse> {
+async fn handle_git_crate(req: HttpRequest, slug: &'static str) -> Result<HttpResponse, failure::Error> {
     let inf = req.match_info();
-    let state = Arc::clone(req.state());
-    let owner: String = inf.query("owner").expect("arg1");
-    let repo: String = inf.query("repo").expect("arg2");
-    let crate_name: String = inf.query("crate").expect("arg3");
+    let state: &AServerState = req.app_data().expect("appdata");
+    let state = state.clone();
+    let owner = inf.query("owner");
+    let repo = inf.query("repo");
+    let crate_name = inf.query("crate");
     println!("{} crate {}/{}/{}", slug, owner, repo, crate_name);
     if !is_alnum(&owner) || !is_alnum_dot(&repo) || !is_alnum(&crate_name) {
-        return Box::new(future::result(render_404_page(&state, &crate_name)));
+        return render_404_page(&state, &crate_name);
     }
 
     let cache_file = state.page_cache_dir.join(format!("{},{},{},{}.html", slug, owner, repo, crate_name));
     let origin = match slug {
-        "gh" => Origin::from_github(SimpleRepo::new(owner.as_str(), repo.as_str()), crate_name),
-        _ => Origin::from_gitlab(SimpleRepo::new(owner.as_str(), repo.as_str()), crate_name),
+        "gh" => Origin::from_github(SimpleRepo::new(owner, repo), crate_name),
+        _ => Origin::from_gitlab(SimpleRepo::new(owner, repo), crate_name),
     };
     if !state.crates.load().crate_exists(&origin) {
         let (repo, _) = origin.into_repo().expect("repohost");
         let url = repo.canonical_http_url("").expect("repohost");
-        return Box::new(future::ok(HttpResponse::TemporaryRedirect().header("Location", url.into_owned()).finish()));
+        return Ok(HttpResponse::TemporaryRedirect().header("Location", url.into_owned()).finish());
     }
 
-    with_file_cache(cache_file, 86400, move || {
-        render_crate_page(&state, origin)
-            .timeout(Duration::from_secs(60))
-            .map_err(map_err)})
-    .from_err()
-    .and_then(serve_cached)
-    .responder()
+    Ok(serve_cached(with_file_cache(cache_file, 86400, move || {
+        render_crate_page(state, origin)
+    }).await?).await)
 }
 
-fn get_origin_from_subpath(q: &Params) -> Option<Origin> {
-    let parts: String = q.query("crate").expect("route");
+fn get_origin_from_subpath(q: &actix_web::dev::Path<Url>) -> Option<Origin> {
+    let parts = q.query("crate");
     let mut parts = parts.splitn(4, '/');
     let first = parts.next()?;
     match parts.next() {
@@ -343,13 +331,13 @@ fn get_origin_from_subpath(q: &Params) -> Option<Origin> {
     }
 }
 
-fn handle_debug(req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
+async fn handle_debug(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
     if !cfg!(debug_assertions) {
         Err(failure::err_msg("off"))?
     }
 
-    let state = req.state();
-    let origin = get_origin_from_subpath(req.match_info()).ok_or_else(|| failure::err_msg("404"))?;
+    let state: &AServerState = req.app_data().expect("appdata");
+    let origin = get_origin_from_subpath(req.match_info()).ok_or(failure::format_err!("boo"))?;
     let mut page: Vec<u8> = Vec::with_capacity(50000);
     let crates = state.crates.load();
     let ver = crates.rich_crate_version(&origin)?;
@@ -361,68 +349,56 @@ fn handle_debug(req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
         .body(page))
 }
 
-fn handle_install(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
-    let state = req.state();
+async fn handle_install(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
+    let state: &AServerState = req.app_data().expect("appdata");
     let origin = if let Some(o) = get_origin_from_subpath(req.match_info()) {o}
     else {
-        return Box::new(future::result(render_404_page(&state, req.path().trim_start_matches("/install"))));
+        return render_404_page(&state, req.path().trim_start_matches("/install"));
     };
 
-    state.render_pool.spawn_fn({
-        let state = Arc::clone(state);
-        move || {
-            let crates = state.crates.load();
-            let ver = crates.rich_crate_version(&origin)?;
-            let mut page: Vec<u8> = Vec::with_capacity(50000);
-            front_end::render_install_page(&mut page, &ver, &crates, &state.markup)?;
-            Ok(page)
-        }})
-        .and_then(|page| {
-            serve_cached((page, 3600, false))
-        })
-        .responder()
+    let state = state.clone();
+    let page = run_timeout(30, move || {
+        let crates = state.crates.load();
+        let ver = crates.rich_crate_version(&origin)?;
+        let mut page: Vec<u8> = Vec::with_capacity(50000);
+        front_end::render_install_page(&mut page, &ver, &crates, &state.markup)?;
+        Ok::<_, failure::Error>(page)
+    }).await?;
+    Ok(serve_cached((page, 3600, false)).await)
 }
 
-fn handle_crate(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
-    let crate_name: String = req.match_info().query("crate").expect("arg");
+async fn handle_crate(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
+    let crate_name = req.match_info().query("crate");
     println!("crate page for {:?}", crate_name);
-    let state = Arc::clone(req.state());
+    let state: &AServerState = req.app_data().expect("appdata");
+    let state = state.clone();
     let crates = state.crates.load();
     let origin = Origin::from_crates_io_name(&crate_name);
     if !is_alnum(&crate_name) || !crates.crate_exists(&origin) {
-        return Box::new(future::result(render_404_page(&state, &crate_name)));
+        return render_404_page(&state, &crate_name);
     }
     let cache_file = state.page_cache_dir.join(format!("{}.html", crate_name));
-    with_file_cache(cache_file, 900, move || {
-        render_crate_page(&state, origin)
-            .timeout(Duration::from_secs(30))
-            .map_err(map_err)})
-    .from_err()
-    .and_then(serve_cached)
-    .responder()
+    Ok(serve_cached(with_file_cache(cache_file, 900, move || {
+        render_crate_page(state, origin)
+    }).await?).await)
 }
 
-fn handle_crate_reverse_dependencies(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
-    let crate_name: String = req.match_info().query("crate").expect("arg");
+async fn handle_crate_reverse_dependencies(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
+    let crate_name = req.match_info().query("crate");
     println!("rev deps for {:?}", crate_name);
-    let state = Arc::clone(req.state());
+    let state: &AServerState = req.app_data().expect("appdata");
     let crates = state.crates.load();
     let origin = Origin::from_crates_io_name(&crate_name);
     if !is_alnum(&crate_name) || !crates.crate_exists(&origin) {
-        return Box::new(future::result(render_404_page(&state, &crate_name)));
+        return render_404_page(&state, &crate_name);
     }
-    render_crate_reverse_dependencies(&state, origin)
-    .timeout(Duration::from_secs(20))
-    .map_err(map_err)
-    .from_err()
-    .and_then(serve_cached)
-    .responder()
+    Ok(serve_cached(render_crate_reverse_dependencies(state.clone(), origin).await?).await)
 }
 
 /// takes path to storage, freshness in seconds, and a function to call on cache miss
 /// returns (page, fresh in seconds)
-fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: impl FnOnce() -> F) -> impl Future<Item=(Vec<u8>, u32, bool), Error=failure::Error>
-    where F: Future<Item=Vec<u8>, Error=failure::Error> + 'static {
+async fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: impl FnOnce() -> F + 'static) -> Result<(Vec<u8>, u32, bool), failure::Error>
+    where F: Future<Output=Result<Vec<u8>, failure::Error>> + 'static {
     if let Ok(modified) = std::fs::metadata(&cache_file).and_then(|m| m.modified()) {
         let now = SystemTime::now();
         // rebuild in debug always
@@ -437,17 +413,20 @@ fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: impl FnOnc
             println!("Using cached page {} {}s fresh={:?} acc={:?}", cache_file.display(), cache_time_remaining, is_fresh, is_acceptable);
 
             if !is_fresh {
-                actix::spawn(generate()
-                    .map(move |page| {
-                        if let Err(e) = std::fs::write(&cache_file, &page) {
-                            eprintln!("warning: Failed writing to {}: {}", cache_file.display(), e);
+                actix_rt::spawn(async move {
+                    match generate().await {
+                        Ok(page) => {
+                            if let Err(e) = std::fs::write(&cache_file, &page) {
+                                eprintln!("warning: Failed writing to {}: {}", cache_file.display(), e);
+                            }
+                        },
+                        Err(e) => {
+                            eprintln!("Cache pre-warm: {}", e);
                         }
-                    })
-                    .map_err(move |e| {eprintln!("Cache pre-warm: {}", e);}))
+                    }
+                });
             }
-            return Either::A(future::ok(
-                (page_cached, if !is_fresh {cache_time_remaining/4} else {cache_time_remaining}.max(2), !is_acceptable)
-            ));
+            return Ok((page_cached, if !is_fresh {cache_time_remaining/4} else {cache_time_remaining}.max(2), !is_acceptable));
         }
 
         println!("Cache miss {} {}", cache_file.display(), age_secs);
@@ -455,100 +434,86 @@ fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: impl FnOnc
         println!("Cache miss {} no file", cache_file.display());
     }
 
-    Either::B(generate().map(move |page| {
-        if let Err(e) = std::fs::write(&cache_file, &page) {
-            eprintln!("warning: Failed writing to {}: {}", cache_file.display(), e);
-        }
-        (page, cache_time, false)
-    }))
+    let page = generate().await?;
+    if let Err(e) = std::fs::write(&cache_file, &page) {
+        eprintln!("warning: Failed writing to {}: {}", cache_file.display(), e);
+    }
+    Ok((page, cache_time, false))
 }
 
-fn render_crate_page(state: &AServerState, origin: Origin) -> impl Future<Item = Vec<u8>, Error = failure::Error> {
-    let state2 = Arc::clone(state);
-    state.render_pool.spawn_fn(move || {
-        let crates = state2.crates.load();
+fn render_crate_page(state: AServerState, origin: Origin) -> impl Future<Output=Result<Vec<u8>, failure::Error>> + 'static {
+    run_timeout(30, move || {
+        let crates = state.crates.load();
         crates.prewarm();
         let all = crates.rich_crate(&origin)?;
         let ver = crates.rich_crate_version(&origin)?;
         let mut page: Vec<u8> = Vec::with_capacity(50000);
-        front_end::render_crate_page(&mut page, &all, &ver, &crates, &state2.markup)?;
-        Ok(page)
+        front_end::render_crate_page(&mut page, &all, &ver, &crates, &state.markup)?;
+        Ok::<_, failure::Error>(page)
     })
 }
 
-fn render_crate_reverse_dependencies(state: &AServerState, origin: Origin) -> impl Future<Item = (Vec<u8>, u32, bool), Error = failure::Error> {
-    let state2 = Arc::clone(state);
-    state.render_pool.spawn_fn(move || {
-        let crates = state2.crates.load();
+async fn render_crate_reverse_dependencies(state: AServerState, origin: Origin) -> Result<(Vec<u8>, u32, bool), failure::Error> {
+    run_timeout(30, move || {
+        let crates = state.crates.load();
         crates.prewarm();
         let ver = crates.rich_crate_version(&origin)?;
         let mut page: Vec<u8> = Vec::with_capacity(50000);
-        front_end::render_crate_reverse_dependencies(&mut page, &ver, &crates, &state2.markup)?;
-        Ok((page, 24*3600, false))
+        front_end::render_crate_reverse_dependencies(&mut page, &ver, &crates, &state.markup)?;
+        Ok::<_, failure::Error>((page, 24*3600, false))
+    }).await
+}
+
+async fn handle_keyword(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
+    let q = req.match_info().query("keyword");
+    if q.is_empty() {
+        return Ok(HttpResponse::TemporaryRedirect().header("Location", "/").finish())
+    }
+
+    let query = q.to_owned();
+    let state: &AServerState = req.app_data().expect("appdata");
+    let state2 = state.clone();
+    let (query, page) = run_timeout(15, move || {
+        if !is_alnum(&query) {
+            return Ok::<_, failure::Error>((query, None));
+        }
+        let keyword_query = format!("keywords:\"{}\"", query);
+        let results = state2.index.search(&keyword_query, 150, false)?;
+        if !results.is_empty() {
+            let mut page: Vec<u8> = Vec::with_capacity(50000);
+            front_end::render_keyword_page(&mut page, &query, &results, &state2.markup)?;
+            Ok((query, Some(page)))
+        } else {
+            Ok((query, None))
+        }
+    }).await?;
+
+    Ok(if let Some(page) = page {
+        HttpResponse::Ok()
+            .content_type("text/html;charset=UTF-8")
+            .header("Cache-Control", "public, max-age=172800, stale-while-revalidate=604800, stale-if-error=86400")
+            .content_length(page.len() as u64)
+            .body(page)
+    } else {
+        HttpResponse::TemporaryRedirect().header("Location", format!("/search?q={}", urlencoding::encode(&query))).finish()
     })
 }
 
-fn handle_keyword(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
-    let kw: Result<String, _> = req.match_info().query("keyword");
-    match kw {
-        Ok(ref q) if !q.is_empty() => {
-            let query = q.to_owned();
-            let state = req.state();
-            let state2 = Arc::clone(state);
-            state
-                .search_pool
-                .spawn_fn(move || {
-                    if !is_alnum(&query) {
-                        return Ok((query, None));
-                    }
-                    let keyword_query = format!("keywords:\"{}\"", query);
-                    let results = state2.index.search(&keyword_query, 150, false)?;
-                    if !results.is_empty() {
-                        let mut page: Vec<u8> = Vec::with_capacity(50000);
-                        front_end::render_keyword_page(&mut page, &query, &results, &state2.markup)?;
-                        Ok((query, Some(page)))
-                    } else {
-                        Ok((query, None))
-                    }
-                })
-                .timeout(Duration::from_secs(4))
-                .map_err(map_err)
-                .from_err()
-                .and_then(|(query, page)| {
-                    future::ok(if let Some(page) = page {
-                        HttpResponse::Ok()
-                            .content_type("text/html;charset=UTF-8")
-                            .header("Cache-Control", "public, max-age=172800, stale-while-revalidate=604800, stale-if-error=86400")
-                            .content_length(page.len() as u64)
-                            .body(page)
-                    } else {
-                        HttpResponse::TemporaryRedirect().header("Location", format!("/search?q={}", urlencoding::encode(&query))).finish()
-                    })
-                    .responder()
-                })
-                .responder()
-        },
-        _ => future::ok(HttpResponse::PermanentRedirect().header("Location", "/").finish()).responder(),
-    }
-}
-
-fn serve_cached<T>((page, cache_time, refresh): (Vec<u8>, u32, bool)) -> FutureResult<HttpResponse, T> {
+async fn serve_cached((page, cache_time, refresh): (Vec<u8>, u32, bool)) -> HttpResponse {
     let err_max = (cache_time*10).max(3600*24*2);
-    future::ok(HttpResponse::Ok()
+    HttpResponse::Ok()
         .content_type("text/html;charset=UTF-8")
         .header("Cache-Control", format!("public, max-age={}, stale-while-revalidate={}, stale-if-error={}", cache_time, cache_time*3, err_max))
         .if_true(refresh, |h| {h.header("Refresh", "5");})
         .content_length(page.len() as u64)
-        .body(page))
+        .body(page)
 }
 
-fn map_err(err: tokio_timer::timeout::Error<failure::Error>) -> failure::Error {
-    match err.into_inner() {
-        Some(e) => e,
-        None => {
-            eprintln!("Page render timed out");
-            failure::err_msg("timed out")
-        },
+fn from_pool<E: std::fmt::Debug + Into<failure::Error>>(err: actix_threadpool::BlockingError<E>) -> failure::Error {
+    use actix_threadpool::BlockingError::*;
+    match err {
+        Canceled => failure::format_err!("cancelled"),
+        Error(e) => e.into()
     }
 }
 
@@ -564,13 +529,14 @@ fn is_alnum_dot(q: &str) -> bool {
     chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.')
 }
 
-fn handle_search(req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
-    match req.query().get("q") {
-        Some(q) if !q.is_empty() => {
+async fn handle_search(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
+    match req.match_info().query("q") {
+        q if !q.is_empty() => {
             let query = q.to_owned();
-            let state = Arc::clone(req.state());
+            let state: &AServerState = req.app_data().expect("appdata");
+            let state = state.clone();
 
-            let (mut w, page) = writer();
+            let (mut w, page) = writer::<_, failure::Error>();
             rayon::spawn(move || {
                 let res = state
                     .index
@@ -582,18 +548,19 @@ fn handle_search(req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
                 }
             });
 
-            Ok(HttpResponse::Ok()
+            Ok::<_, failure::Error>(HttpResponse::Ok()
                 .content_type("text/html;charset=UTF-8")
                 .header("Cache-Control", "public, max-age=600, stale-while-revalidate=259200, stale-if-error=72000")
-                .body(Body::Streaming(Box::new(page))))
+                .streaming(page))
         }
         _ => Ok(HttpResponse::PermanentRedirect().header("Location", "/").finish()),
     }
 }
 
-fn handle_sitemap(req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
-    let (w, page) = writer();
-    let state = Arc::clone(req.state());
+async fn handle_sitemap(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
+    let (w, page) = writer::<_, failure::Error>();
+    let state: &AServerState = req.app_data().expect("appdata");
+    let state = state.clone();
 
     rayon::spawn(move || {
         let mut w = std::io::BufWriter::with_capacity(16000, w);
@@ -605,46 +572,30 @@ fn handle_sitemap(req: &HttpRequest<AServerState>) -> Result<HttpResponse> {
         }
     });
 
-    Ok(HttpResponse::Ok()
+    Ok::<_, failure::Error>(HttpResponse::Ok()
         .content_type("application/xml;charset=UTF-8")
         .header("Cache-Control", "public, max-age=259200, stale-while-revalidate=72000, stale-if-error=72000")
-        .body(Body::Streaming(Box::new(page))))
+        .streaming(page))
 }
 
-fn handle_feed(req: &HttpRequest<AServerState>) -> FutureResponse<HttpResponse> {
-    let state = req.state();
-    let state2 = Arc::clone(state);
-    state
-        .render_pool
-        .spawn_fn(move || {
-            let crates = state2.crates.load();
-            crates.prewarm();
-            let mut page: Vec<u8> = Vec::with_capacity(50000);
-            front_end::render_feed(&mut page, &crates)?;
-            Ok(page)
-        })
-        .timeout(Duration::from_secs(60))
-        .map_err(map_err)
-        .from_err()
-        .and_then(|page| {
-            future::ok(
-                HttpResponse::Ok()
-                    .content_type("application/atom+xml;charset=UTF-8")
-                    .header("Cache-Control", "public, max-age=10800, stale-while-revalidate=259200, stale-if-error=72000")
-                    .content_length(page.len() as u64)
-                    .body(page),
-            )
-        })
-        .responder()
+async fn handle_feed(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
+    let state: &AServerState = req.app_data().expect("appdata");
+    let state2 = state.clone();
+    let page = run_timeout(60, move || {
+        let crates = state2.crates.load();
+        crates.prewarm();
+        let mut page: Vec<u8> = Vec::with_capacity(50000);
+        front_end::render_feed(&mut page, &crates)?;
+        Ok::<_, failure::Error>(page)
+    }).await?;
+    Ok(HttpResponse::Ok()
+    .content_type("application/atom+xml;charset=UTF-8")
+    .header("Cache-Control", "public, max-age=10800, stale-while-revalidate=259200, stale-if-error=72000")
+    .content_length(page.len() as u64)
+    .body(page))
 }
 
-use actix_web::middleware::{Middleware, Response};
-use header::HeaderValue;
-struct StandardHeaders;
-
-impl<S> Middleware<S> for StandardHeaders {
-    fn response(&self, _req: &HttpRequest<S>, mut resp: HttpResponse) -> Result<Response> {
-        resp.headers_mut().insert("Server", HeaderValue::from_static(concat!("actix-web/0.7 crates.rs/", env!("CARGO_PKG_VERSION"))));
-        Ok(Response::Done(resp))
-    }
+async fn run_timeout<T: 'static + Send>(secs: u64, cb: impl FnOnce() -> Result<T, failure::Error> + Send + 'static) -> Result<T, failure::Error> {
+    let ran = actix_threadpool::run(cb).map(|r| r.map_err(from_pool));
+    tokio::time::timeout(Duration::from_secs(secs), ran).await?
 }

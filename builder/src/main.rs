@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::collections::HashMap;
 
 use crate_db::builddb::*;
@@ -82,7 +83,8 @@ fn prepare_docker(docker_root: &Path) -> Result<(), Box<dyn std::error::Error>> 
 
 fn do_builds(_crates: &KitchenSink, all: &CratesIndexCrate, docker_root: &Path) -> Result<(String, String), Box<dyn std::error::Error>> {
     let mut versions = HashMap::new();
-    for ver in all.versions().iter().filter(|v| !v.is_yanked()).filter_map(|v| SemVer::parse(v.version()).ok()) {
+    let tmp: HashSet<_> = all.versions().iter().filter(|v| !v.is_yanked()).filter_map(|v| SemVer::parse(v.version()).ok()).collect();
+    for ver in tmp.iter() {
         let unstable = ver.major == 0;
         let major = if unstable {ver.minor} else {ver.major};
         versions.insert((unstable, major), ver); // later wins

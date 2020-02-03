@@ -324,12 +324,12 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs<'_>) -> Score {
     let downloads_cleaned = (cr.downloads_per_month_minus_most_downloaded_user as f64 / if is_app_only {1.} else {2.} - 50.).max(0.) + 50.;
     // distribution of downloads follows power law.
     // apps have much harder to get high download numbers.
-    let pop = (downloads.log2() - 6.6) / (if is_app_only {4.} else {5.});
+    let pop = (downloads.log2() - 6.6) / (if is_app_only {5.} else {6.});
     let pop_cleaned = downloads_cleaned.log2() - 5.6;
     assert!(pop > 0.);
     assert!(pop_cleaned > 0.);
     // FIXME: max should be based on the most downloaded crate?
-    score.score_f("Downloads", 6., pop);
+    score.score_f("Downloads", 5., pop);
     score.score_f("Downloads (cleaned)", 18., pop_cleaned);
 
     // if it's new, it doesn't have to have many downloads.
@@ -339,8 +339,8 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs<'_>) -> Score {
     // Don't expect apps to have rev deps (omitting these entirely proprtionally increases importance of other factors)
     if !is_app_only {
         score.score_f("Direct rev deps", 10., (cr.number_of_direct_reverse_deps as f64).sqrt());
-        let indirect = 1. + cr.number_of_indirect_reverse_optional_deps as f64 / 3.;
-        score.score_f("Indirect rev deps", 10., indirect.log2());
+        let indirect = 1. + cr.number_of_indirect_reverse_optional_deps as f64 / 4.;
+        score.score_f("Indirect rev deps", 6., indirect.log2());
     }
 
     if !is_app_only || cr.has_docs_rs {

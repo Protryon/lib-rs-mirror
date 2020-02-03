@@ -120,8 +120,8 @@ fn run_server() -> Result<(), failure::Error> {
             .app_data(state.clone())
             .wrap(middleware::DefaultHeaders::new().header("Server", HeaderValue::from_static(concat!("actix-web/2.0 lib.rs/", env!("CARGO_PKG_VERSION")))))
             .wrap(middleware::Logger::default())
-            .route("/search", web::get().to(handle_search))
             .route("/", web::get().to(handle_home))
+            .route("/search", web::get().to(handle_search))
             .route("/index", web::get().to(handle_search)) // old crates.rs/index url
             .route("/keywords/{keyword}", web::get().to(handle_keyword))
             .route("/crates/{crate}", web::get().to(handle_crate))
@@ -530,7 +530,8 @@ fn is_alnum_dot(q: &str) -> bool {
 }
 
 async fn handle_search(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
-    match req.match_info().query("q") {
+    let qs = qstring::QString::from(req.query_string());
+    match qs.get("q").unwrap_or("") {
         q if !q.is_empty() => {
             let query = q.to_owned();
             let state: &AServerState = req.app_data().expect("appdata");

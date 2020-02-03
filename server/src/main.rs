@@ -254,7 +254,7 @@ async fn handle_category(req: HttpRequest, cat: &'static Category) -> Result<Htt
             front_end::render_category(&mut page, cat, &crates, &state.markup)?;
             Ok::<_, failure::Error>(page)
         })
-    }).await?).await)
+    }).await?))
 }
 
 async fn handle_home(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
@@ -275,7 +275,7 @@ async fn handle_home(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
             front_end::render_homepage(&mut page, &crates)?;
             Ok::<_, failure::Error>(page)
         })
-    }).await?).await)
+    }).await?))
 }
 
 async fn handle_github_crate(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
@@ -310,7 +310,7 @@ async fn handle_git_crate(req: HttpRequest, slug: &'static str) -> Result<HttpRe
 
     Ok(serve_cached(with_file_cache(cache_file, 86400, move || {
         render_crate_page(state, origin)
-    }).await?).await)
+    }).await?))
 }
 
 fn get_origin_from_subpath(q: &actix_web::dev::Path<Url>) -> Option<Origin> {
@@ -364,7 +364,7 @@ async fn handle_install(req: HttpRequest) -> Result<HttpResponse, failure::Error
         front_end::render_install_page(&mut page, &ver, &crates, &state.markup)?;
         Ok::<_, failure::Error>(page)
     }).await?;
-    Ok(serve_cached((page, 3600, false)).await)
+    Ok(serve_cached((page, 3600, false)))
 }
 
 async fn handle_crate(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
@@ -380,7 +380,7 @@ async fn handle_crate(req: HttpRequest) -> Result<HttpResponse, failure::Error> 
     let cache_file = state.page_cache_dir.join(format!("{}.html", crate_name));
     Ok(serve_cached(with_file_cache(cache_file, 900, move || {
         render_crate_page(state, origin)
-    }).await?).await)
+    }).await?))
 }
 
 async fn handle_crate_reverse_dependencies(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
@@ -392,7 +392,7 @@ async fn handle_crate_reverse_dependencies(req: HttpRequest) -> Result<HttpRespo
     if !is_alnum(&crate_name) || !crates.crate_exists(&origin) {
         return render_404_page(&state, &crate_name);
     }
-    Ok(serve_cached(render_crate_reverse_dependencies(state.clone(), origin).await?).await)
+    Ok(serve_cached(render_crate_reverse_dependencies(state.clone(), origin).await?))
 }
 
 /// takes path to storage, freshness in seconds, and a function to call on cache miss
@@ -499,7 +499,7 @@ async fn handle_keyword(req: HttpRequest) -> Result<HttpResponse, failure::Error
     })
 }
 
-async fn serve_cached((page, cache_time, refresh): (Vec<u8>, u32, bool)) -> HttpResponse {
+fn serve_cached((page, cache_time, refresh): (Vec<u8>, u32, bool)) -> HttpResponse {
     let err_max = (cache_time*10).max(3600*24*2);
     HttpResponse::Ok()
         .content_type("text/html;charset=UTF-8")
@@ -537,22 +537,13 @@ async fn handle_search(req: HttpRequest) -> Result<HttpResponse, failure::Error>
             let state: &AServerState = req.app_data().expect("appdata");
             let state = state.clone();
 
-            let (mut w, page) = writer::<_, failure::Error>();
-            rayon::spawn(move || {
-                let res = state
-                    .index
-                    .search(&query, 50, true)
-                    .map_err(From::from)
-                    .and_then(|results| front_end::render_serp_page(&mut w, &query, &results, &state.markup));
-                if let Err(e) = res {
-                    w.fail(e.into());
-                }
-            });
+            let results = state
+                .index
+                .search(&query, 50, true)?;
+            let mut page = Vec::with_capacity(50000);
+            front_end::render_serp_page(&mut page, &query, &results, &state.markup)?;
 
-            Ok::<_, failure::Error>(HttpResponse::Ok()
-                .content_type("text/html;charset=UTF-8")
-                .header("Cache-Control", "public, max-age=600, stale-while-revalidate=259200, stale-if-error=72000")
-                .streaming(page))
+            Ok(serve_cached((page, 600, false)))
         }
         _ => Ok(HttpResponse::PermanentRedirect().header("Location", "/").finish()),
     }
@@ -600,3 +591,5 @@ async fn run_timeout<T: 'static + Send>(secs: u64, cb: impl FnOnce() -> Result<T
     let ran = actix_threadpool::run(cb).map(|r| r.map_err(from_pool));
     tokio::time::timeout(Duration::from_secs(secs), ran).await?
 }
+
+

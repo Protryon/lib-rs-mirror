@@ -9,8 +9,9 @@ pub struct Writer<T: 'static, E: 'static> {
     rt: tokio::runtime::Runtime,
 }
 
-impl<T, E> Writer<T, E> {
+impl<T, E: std::fmt::Display> Writer<T, E> {
     pub fn fail(&mut self, error: E) {
+        eprintln!("async write aborted: {}", error);
         let _ = self.sender.send(Err(error));
     }
 }
@@ -23,7 +24,10 @@ where
         let len = d.len();
         let data = Bytes::copy_from_slice(d);
         self.rt.block_on(self.sender.send(Ok(data)))
-            .map_err(|e| io::Error::new(io::ErrorKind::BrokenPipe, e))?;
+            .map_err(|e| {
+                eprintln!("write failed: {}", e);
+                io::Error::new(io::ErrorKind::BrokenPipe, e)
+            })?;
         Ok(len)
     }
 
@@ -34,7 +38,10 @@ where
     fn flush(&mut self) -> io::Result<()> {
         self.rt.block_on(self.sender
             .flush())
-            .map_err(|e| io::Error::new(io::ErrorKind::BrokenPipe, e))?;
+            .map_err(|e| {
+                eprintln!("flush failed: {}", e);
+                io::Error::new(io::ErrorKind::BrokenPipe, e)
+            })?;
         Ok(())
     }
 }

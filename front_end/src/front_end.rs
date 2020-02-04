@@ -131,7 +131,7 @@ pub fn render_sitemap(sitemap: &mut impl Write, crates: &KitchenSink) -> Result<
 }
 
 /// See `crate_page.rs.html`
-pub fn render_crate_page<W: Write>(out: &mut W, all: &RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<String, failure::Error> {
+pub fn render_crate_page<W: Write>(out: &mut W, all: &RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<Option<DateTime<FixedOffset>>, failure::Error> {
     if stopped() {
         Err(KitchenSinkErr::Stopped)?;
     }
@@ -139,7 +139,7 @@ pub fn render_crate_page<W: Write>(out: &mut W, all: &RichCrate, ver: &RichCrate
     let urler = Urler::new(Some(ver.origin().clone()));
     let c = CratePage::new(all, ver, kitchen_sink, renderer).context("New crate page")?;
     templates::crate_page(out, &urler, &c).context("crate page io")?;
-    Ok(c.page_title())
+    Ok(c.date_created())
 }
 
 /// See `reverse_dependencies.rs.html`

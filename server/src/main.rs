@@ -7,6 +7,7 @@ use arc_swap::ArcSwap;
 use cap::Cap;
 use categories::CATEGORIES;
 use categories::Category;
+use chrono::prelude::*;
 use crate::writer::*;
 use env_logger;
 use failure::ResultExt;
@@ -252,7 +253,7 @@ async fn handle_category(req: HttpRequest, cat: &'static Category) -> Result<Htt
         run_timeout(30, move || {
             let mut page: Vec<u8> = Vec::with_capacity(150000);
             front_end::render_category(&mut page, cat, &crates, &state.markup)?;
-            Ok::<_, failure::Error>(page)
+            Ok::<_, failure::Error>((page, None))
         })
     }).await?))
 }
@@ -273,7 +274,7 @@ async fn handle_home(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
             crates.prewarm();
             let mut page: Vec<u8> = Vec::with_capacity(50000);
             front_end::render_homepage(&mut page, &crates)?;
-            Ok::<_, failure::Error>(page)
+            Ok::<_, failure::Error>((page, None))
         })
     }).await?))
 }
@@ -357,14 +358,14 @@ async fn handle_install(req: HttpRequest) -> Result<HttpResponse, failure::Error
     };
 
     let state = state.clone();
-    let page = run_timeout(30, move || {
+    let (page, last_mod) = run_timeout(30, move || {
         let crates = state.crates.load();
         let ver = crates.rich_crate_version(&origin)?;
         let mut page: Vec<u8> = Vec::with_capacity(50000);
         front_end::render_install_page(&mut page, &ver, &crates, &state.markup)?;
-        Ok::<_, failure::Error>(page)
+        Ok::<_, failure::Error>((page, None))
     }).await?;
-    Ok(serve_cached((page, 3600, false)))
+    Ok(serve_cached((page, 3600, false, last_mod)))
 }
 
 async fn handle_crate(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
@@ -397,8 +398,8 @@ async fn handle_crate_reverse_dependencies(req: HttpRequest) -> Result<HttpRespo
 
 /// takes path to storage, freshness in seconds, and a function to call on cache miss
 /// returns (page, fresh in seconds)
-async fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: impl FnOnce() -> F + 'static) -> Result<(Vec<u8>, u32, bool), failure::Error>
-    where F: Future<Output=Result<Vec<u8>, failure::Error>> + 'static {
+async fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: impl FnOnce() -> F + 'static) -> Result<(Vec<u8>, u32, bool, Option<DateTime<FixedOffset>>), failure::Error>
+    where F: Future<Output=Result<(Vec<u8>, Option<DateTime<FixedOffset>>), failure::Error>> + 'static {
     if let Ok(modified) = std::fs::metadata(&cache_file).and_then(|m| m.modified()) {
         let now = SystemTime::now();
         // rebuild in debug always
@@ -408,6 +409,8 @@ async fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: impl
         let age_secs = now.duration_since(modified).ok().map(|age| age.as_secs() as u32).unwrap_or(0);
 
         if let Ok(page_cached) = std::fs::read(&cache_file) {
+            let timestamp = modified.duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+            let last_mod = DateTime::from_utc(NaiveDateTime::from_timestamp(timestamp as _, 0), FixedOffset::east(0));
             let cache_time_remaining = cache_time.saturating_sub(age_secs);
 
             println!("Using cached page {} {}s fresh={:?} acc={:?}", cache_file.display(), cache_time_remaining, is_fresh, is_acceptable);
@@ -415,7 +418,7 @@ async fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: impl
             if !is_fresh {
                 actix_rt::spawn(async move {
                     match generate().await {
-                        Ok(page) => {
+                        Ok((page, _last_mod)) => { // FIXME: set cache file timestamp?
                             if let Err(e) = std::fs::write(&cache_file, &page) {
                                 eprintln!("warning: Failed writing to {}: {}", cache_file.display(), e);
                             }
@@ -426,7 +429,7 @@ async fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: impl
                     }
                 });
             }
-            return Ok((page_cached, if !is_fresh {cache_time_remaining/4} else {cache_time_remaining}.max(2), !is_acceptable));
+            return Ok((page_cached, if !is_fresh {cache_time_remaining/4} else {cache_time_remaining}.max(2), !is_acceptable, Some(last_mod)));
         }
 
         println!("Cache miss {} {}", cache_file.display(), age_secs);
@@ -434,33 +437,33 @@ async fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: impl
         println!("Cache miss {} no file", cache_file.display());
     }
 
-    let page = generate().await?;
+    let (page, last_mod) = generate().await?;
     if let Err(e) = std::fs::write(&cache_file, &page) {
         eprintln!("warning: Failed writing to {}: {}", cache_file.display(), e);
     }
-    Ok((page, cache_time, false))
+    Ok((page, cache_time, false, last_mod))
 }
 
-fn render_crate_page(state: AServerState, origin: Origin) -> impl Future<Output=Result<Vec<u8>, failure::Error>> + 'static {
+fn render_crate_page(state: AServerState, origin: Origin) -> impl Future<Output=Result<(Vec<u8>, Option<DateTime<FixedOffset>>), failure::Error>> + 'static {
     run_timeout(30, move || {
         let crates = state.crates.load();
         crates.prewarm();
         let all = crates.rich_crate(&origin)?;
         let ver = crates.rich_crate_version(&origin)?;
         let mut page: Vec<u8> = Vec::with_capacity(50000);
-        front_end::render_crate_page(&mut page, &all, &ver, &crates, &state.markup)?;
-        Ok::<_, failure::Error>(page)
+        let last_mod = front_end::render_crate_page(&mut page, &all, &ver, &crates, &state.markup)?;
+        Ok::<_, failure::Error>((page, last_mod))
     })
 }
 
-async fn render_crate_reverse_dependencies(state: AServerState, origin: Origin) -> Result<(Vec<u8>, u32, bool), failure::Error> {
+async fn render_crate_reverse_dependencies(state: AServerState, origin: Origin) -> Result<(Vec<u8>, u32, bool, Option<DateTime<FixedOffset>>), failure::Error> {
     run_timeout(30, move || {
         let crates = state.crates.load();
         crates.prewarm();
         let ver = crates.rich_crate_version(&origin)?;
         let mut page: Vec<u8> = Vec::with_capacity(50000);
         front_end::render_crate_reverse_dependencies(&mut page, &ver, &crates, &state.markup)?;
-        Ok::<_, failure::Error>((page, 24*3600, false))
+        Ok::<_, failure::Error>((page, 24*3600, false, None))
     }).await
 }
 
@@ -499,12 +502,13 @@ async fn handle_keyword(req: HttpRequest) -> Result<HttpResponse, failure::Error
     })
 }
 
-fn serve_cached((page, cache_time, refresh): (Vec<u8>, u32, bool)) -> HttpResponse {
+fn serve_cached((page, cache_time, refresh, last_modified): (Vec<u8>, u32, bool, Option<DateTime<FixedOffset>>)) -> HttpResponse {
     let err_max = (cache_time*10).max(3600*24*2);
     HttpResponse::Ok()
         .content_type("text/html;charset=UTF-8")
         .header("Cache-Control", format!("public, max-age={}, stale-while-revalidate={}, stale-if-error={}", cache_time, cache_time*3, err_max))
         .if_true(refresh, |h| {h.header("Refresh", "5");})
+        .if_some(last_modified, |l, h| {h.header("Last-Modified", l.to_rfc2822());})
         .content_length(page.len() as u64)
         .body(page)
 }
@@ -543,7 +547,7 @@ async fn handle_search(req: HttpRequest) -> Result<HttpResponse, failure::Error>
             let mut page = Vec::with_capacity(50000);
             front_end::render_serp_page(&mut page, &query, &results, &state.markup)?;
 
-            Ok(serve_cached((page, 600, false)))
+            Ok(serve_cached((page, 600, false, None)))
         }
         _ => Ok(HttpResponse::PermanentRedirect().header("Location", "/").finish()),
     }

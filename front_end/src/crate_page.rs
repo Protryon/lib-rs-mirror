@@ -127,7 +127,7 @@ impl<'a> CratePage<'a> {
         Page {
             title: self.page_title(),
             keywords: if keywords != "" { Some(keywords) } else { None },
-            created: self.date_created(),
+            created: self.date_created_string(),
             description: self.ver.description().map(|d| format!("{} | Rust/Cargo package", d)),
             item_name: Some(self.ver.short_name().to_string()),
             item_description: self.ver.description().map(|d| d.to_string()),
@@ -626,8 +626,12 @@ impl<'a> CratePage<'a> {
             .collect()
     }
 
-    pub fn date_created(&self) -> Option<String> {
-        self.most_recent_version().map(|v| v.created_at.format("%Y-%m-%d").to_string())
+    pub fn date_created(&self) -> Option<DateTime<FixedOffset>> {
+        self.most_recent_version().map(|v| v.created_at)
+    }
+
+    pub fn date_created_string(&self) -> Option<String> {
+        self.date_created().map(|v| v.format("%Y-%m-%d").to_string())
     }
 
     fn most_recent_version(&self) -> Option<Version<'a>> {

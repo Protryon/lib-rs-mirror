@@ -52,9 +52,9 @@ fn render(origin: &Origin, crates: &KitchenSink, path: &PathBuf, markup: &Render
     }
 
     let mut buf = Vec::new();
-    let title = front_end::render_crate_page(&mut buf, &allver, &c, crates, markup)?;
+    front_end::render_crate_page(&mut buf, &allver, &c, crates, markup)?;
     fs::write(&path, buf)?;
-    println!("{} http://localhost:3000/crates/{} | {}", path.display(), c.short_name(), title);
+    println!("{} http://localhost:3000/crates/{}", path.display(), c.short_name());
     Ok(())
 }
 

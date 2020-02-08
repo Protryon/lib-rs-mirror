@@ -1,5 +1,4 @@
 pub use simple_cache::Error;
-use mysteriouspants_throttle::Throttle;
 use parking_lot::Mutex;
 use serde_derive::*;
 use simple_cache::SimpleCache;
@@ -17,7 +16,6 @@ pub use crate::crate_owners::*;
 pub struct CratesIoClient {
     cache: TempCache<(String, Payload)>,
     crates: SimpleCache,
-    throttle: Mutex<Throttle<()>>,
 }
 
 macro_rules! cioopt {
@@ -36,11 +34,10 @@ pub struct CratesIoCrate {
 }
 
 impl CratesIoClient {
-    pub fn new(cache_base_path: &Path, tps: f32) -> Result<Self, Error> {
+    pub fn new(cache_base_path: &Path) -> Result<Self, Error> {
         Ok(Self {
             cache: TempCache::new(&cache_base_path.join("cratesio.bin"))?,
             crates: SimpleCache::new(&cache_base_path.join("crates.db"))?,
-            throttle: Mutex::new(Throttle::new_tps_throttle(tps)),
         })
     }
 
@@ -119,7 +116,6 @@ impl CratesIoClient {
 
         self.cache.delete(key.0)?; // out of date
 
-        self.throttle.lock().acquire(());  // enforce one req per second
         let url = format!("https://crates.io/api/v1/crates/{}", path.as_ref());
         let res = self.cache.get_json(key.0, url, |raw: B| {
             Some((key.1.to_string(), raw.to()))

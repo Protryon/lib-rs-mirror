@@ -1,5 +1,5 @@
 pub use simple_cache::Error;
-use parking_lot::Mutex;
+
 use serde_derive::*;
 use simple_cache::SimpleCache;
 use simple_cache::TempCache;
@@ -153,12 +153,12 @@ impl Payloadable for CrateTeamsFile {
 
 #[test]
 fn cratesioclient() {
-    let client = CratesIoClient::new(Path::new("../data"), 1.).expect("new");
+    let client = CratesIoClient::new(Path::new("../data")).expect("new");
 
     client.crate_meta("capi", "0.0.1").expect("cargo-deb");
     let owners = client.crate_owners("cargo-deb", "1.10.0").expect("crate_owners").expect("found some");
     assert_eq!(3, owners.len(), "that will fail when metadata updates");
-    match CratesIoClient::new(Path::new("../data"), 1.).expect("new").cache_only(true).crate_data("fail404", "999").unwrap() {
+    match CratesIoClient::new(Path::new("../data")).expect("new").cache_only(true).crate_data("fail404", "999").unwrap() {
         None => {},
         Some(e) => panic!("{:?}", e),
     }

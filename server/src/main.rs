@@ -76,7 +76,7 @@ fn run_server() -> Result<(), failure::Error> {
     assert!(public_document_root.exists(), "DOCUMENT_ROOT {} does not exist", public_document_root.display());
     assert!(data_dir.exists(), "CRATE_DATA_DIR {} does not exist", data_dir.display());
 
-    let crates = KitchenSink::new(&data_dir, &github_token, 20.)?;
+    let crates = KitchenSink::new(&data_dir, &github_token)?;
     let image_filter = Arc::new(ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_dir().join("images.db"))?);
     let markup = Renderer::new_filter(Some(Highlighter::new()), image_filter);
 
@@ -99,7 +99,7 @@ fn run_server() -> Result<(), failure::Error> {
                 std::thread::sleep(std::time::Duration::from_secs(1));
                 if 1 == HUP_SIGNAL.swap(0, Ordering::SeqCst) {
                     println!("HUP!");
-                    match KitchenSink::new(&data_dir, &github_token, 20.) {
+                    match KitchenSink::new(&data_dir, &github_token) {
                         Ok(k) => {
                             let k = Arc::new(k);
                             k.update();

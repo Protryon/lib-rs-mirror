@@ -96,14 +96,17 @@ impl Urler {
     }
 
     pub fn crate_by_origin(&self, o: &Origin) -> String {
+        if self.own_crate != o {
+            self.crate_abs_path_by_origin(o)
+        } else {
+            self.crates_io_crate_by_lowercase_name(o.short_crate_name());
+        }
+    }
+
+    pub fn crate_abs_path_by_origin(&self, o: &Origin) -> String {
         match o {
             Origin::CratesIo(lowercase_name) => {
-                match self.own_crate {
-                    Some(Origin::CratesIo(ref own)) if own == lowercase_name => {
-                        self.crates_io_crate_by_lowercase_name(lowercase_name)
-                    },
-                    _ => format!("/crates/{}", encode(lowercase_name)),
-                }
+                format!("/crates/{}", encode(lowercase_name)),
             },
             Origin::GitHub {repo, package} => {
                 format!("/gh/{}/{}/{}", encode(&repo.owner), encode(&repo.repo), encode(package))

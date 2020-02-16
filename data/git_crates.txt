@@ -323,6 +323,9 @@ github:tauri-apps/tauri/tauri-ui
 github:thebracket/rltk_rs/rltk
 github:thepowersgang/rust_os/kernel
 github:thinkofname/rust-quake/quake
+github:thinkofname/univercity/think_ecs
+github:thinkofname/univercity/univercity
+github:thinkofname/univercity/univercity_server
 github:tikv/tikv/tidb_query
 github:tikv/tikv/tikv
 github:timberio/vector/codec

@@ -1,77 +1,134 @@
 afterburn: web-programming
+afterparty-ng : web-programming::http-server
 ag  :  command-line-utilities
 alert-after: command-line-utilities
 alfred: development-tools, os::macos-apis
+alphavantage: web-programming
+aquaenv: os::macos-apis, command-line-utilities, gui
 argh: command-line-interface
+balena-temen: parser-implementations
 bao: algorithms
 bb8: asynchronous
+bitcoin_hashes : cryptography::cryptocurrencies
+bnf: parsers
+boxcars: parser-implementations
 bspline: rendering
+btc_spv_bin :cryptography::cryptocurrencies
 cage  : development-tools, command-line-utilities
+chillup: web-programming
+click: development-tools
 codenano: science
+core-foundation-sys: os::macos-apis
+core-text: os::macos-apis
+coremidi: os::macos-apis, multimedia::audio
+crates_io_api: web-programming
 crunchy : development-tools
+cute-dnd-dice: game-engines
 deltae: multimedia
+derp: parser-implementations
+diesel: databases
+elefren: web-programming
 evcxr_repl: rust-patterns, command-line-utilities
+failure: rust-patterns
 fdfast: filesystem
 ff: algorithms
 find-files: filesystem
 findomain: networking
+fitrs: parser-implementations
+fixed_width: parser-implementations
+fsevent-sys: os::macos-apis
+fsevent: os::macos-apis
+futures-core: asynchronous
+futures-executor: asynchronous
+futures-task: asynchronous
+gaviota-sys: game-engines
+httpdate: date-and-time, parser-implementations
+hubcaps: web-programming
+hyper-router : web-programming::http-server
+iban_validate: parser-implementations
+ical: parser-implementations
 infer: filesystem
+json-tools: parser-implementations
 jsonapi: web-programming
+jsonpath_lib: parser-implementations
+jsonrpc-parse : parser-implementations, web-programming
+jsonrpc-v2  : web-programming::http-server
 jubjub: algorithms
 just  : development-tools, command-line-utilities
+k8-client : rust-patterns
+k8s-openapi : development-tools
+k8s-openapi-codegen-common: rust-patterns
 ketos : development-tools
+keychain-services: os::macos-apis, authentication
+ktmpl : configuration
+kube: development-tools
+kx : development-tools
+lapp: parser-implementations
+libloadorder-ffi : game-engines
 loop-rs  : command-line-utilities
+mach: os::macos-apis
 makepad: text-editors
+mamba: parser-implementations
 miniquad  : gui
+mobi: parser-implementations
+parse_cfg: parser-implementations, rust-patterns
+moltenvk_deps: os::macos-apis, rendering::graphics-api
 monger: databases
+mqtt-codec: network-programming
 msql-srv: database
 notcurses: command-line-interface
+orgize: parser-implementations
+packapp: os::macos-apis, command-line-utilities
 papyrus  : development-tools, command-line-utilities
+parse_duration: parser-implementations
+paw: parser-implementations
+pngcrush: compression
 prometheus_wireguard_exporter: network-programming
+quoted_printable: parser-implementations
+randrust: web-programming::http-server
+readmouse: os::macos-apis
+ressa: parser-implementations
+retrosheet: parser-implementations
+rfind_url: parser-implementations
 ritual_build  : development-tools, command-line-utilities
+riven: games
+rnix: parser-implementations
+robinhood: web-programming
+romy-core: game-engines
+romy-wasmer: game-engines
+romy: game-engines
+rusoto_credential: authentication
+saml2aws-auto: authentication
+semver-parser: parser-implementations
+sgf-parser: parser-implementations
+sitemap: parser-implementations
+solana-clap-utils :cryptography::cryptocurrencies
+solana-client :cryptography::cryptocurrencies
+solana-gossip :cryptography::cryptocurrencies
+solana-keygen :cryptography::cryptocurrencies
+solana-logger :cryptography::cryptocurrencies
+solana-vote-program : cryptography::cryptocurrencies
+sqlparser: parser-implementations
+suspicious-pods  : development-tools
+sv-parser: parser-implementations
+svd-parser: parser-implementations
 symbolic-minidump: development-tools::debugging
 symbolic: development-tools::debugging
 tagref : development-tools
 tealdeer: command-line-utilities
 telegram-client: web-programming
+text_io: text-processing
 trackable: development-tools::debugging
 tt-call : rust-patterns
 typename: rust-patterns
 ucd-trie: data-structures, text-processing
 ucd-util: text-processing
-text_io: text-processing
-zemeroth: games
-
-bnf: parsers
-
-sqlparser: parser-implementations
-boxcars: parser-implementations
-fixed_width: parser-implementations
-rnix: parser-implementations
-derp: parser-implementations
-iban_validate: parser-implementations
-ical: parser-implementations
-jsonpath_lib: parser-implementations
-orgize: parser-implementations
-parse_duration: parser-implementations
-quoted_printable: parser-implementations
-ressa: parser-implementations
-semver-parser: parser-implementations
-sitemap: parser-implementations
-sv-parser: parser-implementations
-svd-parser: parser-implementations
 urlocator: parser-implementations
 varlink_parser: parser-implementations
+webhook_listener : web-programming::http-server
 webidl: parser-implementations
 wlambda: parser-implementations
+wooting-sdk: hardware-support
 xmltree: parser-implementations
-json-tools: parser-implementations
-mamba: parser-implementations
-lapp: parser-implementations
-rfind_url: parser-implementations
-paw: parser-implementations
-mobi: parser-implementations
-balena-temen: parser-implementations
-sgf-parser: parser-implementations
-fitrs: parser-implementations
-retrosheet: parser-implementations
+xpc-connection: os::macos-apis
+zemeroth: games

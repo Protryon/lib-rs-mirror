@@ -1,0 +1,71 @@
+telegram-client: web-programming
+afterburn: web-programming
+ag  :  command-line-utilities
+alert-after: command-line-utilities
+alfred: development-tools, os::macos-apis
+argh: command-line-interface
+bao: algorithms
+bb8: asynchronous
+bspline: rendering
+cage  : development-tools, command-line-utilities
+codenano: science
+crunchy : development-tools
+deltae: multimedia
+evcxr_repl: rust-patterns, command-line-utilities
+fdfast: filesystem
+ff: algorithms
+find-files: filesystem
+findomain: networking
+infer: filesystem
+jsonapi: web-programming
+jubjub: algorithms
+just  : development-tools, command-line-utilities
+ketos : development-tools
+loop-rs  : command-line-utilities
+makepad: text-editors
+miniquad  : gui
+monger: databases
+notcurses: command-line-interface
+papyrus  : development-tools, command-line-utilities
+ritual_build  : development-tools, command-line-utilities
+symbolic-minidump: development-tools::debugging
+symbolic: development-tools::debugging
+tagref : development-tools
+tealdeer: command-line-utilities
+trackable: development-tools::debugging
+tt-call : rust-patterns
+typename: rust-patterns
+zemeroth: games
+
+bnf: parsers
+
+boxcars: parser-implementations
+fixed_width: parser-implementations
+rnix: parser-implementations
+derp: parser-implementations
+iban_validate: parser-implementations
+ical: parser-implementations
+jsonpath_lib: parser-implementations
+orgize: parser-implementations
+parse_duration: parser-implementations
+quoted_printable: parser-implementations
+ressa: parser-implementations
+semver-parser: parser-implementations
+sitemap: parser-implementations
+sv-parser: parser-implementations
+svd-parser: parser-implementations
+urlocator: parser-implementations
+varlink_parser: parser-implementations
+webidl: parser-implementations
+wlambda: parser-implementations
+xmltree: parser-implementations
+json-tools: parser-implementations
+mamba: parser-implementations
+lapp: parser-implementations
+rfind_url: parser-implementations
+paw: parser-implementations
+mobi: parser-implementations
+balena-temen: parser-implementations
+sgf-parser: parser-implementations
+fitrs: parser-implementations
+retrosheet: parser-implementations

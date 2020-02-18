@@ -48,7 +48,7 @@ pub struct CrateVersionData<'a> {
     pub is_build: bool,
     pub is_dev: bool,
     pub authors: &'a [rich_crate::Author],
-    pub category_slugs: Vec<Cow<'a, str>>,
+    pub category_slugs: &'a [Cow<'a, str>],
     pub repository: Option<&'a Repo>,
     pub readme_text: Option<String>,
 }
@@ -1152,7 +1152,7 @@ categories = ["1", "two", "GAMES", "science", "::science::math::"]
         is_build: false,
         is_dev: false,
         authors: &[],
-        category_slugs: Vec::new(),
+        category_slugs: &[],
         repository: None,
         readme_text: None,
     }).unwrap();

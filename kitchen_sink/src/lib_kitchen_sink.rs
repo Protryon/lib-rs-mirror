@@ -159,6 +159,7 @@ pub struct KitchenSink {
     git_checkout_path: PathBuf,
     main_cache_dir: PathBuf,
     yearly: AllDownloads,
+    category_overrides: HashMap<String, Vec<Cow<'static, str>>>,
 }
 
 impl KitchenSink {
@@ -197,6 +198,7 @@ impl KitchenSink {
             top_crates_cached: RwLock::new(FxHashMap::default()),
             yearly: AllDownloads::new(&main_cache_dir),
             main_cache_dir,
+            category_overrides: Self::load_category_overrides(&data_path.join("category_overrides.txt"))?,
         })
     }
 
@@ -230,6 +232,25 @@ impl KitchenSink {
 
     pub fn main_cache_dir(&self) -> &Path {
         &self.main_cache_dir
+    }
+
+    fn load_category_overrides(path: &Path) -> CResult<HashMap<String, Vec<Cow<'static, str>>>> {
+        let p = std::fs::read_to_string(path)?;
+        let mut out = HashMap::new();
+        for line in p.lines() {
+            let mut parts = line.splitn(2, ':');
+            let crate_name = parts.next().unwrap().trim();
+            if crate_name.is_empty() {
+                continue;
+            }
+            let categories: Vec<_> = parts.next().unwrap().split(',')
+                .map(|s| s.trim().to_string().into()).collect();
+            if categories.is_empty() {
+                continue;
+            }
+            out.insert(crate_name.to_owned(), categories);
+        }
+        Ok(out)
     }
 
     /// Don't make requests to crates.io
@@ -1145,9 +1166,18 @@ impl KitchenSink {
         let readme_text = src.readme.as_ref().map(|r| render_readme::Renderer::new(None).visible_text(&r.markup));
         let repository = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
         let authors = package.authors.iter().map(|a| Author::new(a)).collect::<Vec<_>>();
+
+        let tmp;
+        let category_slugs = if let Some(overrides) = self.category_overrides.get(origin.short_crate_name()) {
+            &overrides
+        } else {
+            tmp = categories::Categories::fixed_category_slugs(&package.categories);
+            &tmp
+        };
+
         self.crate_db.index_latest(CrateVersionData {
             readme_text,
-            category_slugs: categories::Categories::fixed_category_slugs(&package.categories),
+            category_slugs,
             authors: &authors,
             origin,
             repository: repository.as_ref(),
@@ -1690,7 +1720,7 @@ impl KitchenSink {
 
     pub fn category_crate_count(&self, slug: &str) -> Result<u32, KitchenSinkErr> {
         if slug == "uncategorized" {
-            return Ok(100);
+            return Ok(300);
         }
         self.category_crate_counts
             .get(|| match self.crate_db.category_crate_counts() {

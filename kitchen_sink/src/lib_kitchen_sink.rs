@@ -1677,17 +1677,75 @@ impl KitchenSink {
         Ok(match cache.entry(slug.to_owned()) {
             Occupied(e) => Arc::clone(e.get()),
             Vacant(e) => {
-                let crates = if slug == "uncategorized" {
-                    self.crate_db.top_crates_uncategorized(wanted_num)?
+                let mut crates = if slug == "uncategorized" {
+                    self.crate_db.top_crates_uncategorized(wanted_num + 50)?
                 } else {
-                    self.crate_db.top_crates_in_category_partially_ranked(slug, wanted_num)?
+                    self.crate_db.top_crates_in_category_partially_ranked(slug, wanted_num + 50)?
                 };
+                self.knock_duplicates(&mut crates);
                 let crates: Vec<_> = crates.into_iter().map(|(o, _)| o).take(wanted_num as usize).collect();
                 let res = Arc::new(crates);
                 e.insert(Arc::clone(&res));
                 res
             },
         })
+    }
+
+    /// To make categories more varied, lower score of crates by same authors, with same keywords
+    fn knock_duplicates(&self, crates: &mut Vec<(Origin, f64)>) {
+        let mut seen_owners = HashMap::new();
+        let mut seen_keywords = HashMap::new();
+        let mut seen_owner_keywords = HashMap::new();
+
+        let with_owners = crates.drain(..)
+        .filter_map(|(o, score)| {
+            let c = match self.rich_crate_version(&o) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("Skipping {:?} because {}", o, e);
+                    return None;
+                },
+            };
+            if c.is_yanked() {
+                return None;
+            }
+            Some((o, score, self.crate_owners(&c).unwrap_or_default(), c.into_keywords()))
+        })
+        .collect::<Vec<_>>();
+
+        crates.clear();
+        for (origin, score, owners, keywords) in with_owners {
+            let mut weight_sum = 0;
+            let mut score_sum = 0.0;
+            for owner in owners.iter().take(5) {
+                let n = seen_owners.entry(owner.id).or_insert(0u32);
+                score_sum += (*n).saturating_sub(3) as f64; // authors can have a few crates with no penalty
+                weight_sum += 2;
+                *n += 2;
+            }
+            let primary_owner_id = owners.get(0).map(|o| o.id).unwrap_or(0);
+            for keyword in keywords.into_iter().take(5) {
+                let n = seen_keywords.entry(keyword.clone()).or_insert(0u32);
+                score_sum += (*n).saturating_sub(4) as f64; // keywords are expected to repeat a bit
+                weight_sum += 1;
+                *n += 1;
+
+                // but same owner AND same keyword needs extra bonus for being extra boring
+                let n = seen_owner_keywords.entry((primary_owner_id, keyword)).or_insert(0);
+                score_sum += *n as f64;
+                weight_sum += 2;
+                *n += 3;
+            }
+            // it's average, because new fresh keywords should reduce penalty
+            let dupe_points = score_sum / (weight_sum + 10) as f64;  // +10 reduces penalty for crates with few authors, few keywords (higher chance of dupe)
+
+            // +7 here allows some duplication, and penalizes harder only after a few crates
+            // adding original score means it'll never get more than halved
+            let new_score = score + (score + 7.) / (7. + dupe_points);
+            eprintln!("Knocking {}p {} to {} (by {})", dupe_points, origin.short_crate_name(), new_score, new_score/score);
+            crates.push((origin, new_score));
+        }
+        crates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
     }
 
     pub fn top_keywords_in_category(&self, cat: &Category) -> CResult<Vec<String>> {

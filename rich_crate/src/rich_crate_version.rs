@@ -115,6 +115,10 @@ impl RichCrateVersion {
         .map(|s| s.as_str())
     }
 
+    pub fn into_keywords(self) -> Vec<String> {
+        self.derived.keywords.or(self.manifest.package.map(|p| p.keywords)).unwrap_or_default()
+    }
+
     /// Globally unique URL-like string identifying source & the crate within that source
     #[inline]
     pub fn origin(&self) -> &Origin {

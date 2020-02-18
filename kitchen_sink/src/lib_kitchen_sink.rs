@@ -525,7 +525,11 @@ impl KitchenSink {
         };
 
         let krate = RichCrateVersion::new(origin.clone(), manifest, derived);
-        self.loaded_rich_crate_version_cache.write().insert(origin.clone(), krate.clone());
+        let mut cache = self.loaded_rich_crate_version_cache.write();
+        if cache.len() > 1000 {
+            cache.clear();
+        }
+        cache.insert(origin.clone(), krate.clone());
         Ok(krate)
     }
 

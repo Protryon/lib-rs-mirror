@@ -1,4 +1,3 @@
-telegram-client: web-programming
 afterburn: web-programming
 ag  :  command-line-utilities
 alert-after: command-line-utilities
@@ -25,20 +24,27 @@ loop-rs  : command-line-utilities
 makepad: text-editors
 miniquad  : gui
 monger: databases
+msql-srv: database
 notcurses: command-line-interface
 papyrus  : development-tools, command-line-utilities
+prometheus_wireguard_exporter: network-programming
 ritual_build  : development-tools, command-line-utilities
 symbolic-minidump: development-tools::debugging
 symbolic: development-tools::debugging
 tagref : development-tools
 tealdeer: command-line-utilities
+telegram-client: web-programming
 trackable: development-tools::debugging
 tt-call : rust-patterns
 typename: rust-patterns
+ucd-trie: data-structures, text-processing
+ucd-util: text-processing
+text_io: text-processing
 zemeroth: games
 
 bnf: parsers
 
+sqlparser: parser-implementations
 boxcars: parser-implementations
 fixed_width: parser-implementations
 rnix: parser-implementations

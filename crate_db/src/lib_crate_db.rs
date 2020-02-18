@@ -232,7 +232,6 @@ impl CrateDb {
         let all_explicit_keywords = package.keywords.iter()
             .chain(c.derived.github_keywords.iter().flatten());
         for (i, k) in all_explicit_keywords.enumerate() {
-            print!("#{}, ", k);
             let mut w: f64 = 100./(6+i*2) as f64;
             if STOPWORDS.get(k.as_str()).is_some() {
                 w *= 0.6;
@@ -241,7 +240,6 @@ impl CrateDb {
         }
 
         for (i, k) in package.name.split(|c: char| !c.is_alphanumeric()).enumerate() {
-            print!("'{}, ", k);
             let w: f64 = 100./(8+i*2) as f64;
             insert_keyword.add(k, w, false);
         }
@@ -311,11 +309,6 @@ impl CrateDb {
         let mut out = String::with_capacity(200);
         write!(&mut out, "{}: ", origin)?;
 
-        {
-            let mut tmp = insert_keyword.keywords.iter().collect::<Vec<_>>();
-            tmp.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
-            write!(&mut out, "#{} ", tmp.into_iter().map(|(k, _)| k.to_string()).collect::<Vec<_>>().join(" #"))?;
-        }
         let next_timestamp = (Utc::now().timestamp() + 3600 * 24 * 31) as u32;
 
         self.with_write("insert_crate", |tx| {
@@ -387,7 +380,16 @@ impl CrateDb {
             };
 
             if !had_explicit_categories {
-                write!(&mut out, ">??? ")?;
+                let mut tmp = insert_keyword.keywords.iter().collect::<Vec<_>>();
+                tmp.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
+                write!(&mut out, "#{} ", tmp.into_iter().take(20).map(|(k, _)| k.to_string()).collect::<Vec<_>>().join(" #"))?;
+            }
+
+            if categories.is_empty() {
+                write!(&mut out, "[no categories!] ")?;
+            }
+            if !had_explicit_categories {
+                write!(&mut out, "[guessed categories]: ")?;
             }
             for (rank, rel, slug) in categories {
                 write!(&mut out, ">{}, ", slug)?;

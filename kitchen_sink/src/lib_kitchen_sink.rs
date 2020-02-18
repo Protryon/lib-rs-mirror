@@ -86,6 +86,8 @@ pub enum Warning {
     NotAPackage,
     #[fail(display = "`Cargo.toml` doesn't have `readme` property")]
     NoReadmeProperty,
+    #[fail(display = "`readme` property points to a file that hasn't been published")]
+    NoReadmePackaged,
     #[fail(display = "Can't find README in repository: {}", _0)]
     NoReadmeInRepo(String),
     #[fail(display = "Could not clone repository: {}", _0)]
@@ -604,15 +606,20 @@ impl KitchenSink {
         }
 
         let maybe_repo = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
-        let has_readme = meta.readme.is_some();
-        if !has_readme {
-            warnings.insert(Warning::NoReadmeProperty);
-            warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()));
+        let has_readme_file = meta.readme.is_some();
+        if !has_readme_file {
+            let has_readme_prop = meta.manifest.package.as_ref().map_or(false, |p| p.readme.is_some());
+            if has_readme_prop {
+                warnings.insert(Warning::NoReadmePackaged);
+            } else {
+                warnings.insert(Warning::NoReadmeProperty);
+            }
+            // readmes in form of readme="../foo.md" are lost in packaging,
+            // and the only copy exists in crates.io own api
+            self.add_readme_from_crates_io(&mut meta, name, ver);
             let has_readme = meta.readme.is_some();
-            if !has_readme && meta.manifest.package.as_ref().map_or(false, |p| p.readme.is_some()) {
-                // readmes in form of readme="../foo.md" are lost in packaging,
-                // and the only copy exists in crates.io own api
-                self.add_readme_from_crates_io(&mut meta, name, ver);
+            if !has_readme {
+                warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()));
             }
         }
 

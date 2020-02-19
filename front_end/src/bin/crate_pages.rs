@@ -41,7 +41,7 @@ fn is_useful2(c: &RichCrateVersion) -> bool {
     true
 }
 
-fn render(origin: &Origin, crates: &KitchenSink, path: &PathBuf, markup: &Renderer, always: bool) -> Result<(), failure::Error> {
+async fn render(origin: &Origin, crates: &KitchenSink, path: &PathBuf, markup: &Renderer, always: bool) -> Result<(), failure::Error> {
     let allver = crates.rich_crate(origin)?;
     if !always && !is_useful1(&allver) {
         return Ok(());
@@ -53,7 +53,7 @@ fn render(origin: &Origin, crates: &KitchenSink, path: &PathBuf, markup: &Render
     }
 
     let mut buf = Vec::new();
-    front_end::render_crate_page(&mut buf, &allver, &c, crates, markup)?;
+    front_end::render_crate_page(&mut buf, &allver, &c, crates, markup).await?;
     fs::write(&path, buf)?;
     println!("{} http://localhost:3000/crates/{}", path.display(), c.short_name());
     Ok(())
@@ -88,7 +88,8 @@ async fn run(filter: Option<String>) -> Result<(), failure::Error> {
             let crates = Arc::clone(&crates);
             let path = PathBuf::from(format!("public/crates/{}.html", origin.short_crate_name()));
             s1.spawn(move |_| {
-                if let Err(e) = render(&origin, &crates, &path, markup, always_render) {
+                let handle = tokio::runtime::Handle::current();
+                if let Err(e) = handle.enter(|| futures::executor::block_on(render(&origin, &crates, &path, markup, always_render))) {
                     eprintln!("••• error: {} — {}", e, path.display());
                     for c in e.iter_chain().skip(1) {
                         eprintln!("•   error: -- {}", c);

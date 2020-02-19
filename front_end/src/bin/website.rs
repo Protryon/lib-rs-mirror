@@ -46,8 +46,9 @@ async fn run() -> Result<(), failure::Error> {
     let markup = Renderer::new_filter(Some(Highlighter::new()), image_filter);
 
     println!("Generating homepage and category pages…");
+    front_end::render_homepage(&mut out, &crates).await.context("Failed rendering homepage")?;
     let (res1, res2) = rayon::join(
-        || front_end::render_homepage(&mut out, &crates).context("Failed rendering homepage").and_then(|_| front_end::render_feed(&mut feed, &crates).context("Failed rendering homepage")),
+        || front_end::render_feed(&mut feed, &crates).context("Failed rendering homepage"),
         || {
             let _ = fs::create_dir_all("public/crates");
             render_categories(&categories::CATEGORIES.root, Path::new("public"), &crates, &done_pages, &markup).context("Failed rendering categories")

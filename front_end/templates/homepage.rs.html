@@ -1,9 +1,10 @@
 @use crate::templates::base;
 @use crate::templates::home_categories;
 @use crate::home_page::HomePage;
+@use crate::home_page::HomeCategory;
 @use crate::Urler;
 
-@(home: &HomePage, url: &Urler)
+@(home: &HomePage, categories: &[HomeCategory], url: &Urler)
 
 @:base(&home.page(), {
     <header id="home">
@@ -20,7 +21,7 @@
         <section id="home-categories">
             <nav class="inner-col">
                 <ul class=cat>
-                @:home_categories(&home.all_categories(), url, true)
+                @:home_categories(categories, url, true)
                 </ul>
             </nav>
         </section>

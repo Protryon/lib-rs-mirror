@@ -88,9 +88,11 @@ pub async fn render_category(out: &mut impl Write, cat: &Category, crates: &Kitc
 }
 
 /// See `homepage.rs.html`
-pub fn render_homepage<W>(out: &mut W, crates: &KitchenSink) -> Result<(), failure::Error> where W: ?Sized, for<'a> &'a mut W: Write {
+pub async fn render_homepage<W>(out: &mut W, crates: &KitchenSink) -> Result<(), failure::Error> where W: ?Sized, for<'a> &'a mut W: Write {
     let urler = Urler::new(None);
-    templates::homepage(out, &home_page::HomePage::new(crates)?, &urler)?;
+    let home = home_page::HomePage::new(crates)?;
+    let all = home.all_categories().await;
+    templates::homepage(out, &home, &all, &urler)?;
     Ok(())
 }
 
@@ -131,13 +133,13 @@ pub fn render_sitemap(sitemap: &mut impl Write, crates: &KitchenSink) -> Result<
 }
 
 /// See `crate_page.rs.html`
-pub fn render_crate_page<W: Write>(out: &mut W, all: &RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<Option<DateTime<FixedOffset>>, failure::Error> {
+pub async fn render_crate_page<W: Write>(out: &mut W, all: &RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<Option<DateTime<FixedOffset>>, failure::Error> {
     if stopped() {
         Err(KitchenSinkErr::Stopped)?;
     }
 
     let urler = Urler::new(Some(ver.origin().clone()));
-    let c = CratePage::new(all, ver, kitchen_sink, renderer).context("New crate page")?;
+    let c = CratePage::new(all, ver, kitchen_sink, renderer).await.context("New crate page")?;
     templates::crate_page(out, &urler, &c).context("crate page io")?;
     Ok(c.date_created())
 }

@@ -4,7 +4,6 @@
 extern crate serde_derive;
 
 mod index;
-use futures::prelude::*;
 pub use crate::index::*;
 mod yearly;
 pub use crate::yearly::*;
@@ -1705,7 +1704,7 @@ impl KitchenSink {
         let mut seen_keywords = HashMap::new();
         let mut seen_owner_keywords = HashMap::new();
 
-        let with_owners = crates.drain(..)
+        let with_owners = crates.drain(..).par_bridge()
         .filter_map(|(o, score)| {
             let c = match self.rich_crate_version(&o) {
                 Ok(c) => c,

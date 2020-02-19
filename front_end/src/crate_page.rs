@@ -56,6 +56,7 @@ pub struct CratePage<'a> {
     pub sizes: Option<CrateSizes>,
     pub lang_stats: Option<(usize, Stats)>,
     pub viral_license: Option<CrateLicense>,
+    top_category: Option<(u32, &'static Category)>,
 }
 
 /// Helper used to find most "interesting" versions
@@ -96,7 +97,10 @@ pub(crate) struct Contributors<'a> {
 }
 
 impl<'a> CratePage<'a> {
-    pub fn new(all: &'a RichCrate, ver: &'a RichCrateVersion, kitchen_sink: &'a KitchenSink, markup: &'a Renderer) -> CResult<Self> {
+    pub async fn new(all: &'a RichCrate, ver: &'a RichCrateVersion, kitchen_sink: &'a KitchenSink, markup: &'a Renderer) -> CResult<CratePage<'a>> {
+        let top_category = kitchen_sink.top_category(ver).await
+            .and_then(|(top, slug)| CATEGORIES.from_slug(slug).last().map(|c| (top, c)));
+
         let (top_keyword, (all_contributors, deps)) = rayon::join(
             || kitchen_sink.top_keyword(all),
             || rayon::join(
@@ -112,6 +116,7 @@ impl<'a> CratePage<'a> {
             sizes: None,
             lang_stats: None,
             viral_license: None,
+            top_category,
         };
         let (sizes, lang_stats, viral_license) = page.crate_size_and_viral_license(deps?)?;
         page.sizes = Some(sizes);
@@ -532,11 +537,8 @@ impl<'a> CratePage<'a> {
     }
 
     /// Most relevant category for the crate and rank in that category
-    pub fn top_category(&self) -> Option<(u32, &Category)> {
-        let handle = tokio::runtime::Handle::current();
-
-        let res = handle.enter(|| futures::executor::block_on(self.kitchen_sink.top_category(&self.ver)));
-        res.and_then(|(top, slug)| CATEGORIES.from_slug(slug).last().map(|c| (top, c)))
+    pub fn top_category(&self) -> Option<(u32, &'static Category)> {
+        self.top_category
     }
 
     /// docs.rs link, if available

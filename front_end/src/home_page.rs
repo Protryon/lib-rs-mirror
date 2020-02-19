@@ -44,10 +44,9 @@ impl<'a> HomePage<'a> {
     }
 
     /// List of all categories, sorted, with their most popular and newest crates.
-    pub fn all_categories(&self) -> Vec<HomeCategory> {
+    pub async fn all_categories(&self) -> Vec<HomeCategory> {
         let seen = &mut HashSet::with_capacity(5000);
-        let handle = tokio::runtime::Handle::current();
-        let mut all = handle.enter(|| futures::executor::block_on(self.make_all_categories(&CATEGORIES.root, seen)));
+        let mut all = self.make_all_categories(&CATEGORIES.root, seen).await;
         self.add_updated_to_all_categories(&mut all, seen);
         all
     }
@@ -95,12 +94,15 @@ impl<'a> HomePage<'a> {
                 }
             c.sort_by(|a, b| b.pop.cmp(&a.pop));
 
+            let mut c = futures::future::join_all(c.into_iter().map(|cat| async move {
+                let top = self.crates.top_crates_in_category(&cat.cat.slug).await;
+                (cat, top)
+            })).await;
+
             // mark seen from least popular (assuming they're more specific)
-            for cat in c.iter_mut().rev() {
+            for (cat, top) in c.iter_mut().rev() {
                 let mut dl = 0;
-                let top: Vec<_> = self
-                    .crates
-                    .top_crates_in_category(&cat.cat.slug).await
+                let top: Vec<_> = top.as_ref()
                     .unwrap()
                     .iter()
                     .take(35)
@@ -124,7 +126,7 @@ impl<'a> HomePage<'a> {
                 cat.dl = dl.max(cat.dl);
             }
 
-            let mut ranked = c.into_iter().map(|c| (c.cat.slug.as_str(), (c.dl * c.pop, c))).collect::<HashMap<_,_>>();
+            let mut ranked = c.into_iter().map(|(c,_)| (c.cat.slug.as_str(), (c.dl * c.pop, c))).collect::<HashMap<_,_>>();
 
             // this is artificially inflated by popularity of syn/quote in serde
             if let Some(pmh) = ranked.get_mut("development-tools::procedural-macro-helpers") {

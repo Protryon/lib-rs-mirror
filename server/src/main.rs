@@ -13,7 +13,6 @@ use env_logger;
 use failure::ResultExt;
 use front_end;
 use futures::future::Future;
-use futures::future::FutureExt;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::Origin;
 use kitchen_sink;
@@ -251,8 +250,8 @@ async fn handle_category(req: HttpRequest, cat: &'static Category) -> Result<Htt
     let crates = state.crates.load();
     crates.prewarm();
     let cache_file = state.page_cache_dir.join(format!("_{}.html", cat.slug));
-    Ok(serve_cached(with_file_cache(cache_file, 1800, move || {
-        run_timeout_async(30, async move {
+    Ok(serve_cached(with_file_cache(cache_file, 1800, {
+        run_timeout(30, async move {
             let mut page: Vec<u8> = Vec::with_capacity(150000);
             front_end::render_category(&mut page, cat, &crates, &state.markup).await?;
             Ok::<_, failure::Error>((page, None))
@@ -270,12 +269,12 @@ async fn handle_home(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
     let state: &AServerState = req.app_data().expect("appdata");
     let state = state.clone();
     let cache_file = state.page_cache_dir.join("_.html");
-    Ok(serve_cached(with_file_cache(cache_file, 3600, move || {
-        run_timeout_async(300, async move {
+    Ok(serve_cached(with_file_cache(cache_file, 3600, {
+        run_timeout(300, async move {
             let crates = state.crates.load();
             crates.prewarm();
             let mut page: Vec<u8> = Vec::with_capacity(50000);
-            front_end::render_homepage(&mut page, &crates)?;
+            front_end::render_homepage(&mut page, &crates).await?;
             Ok::<_, failure::Error>((page, None))
         })
     }).await?))
@@ -311,7 +310,7 @@ async fn handle_git_crate(req: HttpRequest, slug: &'static str) -> Result<HttpRe
         return Ok(HttpResponse::TemporaryRedirect().header("Location", url.into_owned()).finish());
     }
 
-    Ok(serve_cached(with_file_cache(cache_file, 86400, move || {
+    Ok(serve_cached(with_file_cache(cache_file, 86400, {
         render_crate_page(state, origin)
     }).await?))
 }
@@ -360,7 +359,7 @@ async fn handle_install(req: HttpRequest) -> Result<HttpResponse, failure::Error
     };
 
     let state = state.clone();
-    let (page, last_mod) = run_timeout(30, move || {
+    let (page, last_mod) = run_timeout(30, async move {
         let crates = state.crates.load();
         let ver = crates.rich_crate_version(&origin)?;
         let mut page: Vec<u8> = Vec::with_capacity(50000);
@@ -381,7 +380,7 @@ async fn handle_crate(req: HttpRequest) -> Result<HttpResponse, failure::Error> 
         return render_404_page(&state, &crate_name);
     }
     let cache_file = state.page_cache_dir.join(format!("{}.html", crate_name));
-    Ok(serve_cached(with_file_cache(cache_file, 900, move || {
+    Ok(serve_cached(with_file_cache(cache_file, 900, {
         render_crate_page(state, origin)
     }).await?))
 }
@@ -400,7 +399,7 @@ async fn handle_crate_reverse_dependencies(req: HttpRequest) -> Result<HttpRespo
 
 /// takes path to storage, freshness in seconds, and a function to call on cache miss
 /// returns (page, fresh in seconds)
-async fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: impl FnOnce() -> F + 'static) -> Result<(Vec<u8>, u32, bool, Option<DateTime<FixedOffset>>), failure::Error>
+async fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: F) -> Result<(Vec<u8>, u32, bool, Option<DateTime<FixedOffset>>), failure::Error>
     where F: Future<Output=Result<(Vec<u8>, Option<DateTime<FixedOffset>>), failure::Error>> + 'static {
     if let Ok(modified) = std::fs::metadata(&cache_file).and_then(|m| m.modified()) {
         let now = SystemTime::now();
@@ -419,7 +418,7 @@ async fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: impl
 
             if !is_fresh {
                 actix_rt::spawn(async move {
-                    match generate().await {
+                    match generate.await {
                         Ok((page, _last_mod)) => { // FIXME: set cache file timestamp?
                             if let Err(e) = std::fs::write(&cache_file, &page) {
                                 eprintln!("warning: Failed writing to {}: {}", cache_file.display(), e);
@@ -439,7 +438,7 @@ async fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: impl
         println!("Cache miss {} no file", cache_file.display());
     }
 
-    let (page, last_mod) = generate().await?;
+    let (page, last_mod) = generate.await?;
     if let Err(e) = std::fs::write(&cache_file, &page) {
         eprintln!("warning: Failed writing to {}: {}", cache_file.display(), e);
     }
@@ -447,19 +446,19 @@ async fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: impl
 }
 
 fn render_crate_page(state: AServerState, origin: Origin) -> impl Future<Output=Result<(Vec<u8>, Option<DateTime<FixedOffset>>), failure::Error>> + 'static {
-    run_timeout(30, move || {
+    run_timeout(30, async move {
         let crates = state.crates.load();
         crates.prewarm();
         let all = crates.rich_crate(&origin)?;
         let ver = crates.rich_crate_version(&origin)?;
         let mut page: Vec<u8> = Vec::with_capacity(50000);
-        let last_mod = front_end::render_crate_page(&mut page, &all, &ver, &crates, &state.markup)?;
+        let last_mod = front_end::render_crate_page(&mut page, &all, &ver, &crates, &state.markup).await?;
         Ok::<_, failure::Error>((page, last_mod))
     })
 }
 
 async fn render_crate_reverse_dependencies(state: AServerState, origin: Origin) -> Result<(Vec<u8>, u32, bool, Option<DateTime<FixedOffset>>), failure::Error> {
-    run_timeout(30, move || {
+    run_timeout(30, async move {
         let crates = state.crates.load();
         crates.prewarm();
         let ver = crates.rich_crate_version(&origin)?;
@@ -478,7 +477,7 @@ async fn handle_keyword(req: HttpRequest) -> Result<HttpResponse, failure::Error
     let query = q.to_owned();
     let state: &AServerState = req.app_data().expect("appdata");
     let state2 = state.clone();
-    let (query, page) = run_timeout(15, move || {
+    let (query, page) = run_timeout(15, async move {
         if !is_alnum(&query) {
             return Ok::<_, failure::Error>((query, None));
         }
@@ -513,14 +512,6 @@ fn serve_cached((page, cache_time, refresh, last_modified): (Vec<u8>, u32, bool,
         .if_some(last_modified, |l, h| {h.header("Last-Modified", l.to_rfc2822());})
         .content_length(page.len() as u64)
         .body(page)
-}
-
-fn from_pool<E: std::fmt::Debug + Into<failure::Error>>(err: actix_threadpool::BlockingError<E>) -> failure::Error {
-    use actix_threadpool::BlockingError::*;
-    match err {
-        Canceled => failure::format_err!("cancelled"),
-        Error(e) => e.into()
-    }
 }
 
 fn is_alnum(q: &str) -> bool {
@@ -579,7 +570,7 @@ async fn handle_sitemap(req: HttpRequest) -> Result<HttpResponse, failure::Error
 async fn handle_feed(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
     let state: &AServerState = req.app_data().expect("appdata");
     let state2 = state.clone();
-    let page = run_timeout(60, move || {
+    let page = run_timeout(60, async move {
         let crates = state2.crates.load();
         crates.prewarm();
         let mut page: Vec<u8> = Vec::with_capacity(50000);
@@ -593,11 +584,7 @@ async fn handle_feed(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
     .body(page))
 }
 
-async fn run_timeout<T: 'static + Send>(secs: u64, cb: impl FnOnce() -> Result<T, failure::Error> + Send + 'static) -> Result<T, failure::Error> {
-    tokio::time::timeout(Duration::from_secs(secs), async move { tokio::task::block_in_place(cb) }).await?
-}
-
-async fn run_timeout_async<R, T: 'static + Send>(secs: u64, fut: R) -> Result<T, failure::Error> where R: Future<Output=Result<T, failure::Error>> + Send + 'static {
+async fn run_timeout<R, T: 'static + Send>(secs: u64, fut: R) -> Result<T, failure::Error> where R: Future<Output=Result<T, failure::Error>> {
     tokio::time::timeout(Duration::from_secs(secs), fut).await?
 }
 

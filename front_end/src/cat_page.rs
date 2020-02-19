@@ -1,10 +1,10 @@
+use futures::stream::StreamExt;
 use crate::templates;
 use crate::Page;
 use categories::Category;
 use categories::CATEGORIES;
 use failure::Error;
 use kitchen_sink::KitchenSink;
-use rayon::prelude::*;
 use render_readme::Renderer;
 use rich_crate::RichCrateVersion;
 use std::collections::HashSet;
@@ -21,15 +21,18 @@ pub struct CatPage<'a> {
 
 impl<'a> CatPage<'a> {
     pub async fn new(cat: &'a Category, crates: &'a KitchenSink, markup: &'a Renderer) -> Result<CatPage<'a>, Error> {
+        let (count, keywords, related) = futures::join!(
+            crates.category_crate_count(&cat.slug),
+            crates.top_keywords_in_category(cat),
+            crates.related_categories(&cat.slug),
+        );
         Ok(Self {
-            count: crates.category_crate_count(&cat.slug)? as usize,
-            keywords: crates.top_keywords_in_category(cat)?,
-            related: crates.related_categories(&cat.slug)?,
-            crates: crates
-                .top_crates_in_category(&cat.slug).await?
-                .par_iter()
-                .with_max_len(1)
-                .filter_map(|o| {
+            count: count? as usize,
+            keywords: keywords?,
+            related: related?,
+            crates: futures::stream::iter(crates
+                .top_crates_in_category(&cat.slug).await?.iter())
+                .filter_map(|o| async move {
                     let c = match crates.rich_crate_version(&o) {
                         Ok(c) => c,
                         Err(e) => {
@@ -40,7 +43,7 @@ impl<'a> CatPage<'a> {
                     if c.is_yanked() {
                         return None;
                     }
-                    let d = match crates.downloads_per_month_or_equivalent(&o) {
+                    let d = match crates.downloads_per_month_or_equivalent(&o).await {
                         Ok(d) => d.unwrap_or(0) as u32,
                         Err(e) => {
                             eprintln!("Skipping {:?} because dl {}", o, e);
@@ -49,7 +52,7 @@ impl<'a> CatPage<'a> {
                     };
                     Some((c, d))
                 })
-                .collect::<Vec<_>>(),
+                .collect::<Vec<_>>().await,
             cat,
             markup,
         })

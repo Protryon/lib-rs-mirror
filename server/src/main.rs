@@ -220,7 +220,7 @@ async fn default_handler(req: HttpRequest) -> Result<HttpResponse, failure::Erro
     if let Ok(k) = crates.rich_crate(&Origin::from_crates_io_name(&inverted_hyphens)) {
         return Ok(HttpResponse::TemporaryRedirect().header("Location", format!("/crates/{}", encode(k.name()))).body(""));
     }
-    if crates.is_it_a_keyword(&inverted_hyphens) {
+    if crates.is_it_a_keyword(&inverted_hyphens).await {
         return Ok(HttpResponse::TemporaryRedirect().header("Location", format!("/keywords/{}", encode(&inverted_hyphens))).body(""));
     }
 
@@ -547,14 +547,14 @@ async fn handle_search(req: HttpRequest) -> Result<HttpResponse, failure::Error>
 }
 
 async fn handle_sitemap(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
-    let (w, page) = writer::<_, failure::Error>();
+    let (w, page) = writer::<_, failure::Error>().await;
     let state: &AServerState = req.app_data().expect("appdata");
     let state = state.clone();
 
-    rayon::spawn(move || {
+    tokio::runtime::Handle::current().spawn(async move {
         let mut w = std::io::BufWriter::with_capacity(16000, w);
         let crates = state.crates.load();
-        if let Err(e) = front_end::render_sitemap(&mut w, &crates) {
+        if let Err(e) = front_end::render_sitemap(&mut w, &crates).await {
             if let Ok(mut w) = w.into_inner() {
                 w.fail(e.into());
             }
@@ -574,7 +574,7 @@ async fn handle_feed(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
         let crates = state2.crates.load();
         crates.prewarm();
         let mut page: Vec<u8> = Vec::with_capacity(50000);
-        front_end::render_feed(&mut page, &crates)?;
+        front_end::render_feed(&mut page, &crates).await?;
         Ok::<_, failure::Error>(page)
     }).await?;
     Ok(HttpResponse::Ok()

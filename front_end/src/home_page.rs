@@ -32,11 +32,15 @@ pub struct HomeCategory {
 /// Computes data used on the home page on https://lib.rs/
 pub struct HomePage<'a> {
     crates: &'a KitchenSink,
+    handle: tokio::runtime::Handle,
 }
 
 impl<'a> HomePage<'a> {
-    pub fn new(crates: &'a KitchenSink) -> Result<Self, failure::Error> {
-        Ok(Self { crates })
+    pub async fn new(crates: &'a KitchenSink) -> Result<HomePage<'a>, failure::Error> {
+        Ok(Self {
+            crates,
+            handle: tokio::runtime::Handle::current(),
+        })
     }
 
     pub fn total_crates(&self) -> String {
@@ -86,7 +90,7 @@ impl<'a> HomePage<'a> {
                 if stopped() { return Vec::new(); }
                     // depth first - important!
                     let sub = self.make_all_categories(&cat.sub, seen).await;
-                    let own_pop = self.crates.category_crate_count(&cat.slug).unwrap_or(0) as usize;
+                    let own_pop = self.crates.category_crate_count(&cat.slug).await.unwrap_or(0) as usize;
 
                     c.push(HomeCategory {
                         // make container as popular as its best child (already sorted), because homepage sorts by top-level only
@@ -119,7 +123,7 @@ impl<'a> HomePage<'a> {
                 // skip topmost popular, because some categories have literally just 1 super-popular crate,
                 // which elevates the whole category
                 for c in top.iter().skip(1) {
-                    if let Ok(Some(d)) = self.crates.downloads_per_month_or_equivalent(c) {
+                    if let Ok(Some(d)) = self.crates.downloads_per_month_or_equivalent(c).await {
                         dl += d;
                     }
                 }
@@ -181,8 +185,8 @@ impl<'a> HomePage<'a> {
     }
 
     pub fn all_contributors<'c>(&self, krate: &'c RichCrateVersion) -> Option<Vec<CrateAuthor<'c>>> {
-        self.crates
-            .all_contributors(krate)
+        self.block(self.crates
+            .all_contributors(krate))
             .map(|(mut a, mut o, ..)| {
                 a.append(&mut o);
                 a
@@ -191,11 +195,15 @@ impl<'a> HomePage<'a> {
     }
 
     pub fn recently_updated_crates<'z>(&'z self) -> impl Iterator<Item = (RichCrate, RichCrateVersion)> + 'z {
-        self.crates
-            .recently_updated_crates()
+        self.block(self.crates
+            .recently_updated_crates())
             .expect("recent crates")
             .into_iter()
             .map(move |o| (self.crates.rich_crate(&o).unwrap(), self.crates.rich_crate_version(&o).unwrap()))
+    }
+
+    fn block<O>(&self, f: impl Future<Output=O>) -> O {
+        self.handle.enter(|| futures::executor::block_on(f))
     }
 
     pub fn page(&self) -> Page {

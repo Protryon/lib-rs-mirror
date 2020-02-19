@@ -50,7 +50,6 @@ use failure::ResultExt;
 use github_info::GitCommitAuthor;
 use github_info::GitHubRepo;
 use itertools::Itertools;
-use lazyonce::LazyOnce;
 use parking_lot::RwLock;
 use rayon::prelude::*;
 use repo_url::Repo;
@@ -74,6 +73,7 @@ use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::runtime::Handle;
 use futures::future::join_all;
+use double_checked_cell_async::DoubleCheckedCell;
 
 type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 
@@ -154,8 +154,8 @@ pub struct KitchenSink {
     user_db: user_db::UserDb,
     gh: github_info::GitHub,
     loaded_rich_crate_version_cache: RwLock<FxHashMap<Origin, RichCrateVersion>>,
-    category_crate_counts: LazyOnce<Option<HashMap<String, u32>>>,
-    removals: LazyOnce<HashMap<Origin, f64>>,
+    category_crate_counts: DoubleCheckedCell<Option<HashMap<String, u32>>>,
+    removals: DoubleCheckedCell<HashMap<Origin, f64>>,
     top_crates_cached: tokio::sync::RwLock<FxHashMap<String, Arc<Vec<Origin>>>>,
     git_checkout_path: PathBuf,
     main_cache_dir: PathBuf,
@@ -196,8 +196,8 @@ impl KitchenSink {
             gh: gh.context("gh")?,
             loaded_rich_crate_version_cache: RwLock::new(FxHashMap::default()),
             git_checkout_path: data_path.join("git"),
-            category_crate_counts: LazyOnce::new(),
-            removals: LazyOnce::new(),
+            category_crate_counts: DoubleCheckedCell::new(),
+            removals: DoubleCheckedCell::new(),
             top_crates_cached: tokio::sync::RwLock::new(FxHashMap::default()),
             yearly: AllDownloads::new(&main_cache_dir),
             main_cache_dir,
@@ -323,8 +323,8 @@ impl KitchenSink {
         Ok(res)
     }
 
-    pub fn all_new_crates(&self) -> CResult<Vec<RichCrate>> {
-        let min_timestamp = self.crate_db.latest_crate_update_timestamp()?.unwrap_or(0);
+    pub async fn all_new_crates(&self) -> CResult<Vec<RichCrate>> {
+        let min_timestamp = self.crate_db.latest_crate_update_timestamp().await?.unwrap_or(0);
         let all = self.index.crates_io_crates(); // too slow to scan all GH crates
         Ok(all.into_par_iter()
         .filter_map(move |(name, _)| {
@@ -347,6 +347,10 @@ impl KitchenSink {
 
     /// Wrapper object for metadata common for all versions of a crate
     pub fn rich_crate(&self, origin: &Origin) -> CResult<RichCrate> {
+        self.handle.enter(|| futures::executor::block_on(self.rich_crate_async(origin)))
+    }
+
+    pub async fn rich_crate_async(&self, origin: &Origin) -> CResult<RichCrate> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
         match origin {
             Origin::CratesIo(name) => {
@@ -361,11 +365,11 @@ impl KitchenSink {
             },
             Origin::GitHub {repo, package} => {
                 let host = RepoHost::GitHub(repo.clone()).try_into().map_err(|_| KitchenSinkErr::CrateNotFound(origin.clone())).context("ghrepo host bad")?;
-                let cachebust = self.cachebust_string_for_repo(&host).context("ghrepo")?;
+                let cachebust = self.cachebust_string_for_repo(&host).await.context("ghrepo")?;
                 let gh = self.gh.repo(repo, &cachebust)?
                     .ok_or_else(|| KitchenSinkErr::CrateNotFound(origin.clone()))
                     .context(format!("ghrepo {:?} not found", repo))?;
-                let versions = self.get_repo_versions(origin, &host, &cachebust)?;
+                let versions = self.get_repo_versions(origin, &host, &cachebust).await?;
                 Ok(RichCrate::new(origin.clone(), gh.owner.into_iter().map(|o| {
                     CrateOwner {
                         id: 0,
@@ -381,14 +385,14 @@ impl KitchenSink {
             },
             Origin::GitLab {repo, package} => {
                 let host = RepoHost::GitLab(repo.clone()).try_into().map_err(|_| KitchenSinkErr::CrateNotFound(origin.clone())).context("ghrepo host bad")?;
-                let cachebust = self.cachebust_string_for_repo(&host).context("ghrepo")?;
-                let versions = self.get_repo_versions(origin, &host, &cachebust)?;
+                let cachebust = self.cachebust_string_for_repo(&host).await.context("ghrepo")?;
+                let versions = self.get_repo_versions(origin, &host, &cachebust).await?;
                 Ok(RichCrate::new(origin.clone(), vec![], format!("gitlab/{}/{}", repo.owner, package), versions))
             }
         }
     }
 
-    fn get_repo_versions(&self, origin: &Origin, repo: &Repo, cachebust: &str) -> CResult<Vec<CrateVersion>> {
+    async fn get_repo_versions(&self, origin: &Origin, repo: &Repo, cachebust: &str) -> CResult<Vec<CrateVersion>> {
         let package = match origin {
             Origin::GitLab {package, ..} => package,
             Origin::GitHub {repo, package} => {
@@ -414,7 +418,7 @@ impl KitchenSink {
             _ => unreachable!(),
         };
 
-        let versions: Vec<_> = self.crate_db.crate_versions(origin)?.into_iter().map(|(num, timestamp)| {
+        let versions: Vec<_> = self.crate_db.crate_versions(origin).await?.into_iter().map(|(num, timestamp)| {
             let date = Utc.timestamp(timestamp as _, 0).to_rfc3339();
             CrateVersion {
                 num,
@@ -447,9 +451,10 @@ impl KitchenSink {
     }
 
     /// Fudge-factor score proprtional to how many times a crate has been removed from some project
-    pub fn crate_removals(&self, origin: &Origin) -> Option<f64> {
+    pub async fn crate_removals(&self, origin: &Origin) -> Option<f64> {
         self.removals
-            .get(|| self.crate_db.removals().expect("fetch crate removals"))
+            .get_or_init(async {self.crate_db.removals().await.expect("fetch crate removals")})
+            .await
             .get(origin).cloned()
     }
 
@@ -457,20 +462,20 @@ impl KitchenSink {
         self.downloads_recent(origin).map(|dl| dl.map(|n| n/3))
     }
 
-    pub fn downloads_per_month_or_equivalent(&self, origin: &Origin) -> CResult<Option<usize>> {
+    pub async fn downloads_per_month_or_equivalent(&self, origin: &Origin) -> CResult<Option<usize>> {
         if let Some(dl) = self.downloads_per_month(origin)? {
             return Ok(Some(dl));
         }
 
         // arbitrary multiplier. TODO: it's not fair for apps vs libraries
-        Ok(self.github_stargazers_and_watchers(origin)?.map(|(stars, watch)| stars.saturating_sub(1) as usize * 50 + watch.saturating_sub(1) as usize * 150))
+        Ok(self.github_stargazers_and_watchers(origin).await?.map(|(stars, watch)| stars.saturating_sub(1) as usize * 50 + watch.saturating_sub(1) as usize * 150))
     }
 
     /// Only for GitHub origins, not for crates-io crates
-    pub fn github_stargazers_and_watchers(&self, origin: &Origin) -> CResult<Option<(u32, u32)>> {
+    pub async fn github_stargazers_and_watchers(&self, origin: &Origin) -> CResult<Option<(u32, u32)>> {
         if let Origin::GitHub {repo, ..} = origin {
             let repo = RepoHost::GitHub(repo.clone()).try_into().expect("repohost");
-            if let Some(gh) = self.github_repo(&repo)? {
+            if let Some(gh) = self.github_repo(&repo).await? {
                 return Ok(Some((gh.stargazers_count, gh.subscribers_count)));
             }
         }
@@ -520,12 +525,12 @@ impl KitchenSink {
             return Ok(krate.clone());
         }
 
-        let (manifest, derived) = match self.crate_db.rich_crate_version_data(origin) {
+        let (manifest, derived) = match self.crate_db.rich_crate_version_data(origin).await {
             Ok(v) => v,
             Err(e) => {
                 eprintln!("getting {:?}: {}", origin, e);
                     self.index_crate_highest_version(origin).await?;
-                match self.crate_db.rich_crate_version_data(origin) {
+                match self.crate_db.rich_crate_version_data(origin).await {
                     Ok(v) => v,
                     Err(e) => Err(e)?,
                 }
@@ -541,10 +546,10 @@ impl KitchenSink {
         Ok(krate)
     }
 
-    pub fn changelog_url(&self, k: &RichCrateVersion) -> Option<String> {
+    pub async fn changelog_url(&self, k: &RichCrateVersion) -> Option<String> {
         let repo = k.repository()?;
         if let RepoHost::GitHub(ref gh) = repo.host() {
-            let releases = self.gh.releases(gh, &self.cachebust_string_for_repo(repo).ok()?).ok()??;
+            let releases = self.gh.releases(gh, &self.cachebust_string_for_repo(repo).await.ok()?).ok()??;
             if releases.iter().any(|rel| rel.body.as_ref().map_or(false, |b| b.len() > 15)) {
                 return Some(format!("https://github.com/{}/{}/releases", gh.owner, gh.repo));
             }
@@ -552,7 +557,7 @@ impl KitchenSink {
         None
     }
 
-    fn rich_crate_version_from_repo(&self, origin: &Origin) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
+    async fn rich_crate_version_from_repo(&self, origin: &Origin) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
         let (repo, package) = match origin {
             Origin::GitHub {repo, package} => {
                 (RepoHost::GitHub(repo.clone()).try_into().expect("repohost"), &**package)
@@ -597,7 +602,7 @@ impl KitchenSink {
             readme.base_image_url = Some(repo.readme_base_image_url(&path_in_repo));
         });
 
-        self.rich_crate_version_data_common(origin.clone(), meta, 0, false, warnings)
+        self.rich_crate_version_data_common(origin.clone(), meta, 0, false, warnings).await
     }
 
     pub fn tarball(&self, name: &str, ver: &str) -> CResult<Vec<u8>> {
@@ -607,7 +612,7 @@ impl KitchenSink {
         Ok(tarball)
     }
 
-    fn rich_crate_version_data_from_crates_io(&self, latest: &crates_index::Version) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
+    async fn rich_crate_version_data_from_crates_io(&self, latest: &crates_index::Version) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
         let mut warnings = HashSet::new();
 
         let name = latest.name();
@@ -671,11 +676,11 @@ impl KitchenSink {
             }
         }
 
-        self.rich_crate_version_data_common(origin, meta, crate_compressed_size as u32, latest.is_yanked(), warnings)
+        self.rich_crate_version_data_common(origin, meta, crate_compressed_size as u32, latest.is_yanked(), warnings).await
     }
 
     ///// Fixing and faking the data
-    fn rich_crate_version_data_common(&self, origin: Origin, mut meta: CrateFile, crate_compressed_size: u32, is_yanked: bool, mut warnings: Warnings) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
+    async fn rich_crate_version_data_common(&self, origin: Origin, mut meta: CrateFile, crate_compressed_size: u32, is_yanked: bool, mut warnings: Warnings) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
         Self::override_bad_categories(&mut meta.manifest);
 
         let mut github_keywords = None;
@@ -686,7 +691,7 @@ impl KitchenSink {
         // TODO: also ignore useless keywords that are unique db-wide
         let gh = match maybe_repo.as_ref() {
             Some(repo) => if let RepoHost::GitHub(ref gh) = repo.host() {
-                self.gh.topics(gh, &self.cachebust_string_for_repo(repo).context("fetch topics")?)?
+                self.gh.topics(gh, &self.cachebust_string_for_repo(repo).await.context("fetch topics")?)?
             } else {None},
             _ => None,
         };
@@ -720,7 +725,7 @@ impl KitchenSink {
         let mut github_description = None;
         let mut github_name = None;
         if let Some(ref crate_repo) = maybe_repo {
-            if let Some(ghrepo) = self.github_repo(crate_repo)? {
+            if let Some(ghrepo) = self.github_repo(crate_repo).await? {
                 if package.homepage.is_none() {
                     if let Some(url) = ghrepo.homepage {
                         let also_add_docs = package.documentation.is_none() && ghrepo.github_page_url.as_ref().map_or(false, |p| p != &url);
@@ -840,10 +845,10 @@ impl KitchenSink {
         }
     }
 
-    fn github_repo(&self, crate_repo: &Repo) -> CResult<Option<GitHubRepo>> {
+    async fn github_repo(&self, crate_repo: &Repo) -> CResult<Option<GitHubRepo>> {
         Ok(match crate_repo.host() {
             RepoHost::GitHub(ref repo) => {
-                let cachebust = self.cachebust_string_for_repo(crate_repo).context("ghrepo")?;
+                let cachebust = self.cachebust_string_for_repo(crate_repo).await.context("ghrepo")?;
                 self.gh.repo(repo, &cachebust)?
             },
             _ => None,
@@ -1036,20 +1041,20 @@ impl KitchenSink {
     }
 
     /// "See also"
-    pub fn related_categories(&self, slug: &str) -> CResult<Vec<String>> {
-        self.crate_db.related_categories(slug)
+    pub async fn related_categories(&self, slug: &str) -> CResult<Vec<String>> {
+        self.crate_db.related_categories(slug).await
     }
 
     /// Recommendations
-    pub fn related_crates(&self, krate: &RichCrateVersion, min_recent_downloads: u32) -> CResult<Vec<Origin>> {
-        let (replacements, related) = rayon::join(
-            || self.crate_db.replacement_crates(krate.short_name()).context("related_crates1"),
-            || self.crate_db.related_crates(krate.origin(), min_recent_downloads).context("related_crates2"),
-        );
+    pub async fn related_crates(&self, krate: &RichCrateVersion, min_recent_downloads: u32) -> CResult<Vec<Origin>> {
+        let (replacements, related) = futures::try_join!(
+            self.crate_db.replacement_crates(krate.short_name()),
+            self.crate_db.related_crates(krate.origin(), min_recent_downloads),
+        )?;
 
-        Ok(replacements?.into_iter()
+        Ok(replacements.into_iter()
             .map(|name| Origin::from_crates_io_name(&name))
-            .chain(related?)
+            .chain(related)
             .unique()
             .take(10)
             .collect())
@@ -1072,8 +1077,8 @@ impl KitchenSink {
     }
 
     /// Returns (nth, keyword)
-    pub fn top_keyword(&self, krate: &RichCrate) -> CResult<Option<(u32, String)>> {
-        Ok(self.crate_db.top_keyword(&krate.origin())?)
+    pub async fn top_keyword(&self, krate: &RichCrate) -> CResult<Option<(u32, String)>> {
+        Ok(self.crate_db.top_keyword(&krate.origin()).await?)
     }
 
     /// Maintenance: add user to local db index
@@ -1105,9 +1110,9 @@ impl KitchenSink {
     }
 
     /// Maintenance: add crate to local db index
-    pub fn index_crate(&self, k: &RichCrate, score: f64) -> CResult<()> {
+    pub async fn index_crate(&self, k: &RichCrate, score: f64) -> CResult<()> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
-        self.crate_db.index_versions(k, score, self.downloads_recent(k.origin())?)?;
+        self.crate_db.index_versions(k, score, self.downloads_recent(k.origin())?).await?;
         Ok(())
     }
 
@@ -1145,13 +1150,13 @@ impl KitchenSink {
         let (src, manifest, _warn) = match origin {
             Origin::CratesIo(ref name) => {
                 let ver = self.index.crate_highest_version(name, false).context("rich_crate_version2")?;
-                self.rich_crate_version_data_from_crates_io(ver).context("rich_crate_version_data_from_crates_io")?
+                self.rich_crate_version_data_from_crates_io(ver).await.context("rich_crate_version_data_from_crates_io")?
             },
             Origin::GitHub {..} | Origin::GitLab {..} => {
                 if !self.crate_exists(origin) {
                     Err(KitchenSinkErr::GitCrateNotAllowed(origin.to_owned()))?
                 }
-                self.rich_crate_version_from_repo(&origin)?
+                self.rich_crate_version_from_repo(&origin).await?
             },
         };
 
@@ -1197,7 +1202,7 @@ impl KitchenSink {
             is_build, is_dev,
             manifest: &manifest,
             derived: &src,
-        })?;
+        }).await?;
         Ok(())
     }
 
@@ -1266,7 +1271,7 @@ impl KitchenSink {
         Ok(has)
     }
 
-    pub fn index_repo(&self, repo: &Repo, as_of_version: &str) -> CResult<()> {
+    pub async fn index_repo(&self, repo: &Repo, as_of_version: &str) -> CResult<()> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
         let url = repo.canonical_git_url();
         let checkout = crate_git_checkout::checkout(repo, &self.git_checkout_path)?;
@@ -1279,7 +1284,7 @@ impl KitchenSink {
         let manif = manif.into_iter().filter_map(|(subpath, _, manifest)| {
             manifest.package.map(|p| (subpath, p.name))
         });
-        self.crate_db.index_repo_crates(repo, manif).context("index rev repo")?;
+        self.crate_db.index_repo_crates(repo, manif).await.context("index rev repo")?;
 
         if let Repo { host: RepoHost::GitHub(ref repo), .. } = repo {
             if let Some(commits) = self.repo_commits(repo, as_of_version)? {
@@ -1332,7 +1337,7 @@ impl KitchenSink {
                 }
             }
         })?;
-        self.crate_db.index_repo_changes(repo, &changes)?;
+        self.crate_db.index_repo_changes(repo, &changes).await?;
 
         Ok(())
     }
@@ -1357,19 +1362,19 @@ impl KitchenSink {
 
     /// List of all notable crates
     /// Returns origin, rank, last updated unix timestamp
-    pub fn sitemap_crates(&self) -> CResult<Vec<(Origin, f64, i64)>> {
-        Ok(self.crate_db.sitemap_crates()?)
+    pub async fn sitemap_crates(&self) -> CResult<Vec<(Origin, f64, i64)>> {
+        Ok(self.crate_db.sitemap_crates().await?)
     }
 
     /// If given crate is a sub-crate, return crate that owns it.
     /// The relationship is based on directory layout of monorepos.
-    pub fn parent_crate(&self, child: &RichCrateVersion) -> Option<Origin> {
+    pub async fn parent_crate(&self, child: &RichCrateVersion) -> Option<Origin> {
         let repo = child.repository()?;
-        self.crate_db.parent_crate(repo, child.short_name()).ok()?
+        self.crate_db.parent_crate(repo, child.short_name()).await.ok()?
     }
 
-    pub fn cachebust_string_for_repo(&self, crate_repo: &Repo) -> CResult<String> {
-        Ok(self.crate_db.crates_in_repo(crate_repo)
+    pub async fn cachebust_string_for_repo(&self, crate_repo: &Repo) -> CResult<String> {
+        Ok(self.crate_db.crates_in_repo(crate_repo).await
             .context("db crates_in_repo")?
             .into_iter()
             .filter_map(|origin| {
@@ -1391,7 +1396,7 @@ impl KitchenSink {
     }
 
     /// Returns (contrib, github user)
-    fn contributors_from_repo(&self, crate_repo: &Repo, owners: &[CrateOwner], found_crate_in_repo: bool) -> CResult<(bool, HashMap<String, (f64, User)>)> {
+    async fn contributors_from_repo(&self, crate_repo: &Repo, owners: &[CrateOwner], found_crate_in_repo: bool) -> CResult<(bool, HashMap<String, (f64, User)>)> {
         let mut hit_max_contributor_count = false;
         match crate_repo.host() {
             // TODO: warn on errors?
@@ -1402,7 +1407,7 @@ impl KitchenSink {
 
                 // multiple crates share a repo, which causes cache churn when version "changes"
                 // so pick one of them and track just that one version
-                let cachebust = self.cachebust_string_for_repo(crate_repo).context("contrib")?;
+                let cachebust = self.cachebust_string_for_repo(crate_repo).await.context("contrib")?;
                 let contributors = self.gh.contributors(repo, &cachebust).context("contributors")?.unwrap_or_default();
                 if contributors.len() >= 100 {
                     hit_max_contributor_count = true;
@@ -1431,13 +1436,13 @@ impl KitchenSink {
     }
 
     /// Merge authors, owners, contributors
-    pub fn all_contributors<'a>(&self, krate: &'a RichCrateVersion) -> CResult<(Vec<CrateAuthor<'a>>, Vec<CrateAuthor<'a>>, bool, usize)> {
+    pub async fn all_contributors<'a>(&self, krate: &'a RichCrateVersion) -> CResult<(Vec<CrateAuthor<'a>>, Vec<CrateAuthor<'a>>, bool, usize)> {
         let owners = self.crate_owners(krate)?;
 
         let (hit_max_contributor_count, mut contributors_by_login) = match krate.repository().as_ref() {
             // Only get contributors from github if the crate has been found in the repo,
             // otherwise someone else's repo URL can be used to get fake contributor numbers
-            Some(crate_repo) => self.contributors_from_repo(crate_repo, &owners, krate.has_path_in_repo())?,
+            Some(crate_repo) => self.contributors_from_repo(crate_repo, &owners, krate.has_path_in_repo()).await?,
             None => (false, HashMap::new()),
         };
 
@@ -1678,7 +1683,7 @@ impl KitchenSink {
                 return Ok(category.clone());
             }
         }
-        let total_count = self.category_crate_count(slug)?;
+        let total_count = self.category_crate_count(slug).await?;
         let wanted_num = ((total_count/2+25)/50 * 50).max(100);
         let mut cache = self.top_crates_cached.write().await;
 
@@ -1687,9 +1692,9 @@ impl KitchenSink {
             Occupied(e) => Arc::clone(e.get()),
             Vacant(e) => {
                 let mut crates = if slug == "uncategorized" {
-                    self.crate_db.top_crates_uncategorized(wanted_num + 50)?
+                    self.crate_db.top_crates_uncategorized(wanted_num + 50).await?
                 } else {
-                    self.crate_db.top_crates_in_category_partially_ranked(slug, wanted_num + 50)?
+                    self.crate_db.top_crates_in_category_partially_ranked(slug, wanted_num + 50).await?
                 };
                 self.knock_duplicates(&mut crates).await;
                 let crates: Vec<_> = crates.into_iter().map(|(o, _)| o).take(wanted_num as usize).collect();
@@ -1771,50 +1776,50 @@ impl KitchenSink {
         crates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
     }
 
-    pub fn top_keywords_in_category(&self, cat: &Category) -> CResult<Vec<String>> {
-        let mut keywords = self.crate_db.top_keywords_in_category(&cat.slug)?;
+    pub async fn top_keywords_in_category(&self, cat: &Category) -> CResult<Vec<String>> {
+        let mut keywords = self.crate_db.top_keywords_in_category(&cat.slug).await?;
         keywords.retain(|k| !cat.obvious_keywords.contains(k));
         keywords.truncate(10);
         Ok(keywords)
     }
 
     /// true if it's useful as a keyword page
-    pub fn is_it_a_keyword(&self, k: &str) -> bool {
-        self.crate_db.crates_with_keyword(k).map(|n| n >= 5).unwrap_or(false)
+    pub async fn is_it_a_keyword(&self, k: &str) -> bool {
+        self.crate_db.crates_with_keyword(k).await.map(|n| n >= 5).unwrap_or(false)
     }
 
     /// True if there are multiple crates with that keyword. Populated first.
-    pub fn keywords_populated(&self, krate: &RichCrateVersion) -> Vec<(String, bool)> {
-        let mut keywords: Vec<_> = krate.keywords()
-        .map(|k| {
-            let populated = self.crate_db.crates_with_keyword(&k.to_lowercase()).unwrap() >= 3;
+    pub async fn keywords_populated(&self, krate: &RichCrateVersion) -> Vec<(String, bool)> {
+        let mut keywords: Vec<_> = join_all(krate.keywords()
+        .map(|k| async move {
+            let populated = self.crate_db.crates_with_keyword(&k.to_lowercase()).await.unwrap() >= 3;
             (k.to_owned(), populated)
-        })
-        .collect();
+        })).await;
         keywords.sort_by_key(|&(_, v)| !v); // populated first; relies on stable sort
         keywords
     }
 
     pub async fn recently_updated_crates_in_category(&self, slug: &str) -> CResult<Vec<Origin>> {
-        Ok(self.crate_db.recently_updated_crates_in_category(slug)?)
+        Ok(self.crate_db.recently_updated_crates_in_category(slug).await?)
     }
 
-    pub fn recently_updated_crates(&self) -> CResult<Vec<Origin>> {
-        Ok(self.crate_db.recently_updated_crates()?)
+    pub async fn recently_updated_crates(&self) -> CResult<Vec<Origin>> {
+        Ok(self.crate_db.recently_updated_crates().await?)
     }
 
-    pub fn category_crate_count(&self, slug: &str) -> Result<u32, KitchenSinkErr> {
+    pub async fn category_crate_count(&self, slug: &str) -> Result<u32, KitchenSinkErr> {
         if slug == "uncategorized" {
             return Ok(300);
         }
         self.category_crate_counts
-            .get(|| match self.crate_db.category_crate_counts() {
+            .get_or_init(async {match self.crate_db.category_crate_counts().await {
                 Ok(res) => Some(res),
                 Err(err) => {
                     eprintln!("error: can't get category counts: {}", err);
                     None
                 },
-            })
+            }})
+            .await
             .as_ref()
             .ok_or(KitchenSinkErr::CategoryQueryFailed)
             .and_then(|h| {

@@ -6,7 +6,7 @@ use actix_web::web::Bytes;
 
 pub struct Writer<T: 'static, E: 'static> {
     sender: mpsc::Sender<Result<T, E>>,
-    rt: tokio::runtime::Runtime,
+    rt: tokio::runtime::Handle,
 }
 
 impl<T, E: std::fmt::Display> Writer<T, E> {
@@ -22,8 +22,8 @@ where
 {
     fn write(&mut self, d: &[u8]) -> io::Result<usize> {
         let len = d.len();
-        let data = Bytes::copy_from_slice(d);
-        self.rt.block_on(self.sender.send(Ok(data)))
+        let sent = self.sender.send(Ok(Bytes::copy_from_slice(d)));
+        self.rt.enter(|| futures::executor::block_on(sent))
             .map_err(|e| {
                 eprintln!("write failed: {}", e);
                 io::Error::new(io::ErrorKind::BrokenPipe, e)
@@ -36,8 +36,8 @@ where
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.rt.block_on(self.sender
-            .flush())
+        let flushed = self.sender.flush();
+        self.rt.enter(|| futures::executor::block_on(flushed))
             .map_err(|e| {
                 eprintln!("flush failed: {}", e);
                 io::Error::new(io::ErrorKind::BrokenPipe, e)
@@ -46,8 +46,8 @@ where
     }
 }
 
-pub fn writer<T, E: std::fmt::Debug>() -> (Writer<T, E>, impl Stream<Item = Result<T, E>>) {
-    let rt = tokio::runtime::Runtime::new().unwrap();
+pub async fn writer<T: 'static, E: 'static + std::fmt::Debug>() -> (Writer<T, E>, impl Stream<Item = Result<T, E>>) {
+    let rt = tokio::runtime::Handle::current();
     let (tx, rx) = mpsc::channel(3);
     let w = Writer {
         sender: tx,

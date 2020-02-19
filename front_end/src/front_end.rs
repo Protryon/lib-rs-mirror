@@ -90,21 +90,21 @@ pub async fn render_category(out: &mut impl Write, cat: &Category, crates: &Kitc
 /// See `homepage.rs.html`
 pub async fn render_homepage<W>(out: &mut W, crates: &KitchenSink) -> Result<(), failure::Error> where W: ?Sized, for<'a> &'a mut W: Write {
     let urler = Urler::new(None);
-    let home = home_page::HomePage::new(crates)?;
+    let home = home_page::HomePage::new(crates).await?;
     let all = home.all_categories().await;
     templates::homepage(out, &home, &all, &urler)?;
     Ok(())
 }
 
 /// See `atom.rs.html`
-pub fn render_feed(out: &mut impl Write, crates: &KitchenSink) -> Result<(), failure::Error> {
+pub async fn render_feed(out: &mut impl Write, crates: &KitchenSink) -> Result<(), failure::Error> {
     let urler = Urler::new(None);
-    templates::atom(out, &home_page::HomePage::new(crates)?, &urler)?;
+    templates::atom(out, &home_page::HomePage::new(crates).await?, &urler)?;
     Ok(())
 }
 
-pub fn render_sitemap(sitemap: &mut impl Write, crates: &KitchenSink) -> Result<(), failure::Error> {
-    let all_crates = crates.sitemap_crates()?;
+pub async fn render_sitemap(sitemap: &mut impl Write, crates: &KitchenSink) -> Result<(), failure::Error> {
+    let all_crates = crates.sitemap_crates().await?;
     let urler = Urler::new(None);
 
     sitemap.write_all(br#"<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">"#)?;

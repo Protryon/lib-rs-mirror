@@ -15,6 +15,7 @@ boxcars: parser-implementations
 bspline: rendering
 btc_spv_bin :cryptography::cryptocurrencies
 cage  : development-tools, command-line-utilities
+syncat-stylesheet: parser-implementations
 chillup: web-programming
 click: development-tools
 codenano: science

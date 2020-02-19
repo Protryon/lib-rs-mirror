@@ -1,3 +1,4 @@
+use futures::future::Future;
 use tokio::runtime::Handle;
 use futures::future::join_all;
 use crate::download_graph::DownloadsGraph;
@@ -105,14 +106,13 @@ impl<'a> CratePage<'a> {
             .and_then(|(top, slug)| CATEGORIES.from_slug(slug).last().map(|c| (top, c)));
         let is_build_or_dev = kitchen_sink.is_build_or_dev(ver.origin()).await?;
 
-        let (top_keyword, (all_contributors, deps)) = rayon::join(
-            || kitchen_sink.top_keyword(all),
-            || rayon::join(
-                || kitchen_sink.all_contributors(ver),
-                || kitchen_sink.all_dependencies_flattened(ver)));
+        let (top_keyword, all_contributors) = futures::try_join!(
+            kitchen_sink.top_keyword(all),
+            kitchen_sink.all_contributors(ver))?;
+        let deps = kitchen_sink.all_dependencies_flattened(ver);
         let mut page = Self {
-            top_keyword: top_keyword?,
-            all_contributors: all_contributors?,
+            top_keyword,
+            all_contributors,
             all,
             ver,
             kitchen_sink,
@@ -185,7 +185,7 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn changelog_url(&self) -> Option<String> {
-        self.kitchen_sink.changelog_url(self.ver)
+        self.handle.enter(|| futures::executor::block_on(self.kitchen_sink.changelog_url(self.ver)))
     }
 
     pub fn is_build_or_dev(&self) -> (bool, bool) {
@@ -206,18 +206,22 @@ impl<'a> CratePage<'a> {
 
     /// If true, there are many other crates with this keyword. Populated first.
     pub fn keywords_populated(&self) -> Option<Vec<(String, bool)>> {
-        let k = self.kitchen_sink.keywords_populated(self.ver);
-        if k.is_empty() {
-            None
-        } else {
-            Some(k)
-        }
+        self.handle.enter(|| futures::executor::block_on(async {
+            let k = self.kitchen_sink.keywords_populated(self.ver).await;
+            if k.is_empty() {
+                None
+            } else {
+                Some(k)
+            }
+        }))
     }
 
     pub fn parent_crate(&self) -> Option<RichCrateVersion> {
-        let origin = self.kitchen_sink.parent_crate(self.ver)?;
-        self.kitchen_sink.rich_crate_version(&origin)
-            .map_err(|e| eprintln!("parent crate: {} {:?}", e, origin)).ok()
+        self.handle.enter(|| futures::executor::block_on(async {
+            let origin = self.kitchen_sink.parent_crate(self.ver).await?;
+            self.kitchen_sink.rich_crate_version(&origin)
+                .map_err(|e| eprintln!("parent crate: {} {:?}", e, origin)).ok()
+        }))
     }
 
     pub fn render_markdown_str(&self, s: &str) -> templates::Html<String> {
@@ -259,7 +263,11 @@ impl<'a> CratePage<'a> {
 
     pub fn nofollow(&self) -> bool {
         // TODO: take multiple factors into account, like # of contributors, author reputation, dependents
-        self.kitchen_sink.downloads_per_month_or_equivalent(self.all.origin()).ok().and_then(|x| x).unwrap_or(0) < 50
+        self.block(self.kitchen_sink.downloads_per_month_or_equivalent(self.all.origin())).ok().and_then(|x| x).unwrap_or(0) < 50
+    }
+
+    fn block<O>(&self, f: impl Future<Output=O>) -> O {
+        self.handle.enter(|| futures::executor::block_on(f))
     }
 
     pub(crate) fn all_contributors(&self) -> Contributors<'_> {
@@ -355,22 +363,21 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn up_to_date_class(&self, richdep: &RichDep) -> &str {
-        if richdep.dep.req() == "*" {
+        if richdep.dep.req() == "*" || !richdep.dep.is_crates_io() {
             return "common";
         }
-        self.handle.enter(|| {
-            let (matches_latest, pop) = richdep.dep.req().parse().ok().and_then(|req| {
-                if !richdep.dep.is_crates_io() {
-                    return None;
+        self.block(async {
+            if let Ok(req) = richdep.dep.req().parse() {
+                if let Ok(Some((matches_latest, pop))) = self.kitchen_sink.version_popularity(&richdep.package, &req).await {
+                    return match pop {
+                        x if x >= 0.5 && matches_latest => "top",
+                        x if x >= 0.75 || matches_latest => "common",
+                        x if x >= 0.25 => "outdated",
+                        _ => "obsolete",
+                    }
                 }
-                futures::executor::block_on(self.kitchen_sink.version_popularity(&richdep.package, &req)).expect("deps")
-            }).unwrap_or((false, 0.));
-            match pop {
-                x if x >= 0.5 && matches_latest => "top",
-                x if x >= 0.75 || matches_latest => "common",
-                x if x >= 0.25 => "outdated",
-                _ => "obsolete",
             }
+            "obsolete"
         })
     }
 
@@ -675,16 +682,18 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn github_stargazers_and_watchers(&self) -> Option<(u32, u32)> {
-        self.kitchen_sink.github_stargazers_and_watchers(self.all.origin()).ok().and_then(|x| x)
+        self.block(self.kitchen_sink.github_stargazers_and_watchers(self.all.origin())).ok().and_then(|x| x)
     }
 
     pub fn related_crates(&self) -> Option<Vec<Origin>> {
         // require some level of downloads to avoid recommending spam
         // but limit should be relative to the current crate, so that minor crates
         // get related suggestions too
-        let dl = self.kitchen_sink.downloads_per_month_or_equivalent(self.all.origin()).ok().and_then(|x| x).unwrap_or(100);
-        let min_recent_downloads = (dl as u32/2).min(200);
-        self.kitchen_sink.related_crates(&self.ver, min_recent_downloads).map_err(|e| eprintln!("related crates fail: {}", e)).ok()
+        self.block(async {
+            let dl = self.kitchen_sink.downloads_per_month_or_equivalent(self.all.origin()).await.ok().and_then(|x| x).unwrap_or(100);
+            let min_recent_downloads = (dl as u32/2).min(200);
+            self.kitchen_sink.related_crates(&self.ver, min_recent_downloads).await.map_err(|e| eprintln!("related crates fail: {}", e)).ok()
+        })
     }
 
     /// data for piechart

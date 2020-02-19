@@ -74,7 +74,7 @@ async fn main() {
         } else if !specific.is_empty() {
             Either::Left(specific)
         } else {
-            Either::Right(crates.all_new_crates().unwrap().into_iter().map(|c| c.origin().clone()))
+            Either::Right(handle.enter(|| futures::executor::block_on(crates.all_new_crates())).unwrap().into_iter().map(|c| c.origin().clone()))
         };
         for (i, origin) in c.into_iter().enumerate() {
             if stopped() {
@@ -111,7 +111,8 @@ async fn main() {
                                             println!("Indexing {}", url);
                                             s.insert(url);
                                         }
-                                        print_res(crates.index_repo(repo, v.version()));
+                                        print_res(
+                                            handle.enter(|| futures::executor::block_on(crates.index_repo(repo, v.version()))));
                                     }
                                 })
                             }
@@ -133,7 +134,7 @@ async fn index_crate(crates: &KitchenSink, origin: &Origin, renderer: &Renderer,
 
     let (downloads_per_month, score) = crate_overall_score(crates, &k, &v, renderer).await;
     search_sender.send((v.clone(), downloads_per_month, score)).map_err(|e| {stop();e}).expect("closed channel?");
-    crates.index_crate(&k, score)?;
+    crates.index_crate(&k, score).await?;
     Ok(v)
 }
 
@@ -155,7 +156,7 @@ fn index_search(indexer: &mut Indexer, renderer: &Renderer, k: &RichCrateVersion
 
 
 async fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) -> (usize, f64) {
-    let contrib_info = crates.all_contributors(&k).map_err(|e| eprintln!("{}", e)).ok();
+    let contrib_info = crates.all_contributors(&k).await.map_err(|e| eprintln!("{}", e)).ok();
     let contributors_count = if let Some((authors, _owner_only, _, extra_contributors)) = &contrib_info {
         (authors.len() + extra_contributors) as u32
     } else {
@@ -201,7 +202,7 @@ async fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrat
     })
     .total();
 
-    let downloads_per_month = crates.downloads_per_month_or_equivalent(all.origin()).expect("dl numbers").unwrap_or(0) as u32;
+    let downloads_per_month = crates.downloads_per_month_or_equivalent(all.origin()).await.expect("dl numbers").unwrap_or(0) as u32;
     let dependency_freshness = if let Ok((runtime, _, build)) = k.direct_dependencies() {
         // outdated dev deps don't matter
         join_all(runtime.iter().chain(&build).filter_map(|richdep| {
@@ -255,7 +256,7 @@ async fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrat
         temp_inp.downloads_per_month_minus_most_downloaded_user = downloads_per_month.saturating_sub(biggest as u32);
     }
 
-    let removals_divisor = if let Some(removals_weighed) = crates.crate_removals(k.origin()) {
+    let removals_divisor = if let Some(removals_weighed) = crates.crate_removals(k.origin()).await {
         // count some indirect/optional deps in case removals have been due to moving the crate behind another facade
         // +20 is a fudge factor to smooth out nosiy data for rarely used crates.
         // We don't care about small amount of removals, only mass exodus from big dead crates.
@@ -276,7 +277,7 @@ async fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrat
     if k.is_proc_macro() || k.is_sys() {
         score *= 0.9;
     }
-    if is_sub_component(crates, k) {
+    if is_sub_component(crates, k).await {
         score *= 0.9;
     }
 
@@ -303,7 +304,7 @@ async fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrat
 }
 
 /// Crates are spilt into foo and foo-core. The core is usually uninteresting/duplicate.
-fn is_sub_component(crates: &KitchenSink, k: &RichCrateVersion) -> bool {
+async fn is_sub_component(crates: &KitchenSink, k: &RichCrateVersion) -> bool {
     let name = k.short_name();
     if let Some(pos) = name.rfind(|c: char| c == '-' || c == '_') {
         match name.get(pos+1..) {
@@ -315,7 +316,7 @@ fn is_sub_component(crates: &KitchenSink, k: &RichCrateVersion) -> bool {
                         return true;
                     }
                 }
-                if crates.parent_crate(k).is_some() {
+                if crates.parent_crate(k).await.is_some() {
                     return true;
                 }
             },

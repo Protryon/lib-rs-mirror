@@ -1713,6 +1713,17 @@ impl KitchenSink {
         })
         .collect::<Vec<_>>();
 
+        let mut top_keywords = HashMap::new();
+        for (_, _, _, keywords) in &with_owners {
+            for k in keywords {
+                *top_keywords.entry(k).or_insert(0u32) += 1;
+            }
+        }
+        let mut top_keywords: Vec<_> = top_keywords.into_iter().collect();
+        top_keywords.sort_by(|a,b| b.cmp(&a));
+        eprintln!("top cat keywords {:?}", top_keywords);
+        let top_keywords: HashSet<_> = top_keywords.iter().take((top_keywords.len()/10).min(10).max(2)).map(|(k,_)| k.to_string()).collect();
+
         crates.clear();
         for (origin, score, owners, keywords) in with_owners {
             let mut weight_sum = 0;
@@ -1725,10 +1736,13 @@ impl KitchenSink {
             }
             let primary_owner_id = owners.get(0).map(|o| o.id).unwrap_or(0);
             for keyword in keywords.into_iter().take(5) {
-                let n = seen_keywords.entry(keyword.clone()).or_insert(0u32);
-                score_sum += (*n).saturating_sub(4) as f64; // keywords are expected to repeat a bit
-                weight_sum += 1;
-                *n += 1;
+                // obvious keywords are too repetitive and affect innocent crates
+                if !top_keywords.contains(&keyword) {
+                    let n = seen_keywords.entry(keyword.clone()).or_insert(0u32);
+                    score_sum += (*n).saturating_sub(4) as f64; // keywords are expected to repeat a bit
+                    weight_sum += 1;
+                    *n += 1;
+                }
 
                 // but same owner AND same keyword needs extra bonus for being extra boring
                 let n = seen_owner_keywords.entry((primary_owner_id, keyword)).or_insert(0);
@@ -1740,8 +1754,8 @@ impl KitchenSink {
             let dupe_points = score_sum / (weight_sum + 10) as f64;  // +10 reduces penalty for crates with few authors, few keywords (higher chance of dupe)
 
             // +7 here allows some duplication, and penalizes harder only after a few crates
-            // adding original score means it'll never get more than halved
-            let new_score = score + (score + 7.) / (7. + dupe_points);
+            // adding original score means it'll never get lower than 1/3rd
+            let new_score = score * 0.5 + (score + 7.) / (7. + dupe_points);
             eprintln!("Knocking {}p {} to {} (by {})", dupe_points, origin.short_crate_name(), new_score, new_score/score);
             crates.push((origin, new_score));
         }

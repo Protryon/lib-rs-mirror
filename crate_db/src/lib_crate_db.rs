@@ -388,7 +388,7 @@ impl CrateDb {
             if categories.is_empty() {
                 write!(&mut out, "[no categories!] ")?;
             }
-            if !had_explicit_categories {
+            if !had_explicit_categories && !categories.is_empty() {
                 write!(&mut out, "[guessed categories]: ")?;
             }
             for (rank, rel, slug) in categories {

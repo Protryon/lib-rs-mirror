@@ -80,6 +80,7 @@ impl CrateDb {
                 relevance_weight REAL NOT NULL
             );
             CREATE UNIQUE INDEX IF NOT EXISTS categories_idx on categories(crate_id, slug);
+            CREATE INDEX IF NOT EXISTS categories_slug_idx on categories(slug);
             COMMIT;"#)?;
         Ok(conn)
     }

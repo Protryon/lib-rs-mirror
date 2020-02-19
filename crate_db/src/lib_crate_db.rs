@@ -180,7 +180,7 @@ impl CrateDb {
                 None
             };
             let categories = if categories::Categories::fixed_category_slugs(&package.categories).is_empty() {
-                Some(self.guess_crate_categories_tx(conn, &origin, keywords, 0.1).context("catdb")?
+                Some(self.crate_categories_tx(conn, &origin, &keywords, 0.1).context("catdb")?
                     .into_iter().map(|(_, c)| c).collect())
             } else {
                 None
@@ -446,10 +446,10 @@ impl CrateDb {
                 })
                 .collect();
 
-            categories::adjusted_relevance(candidates, keywords_collected, 0.01, 15)
+            categories::adjusted_relevance(candidates, &keywords_collected, 0.01, 15)
         } else {
             let cat_w = 0.2 + 0.2 * c.manifest.package().keywords.len() as f64;
-            self.guess_crate_categories_tx(conn, &c.origin, keywords_collected, if is_important_ish {0.1} else {0.3})?.into_iter()
+            self.guess_crate_categories_tx(conn, &c.origin, &keywords_collected, if is_important_ish {0.1} else {0.3})?.into_iter()
             .map(|(w, slug)| {
                 ((w * cat_w).min(0.99), slug)
             }).collect()
@@ -621,23 +621,20 @@ impl CrateDb {
         })
     }
 
-    /// Guess categories for a crate
+    /// Fetch or guess categories for a crate
     ///
     /// Returns category slugs
-    pub fn guess_crate_categories<'a>(&self, origin: &Origin, keywords: impl Iterator<Item = &'a str>) -> FResult<Vec<(f64, String)>> {
-        let assigned = self.crate_categories(origin)?;
+    fn crate_categories_tx<'a>(&self, conn: &Connection, origin: &Origin, kebab_keywords: &HashSet<String>, threshold: f64) -> FResult<Vec<(f64, String)>> {
+        let assigned = self.assigned_crate_categories_tx(conn, origin)?;
         if !assigned.is_empty() {
             Ok(assigned)
         } else {
-            self.with_read("guess_crate_categories", |conn| {
-                self.guess_crate_categories_tx(&conn, origin, keywords.map(|k| k.to_lowercase()).collect(), 0.1)
-            })
+            self.guess_crate_categories_tx(&conn, origin, kebab_keywords, threshold)
         }
     }
 
     /// Assigned categories with their weights
-    fn crate_categories(&self, origin: &Origin) -> FResult<Vec<(f64, String)>> {
-        self.with_read("crate_categories", |conn| {
+    fn assigned_crate_categories_tx(&self, conn: &Connection, origin: &Origin) -> FResult<Vec<(f64, String)>> {
             let mut query = conn.prepare_cached(r#"
                 SELECT c.relevance_weight, c.slug
                 FROM crates k
@@ -647,10 +644,9 @@ impl CrateDb {
             "#)?;
             let res = query.query_map(&[&origin.to_str()], |row| Ok((row.get_unwrap(0), row.get_unwrap(1)))).context("crate_categories")?;
             Ok(res.collect::<std::result::Result<_,_>>()?)
-        })
     }
 
-    fn guess_crate_categories_tx(&self, conn: &Connection, origin: &Origin, keywords: HashSet<String>, threshold: f64) -> FResult<Vec<(f64, String)>> {
+    fn guess_crate_categories_tx(&self, conn: &Connection, origin: &Origin, kebab_keywords: &HashSet<String>, threshold: f64) -> FResult<Vec<(f64, String)>> {
         let mut query = conn.prepare_cached(r#"
         select cc.slug, sum(cc.relevance_weight * ck.weight * relk.relevance)/(8+count(*)) as w
         from (
@@ -677,7 +673,7 @@ impl CrateDb {
         let candidates = query.query_map(&[&origin.to_str()], |row| Ok((row.get_unwrap(0), row.get_unwrap(1)))).context("categories q")?;
         let candidates = candidates.collect::<std::result::Result<_, _>>()?;
 
-        Ok(categories::adjusted_relevance(candidates, keywords, threshold, 2))
+        Ok(categories::adjusted_relevance(candidates, kebab_keywords, threshold, 2))
     }
 
     /// Find most relevant keyword for the crate

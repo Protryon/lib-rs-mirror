@@ -1090,7 +1090,7 @@ lazy_static! {
 /// Based on the set of keywords, adjust relevance of given categories
 ///
 /// Returns (weight, slug)
-pub fn adjusted_relevance(mut candidates: HashMap<String, f64>, keywords: HashSet<String>, min_category_match_threshold: f64, max_num_categories: usize) -> Vec<(f64, String)> {
+pub fn adjusted_relevance(mut candidates: HashMap<String, f64>, keywords: &HashSet<String>, min_category_match_threshold: f64, max_num_categories: usize) -> Vec<(f64, String)> {
     for (cond, actions) in KEYWORD_CATEGORIES.iter() {
         if match cond {
             Cond::All(reqs) => {

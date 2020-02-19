@@ -11,9 +11,10 @@ use kitchen_sink::KitchenSink;
 const NUM_CRATES: usize = 40000;
 type BoxErr = Box<dyn std::error::Error + Sync + Send>;
 
-pub fn main() -> Result<(), BoxErr> {
+#[tokio::main]
+async fn main() -> Result<(), BoxErr> {
     let mut a = Archive::new(Decoder::new(BufReader::new(File::open("db-dump.tar.gz")?))?);
-    let ksink = KitchenSink::new_default()?;
+    let ksink = KitchenSink::new_default().await?;
 
     let mut crate_owners = None;
     let mut crates = None;

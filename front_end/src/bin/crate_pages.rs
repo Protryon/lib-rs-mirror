@@ -10,8 +10,9 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-fn main() {
-    if let Err(e) = run(std::env::args().nth(1)) {
+#[tokio::main]
+async fn main() {
+    if let Err(e) = run(std::env::args().nth(1)).await {
         eprintln!("error: {}", e);
         for c in e.iter_chain() {
             eprintln!("error: -- {}", c);
@@ -58,10 +59,10 @@ fn render(origin: &Origin, crates: &KitchenSink, path: &PathBuf, markup: &Render
     Ok(())
 }
 
-fn run(filter: Option<String>) -> Result<(), failure::Error> {
+async fn run(filter: Option<String>) -> Result<(), failure::Error> {
     rayon::ThreadPoolBuilder::new().thread_name(|i| format!("rayon-{}", i)).build_global()?;
 
-    let crates = Arc::new(kitchen_sink::KitchenSink::new_default()?);
+    let crates = Arc::new(kitchen_sink::KitchenSink::new_default().await?);
     crates.prewarm();
     let image_filter = Arc::new(ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_dir().join("images.db"))?);
     let markup = &Renderer::new_filter(Some(Highlighter::new()), image_filter);

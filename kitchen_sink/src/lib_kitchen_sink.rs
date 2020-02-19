@@ -71,6 +71,7 @@ use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
+use tokio::runtime::Handle;
 
 type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 
@@ -164,7 +165,7 @@ pub struct KitchenSink {
 
 impl KitchenSink {
     /// Use env vars to find data directory and config
-    pub fn new_default() -> CResult<Self> {
+    pub async fn new_default() -> CResult<Self> {
         let github_token = match env::var("GITHUB_TOKEN") {
             Ok(t) => t,
             Err(_) => {
@@ -173,10 +174,14 @@ impl KitchenSink {
             },
         };
         let data_path = Self::data_path()?;
-        Self::new(&data_path, &github_token)
+        Self::new(&data_path, &github_token).await
     }
 
-    pub fn new(data_path: &Path, github_token: &str) -> CResult<Self> {
+    pub async fn new(data_path: &Path, github_token: &str) -> CResult<Self> {
+        // just testing whether runtime is on
+        let handle = Handle::current();
+        handle.spawn(async {});
+
         let main_cache_dir = data_path.to_owned();
 
         let ((crates_io, gh), index) = rayon::join(|| rayon::join(
@@ -1872,17 +1877,17 @@ impl<'a> CrateAuthor<'a> {
     }
 }
 
-#[test]
-fn is_build_or_dev_test() {
-    let c = KitchenSink::new_default().expect("uhg");
+#[tokio::test]
+async fn is_build_or_dev_test() {
+    let c = KitchenSink::new_default().await.expect("uhg");
     assert_eq!((false, false), c.is_build_or_dev(&Origin::from_crates_io_name("semver")).unwrap());
     assert_eq!((false, true), c.is_build_or_dev(&Origin::from_crates_io_name("version-sync")).unwrap());
     assert_eq!((true, false), c.is_build_or_dev(&Origin::from_crates_io_name("cc")).unwrap());
 }
 
-#[test]
-fn fetch_uppercase_name() {
-    let k = KitchenSink::new_default().expect("Test if configured");
+#[tokio::test]
+async fn fetch_uppercase_name() {
+    let k = KitchenSink::new_default().await.expect("Test if configured");
     let _ = k.rich_crate(&Origin::from_crates_io_name("Inflector")).unwrap();
     let _ = k.rich_crate(&Origin::from_crates_io_name("inflector")).unwrap();
 }

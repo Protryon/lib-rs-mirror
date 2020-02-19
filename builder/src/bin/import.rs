@@ -4,8 +4,10 @@ use kitchen_sink::Origin;
 use lts::*;
 use std::path::Path;
 
-fn main() {
-    let crates = kitchen_sink::KitchenSink::new_default().unwrap();
+#[tokio::main]
+async fn main() {
+
+    let crates = kitchen_sink::KitchenSink::new_default().await.unwrap();
 
     let db = BuildDb::new(crates.main_cache_dir().join("builds.db")).unwrap();
     let lts = LTS::new(None);

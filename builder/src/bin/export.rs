@@ -4,9 +4,10 @@ use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 
+#[tokio::main]
+async fn main() {
 
-fn main() {
-    let crates = kitchen_sink::KitchenSink::new_default().unwrap();
+    let crates = kitchen_sink::KitchenSink::new_default().await.unwrap();
 
     let db = BuildDb::new(crates.main_cache_dir().join("builds.db")).unwrap();
     let mut outputs = BTreeSet::new();

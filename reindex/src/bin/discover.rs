@@ -4,8 +4,10 @@ use repo_url::*;
 use std::io;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::Origin;
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let crates = KitchenSink::new_default()?;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let crates = KitchenSink::new_default().await?;
 
     for line in io::stdin().lock().lines() {
         let mut line = line?;

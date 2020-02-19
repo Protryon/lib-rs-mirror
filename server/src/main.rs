@@ -28,6 +28,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{Duration, SystemTime};
 use urlencoding::decode;
 use urlencoding::encode;
+use tokio::runtime::Handle;
 
 mod writer;
 
@@ -46,8 +47,9 @@ struct ServerState {
 
 type AServerState = web::Data<ServerState>;
 
-fn main() {
-    if let Err(e) = run_server() {
+#[tokio::main]
+async fn main() {
+    if let Err(e) = run_server().await {
         for c in e.iter_chain() {
             eprintln!("Error: {}", c);
         }
@@ -55,7 +57,7 @@ fn main() {
     }
 }
 
-fn run_server() -> Result<(), failure::Error> {
+async fn run_server() -> Result<(), failure::Error> {
     unsafe {
         signal_hook::register(signal_hook::SIGHUP, || HUP_SIGNAL.store(1, Ordering::SeqCst))
     }?;
@@ -76,7 +78,7 @@ fn run_server() -> Result<(), failure::Error> {
     assert!(public_document_root.exists(), "DOCUMENT_ROOT {} does not exist", public_document_root.display());
     assert!(data_dir.exists(), "CRATE_DATA_DIR {} does not exist", data_dir.display());
 
-    let crates = KitchenSink::new(&data_dir, &github_token)?;
+    let crates = KitchenSink::new(&data_dir, &github_token).await?;
     let image_filter = Arc::new(ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_dir().join("images.db"))?);
     let markup = Renderer::new_filter(Some(Highlighter::new()), image_filter);
 
@@ -91,15 +93,16 @@ fn run_server() -> Result<(), failure::Error> {
     });
 
     // refresher thread
-    std::thread::spawn({
+    let handle = Handle::current();
+    handle.spawn({
         let state = state.clone();
-        move || {
+        async move {
             state.crates.load().prewarm();
             loop {
-                std::thread::sleep(std::time::Duration::from_secs(1));
+                tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
                 if 1 == HUP_SIGNAL.swap(0, Ordering::SeqCst) {
                     println!("HUP!");
-                    match KitchenSink::new(&data_dir, &github_token) {
+                    match KitchenSink::new(&data_dir, &github_token).await {
                         Ok(k) => {
                             let k = Arc::new(k);
                             k.update();
@@ -113,8 +116,7 @@ fn run_server() -> Result<(), failure::Error> {
                     }
                 }
             }
-        }
-    });
+        }});
 
     let server = HttpServer::new(move || {
         App::new()

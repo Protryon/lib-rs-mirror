@@ -13,9 +13,10 @@ use std::collections::HashSet;
 use std::sync::mpsc;
 use std::sync::Arc;
 use udedokei::LanguageExt;
+#[tokio::main]
+async fn main() {
 
-fn main() {
-    let crates = Arc::new(match kitchen_sink::KitchenSink::new_default() {
+    let crates = Arc::new(match kitchen_sink::KitchenSink::new_default().await {
         Ok(a) => a,
         e => {
             print_res(e);

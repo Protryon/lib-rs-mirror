@@ -10,8 +10,9 @@ use parse::*;
 use std::path::Path;
 use std::process::Command;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let crates = kitchen_sink::KitchenSink::new_default()?;
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let crates = kitchen_sink::KitchenSink::new_default().await?;
 
     let db = BuildDb::new(crates.main_cache_dir().join("builds.db"))?;
     let docker_root = crates.main_cache_dir().join("docker");

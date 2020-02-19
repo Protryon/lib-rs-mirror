@@ -33,3 +33,4 @@ parking_lot = "0.10.0"
 unicase = "2.6.0"
 either = "1.5.3"
 heck = "0.3.1"
+tokio = { version = "0.2.11", features = ["rt-threaded", "macros"] }

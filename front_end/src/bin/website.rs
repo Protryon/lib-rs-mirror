@@ -26,8 +26,9 @@ use std::sync::Arc;
 ///
 /// See home_page.rs for interesting bits
 ///
-fn main() {
-    if let Err(e) = run() {
+#[tokio::main]
+async fn main() {
+    if let Err(e) = run().await {
         eprintln!("Website generation failed: {}", e);
         for c in e.iter_chain() {
             eprintln!("error: -- {} {:?}", c, c);
@@ -36,10 +37,10 @@ fn main() {
     }
 }
 
-fn run() -> Result<(), failure::Error> {
+async fn run() -> Result<(), failure::Error> {
     let mut out = BufWriter::new(File::create("public/index.html").context("write to public/index.html")?);
     let mut feed = BufWriter::new(File::create("public/atom.xml").context("write to public/index.html")?);
-    let crates = KitchenSink::new_default().context("init caches, data, etc.")?;
+    let crates = KitchenSink::new_default().await.context("init caches, data, etc.")?;
     let done_pages = Mutex::new(HashSet::with_capacity(5000));
     let image_filter = Arc::new(ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_dir().join("images.db"))?);
     let markup = Renderer::new_filter(Some(Highlighter::new()), image_filter);

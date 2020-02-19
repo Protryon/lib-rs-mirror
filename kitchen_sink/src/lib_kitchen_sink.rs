@@ -51,7 +51,6 @@ use github_info::GitCommitAuthor;
 use github_info::GitHubRepo;
 use itertools::Itertools;
 use parking_lot::RwLock;
-use rayon::prelude::*;
 use repo_url::Repo;
 use repo_url::RepoHost;
 use repo_url::SimpleRepo;
@@ -326,19 +325,21 @@ impl KitchenSink {
     pub async fn all_new_crates(&self) -> CResult<Vec<RichCrate>> {
         let min_timestamp = self.crate_db.latest_crate_update_timestamp().await?.unwrap_or(0);
         let all = self.index.crates_io_crates(); // too slow to scan all GH crates
-        Ok(all.into_par_iter()
-        .filter_map(move |(name, _)| {
-            self.rich_crate(&Origin::from_crates_io_name(&*name)).map_err(|e| eprintln!("{}: {}", name, e)).ok()
-        })
-        .filter(move |k| {
+        let stream = futures::stream::iter(all.into_iter())
+            .filter_map(move |(name, _)| async move {
+                self.rich_crate_async(&Origin::from_crates_io_name(&*name)).await.map_err(|e| eprintln!("{}: {}", name, e)).ok()
+            });
+        Ok(stream.filter(move |k| {
             let latest = k.versions().iter().map(|v| v.created_at.as_str()).max().unwrap_or("");
-            if let Ok(timestamp) = DateTime::parse_from_rfc3339(latest) {
+            let res = if let Ok(timestamp) = DateTime::parse_from_rfc3339(latest) {
                 timestamp.timestamp() >= min_timestamp as i64
             } else {
                 eprintln!("Can't parse {} of {}", latest, k.name());
                 true
-            }
-        }).collect())
+            };
+            async move { res }
+        })
+        .collect::<Vec<_>>().await)
     }
 
     pub fn crate_exists(&self, origin: &Origin) -> bool {
@@ -346,10 +347,6 @@ impl KitchenSink {
     }
 
     /// Wrapper object for metadata common for all versions of a crate
-    pub fn rich_crate(&self, origin: &Origin) -> CResult<RichCrate> {
-        self.handle.enter(|| futures::executor::block_on(self.rich_crate_async(origin)))
-    }
-
     pub async fn rich_crate_async(&self, origin: &Origin) -> CResult<RichCrate> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
         match origin {
@@ -1897,7 +1894,7 @@ async fn is_build_or_dev_test() {
 #[tokio::test]
 async fn fetch_uppercase_name() {
     let k = KitchenSink::new_default().await.expect("Test if configured");
-    let _ = k.rich_crate(&Origin::from_crates_io_name("Inflector")).unwrap();
-    let _ = k.rich_crate(&Origin::from_crates_io_name("inflector")).unwrap();
+    let _ = k.rich_crate_async(&Origin::from_crates_io_name("Inflector")).await.unwrap();
+    let _ = k.rich_crate_async(&Origin::from_crates_io_name("inflector")).await.unwrap();
 }
 

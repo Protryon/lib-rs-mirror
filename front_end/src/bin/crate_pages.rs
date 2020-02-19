@@ -42,12 +42,12 @@ fn is_useful2(c: &RichCrateVersion) -> bool {
 }
 
 async fn render(origin: &Origin, crates: &KitchenSink, path: &PathBuf, markup: &Renderer, always: bool) -> Result<(), failure::Error> {
-    let allver = crates.rich_crate(origin)?;
+    let allver = crates.rich_crate_async(origin).await?;
     if !always && !is_useful1(&allver) {
         return Ok(());
     }
 
-    let c = crates.rich_crate_version(origin)?;
+    let c = crates.rich_crate_version_async(origin).await?;
     if !always && !is_useful2(&c) {
         return Ok(());
     }

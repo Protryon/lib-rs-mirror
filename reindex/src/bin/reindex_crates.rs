@@ -129,8 +129,7 @@ async fn main() {
 }
 
 async fn index_crate(crates: &KitchenSink, origin: &Origin, renderer: &Renderer, search_sender: &mpsc::SyncSender<(RichCrateVersion, usize, f64)>) -> Result<RichCrateVersion, failure::Error> {
-    let k = crates.rich_crate(origin)?;
-    let v = crates.rich_crate_version(origin)?;
+    let (k, v) = futures::try_join!(crates.rich_crate_async(origin), crates.rich_crate_version_async(origin))?;
 
     let (downloads_per_month, score) = crate_overall_score(crates, &k, &v, renderer).await;
     search_sender.send((v.clone(), downloads_per_month, score)).map_err(|e| {stop();e}).expect("closed channel?");

@@ -194,12 +194,17 @@ impl<'a> HomePage<'a> {
             .ok()
     }
 
-    pub fn recently_updated_crates<'z>(&'z self) -> impl Iterator<Item = (RichCrate, RichCrateVersion)> + 'z {
-        self.block(self.crates
-            .recently_updated_crates())
-            .expect("recent crates")
-            .into_iter()
-            .map(move |o| (self.crates.rich_crate(&o).unwrap(), self.crates.rich_crate_version(&o).unwrap()))
+    pub fn recently_updated_crates(&self) -> Vec<(RichCrate, RichCrateVersion)> {
+        self.block(async {
+            futures::stream::iter(self.crates
+                .recently_updated_crates().await
+                .expect("recent crates")
+                .into_iter())
+                .filter_map(move |o| async move {
+                    futures::try_join!(self.crates.rich_crate_async(&o), self.crates.rich_crate_version_async(&o)).ok()
+                })
+                .collect::<Vec<_>>().await
+            })
     }
 
     fn block<O>(&self, f: impl Future<Output=O>) -> O {

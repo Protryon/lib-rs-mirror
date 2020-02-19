@@ -213,11 +213,11 @@ async fn default_handler(req: HttpRequest) -> Result<HttpResponse, failure::Erro
 
     let crates = state.crates.load();
     let name = path.trim_matches('/');
-    if let Ok(k) = crates.rich_crate(&Origin::from_crates_io_name(name)) {
+    if let Ok(k) = crates.rich_crate_async(&Origin::from_crates_io_name(name)).await {
         return Ok(HttpResponse::PermanentRedirect().header("Location", format!("/crates/{}", encode(k.name()))).body(""));
     }
     let inverted_hyphens: String = name.chars().map(|c| if c == '-' {'_'} else if c == '_' {'-'} else {c.to_ascii_lowercase()}).collect();
-    if let Ok(k) = crates.rich_crate(&Origin::from_crates_io_name(&inverted_hyphens)) {
+    if let Ok(k) = crates.rich_crate_async(&Origin::from_crates_io_name(&inverted_hyphens)).await {
         return Ok(HttpResponse::TemporaryRedirect().header("Location", format!("/crates/{}", encode(k.name()))).body(""));
     }
     if crates.is_it_a_keyword(&inverted_hyphens).await {
@@ -449,8 +449,7 @@ fn render_crate_page(state: AServerState, origin: Origin) -> impl Future<Output=
     run_timeout(30, async move {
         let crates = state.crates.load();
         crates.prewarm();
-        let all = crates.rich_crate(&origin)?;
-        let ver = crates.rich_crate_version(&origin)?;
+        let (all, ver) = futures::try_join!(crates.rich_crate_async(&origin), crates.rich_crate_version_async(&origin))?;
         let mut page: Vec<u8> = Vec::with_capacity(50000);
         let last_mod = front_end::render_crate_page(&mut page, &all, &ver, &crates, &state.markup).await?;
         Ok::<_, failure::Error>((page, last_mod))

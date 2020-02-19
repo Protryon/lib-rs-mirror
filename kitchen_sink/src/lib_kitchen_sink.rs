@@ -1720,7 +1720,7 @@ impl KitchenSink {
             }
         }
         let mut top_keywords: Vec<_> = top_keywords.into_iter().collect();
-        top_keywords.sort_by(|a,b| b.cmp(&a));
+        top_keywords.sort_by(|a,b| b.1.cmp(&a.1));
         eprintln!("top cat keywords {:?}", top_keywords);
         let top_keywords: HashSet<_> = top_keywords.iter().take((top_keywords.len()/10).min(10).max(2)).map(|(k,_)| k.to_string()).collect();
 

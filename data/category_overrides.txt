@@ -49,6 +49,14 @@ iban_validate: parser-implementations
 ical: parser-implementations
 infer: filesystem
 json-tools: parser-implementations
+geos: science::math
+collider: science::math, game-engines
+myelin-geometry : science::math
+euclid: science::math
+kurbo: science::math, rendering::graphics-api
+spade: data-structures
+differential-geometry : science::math
+pathfinder_geometry: science::math
 jsonapi: web-programming
 jsonpath_lib: parser-implementations
 jsonrpc-parse : parser-implementations, web-programming

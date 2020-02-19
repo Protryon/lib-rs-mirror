@@ -63,8 +63,9 @@ async fn run() -> Result<(), failure::Error> {
 fn render_categories(
     cats: &CategoryMap, base: &Path, crates: &KitchenSink, done_pages: &Mutex<HashSet<Origin>>, markup: &Renderer,
 ) -> Result<(), failure::Error> {
-    cats.par_iter()
-        .map(|(slug, cat)| {
+    let handle = tokio::runtime::Handle::current();
+
+    for (slug, cat) in cats {
             running()?;
 
             if !cat.sub.is_empty() {
@@ -97,8 +98,8 @@ fn render_categories(
                 Ok(())
             };
 
-            crates
-                .top_crates_in_category(&cat.slug)
+            handle.enter(|| futures::executor::block_on(crates
+                .top_crates_in_category(&cat.slug)))
                 .context("top crates")?
                 .par_iter()
                 .take(75)
@@ -121,9 +122,9 @@ fn render_categories(
 
             let path = base.join(format!("{}.html", slug));
             let mut out = BufWriter::new(File::create(&path).with_context(|_| format!("Can't create {}", path.display()))?);
-            front_end::render_category(&mut out, cat, crates, markup)?;
+
+            handle.enter(|| futures::executor::block_on(front_end::render_category(&mut out, cat, crates, markup)))?;
             println!("{}", path.display());
-            Ok(())
-        })
-        .collect()
+    }
+    Ok(())
 }

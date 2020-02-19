@@ -4,6 +4,7 @@
 extern crate serde_derive;
 
 mod index;
+use futures::prelude::*;
 pub use crate::index::*;
 mod yearly;
 pub use crate::yearly::*;
@@ -72,6 +73,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::runtime::Handle;
+use futures::future::join_all;
 
 type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 
@@ -156,7 +158,7 @@ pub struct KitchenSink {
     loaded_rich_crate_version_cache: RwLock<FxHashMap<Origin, RichCrateVersion>>,
     category_crate_counts: LazyOnce<Option<HashMap<String, u32>>>,
     removals: LazyOnce<HashMap<Origin, f64>>,
-    top_crates_cached: RwLock<FxHashMap<String, Arc<Vec<Origin>>>>,
+    top_crates_cached: tokio::sync::RwLock<FxHashMap<String, Arc<Vec<Origin>>>>,
     git_checkout_path: PathBuf,
     main_cache_dir: PathBuf,
     yearly: AllDownloads,
@@ -200,7 +202,7 @@ impl KitchenSink {
             git_checkout_path: data_path.join("git"),
             category_crate_counts: LazyOnce::new(),
             removals: LazyOnce::new(),
-            top_crates_cached: RwLock::new(FxHashMap::default()),
+            top_crates_cached: tokio::sync::RwLock::new(FxHashMap::default()),
             yearly: AllDownloads::new(&main_cache_dir),
             main_cache_dir,
             category_overrides: Self::load_category_overrides(&data_path.join("category_overrides.txt"))?,
@@ -1054,15 +1056,15 @@ impl KitchenSink {
     }
 
     /// Returns (nth, slug)
-    pub fn top_category<'crat>(&self, krate: &'crat RichCrateVersion) -> Option<(u32, Cow<'crat, str>)> {
+    pub async fn top_category(&self, krate: &RichCrateVersion) -> Option<(u32, String)> {
         let crate_origin = krate.origin();
-        krate.category_slugs()
-        .filter_map(|slug| {
-            self.top_crates_in_category(&slug).ok()
-            .and_then(|cat| {
-                cat.iter().position(|o| o == crate_origin).map(|pos| {
-                    (pos as u32 +1, slug)
-                })
+        let cats = join_all(krate.category_slugs().map(|slug| slug.into_owned()).map(|slug| async move {
+            let c = self.top_crates_in_category(&slug).await?;
+            Ok::<_, CError>((c, slug))
+        })).await;
+        cats.into_iter().filter_map(|cats| cats.ok()).filter_map(|(cat, slug)| {
+            cat.iter().position(|o| o == crate_origin).map(|pos| {
+                (pos as u32 +1, slug)
             })
         })
         .min_by_key(|a| a.0)
@@ -1668,16 +1670,17 @@ impl KitchenSink {
     }
 
     // Sorted from the top, returns origins
-    pub fn top_crates_in_category(&self, slug: &str) -> CResult<Arc<Vec<Origin>>> {
+    pub async fn top_crates_in_category(&self, slug: &str) -> CResult<Arc<Vec<Origin>>> {
         {
-            let cache = self.top_crates_cached.read();
+            let cache = self.top_crates_cached.read().await;
             if let Some(category) = cache.get(slug) {
                 return Ok(category.clone());
             }
         }
         let total_count = self.category_crate_count(slug)?;
         let wanted_num = ((total_count/2+25)/50 * 50).max(100);
-        let mut cache = self.top_crates_cached.write();
+        let mut cache = self.top_crates_cached.write().await;
+
         use std::collections::hash_map::Entry::*;
         Ok(match cache.entry(slug.to_owned()) {
             Occupied(e) => Arc::clone(e.get()),

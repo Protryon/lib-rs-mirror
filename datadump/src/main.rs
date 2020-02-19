@@ -1,3 +1,5 @@
+#![allow(unused)]
+#![allow(dead_code)]
 use chrono::prelude::*;
 use std::io::Read;
 use std::io::BufReader;

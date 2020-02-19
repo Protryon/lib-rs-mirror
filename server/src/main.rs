@@ -47,9 +47,11 @@ struct ServerState {
 
 type AServerState = web::Data<ServerState>;
 
-#[tokio::main]
-async fn main() {
-    if let Err(e) = run_server().await {
+fn main() {
+    let mut sys = actix_rt::System::new("actix-server");
+    let res = sys.block_on(run_server());
+
+    if let Err(e) = res {
         for c in e.iter_chain() {
             eprintln!("Error: {}", c);
         }
@@ -142,10 +144,8 @@ async fn run_server() -> Result<(), failure::Error> {
     .expect("Can not bind to 127.0.0.1:32531")
     .shutdown_timeout(1);
 
-    actix_rt::System::new("actix-server").block_on(async {
-        println!("Starting HTTP server {} on http://127.0.0.1:32531", env!("CARGO_PKG_VERSION"));
-        server.run().await
-    })?;
+    println!("Starting HTTP server {} on http://127.0.0.1:32531", env!("CARGO_PKG_VERSION"));
+    server.run().await?;
 
     println!("bye!");
     Ok(())
@@ -252,9 +252,9 @@ async fn handle_category(req: HttpRequest, cat: &'static Category) -> Result<Htt
     crates.prewarm();
     let cache_file = state.page_cache_dir.join(format!("_{}.html", cat.slug));
     Ok(serve_cached(with_file_cache(cache_file, 1800, move || {
-        run_timeout(30, move || {
+        run_timeout_async(30, async move {
             let mut page: Vec<u8> = Vec::with_capacity(150000);
-            front_end::render_category(&mut page, cat, &crates, &state.markup)?;
+            front_end::render_category(&mut page, cat, &crates, &state.markup).await?;
             Ok::<_, failure::Error>((page, None))
         })
     }).await?))
@@ -271,7 +271,7 @@ async fn handle_home(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
     let state = state.clone();
     let cache_file = state.page_cache_dir.join("_.html");
     Ok(serve_cached(with_file_cache(cache_file, 3600, move || {
-        run_timeout(300, move || {
+        run_timeout_async(300, async move {
             let crates = state.crates.load();
             crates.prewarm();
             let mut page: Vec<u8> = Vec::with_capacity(50000);
@@ -594,8 +594,11 @@ async fn handle_feed(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
 }
 
 async fn run_timeout<T: 'static + Send>(secs: u64, cb: impl FnOnce() -> Result<T, failure::Error> + Send + 'static) -> Result<T, failure::Error> {
-    let ran = actix_threadpool::run(cb).map(|r| r.map_err(from_pool));
-    tokio::time::timeout(Duration::from_secs(secs), ran).await?
+    tokio::time::timeout(Duration::from_secs(secs), async move { tokio::task::block_in_place(cb) }).await?
+}
+
+async fn run_timeout_async<R, T: 'static + Send>(secs: u64, fut: R) -> Result<T, failure::Error> where R: Future<Output=Result<T, failure::Error>> + Send + 'static {
+    tokio::time::timeout(Duration::from_secs(secs), fut).await?
 }
 
 

@@ -20,13 +20,13 @@ pub struct CatPage<'a> {
 }
 
 impl<'a> CatPage<'a> {
-    pub fn new(cat: &'a Category, crates: &'a KitchenSink, markup: &'a Renderer) -> Result<Self, Error> {
+    pub async fn new(cat: &'a Category, crates: &'a KitchenSink, markup: &'a Renderer) -> Result<CatPage<'a>, Error> {
         Ok(Self {
             count: crates.category_crate_count(&cat.slug)? as usize,
             keywords: crates.top_keywords_in_category(cat)?,
             related: crates.related_categories(&cat.slug)?,
             crates: crates
-                .top_crates_in_category(&cat.slug)?
+                .top_crates_in_category(&cat.slug).await?
                 .par_iter()
                 .with_max_len(1)
                 .filter_map(|o| {

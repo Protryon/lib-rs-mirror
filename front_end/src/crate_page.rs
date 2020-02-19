@@ -533,7 +533,10 @@ impl<'a> CratePage<'a> {
 
     /// Most relevant category for the crate and rank in that category
     pub fn top_category(&self) -> Option<(u32, &Category)> {
-        self.kitchen_sink.top_category(&self.ver).and_then(|(top, slug)| CATEGORIES.from_slug(slug).last().map(|c| (top, c)))
+        let handle = tokio::runtime::Handle::current();
+
+        let res = handle.enter(|| futures::executor::block_on(self.kitchen_sink.top_category(&self.ver)));
+        res.and_then(|(top, slug)| CATEGORIES.from_slug(slug).last().map(|c| (top, c)))
     }
 
     /// docs.rs link, if available

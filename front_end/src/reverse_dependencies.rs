@@ -31,19 +31,19 @@ pub struct RevDepInf<'a> {
 }
 
 impl<'a> CratePageRevDeps<'a> {
-    pub fn new(ver: &'a RichCrateVersion, kitchen_sink: &'a KitchenSink, _markup: &'a Renderer) -> CResult<Self> {
-        let all_deps_stats = kitchen_sink.index.deps_stats()?;
-        let own_name = ver.short_name();
+    pub async fn new(ver: &'a RichCrateVersion, kitchen_sink: &'a KitchenSink, _markup: &'a Renderer) -> CResult<CratePageRevDeps<'a>> {
+        let all_deps_stats = kitchen_sink.index.deps_stats().await?;
+        let own_name = ver.short_name().to_ascii_lowercase();
         // RichCrateVersion may be unstable
-        let latest_stable_semver = kitchen_sink.index.crate_highest_version(&own_name.to_lowercase(), true)?.version().parse()?;
-        let stats = all_deps_stats.counts.get(own_name);
+        let latest_stable_semver = kitchen_sink.index.crate_highest_version(&own_name, true)?.version().parse()?;
+        let stats = all_deps_stats.counts.get(&*own_name);
 
         let mut deps: Vec<_> = stats.map(|s| s.rev_dep_names.iter().par_bridge().map(|rev_dep| {
             let origin = Origin::from_crates_io_name(rev_dep);
             let downloads = kitchen_sink.downloads_per_month(&origin).ok().and_then(|x| x).unwrap_or(0);
             let depender = kitchen_sink.index.crate_highest_version(&rev_dep.to_lowercase(), true).expect("rev dep integrity");
             let (is_optional, req, kind) = depender.dependencies().iter().filter(|d| {
-                own_name == d.crate_name()
+                own_name.eq_ignore_ascii_case(d.crate_name())
             })
             .next()
             .map(|d| {

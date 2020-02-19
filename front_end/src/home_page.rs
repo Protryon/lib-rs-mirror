@@ -47,25 +47,30 @@ impl<'a> HomePage<'a> {
     pub async fn all_categories(&self) -> Vec<HomeCategory> {
         let seen = &mut HashSet::with_capacity(5000);
         let mut all = self.make_all_categories(&CATEGORIES.root, seen).await;
-        self.add_updated_to_all_categories(&mut all, seen);
+        self.add_updated_to_all_categories(&mut all, seen).await;
         all
     }
 
     /// Add most recently updated crates to the list of top crates in each category
-    fn add_updated_to_all_categories(&self, cats: &mut [HomeCategory], seen: &mut HashSet<Origin>) {
+    fn add_updated_to_all_categories<'z, 's: 'z>(&'s self, cats: &'z mut [HomeCategory], seen: &'z mut HashSet<Origin>) -> std::pin::Pin<Box<dyn 'z + Future<Output=()>>> {
+        Box::pin(async move {
         // it's not the same order as before, but that's fine, it adds more variety
         for cat in cats {
             // depth first
-            self.add_updated_to_all_categories(&mut cat.sub, seen);
+            self.add_updated_to_all_categories(&mut cat.sub, seen).await;
 
-            let new: Vec<_> =
-                self.crates.recently_updated_crates_in_category(&cat.cat.slug).unwrap().into_iter().filter(|c| seen.get(&c).is_none()).take(3).collect();
-            let new: Vec<_> = new.into_par_iter().with_max_len(1).filter_map(|c| self.crates.rich_crate_version(&c).ok()).collect();
-            for c in &new {
-                seen.insert(c.origin().to_owned());
+            let mut n = 0u16;
+            for c in self.crates.recently_updated_crates_in_category(&cat.cat.slug).await.unwrap() {
+                if let Ok(c) = self.crates.rich_crate_version_async(&c).await {
+                    seen.insert(c.origin().to_owned());
+                    cat.top.push(c);
+                    if n >= 3 {
+                        break;
+                    }
+                    n += 1;
+                }
             }
-            cat.top.extend(new);
-        }
+        }})
     }
 
     /// A crate can be in multiple categories, so `seen` ensures every crate is shown only once
@@ -119,9 +124,11 @@ impl<'a> HomePage<'a> {
                     }
                 }
 
-                cat.top.par_extend(top.into_par_iter().with_max_len(1).filter_map(|c| self.crates.rich_crate_version(&c).ok()));
-                for c in &cat.top {
-                    seen.insert(c.origin().to_owned());
+                for c in top {
+                    if let Ok(c) = self.crates.rich_crate_version_async(&c).await {
+                        seen.insert(c.origin().to_owned());
+                        cat.top.push(c);
+                    }
                 }
                 cat.dl = dl.max(cat.dl);
             }

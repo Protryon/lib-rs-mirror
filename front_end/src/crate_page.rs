@@ -1,3 +1,4 @@
+use futures::future::join_all;
 use crate::download_graph::DownloadsGraph;
 use crate::templates;
 use crate::urler::Urler;
@@ -11,7 +12,6 @@ use kitchen_sink::CrateAuthor;
 use kitchen_sink::DepInfMap;
 use kitchen_sink::{DepTy, KitchenSink, Origin};
 use locale::Numeric;
-use rayon::prelude::*;
 use render_readme::Renderer;
 use rich_crate::Readme;
 use rich_crate::RepoHost;
@@ -57,6 +57,7 @@ pub struct CratePage<'a> {
     pub lang_stats: Option<(usize, Stats)>,
     pub viral_license: Option<CrateLicense>,
     top_category: Option<(u32, &'static Category)>,
+    is_build_or_dev: (bool, bool),
 }
 
 /// Helper used to find most "interesting" versions
@@ -100,6 +101,7 @@ impl<'a> CratePage<'a> {
     pub async fn new(all: &'a RichCrate, ver: &'a RichCrateVersion, kitchen_sink: &'a KitchenSink, markup: &'a Renderer) -> CResult<CratePage<'a>> {
         let top_category = kitchen_sink.top_category(ver).await
             .and_then(|(top, slug)| CATEGORIES.from_slug(slug).last().map(|c| (top, c)));
+        let is_build_or_dev = kitchen_sink.is_build_or_dev(ver.origin()).await?;
 
         let (top_keyword, (all_contributors, deps)) = rayon::join(
             || kitchen_sink.top_keyword(all),
@@ -117,8 +119,9 @@ impl<'a> CratePage<'a> {
             lang_stats: None,
             viral_license: None,
             top_category,
+            is_build_or_dev,
         };
-        let (sizes, lang_stats, viral_license) = page.crate_size_and_viral_license(deps?)?;
+        let (sizes, lang_stats, viral_license) = page.crate_size_and_viral_license(deps?).await?;
         page.sizes = Some(sizes);
         page.viral_license = viral_license;
 
@@ -183,11 +186,11 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn is_build_or_dev(&self) -> (bool, bool) {
-        self.kitchen_sink.is_build_or_dev(self.ver.origin()).expect("deps")
+        self.is_build_or_dev
     }
 
     pub fn dependents_stats(&self) -> Option<(u32, u32, Option<&str>)> {
-        self.kitchen_sink.crates_io_dependents_stats_of(self.ver.origin())
+        kitchen_sink::block_on(self.kitchen_sink.crates_io_dependents_stats_of(self.ver.origin()))
         .map_err(|e| eprintln!("{}", e))
         .ok().and_then(|x| x)
         .map(|d| (
@@ -356,7 +359,7 @@ impl<'a> CratePage<'a> {
             if !richdep.dep.is_crates_io() {
                 return None;
             }
-            self.kitchen_sink.version_popularity(&richdep.package, &req).expect("deps")
+            kitchen_sink::block_on(self.kitchen_sink.version_popularity(&richdep.package, &req)).expect("deps")
         }).unwrap_or((false, 0.));
         match pop {
             x if x >= 0.5 && matches_latest => "top",
@@ -730,10 +733,10 @@ impl<'a> CratePage<'a> {
     }
 
     /// analyze dependencies checking their weight and their license
-    fn crate_size_and_viral_license(&self, deps: DepInfMap) -> CResult<(CrateSizes, Stats, Option<CrateLicense>)> {
+    async fn crate_size_and_viral_license(&self, deps: DepInfMap) -> CResult<(CrateSizes, Stats, Option<CrateLicense>)> {
         let mut viral_license: Option<CrateLicense> = None;
-        let tmp: Vec<_> = deps
-            .into_par_iter()
+        let tmp: Vec<_> = join_all(deps
+            .into_iter()
             .filter_map(|(name, (depinf, semver))| {
                 if depinf.ty == DepTy::Dev {
                     return None;
@@ -750,7 +753,9 @@ impl<'a> CratePage<'a> {
                     },
                 };
 
-                let commonality = self.kitchen_sink.index.version_global_popularity(&name, &semver).expect("depsstats").unwrap_or(0.);
+                Some(async move {
+
+                let commonality = self.kitchen_sink.index.version_global_popularity(&name, &semver).await.expect("depsstats").unwrap_or(0.);
                 let is_heavy_build_dep = match &*name {
                     "bindgen" | "clang-sys" | "cmake" | "cc" if depinf.default => true, // you deserve full weight of it
                     _ => false,
@@ -773,9 +778,9 @@ impl<'a> CratePage<'a> {
                 if krate.is_proc_macro() {0.} else {1.} *
                 if depinf.ty == DepTy::Runtime {1.} else {0.};
 
-                Some((depinf, krate, weight, weight_minimal))
+                (depinf, krate, weight, weight_minimal)
             })
-            .collect();
+        })).await;
 
         let mut main_lang_stats = self.ver.language_stats().clone();
         let mut main_crate_size = self.ver.crate_size();

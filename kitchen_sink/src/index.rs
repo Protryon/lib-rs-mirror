@@ -17,9 +17,9 @@ use semver::VersionReq;
 use std::iter;
 use std::path::Path;
 use std::sync::Arc;
-use std::time::Duration;
 use string_interner::StringInterner;
 use string_interner::Sym;
+use double_checked_cell_async::DoubleCheckedCell;
 
 type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 type FxHashSet<V> = std::collections::HashSet<V, ahash::RandomState>;
@@ -132,7 +132,7 @@ pub struct Index {
 
     pub(crate) inter: RwLock<StringInterner<Sym>>,
     pub(crate) cache: RwLock<FxHashMap<(Box<str>, Features), ArcDepSet>>,
-    deps_stats: LazyOnce<DepsStats>,
+    deps_stats: DoubleCheckedCell<DepsStats>,
 }
 
 impl Index {
@@ -146,7 +146,7 @@ impl Index {
             git_index: GitIndex::new(data_dir)?,
             cache: RwLock::new(FxHashMap::with_capacity_and_hasher(5000, Default::default())),
             inter: RwLock::new(StringInterner::new()),
-            deps_stats: LazyOnce::new(),
+            deps_stats: DoubleCheckedCell::new(),
             indexed_crates: LazyOnce::new(),
             crates_io_index,
         })
@@ -181,17 +181,8 @@ impl Index {
         self.git_index.crates().cloned().chain(self.crates_io_crates().keys().map(|n| Origin::from_crates_io_name(&n)))
     }
 
-    pub fn deps_stats(&self) -> Result<&DepsStats, KitchenSinkErr> {
-        match self.deps_stats.try_get_for(Duration::from_secs(10), || {
-            let pool = rayon::ThreadPoolBuilder::new().build().unwrap();
-            pool.install(|| self.get_deps_stats())
-        }) {
-            Some(res) => Ok(res),
-            None => {
-                eprintln!("rayon deadlock");
-                return Err(KitchenSinkErr::DepsStatsNotAvailable)
-            },
-        }
+    pub async fn deps_stats(&self) -> Result<&DepsStats, KitchenSinkErr> {
+        Ok(self.deps_stats.get_or_init(self.get_deps_stats()).await)
     }
 
     #[inline]
@@ -295,6 +286,8 @@ impl Index {
             },
         };
         for (crate_name, kind, target_specific, is_optional, requirement, has_default_features, features) in deps {
+            debug_assert_eq!(crate_name, crate_name.to_ascii_lowercase());
+
             // people forget to include winapi conditionally
             let is_target_specific = crate_name == "winapi" || target_specific;
             if !wants.all_targets && is_target_specific {
@@ -340,6 +333,7 @@ impl Index {
 
             let key = {
                 let mut inter = self.inter.write();
+                debug_assert_eq!(crate_name, crate_name.to_ascii_lowercase());
                 (inter.get_or_intern(crate_name), inter.get_or_intern(matched.version()))
             };
 
@@ -392,7 +386,7 @@ impl Index {
     /// For crate being outdated. Returns (is_latest, popularity)
     /// 0 = not used *or deprecated*
     /// 1 = everyone uses it
-    pub fn version_popularity(&self, crate_name: &str, requirement: &VersionReq) -> Result<Option<(bool, f32)>, KitchenSinkErr> {
+    pub async fn version_popularity(&self, crate_name: &str, requirement: &VersionReq) -> Result<Option<(bool, f32)>, KitchenSinkErr> {
         if is_deprecated(crate_name) {
             return Ok(Some((false, 0.)));
         }
@@ -402,7 +396,7 @@ impl Index {
         let matches_latest = Self::highest_crates_io_version(krate, true).version().parse().ok()
             .map_or(false, |latest| requirement.matches(&latest));
 
-        let stats = self.deps_stats()?;
+        let stats = self.deps_stats().await?;
         let pop = stats.counts.get(crate_name)
         .map(|stats| {
             let mut matches = 0;
@@ -424,14 +418,14 @@ impl Index {
     }
 
     /// How likely it is that this exact crate will be installed in any project
-    pub fn version_global_popularity(&self, crate_name: &str, version: &MiniVer) -> Result<Option<f32>, KitchenSinkErr> {
+    pub async fn version_global_popularity(&self, crate_name: &str, version: &MiniVer) -> Result<Option<f32>, KitchenSinkErr> {
         match crate_name {
             // bindings' SLoC looks heavier than actual overhead of standard system libs
             "libc" | "winapi" | "kernel32-sys" | "winapi-i686-pc-windows-gnu" | "winapi-x86_64-pc-windows-gnu" => return Ok(Some(0.99)),
             _ => {},
         }
 
-        let stats = self.deps_stats()?;
+        let stats = self.deps_stats().await?;
         Ok(stats.counts.get(crate_name)
         .and_then(|c| {
             c.versions.get(&version)
@@ -511,10 +505,10 @@ pub struct DepQuery {
     pub dev: bool,
 }
 
-#[test]
-fn index_test() {
+#[tokio::test]
+async fn index_test() {
     let idx = Index::new_default().unwrap();
-    let stats = idx.deps_stats().unwrap();
+    let stats = idx.deps_stats().await.unwrap();
     assert!(stats.total > 13800);
     let lode = stats.counts.get("lodepng").unwrap();
     assert_eq!(12, lode.runtime.def);

@@ -88,8 +88,7 @@ async fn run(filter: Option<String>) -> Result<(), failure::Error> {
             let crates = Arc::clone(&crates);
             let path = PathBuf::from(format!("public/crates/{}.html", origin.short_crate_name()));
             s1.spawn(move |_| {
-                let handle = tokio::runtime::Handle::current();
-                if let Err(e) = handle.enter(|| futures::executor::block_on(render(&origin, &crates, &path, markup, always_render))) {
+                if let Err(e) = kitchen_sink::block_on(render(&origin, &crates, &path, markup, always_render)) {
                     eprintln!("••• error: {} — {}", e, path.display());
                     for c in e.iter_chain().skip(1) {
                         eprintln!("•   error: -- {}", c);

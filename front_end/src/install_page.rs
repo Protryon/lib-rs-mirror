@@ -14,8 +14,8 @@ pub struct InstallPage<'a> {
 }
 
 impl<'a> InstallPage<'a> {
-    pub fn new(ver: &'a RichCrateVersion, kitchen_sink: &'a KitchenSink, markup: &'a Renderer) -> Self {
-        let (is_build, is_dev) = kitchen_sink.is_build_or_dev(ver.origin()).expect("deps");
+    pub async fn new(ver: &'a RichCrateVersion, kitchen_sink: &'a KitchenSink, markup: &'a Renderer) -> InstallPage<'a> {
+        let (is_build, is_dev) = kitchen_sink.is_build_or_dev(ver.origin()).await.expect("deps");
         Self {
             is_build, is_dev,
             ver,

@@ -147,21 +147,23 @@ impl Index {
         let inter = self.inter.read();
         let mut converted = FxHashMap::with_capacity_and_hasher(collected.len(), Default::default());
         converted.extend(collected.into_iter().map(|(k, v)| {
-            (inter.resolve(k).expect("resolve").into(), v)
+            let name = inter.resolve(k).expect("resolve");
+            debug_assert_eq!(name, name.to_ascii_lowercase());
+            (name.into(), v)
         }));
         Ok(converted)
     }
 
-    pub(crate) fn get_deps_stats(&self) -> DepsStats {
+    pub(crate) async fn get_deps_stats(&self) -> DepsStats {
         let crates = self.crates_io_crates();
-        let crates: Vec<(&str, FxHashMap<_,_>)> = crates
+        let crates: Vec<(Box<str>, FxHashMap<_,_>)> = crates
         .par_iter()
         .filter_map(|(_, c)| {
             self.all_dependencies_flattened(c)
             .ok()
             .filter(|collected| !collected.is_empty())
             .map(|dep| {
-                (c.name(), dep)
+                (c.name().to_ascii_lowercase().into(), dep)
             })
         }).collect();
 
@@ -171,11 +173,11 @@ impl Index {
         let mut counts = FxHashMap::with_capacity_and_hasher(total, Default::default());
         for (parent_name, deps) in crates {
             for (name, (depinf, semver)) in deps {
-                let n = counts.entry(name.clone()).or_insert_with(RevDependencies::default);
+                let n = counts.entry(name).or_insert_with(RevDependencies::default);
                 let t = n.versions.entry(semver).or_insert(0);
                 *t = t.checked_add(1).expect("overflow");
                 if depinf.direct {
-                    n.rev_dep_names.push(parent_name);
+                    n.rev_dep_names.push(&parent_name);
                 }
                 match depinf.ty {
                     DepTy::Runtime => {

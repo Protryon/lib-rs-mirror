@@ -4,6 +4,7 @@
 extern crate serde_derive;
 
 mod index;
+use futures::stream::StreamExt;
 pub use crate::index::*;
 mod yearly;
 pub use crate::yearly::*;
@@ -132,8 +133,6 @@ pub enum KitchenSinkErr {
     GitIndexParse(String),
     #[fail(display = "Git index {:?}: {}", _0, _1)]
     GitIndexFile(PathBuf, String),
-    #[fail(display = "Rayon deadlock broke the stats")]
-    DepsStatsNotAvailable,
     #[fail(display = "Git crate '{:?}' can't be indexed, because it's not on the list", _0)]
     GitCrateNotAllowed(Origin),
 }
@@ -512,6 +511,10 @@ impl KitchenSink {
     ///
     /// There's no support for getting anything else than the latest version.
     pub fn rich_crate_version(&self, origin: &Origin) -> CResult<RichCrateVersion> {
+        block_on(self.rich_crate_version_async(origin))
+    }
+
+    pub async fn rich_crate_version_async(&self, origin: &Origin) -> CResult<RichCrateVersion> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
 
         if let Some(krate) = self.loaded_rich_crate_version_cache.read().get(origin) {
@@ -522,7 +525,7 @@ impl KitchenSink {
             Ok(v) => v,
             Err(e) => {
                 eprintln!("getting {:?}: {}", origin, e);
-                self.index_crate_highest_version(origin)?;
+                    self.index_crate_highest_version(origin).await?;
                 match self.crate_db.rich_crate_version_data(origin) {
                     Ok(v) => v,
                     Err(e) => Err(e)?,
@@ -858,8 +861,8 @@ impl KitchenSink {
         }
     }
 
-    pub fn is_build_or_dev(&self, k: &Origin) -> Result<(bool, bool), KitchenSinkErr> {
-        Ok(self.crates_io_dependents_stats_of(k)?
+    pub async fn is_build_or_dev(&self, k: &Origin) -> Result<(bool, bool), KitchenSinkErr> {
+        Ok(self.crates_io_dependents_stats_of(k).await?
         .map(|d| {
             // direct deps are more relevant, but sparse data gives wrong results
             let direct_weight = 1 + d.direct.all()/4;
@@ -1019,9 +1022,9 @@ impl KitchenSink {
         let _ = self.index.deps_stats();
     }
 
-    pub fn crates_io_dependents_stats_of(&self, origin: &Origin) -> Result<Option<&RevDependencies>, KitchenSinkErr> {
+    pub async fn crates_io_dependents_stats_of(&self, origin: &Origin) -> Result<Option<&RevDependencies>, KitchenSinkErr> {
         match origin {
-            Origin::CratesIo(crate_name) => Ok(self.index.deps_stats()?.counts.get(crate_name)),
+            Origin::CratesIo(crate_name) => Ok(self.index.deps_stats().await?.counts.get(crate_name)),
             _ => Ok(None),
         }
     }
@@ -1029,8 +1032,8 @@ impl KitchenSink {
     /// (latest, pop)
     /// 0 = not used
     /// 1 = everyone uses it
-    pub fn version_popularity(&self, crate_name: &str, requirement: &VersionReq) -> Result<Option<(bool, f32)>, KitchenSinkErr> {
-        self.index.version_popularity(crate_name, requirement)
+    pub async fn version_popularity(&self, crate_name: &str, requirement: &VersionReq) -> Result<Option<(bool, f32)>, KitchenSinkErr> {
+        self.index.version_popularity(crate_name, requirement).await
     }
 
     /// "See also"
@@ -1137,7 +1140,7 @@ impl KitchenSink {
         Ok(())
     }
 
-    pub fn index_crate_highest_version(&self, origin: &Origin) -> CResult<()> {
+    pub async fn index_crate_highest_version(&self, origin: &Origin) -> CResult<()> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
 
         let (src, manifest, _warn) = match origin {
@@ -1155,7 +1158,7 @@ impl KitchenSink {
 
         // direct deps are used as extra keywords for similarity matching,
         // but we're taking only niche deps to group similar niche crates together
-        let raw_deps_stats = self.index.deps_stats()?;
+        let raw_deps_stats = self.index.deps_stats().await?;
         let mut weighed_deps = Vec::<(&str, f32)>::new();
         let all_deps = manifest.direct_dependencies()?;
         let all_deps = [(all_deps.0, 1.0), (all_deps.2, 0.33)];
@@ -1171,7 +1174,7 @@ impl KitchenSink {
                 }
             }
         }
-        let (is_build, is_dev) = self.is_build_or_dev(origin)?;
+        let (is_build, is_dev) = self.is_build_or_dev(origin).await?;
         let package = manifest.package();
         let readme_text = src.readme.as_ref().map(|r| render_readme::Renderer::new(None).visible_text(&r.markup));
         let repository = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
@@ -1689,7 +1692,7 @@ impl KitchenSink {
                 } else {
                     self.crate_db.top_crates_in_category_partially_ranked(slug, wanted_num + 50)?
                 };
-                self.knock_duplicates(&mut crates);
+                self.knock_duplicates(&mut crates).await;
                 let crates: Vec<_> = crates.into_iter().map(|(o, _)| o).take(wanted_num as usize).collect();
                 let res = Arc::new(crates);
                 e.insert(Arc::clone(&res));
@@ -1699,13 +1702,13 @@ impl KitchenSink {
     }
 
     /// To make categories more varied, lower score of crates by same authors, with same keywords
-    fn knock_duplicates(&self, crates: &mut Vec<(Origin, f64)>) {
+    async fn knock_duplicates(&self, crates: &mut Vec<(Origin, f64)>) {
         let mut seen_owners = HashMap::new();
         let mut seen_keywords = HashMap::new();
         let mut seen_owner_keywords = HashMap::new();
 
-        let with_owners = crates.drain(..).par_bridge()
-        .filter_map(|(o, score)| {
+        let with_owners = futures::stream::iter(crates.drain(..))
+        .filter_map(|(o, score)| async move {
             let c = match self.rich_crate_version(&o) {
                 Ok(c) => c,
                 Err(e) => {
@@ -1718,7 +1721,7 @@ impl KitchenSink {
             }
             Some((o, score, self.crate_owners(&c).unwrap_or_default(), c.into_keywords()))
         })
-        .collect::<Vec<_>>();
+        .collect::<Vec<_>>().await;
 
         let mut top_keywords = HashMap::new();
         for (_, _, _, keywords) in &with_owners {
@@ -1793,7 +1796,7 @@ impl KitchenSink {
         keywords
     }
 
-    pub fn recently_updated_crates_in_category(&self, slug: &str) -> CResult<Vec<Origin>> {
+    pub async fn recently_updated_crates_in_category(&self, slug: &str) -> CResult<Vec<Origin>> {
         Ok(self.crate_db.recently_updated_crates_in_category(slug)?)
     }
 
@@ -1882,9 +1885,9 @@ impl<'a> CrateAuthor<'a> {
 #[tokio::test]
 async fn is_build_or_dev_test() {
     let c = KitchenSink::new_default().await.expect("uhg");
-    assert_eq!((false, false), c.is_build_or_dev(&Origin::from_crates_io_name("semver")).unwrap());
-    assert_eq!((false, true), c.is_build_or_dev(&Origin::from_crates_io_name("version-sync")).unwrap());
-    assert_eq!((true, false), c.is_build_or_dev(&Origin::from_crates_io_name("cc")).unwrap());
+    assert_eq!((false, false), c.is_build_or_dev(&Origin::from_crates_io_name("semver")).await.unwrap());
+    assert_eq!((false, true), c.is_build_or_dev(&Origin::from_crates_io_name("version-sync")).await.unwrap());
+    assert_eq!((true, false), c.is_build_or_dev(&Origin::from_crates_io_name("cc")).await.unwrap());
 }
 
 #[tokio::test]
@@ -1892,4 +1895,15 @@ async fn fetch_uppercase_name() {
     let k = KitchenSink::new_default().await.expect("Test if configured");
     let _ = k.rich_crate(&Origin::from_crates_io_name("Inflector")).unwrap();
     let _ = k.rich_crate(&Origin::from_crates_io_name("inflector")).unwrap();
+}
+
+pub fn block_on<O>(f: impl futures::Future<Output=O>) -> O {
+    match tokio::runtime::Handle::try_current() {
+        Ok(h) => h.enter(|| futures::executor::block_on(f)),
+        Err(_) => {
+            eprintln!("Boo, needs to set up a Tokio runtime");
+            let mut rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+            rt.block_on(f)
+        }
+    }
 }

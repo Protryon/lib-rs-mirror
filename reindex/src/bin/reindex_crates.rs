@@ -1,3 +1,4 @@
+use futures::future::join_all;
 use either::*;
 use failure;
 use kitchen_sink::RichCrate;
@@ -85,7 +86,7 @@ async fn main() {
                     return;
                 }
                 print!("{} ", i);
-                match crates.index_crate_highest_version(&origin) {
+                match kitchen_sink::block_on(crates.index_crate_highest_version(&origin)) {
                     Ok(()) => {},
                     err => {
                         print_res(err);
@@ -93,7 +94,7 @@ async fn main() {
                     },
                 }
                 scope.spawn(move |scope| {
-                    match index_crate(&crates, &origin, &renderer, &tx) {
+                    match kitchen_sink::block_on(index_crate(&crates, &origin, &renderer, &tx)) {
                         Ok(v) => {
                             if repos {
                                 scope.spawn(move |_| {
@@ -123,11 +124,11 @@ async fn main() {
     index_thread.join().unwrap().unwrap();
 }
 
-fn index_crate(crates: &KitchenSink, origin: &Origin, renderer: &Renderer, search_sender: &mpsc::SyncSender<(RichCrateVersion, usize, f64)>) -> Result<RichCrateVersion, failure::Error> {
+async fn index_crate(crates: &KitchenSink, origin: &Origin, renderer: &Renderer, search_sender: &mpsc::SyncSender<(RichCrateVersion, usize, f64)>) -> Result<RichCrateVersion, failure::Error> {
     let k = crates.rich_crate(origin)?;
     let v = crates.rich_crate_version(origin)?;
 
-    let (downloads_per_month, score) = crate_overall_score(crates, &k, &v, renderer);
+    let (downloads_per_month, score) = crate_overall_score(crates, &k, &v, renderer).await;
     search_sender.send((v.clone(), downloads_per_month, score)).map_err(|e| {stop();e}).expect("closed channel?");
     crates.index_crate(&k, score)?;
     Ok(v)
@@ -150,7 +151,7 @@ fn index_search(indexer: &mut Indexer, renderer: &Renderer, k: &RichCrateVersion
 }
 
 
-fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) -> (usize, f64) {
+async fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) -> (usize, f64) {
     let contrib_info = crates.all_contributors(&k).map_err(|e| eprintln!("{}", e)).ok();
     let contributors_count = if let Some((authors, _owner_only, _, extra_contributors)) = &contrib_info {
         (authors.len() + extra_contributors) as u32
@@ -200,13 +201,17 @@ fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersi
     let downloads_per_month = crates.downloads_per_month_or_equivalent(all.origin()).expect("dl numbers").unwrap_or(0) as u32;
     let dependency_freshness = if let Ok((runtime, _, build)) = k.direct_dependencies() {
         // outdated dev deps don't matter
-        runtime.iter().chain(&build).filter_map(|richdep| {
+        join_all(runtime.iter().chain(&build).filter_map(|richdep| {
             if !richdep.dep.is_crates_io() {
                 return None;
             }
             let req = richdep.dep.req().parse().ok()?;
-            Some((richdep.is_optional(), crates.version_popularity(&richdep.package, &req).expect("ver1pop").expect("ver2pop")))
-        })
+            Some(async move {
+                (richdep.is_optional(), crates.version_popularity(&richdep.package, &req).await.expect("ver1pop").expect("ver2pop"))
+            })
+        }))
+        .await
+        .into_iter()
         .map(|(is_optional, (is_latest, popularity))| {
             if is_latest {1.0} // don't penalize pioneers
             else if is_optional {0.8 + popularity * 0.2} // not a big deal when it's off
@@ -232,7 +237,7 @@ fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersi
 
     let mut direct_rev_deps = 0;
     let mut indirect_reverse_optional_deps = 0;
-    if let Some(deps) = crates.crates_io_dependents_stats_of(k.origin()).expect("depsstats") {
+    if let Some(deps) = crates.crates_io_dependents_stats_of(k.origin()).await.expect("depsstats") {
         direct_rev_deps = deps.direct.all();
         indirect_reverse_optional_deps = (deps.runtime.def as u32 + deps.runtime.opt as u32)
             .max(deps.dev as u32)

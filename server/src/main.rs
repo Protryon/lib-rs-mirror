@@ -94,7 +94,7 @@ async fn run_server() -> Result<(), failure::Error> {
     });
 
     // refresher thread
-    let handle = Handle::current();
+    let handle = Handle::try_current()?;
     handle.spawn({
         let state = state.clone();
         async move {
@@ -363,7 +363,7 @@ async fn handle_install(req: HttpRequest) -> Result<HttpResponse, failure::Error
         let crates = state.crates.load();
         let ver = crates.rich_crate_version(&origin)?;
         let mut page: Vec<u8> = Vec::with_capacity(50000);
-        front_end::render_install_page(&mut page, &ver, &crates, &state.markup)?;
+        front_end::render_install_page(&mut page, &ver, &crates, &state.markup).await?;
         Ok::<_, failure::Error>((page, None))
     }).await?;
     Ok(serve_cached((page, 3600, false, last_mod)))
@@ -463,7 +463,7 @@ async fn render_crate_reverse_dependencies(state: AServerState, origin: Origin) 
         crates.prewarm();
         let ver = crates.rich_crate_version(&origin)?;
         let mut page: Vec<u8> = Vec::with_capacity(50000);
-        front_end::render_crate_reverse_dependencies(&mut page, &ver, &crates, &state.markup)?;
+        front_end::render_crate_reverse_dependencies(&mut page, &ver, &crates, &state.markup).await?;
         Ok::<_, failure::Error>((page, 24*3600, false, None))
     }).await
 }
@@ -585,7 +585,7 @@ async fn handle_feed(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
 }
 
 async fn run_timeout<R, T: 'static + Send>(secs: u64, fut: R) -> Result<T, failure::Error> where R: Future<Output=Result<T, failure::Error>> {
-    tokio::time::timeout(Duration::from_secs(secs), fut).await?
+    tokio::time::timeout(Duration::from_secs(secs*4), fut).await?
 }
 
 

@@ -145,23 +145,23 @@ pub async fn render_crate_page<W: Write>(out: &mut W, all: &RichCrate, ver: &Ric
 }
 
 /// See `reverse_dependencies.rs.html`
-pub fn render_crate_reverse_dependencies<W: Write>(out: &mut W, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
+pub async fn render_crate_reverse_dependencies<W: Write>(out: &mut W, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
     if stopped() {
         Err(KitchenSinkErr::Stopped)?;
     }
     let urler = Urler::new(None);
-    let c = reverse_dependencies::CratePageRevDeps::new(ver, kitchen_sink, renderer)?;
+    let c = reverse_dependencies::CratePageRevDeps::new(ver, kitchen_sink, renderer).await?;
     templates::reverse_dependencies(out, &urler, &c)?;
     Ok(())
 }
 
 /// See `install.rs.html`
-pub fn render_install_page(out: &mut impl Write, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
+pub async fn render_install_page(out: &mut impl Write, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
     if stopped() {
         Err(KitchenSinkErr::Stopped)?;
     }
     let urler = Urler::new(None); // Don't set self-crate, because we want to link back to crate page
-    let c = crate::install_page::InstallPage::new(ver, kitchen_sink, renderer);
+    let c = crate::install_page::InstallPage::new(ver, kitchen_sink, renderer).await;
     templates::install(out, &urler, &c).context("install page io")?;
     Ok(())
 }

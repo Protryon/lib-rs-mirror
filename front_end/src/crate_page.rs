@@ -1,3 +1,4 @@
+use tokio::runtime::Handle;
 use futures::future::join_all;
 use crate::download_graph::DownloadsGraph;
 use crate::templates;
@@ -58,6 +59,7 @@ pub struct CratePage<'a> {
     pub viral_license: Option<CrateLicense>,
     top_category: Option<(u32, &'static Category)>,
     is_build_or_dev: (bool, bool),
+    handle: Handle,
 }
 
 /// Helper used to find most "interesting" versions
@@ -120,6 +122,7 @@ impl<'a> CratePage<'a> {
             viral_license: None,
             top_category,
             is_build_or_dev,
+            handle: Handle::current(),
         };
         let (sizes, lang_stats, viral_license) = page.crate_size_and_viral_license(deps?).await?;
         page.sizes = Some(sizes);
@@ -190,7 +193,7 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn dependents_stats(&self) -> Option<(u32, u32, Option<&str>)> {
-        kitchen_sink::block_on(self.kitchen_sink.crates_io_dependents_stats_of(self.ver.origin()))
+        self.handle.enter(|| futures::executor::block_on(self.kitchen_sink.crates_io_dependents_stats_of(self.ver.origin())))
         .map_err(|e| eprintln!("{}", e))
         .ok().and_then(|x| x)
         .map(|d| (
@@ -355,18 +358,20 @@ impl<'a> CratePage<'a> {
         if richdep.dep.req() == "*" {
             return "common";
         }
-        let (matches_latest, pop) = richdep.dep.req().parse().ok().and_then(|req| {
-            if !richdep.dep.is_crates_io() {
-                return None;
+        self.handle.enter(|| {
+            let (matches_latest, pop) = richdep.dep.req().parse().ok().and_then(|req| {
+                if !richdep.dep.is_crates_io() {
+                    return None;
+                }
+                futures::executor::block_on(self.kitchen_sink.version_popularity(&richdep.package, &req)).expect("deps")
+            }).unwrap_or((false, 0.));
+            match pop {
+                x if x >= 0.5 && matches_latest => "top",
+                x if x >= 0.75 || matches_latest => "common",
+                x if x >= 0.25 => "outdated",
+                _ => "obsolete",
             }
-            kitchen_sink::block_on(self.kitchen_sink.version_popularity(&richdep.package, &req)).expect("deps")
-        }).unwrap_or((false, 0.));
-        match pop {
-            x if x >= 0.5 && matches_latest => "top",
-            x if x >= 0.75 || matches_latest => "common",
-            x if x >= 0.25 => "outdated",
-            _ => "obsolete",
-        }
+        })
     }
 
     /// The rule is - last displayed digit may change (except 0.x)

@@ -161,6 +161,7 @@ pub struct KitchenSink {
     main_cache_dir: PathBuf,
     yearly: AllDownloads,
     category_overrides: HashMap<String, Vec<Cow<'static, str>>>,
+    handle: Handle,
 }
 
 impl KitchenSink {
@@ -178,10 +179,7 @@ impl KitchenSink {
     }
 
     pub async fn new(data_path: &Path, github_token: &str) -> CResult<Self> {
-        // just testing whether runtime is on
         let handle = Handle::current();
-        handle.spawn(async {});
-
         let main_cache_dir = data_path.to_owned();
 
         let ((crates_io, gh), index) = rayon::join(|| rayon::join(
@@ -204,6 +202,7 @@ impl KitchenSink {
             yearly: AllDownloads::new(&main_cache_dir),
             main_cache_dir,
             category_overrides: Self::load_category_overrides(&data_path.join("category_overrides.txt"))?,
+            handle,
         })
     }
 
@@ -511,7 +510,7 @@ impl KitchenSink {
     ///
     /// There's no support for getting anything else than the latest version.
     pub fn rich_crate_version(&self, origin: &Origin) -> CResult<RichCrateVersion> {
-        block_on(self.rich_crate_version_async(origin))
+        self.handle.enter(|| futures::executor::block_on(self.rich_crate_version_async(origin)))
     }
 
     pub async fn rich_crate_version_async(&self, origin: &Origin) -> CResult<RichCrateVersion> {
@@ -1897,13 +1896,3 @@ async fn fetch_uppercase_name() {
     let _ = k.rich_crate(&Origin::from_crates_io_name("inflector")).unwrap();
 }
 
-pub fn block_on<O>(f: impl futures::Future<Output=O>) -> O {
-    match tokio::runtime::Handle::try_current() {
-        Ok(h) => h.enter(|| futures::executor::block_on(f)),
-        Err(_) => {
-            eprintln!("Boo, needs to set up a Tokio runtime");
-            let mut rt = tokio::runtime::Runtime::new().expect("tokio runtime");
-            rt.block_on(f)
-        }
-    }
-}

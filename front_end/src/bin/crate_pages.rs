@@ -67,6 +67,7 @@ async fn run(filter: Option<String>) -> Result<(), failure::Error> {
     let image_filter = Arc::new(ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_dir().join("images.db"))?);
     let markup = &Renderer::new_filter(Some(Highlighter::new()), image_filter);
 
+    let handle = Arc::new(tokio::runtime::Handle::current());
     rayon::scope(move |s1| {
         let tmp;
         let always_render = filter.is_some();
@@ -86,9 +87,10 @@ async fn run(filter: Option<String>) -> Result<(), failure::Error> {
             }
             let origin = origin.clone();
             let crates = Arc::clone(&crates);
+            let handle = Arc::clone(&handle);
             let path = PathBuf::from(format!("public/crates/{}.html", origin.short_crate_name()));
             s1.spawn(move |_| {
-                if let Err(e) = kitchen_sink::block_on(render(&origin, &crates, &path, markup, always_render)) {
+                if let Err(e) = handle.enter(|| futures::executor::block_on(render(&origin, &crates, &path, markup, always_render))) {
                     eprintln!("••• error: {} — {}", e, path.display());
                     for c in e.iter_chain().skip(1) {
                         eprintln!("•   error: -- {}", c);

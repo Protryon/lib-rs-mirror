@@ -62,6 +62,8 @@ async fn main() {
         }
     });
 
+    let handle = Arc::new(tokio::runtime::Handle::current());
+
     let seen_repos = &Mutex::new(HashSet::new());
     let _ = pre.join().unwrap();
     rayon::scope(move |scope| {
@@ -79,6 +81,7 @@ async fn main() {
                 return;
             }
             let crates = Arc::clone(&crates);
+            let handle = Arc::clone(&handle);
             let renderer = Arc::clone(&renderer);
             let tx = tx.clone();
             scope.spawn(move |scope| {
@@ -86,7 +89,7 @@ async fn main() {
                     return;
                 }
                 print!("{} ", i);
-                match kitchen_sink::block_on(crates.index_crate_highest_version(&origin)) {
+                match handle.enter(|| futures::executor::block_on(crates.index_crate_highest_version(&origin))) {
                     Ok(()) => {},
                     err => {
                         print_res(err);
@@ -94,7 +97,7 @@ async fn main() {
                     },
                 }
                 scope.spawn(move |scope| {
-                    match kitchen_sink::block_on(index_crate(&crates, &origin, &renderer, &tx)) {
+                    match handle.enter(|| futures::executor::block_on(index_crate(&crates, &origin, &renderer, &tx))) {
                         Ok(v) => {
                             if repos {
                                 scope.spawn(move |_| {

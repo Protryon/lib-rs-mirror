@@ -1,7 +1,7 @@
-use std::collections::HashSet;
-use regex::Regex;
 use crate_db::builddb::Compat;
+use regex::Regex;
 use serde_derive::*;
+use std::collections::HashSet;
 
 #[derive(Deserialize)]
 pub struct CompilerMessageInner {
@@ -72,8 +72,7 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                     }
                     if level == "error" {
                         findings.crates.insert((None, name, ver, Compat::Incompatible));
-                    }
-                    else if reason == "compiler-artifact" {
+                    } else if reason == "compiler-artifact" {
                         findings.crates.insert((None, name, ver, Compat::VerifiedWorks));
                     } else {
                         if level != "warning" && reason != "build-script-executed" && !(level == "" && reason == "compiler-message") {

@@ -160,7 +160,7 @@ struct MarkupProps {
 
 fn fill_props(node: &Handle, props: &mut MarkupProps, mut in_code: bool) {
     match node.data {
-        NodeData::Text {ref contents} => {
+        NodeData::Text { ref contents } => {
             let len = contents.borrow().trim().len();
             if len > 0 {
                 if in_code {
@@ -171,7 +171,7 @@ fn fill_props(node: &Handle, props: &mut MarkupProps, mut in_code: bool) {
             }
             return; // has no children
         },
-        NodeData::Element {ref name, ref attrs, ..} => {
+        NodeData::Element { ref name, ref attrs, .. } => {
             match name.local.get(..).unwrap() {
                 "img" => {
                     if let Some(src) = attrs.borrow().iter().find(|a| a.name.local.get(..).unwrap() == "src") {
@@ -212,11 +212,11 @@ fn readme_score(readme: Option<&Handle>, is_app: bool) -> Score {
     if let Some(readme) = readme {
         fill_props(readme, &mut props, false);
     }
-    s.frac("text length", 75, (props.text_len as f64 /3000.).min(1.0));
+    s.frac("text length", 75, (props.text_len as f64 / 3000.).min(1.0));
     // code examples are not expected for apps
-    s.frac("code length", if is_app {25} else {100}, (props.code_len as f64 /2000.).min(1.0));
-    s.n("code blocks", if is_app {15} else {25}, props.pre_blocks * 5);
-    s.has("has code", if is_app {10} else {30}, props.code_len > 150 && props.pre_blocks > 0); // people really like seeing a code example
+    s.frac("code length", if is_app { 25 } else { 100 }, (props.code_len as f64 / 2000.).min(1.0));
+    s.n("code blocks", if is_app { 15 } else { 25 }, props.pre_blocks * 5);
+    s.has("has code", if is_app { 10 } else { 30 }, props.code_len > 150 && props.pre_blocks > 0); // people really like seeing a code example
     s.n("images", 35, props.images * 25); // I like pages with logos
     s.n("sections", 30, props.sections * 4);
     s.n("list or table rows", 25, props.list_or_table_rows * 2);
@@ -302,7 +302,7 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs<'_>) -> Score {
                 Ok(ref ver) if ver.minor > 3 => 150,
                 _ => 80,
             };
-            let expected_update_interval = version_stability_interval.min(cr.versions.len() as i64 * 50) / if cr.is_nightly {2} else {1};
+            let expected_update_interval = version_stability_interval.min(cr.versions.len() as i64 * 50) / if cr.is_nightly { 2 } else { 1 };
             let age = (Utc::now() - latest_date).num_days();
             let days_past_expiration_date = (age - expected_update_interval).max(0);
             // score decays for a ~year after the crate should have been updated
@@ -321,10 +321,10 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs<'_>) -> Score {
 
     // Low numbers are just bots/noise.
     let downloads = (cr.downloads_per_month as f64 - 100.).max(0.) + 100.;
-    let downloads_cleaned = (cr.downloads_per_month_minus_most_downloaded_user as f64 / if is_app_only {1.} else {2.} - 50.).max(0.) + 50.;
+    let downloads_cleaned = (cr.downloads_per_month_minus_most_downloaded_user as f64 / if is_app_only { 1. } else { 2. } - 50.).max(0.) + 50.;
     // distribution of downloads follows power law.
     // apps have much harder to get high download numbers.
-    let pop = (downloads.log2() - 6.6) / (if is_app_only {5.} else {6.});
+    let pop = (downloads.log2() - 6.6) / (if is_app_only { 5. } else { 6. });
     let pop_cleaned = downloads_cleaned.log2() - 5.6;
     assert!(pop > 0.);
     assert!(pop_cleaned > 0.);

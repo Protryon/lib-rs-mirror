@@ -8,12 +8,12 @@ use github_rs::client::Executor;
 use github_rs::headers::{rate_limit_remaining, rate_limit_reset};
 use github_rs::{HeaderMap, StatusCode};
 use repo_url::SimpleRepo;
+use serde_derive::*;
 use simple_cache::TempCache;
 use std::thread;
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 use urlencoding::encode;
-use serde_derive::*;
 
 mod model;
 pub use crate::model::*;
@@ -193,10 +193,11 @@ impl GitHub {
     }
 
     fn get_cached<F, P, B, R>(&self, cache: &TempCache<(String, Option<R>)>, key: (&str, &str), cb: F, postproc: P) -> CResult<Option<R>>
-        where P: FnOnce(B) -> R,
+    where
+        P: FnOnce(B) -> R,
         F: FnOnce(&client::Github) -> Result<(HeaderMap, StatusCode, Option<serde_json::Value>), github_rs::errors::Error>,
-        B: for <'de> serde::Deserialize<'de> + serde::Serialize + Clone + Send + 'static,
-        R: for <'de> serde::Deserialize<'de> + serde::Serialize + Clone + Send + 'static
+        B: for<'de> serde::Deserialize<'de> + serde::Serialize + Clone + Send + 'static,
+        R: for<'de> serde::Deserialize<'de> + serde::Serialize + Clone + Send + 'static,
     {
         if let Some((ver, payload)) = cache.get(key.0)? {
             if ver == key.1 {

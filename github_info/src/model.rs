@@ -15,8 +15,7 @@ use std::fmt;
 /// Case-insensitive enum
 impl<'de> Deserialize<'de> for UserType {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer<'de>,
-    {
+    where D: Deserializer<'de> {
         struct UserTypeVisitor;
 
         impl<'a> Visitor<'a> for UserTypeVisitor {
@@ -46,8 +45,7 @@ impl<'de> Deserialize<'de> for UserType {
 
 impl Serialize for UserType {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer,
-    {
+    where S: Serializer {
         serializer.serialize_str(match *self {
             UserType::User => "user",
             UserType::Org => "org",

@@ -4,23 +4,23 @@
 extern crate serde_derive;
 
 mod index;
-use futures::stream::StreamExt;
 pub use crate::index::*;
+use futures::stream::StreamExt;
 mod yearly;
 pub use crate::yearly::*;
 mod deps_stats;
 pub use crate::deps_stats::*;
 
+mod ctrlcbreak;
 mod git_crates_index;
 mod tarball;
-mod ctrlcbreak;
 pub use crate::ctrlcbreak::*;
 
-pub use crate_db::builddb::CompatibilityInfo;
 pub use crate_db::builddb::Compat;
+pub use crate_db::builddb::CompatibilityInfo;
 pub use crates_index::Crate as CratesIndexCrate;
-pub use crates_io_client::CrateDependency;
 pub use crates_io_client::CrateDepKind;
+pub use crates_io_client::CrateDependency;
 pub use crates_io_client::CrateMetaVersion;
 pub use crates_io_client::CratesIoCrate;
 pub use crates_io_client::OwnerKind;
@@ -29,6 +29,7 @@ pub use github_info::UserOrg;
 pub use github_info::UserType;
 pub use rich_crate::Edition;
 pub use rich_crate::MaintenanceStatus;
+use rich_crate::ManifestExt;
 pub use rich_crate::Markup;
 pub use rich_crate::Origin;
 pub use rich_crate::RichCrate;
@@ -36,17 +37,18 @@ pub use rich_crate::RichCrateVersion;
 pub use rich_crate::RichDep;
 pub use rich_crate::{Cfg, Target};
 pub use semver::Version as SemVer;
-use rich_crate::ManifestExt;
 
+use crate::tarball::CrateFile;
 use cargo_toml::Manifest;
 use cargo_toml::Package;
 use categories::Category;
-use chrono::DateTime;
 use chrono::prelude::*;
-use crate::tarball::CrateFile;
-use crate_db::{CrateDb, CrateVersionData, RepoChange, builddb::BuildDb};
+use chrono::DateTime;
+use crate_db::{builddb::BuildDb, CrateDb, CrateVersionData, RepoChange};
 use crates_io_client::CrateOwner;
+use double_checked_cell_async::DoubleCheckedCell;
 use failure::ResultExt;
+use futures::future::join_all;
 use github_info::GitCommitAuthor;
 use github_info::GitHubRepo;
 use itertools::Itertools;
@@ -70,8 +72,6 @@ use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
-use futures::future::join_all;
-use double_checked_cell_async::DoubleCheckedCell;
 
 type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 
@@ -262,7 +262,7 @@ impl KitchenSink {
     ///
     /// It returns only identifiers,
     /// so `rich_crate`/`rich_crate_version` is needed to do more.
-    pub fn all_crates(&self) -> impl Iterator<Item=Origin> + '_ {
+    pub fn all_crates(&self) -> impl Iterator<Item = Origin> + '_ {
         self.index.all_crates()
     }
 
@@ -356,7 +356,7 @@ impl KitchenSink {
                 }).collect();
                 Ok(RichCrate::new(origin.clone(), meta.owners, meta.meta.krate.name, versions))
             },
-            Origin::GitHub {repo, package} => {
+            Origin::GitHub { repo, package } => {
                 let host = RepoHost::GitHub(repo.clone()).try_into().map_err(|_| KitchenSinkErr::CrateNotFound(origin.clone())).context("ghrepo host bad")?;
                 let cachebust = self.cachebust_string_for_repo(&host).await.context("ghrepo")?;
                 let gh = self.gh.repo(repo, &cachebust)?
@@ -376,19 +376,19 @@ impl KitchenSink {
                 format!("github/{}/{}", repo.owner, package),
                 versions))
             },
-            Origin::GitLab {repo, package} => {
+            Origin::GitLab { repo, package } => {
                 let host = RepoHost::GitLab(repo.clone()).try_into().map_err(|_| KitchenSinkErr::CrateNotFound(origin.clone())).context("ghrepo host bad")?;
                 let cachebust = self.cachebust_string_for_repo(&host).await.context("ghrepo")?;
                 let versions = self.get_repo_versions(origin, &host, &cachebust).await?;
                 Ok(RichCrate::new(origin.clone(), vec![], format!("gitlab/{}/{}", repo.owner, package), versions))
-            }
+            },
         }
     }
 
     async fn get_repo_versions(&self, origin: &Origin, repo: &Repo, cachebust: &str) -> CResult<Vec<CrateVersion>> {
         let package = match origin {
-            Origin::GitLab {package, ..} => package,
-            Origin::GitHub {repo, package} => {
+            Origin::GitLab { package, .. } => package,
+            Origin::GitHub { repo, package } => {
                 let releases = self.gh.releases(repo, cachebust)?.ok_or_else(|| KitchenSinkErr::CrateNotFound(origin.clone())).context("releases not found")?;
                 let versions: Vec<_> = releases.into_iter().filter_map(|r| {
                     let date = r.published_at.or(r.created_at)?;
@@ -452,7 +452,7 @@ impl KitchenSink {
     }
 
     pub fn downloads_per_month(&self, origin: &Origin) -> CResult<Option<usize>> {
-        self.downloads_recent(origin).map(|dl| dl.map(|n| n/3))
+        self.downloads_recent(origin).map(|dl| dl.map(|n| n / 3))
     }
 
     pub async fn downloads_per_month_or_equivalent(&self, origin: &Origin) -> CResult<Option<usize>> {
@@ -466,7 +466,7 @@ impl KitchenSink {
 
     /// Only for GitHub origins, not for crates-io crates
     pub async fn github_stargazers_and_watchers(&self, origin: &Origin) -> CResult<Option<(u32, u32)>> {
-        if let Origin::GitHub {repo, ..} = origin {
+        if let Origin::GitHub { repo, .. } = origin {
             let repo = RepoHost::GitHub(repo.clone()).try_into().expect("repohost");
             if let Some(gh) = self.github_repo(&repo).await? {
                 return Ok(Some((gh.stargazers_count, gh.subscribers_count)));
@@ -518,7 +518,7 @@ impl KitchenSink {
             Ok(v) => v,
             Err(e) => {
                 eprintln!("getting {:?}: {}", origin, e);
-                    self.index_crate_highest_version(origin).await?;
+                self.index_crate_highest_version(origin).await?;
                 match self.crate_db.rich_crate_version_data(origin).await {
                     Ok(v) => v,
                     Err(e) => Err(e)?,
@@ -784,7 +784,7 @@ impl KitchenSink {
         let direct_dependencies = &manifest.dependencies;
         let has_cargo_bin = manifest.has_cargo_bin();
         let package = manifest.package.as_mut().expect("pkg");
-        let eq = |a:&str,b:&str| -> bool {a.eq_ignore_ascii_case(b)};
+        let eq = |a: &str, b: &str| -> bool { a.eq_ignore_ascii_case(b) };
 
         for cat in &mut package.categories {
             if cat.as_bytes().iter().any(|c| !c.is_ascii_lowercase()) {
@@ -811,7 +811,7 @@ impl KitchenSink {
                 }
             }
             if cat == "cryptography" || cat == "database" || cat == "rust-patterns" || cat == "development-tools" {
-                if package.keywords.iter().any(|k| eq(k,"bitcoin") || eq(k,"ethereum") || eq(k,"ledger") || eq(k,"exonum") || eq(k,"blockchain")) {
+                if package.keywords.iter().any(|k| eq(k, "bitcoin") || eq(k, "ethereum") || eq(k, "ledger") || eq(k, "exonum") || eq(k, "blockchain")) {
                     *cat = "cryptography::cryptocurrencies".into();
                 }
             }
@@ -881,10 +881,8 @@ impl KitchenSink {
         };
         if let Some(repo) = maybe_repo {
             let res = crate_git_checkout::checkout(repo, &self.git_checkout_path)
-            .map_err(From::from)
-            .and_then(|checkout| {
-                crate_git_checkout::find_readme(&checkout, package)
-            });
+                .map_err(From::from)
+                .and_then(|checkout| crate_git_checkout::find_readme(&checkout, package));
             match res {
                 Ok(Some(readme)) => {
                     meta.readme = Some(readme);
@@ -1141,7 +1139,7 @@ impl KitchenSink {
                 let ver = self.index.crate_highest_version(name, false).context("rich_crate_version2")?;
                 self.rich_crate_version_data_from_crates_io(ver).await.context("rich_crate_version_data_from_crates_io")?
             },
-            Origin::GitHub {..} | Origin::GitLab {..} => {
+            Origin::GitHub { .. } | Origin::GitLab { .. } => {
                 if !self.crate_exists(origin) {
                     Err(KitchenSinkErr::GitCrateNotAllowed(origin.to_owned()))?
                 }
@@ -1200,7 +1198,7 @@ impl KitchenSink {
         let mut ch = name.chars();
         if let Some(f) = ch.next() {
             first_capital.extend(f.to_uppercase());
-            first_capital.extend(ch.map(|c| if c == '_' {' '} else {c}));
+            first_capital.extend(ch.map(|c| if c == '_' { ' ' } else { c }));
         }
 
         let mut words = HashMap::with_capacity(100);
@@ -1538,7 +1536,7 @@ impl KitchenSink {
                 Occupied(mut e) => {
                     let e = e.get_mut();
                     if let (Some(e), Some(a)) = (e.github.as_ref(), a.github.as_ref()) {
-                         // different users? may fail on stale/renamed login name
+                        // different users? may fail on stale/renamed login name
                         if !e.login.eq_ignore_ascii_case(&a.login) {
                             continue;
                         }
@@ -1673,7 +1671,7 @@ impl KitchenSink {
             }
         }
         let total_count = self.category_crate_count(slug).await?;
-        let wanted_num = ((total_count/2+25)/50 * 50).max(100);
+        let wanted_num = ((total_count / 2 + 25) / 50 * 50).max(100);
         let mut cache = self.top_crates_cached.write().await;
 
         use std::collections::hash_map::Entry::*;
@@ -1723,9 +1721,9 @@ impl KitchenSink {
             }
         }
         let mut top_keywords: Vec<_> = top_keywords.into_iter().collect();
-        top_keywords.sort_by(|a,b| b.1.cmp(&a.1));
+        top_keywords.sort_by(|a, b| b.1.cmp(&a.1));
         eprintln!("top cat keywords {:?}", top_keywords);
-        let top_keywords: HashSet<_> = top_keywords.iter().take((top_keywords.len()/10).min(10).max(2)).map(|(k,_)| k.to_string()).collect();
+        let top_keywords: HashSet<_> = top_keywords.iter().take((top_keywords.len() / 10).min(10).max(2)).map(|(k, _)| k.to_string()).collect();
 
         crates.clear();
         for (origin, score, owners, keywords) in with_owners {
@@ -1754,12 +1752,12 @@ impl KitchenSink {
                 *n += 3;
             }
             // it's average, because new fresh keywords should reduce penalty
-            let dupe_points = score_sum / (weight_sum + 10) as f64;  // +10 reduces penalty for crates with few authors, few keywords (higher chance of dupe)
+            let dupe_points = score_sum / (weight_sum + 10) as f64; // +10 reduces penalty for crates with few authors, few keywords (higher chance of dupe)
 
             // +7 here allows some duplication, and penalizes harder only after a few crates
             // adding original score means it'll never get lower than 1/3rd
             let new_score = score * 0.5 + (score + 7.) / (7. + dupe_points);
-            eprintln!("Knocking {}p {} to {} (by {})", dupe_points, origin.short_crate_name(), new_score, new_score/score);
+            eprintln!("Knocking {}p {} to {} (by {})", dupe_points, origin.short_crate_name(), new_score, new_score / score);
             crates.push((origin, new_score));
         }
         crates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
@@ -1889,4 +1887,3 @@ async fn fetch_uppercase_name() {
     let _ = k.rich_crate_async(&Origin::from_crates_io_name("Inflector")).await.unwrap();
     let _ = k.rich_crate_async(&Origin::from_crates_io_name("inflector")).await.unwrap();
 }
-

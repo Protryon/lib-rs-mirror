@@ -1,8 +1,8 @@
-use futures::sink::SinkExt;
+use actix_web::web::Bytes;
 use futures::channel::mpsc;
+use futures::sink::SinkExt;
 use futures::Stream;
 use std::io;
-use actix_web::web::Bytes;
 
 pub struct Writer<T: 'static, E: 'static> {
     sender: mpsc::Sender<Result<T, E>>,

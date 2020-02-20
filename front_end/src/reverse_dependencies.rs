@@ -107,7 +107,7 @@ impl<'a> CratePageRevDeps<'a> {
             (k.to_semver(), *v, 0., 0.)
         }).collect()).unwrap_or_default();
 
-        let max = ver.iter().map(|(_, n, _, _)| *n).max().unwrap_or(1) as f32;
+        let max = ver.iter().map(|(_, n, ..)| *n).max().unwrap_or(1) as f32;
         for i in ver.iter_mut() {
             i.2 = i.1 as f32 / max * 100.0;
             i.3 = 3. + 5. * (i.1 as f32 + 1.).log10().ceil(); // approx visual width of the number

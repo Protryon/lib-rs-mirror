@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate serde_derive;
-use std::fmt;
 pub use cargo_author::*;
+use std::fmt;
 mod rich_crate;
 pub use crate::rich_crate::*;
 mod rich_crate_version;
@@ -26,8 +26,8 @@ impl fmt::Debug for Origin {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Origin::CratesIo(name) => write!(f, "Origin( lib.rs/{} )", name),
-            Origin::GitHub {repo, package} => write!(f, "Origin( github.com/{}/{} {} )", repo.owner, repo.repo, package),
-            Origin::GitLab {repo, package} => write!(f, "Origin( gitlab.com/{}/{} {} )", repo.owner, repo.repo, package),
+            Origin::GitHub { repo, package } => write!(f, "Origin( github.com/{}/{} {} )", repo.owner, repo.repo, package),
+            Origin::GitLab { repo, package } => write!(f, "Origin( gitlab.com/{}/{} {} )", repo.owner, repo.repo, package),
         }
     }
 }
@@ -66,9 +66,9 @@ impl Origin {
                 let repo = n.next().expect("parse").into();
                 let package = n.next().expect("parse");
                 if host == "github" {
-                    Self::from_github(SimpleRepo {owner, repo}, package)
+                    Self::from_github(SimpleRepo { owner, repo }, package)
                 } else {
-                    Self::from_gitlab(SimpleRepo {owner, repo}, package)
+                    Self::from_gitlab(SimpleRepo { owner, repo }, package)
                 }
             },
             _ => panic!("bad str {}", s),

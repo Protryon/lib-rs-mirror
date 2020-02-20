@@ -41,13 +41,13 @@ impl SearchPage<'_> {
 
     pub fn top_keywords(&self) -> Vec<&str> {
         let mut counts = HashMap::new();
-        let obvious_threshold = (self.good_results.len() + self.bad_results.len()/2) as u32;
+        let obvious_threshold = (self.good_results.len() + self.bad_results.len() / 2) as u32;
         let query = match self.query {
             SearchKind::Query(s) | SearchKind::Keyword(s) => s,
         };
         for res in self.good_results.iter().chain(self.bad_results.iter()) {
             for keyword in res.keywords.split(", ").filter(|&k| !k.is_empty() && !unicase::eq_ascii(k, query)) {
-                let cnt = counts.entry(unicase::Ascii::new(keyword)).or_insert((0u32,0f32));
+                let cnt = counts.entry(unicase::Ascii::new(keyword)).or_insert((0u32, 0f32));
                 cnt.0 += 1;
                 cnt.1 += res.score;
             }
@@ -57,8 +57,8 @@ impl SearchPage<'_> {
             // but don't repeat terms from the query
             .filter(|(_, (n, _))| *n > 1 && *n < obvious_threshold)
             .map(|(k, (_, v))| (k.into_inner(),v)).collect();
-        counts.sort_by(|a,b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-        counts.into_iter().take(6).map(|(k,_)| k).collect()
+        counts.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        counts.into_iter().take(6).map(|(k, _)| k).collect()
     }
 
     pub fn page(&self) -> Page {

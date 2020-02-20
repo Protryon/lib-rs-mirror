@@ -1,12 +1,11 @@
-use std::sync::Arc;
 use crate_db::builddb::*;
+use std::collections::hash_map::Entry;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
-use std::collections::hash_map::Entry;
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() {
-
     let crates = kitchen_sink::KitchenSink::new_default().await.unwrap();
 
     let db = BuildDb::new(crates.main_cache_dir().join("builds.db")).unwrap();
@@ -39,7 +38,7 @@ async fn main() {
     println!("winapi 9.9.9 <=0.1.17");
 
     for c in db.get_all_compat().unwrap() {
-        if !c.origin.is_crates_io()  {
+        if !c.origin.is_crates_io() {
             continue;
         }
         let mut combined = HashMap::with_capacity(c.rustc_versions.len());

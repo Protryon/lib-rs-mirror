@@ -2,10 +2,10 @@ use parking_lot::Mutex;
 use rich_crate::Origin;
 use rusqlite::*;
 use semver::Version as SemVer;
-use std::path::Path;
-use std::collections::HashMap;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::collections::HashMap;
+use std::path::Path;
 
 pub struct BuildDb {
     pub(crate) conn: Mutex<Connection>,
@@ -188,7 +188,7 @@ impl BuildDb {
         Ok(CompatibilityInfo {
             rustc_version: SemVer::parse(row.get_raw(0).as_str().unwrap()).expect("semver"),
             crate_version: SemVer::parse(row.get_raw(1).as_str().unwrap()).expect("semver"),
-            compat
+            compat,
         })
     }
 

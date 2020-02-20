@@ -1,5 +1,3 @@
-use futures::future::Future;
-use tokio::runtime::Handle;
 use crate::download_graph::DownloadsGraph;
 use crate::templates;
 use crate::urler::Urler;
@@ -8,6 +6,8 @@ use categories::Category;
 use categories::CATEGORIES;
 use chrono::prelude::*;
 use chrono::Duration;
+use futures::future::Future;
+use futures::stream::StreamExt;
 use kitchen_sink::CResult;
 use kitchen_sink::CrateAuthor;
 use kitchen_sink::DepInfMap;
@@ -22,16 +22,16 @@ use rich_crate::RichDep;
 use semver::Version as SemVer;
 use semver_parser;
 use std::borrow::Cow;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::f64::consts::PI;
 use std::fmt::Display;
 use std::hash::Hash;
+use tokio::runtime::Handle;
 use udedokei::LanguageExt;
 use udedokei::{Language, Lines, Stats};
 use url::Url;
-use std::cmp::Ordering;
-use futures::stream::StreamExt;
 
 pub struct CrateLicense {
     pub origin: Origin,
@@ -266,7 +266,7 @@ impl<'a> CratePage<'a> {
         self.block(self.kitchen_sink.downloads_per_month_or_equivalent(self.all.origin())).ok().and_then(|x| x).unwrap_or(0) < 50
     }
 
-    fn block<O>(&self, f: impl Future<Output=O>) -> O {
+    fn block<O>(&self, f: impl Future<Output = O>) -> O {
         self.handle.enter(|| futures::executor::block_on(f))
     }
 
@@ -374,7 +374,7 @@ impl<'a> CratePage<'a> {
                         x if x >= 0.75 || matches_latest => "common",
                         x if x >= 0.25 => "outdated",
                         _ => "obsolete",
-                    }
+                    };
                 }
             }
             "obsolete"
@@ -691,7 +691,7 @@ impl<'a> CratePage<'a> {
         // get related suggestions too
         self.block(async {
             let dl = self.kitchen_sink.downloads_per_month_or_equivalent(self.all.origin()).await.ok().and_then(|x| x).unwrap_or(100);
-            let min_recent_downloads = (dl as u32/2).min(200);
+            let min_recent_downloads = (dl as u32 / 2).min(200);
             self.kitchen_sink.related_crates(&self.ver, min_recent_downloads).await.map_err(|e| eprintln!("related crates fail: {}", e)).ok()
         })
     }
@@ -979,9 +979,9 @@ fn compare_virality(license: &str, other_license: Option<&str>) -> Ordering {
 
 #[test]
 fn counts() {
-    let r = ReleaseCounts {total: 10, stable: 0, major: 0, major_recent: 0, patch: 0, unstable: 9, breaking: 9, breaking_recent: 0};
+    let r = ReleaseCounts { total: 10, stable: 0, major: 0, major_recent: 0, patch: 0, unstable: 9, breaking: 9, breaking_recent: 0 };
     assert_eq!(r.summary(), ("9 breaking releases".to_string(), None));
-    let r = ReleaseCounts {total: 25, stable: 3, major: 0, major_recent: 0, patch: 7, unstable: 2, breaking: 1, breaking_recent: 2};
+    let r = ReleaseCounts { total: 25, stable: 3, major: 0, major_recent: 0, patch: 7, unstable: 2, breaking: 1, breaking_recent: 2 };
     assert_eq!(r.summary(), ("25 releases".to_string(), Some("(3 stable)".to_string())));
     let r = ReleaseCounts { total: 27, stable: 0, major: 1, major_recent: 0, patch: 23, unstable: 13, breaking: 1, breaking_recent: 0 };
     assert_eq!(r.summary(), ("27 releases".to_string(), None));

@@ -1,5 +1,5 @@
-use std::collections::HashSet;
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 use crate_db::builddb::*;
 mod parse;
@@ -87,7 +87,7 @@ fn do_builds(_crates: &KitchenSink, all: &CratesIndexCrate, docker_root: &Path) 
     let tmp: HashSet<_> = all.versions().iter().filter(|v| !v.is_yanked()).filter_map(|v| SemVer::parse(v.version()).ok()).collect();
     for ver in tmp.iter() {
         let unstable = ver.major == 0;
-        let major = if unstable {ver.minor} else {ver.major};
+        let major = if unstable { ver.minor } else { ver.major };
         versions.insert((unstable, major), ver); // later wins
     }
 
@@ -102,8 +102,7 @@ fn do_builds(_crates: &KitchenSink, all: &CratesIndexCrate, docker_root: &Path) 
     for ver in versions.values().take(15) {
         cmd.arg(format!("{}=\"{}\"\n", all.name(), ver));
     }
-    let out = cmd
-        .output()?;
+    let out = cmd.output()?;
 
     let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
     let mut stderr = String::from_utf8_lossy(&out.stderr).into_owned();

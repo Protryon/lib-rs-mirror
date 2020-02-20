@@ -2,10 +2,11 @@ use crate::deps_stats::DepsStats;
 use crate::git_crates_index::*;
 use crate::KitchenSink;
 use crate::KitchenSinkErr;
+use crates_index;
 use crates_index::Crate;
 use crates_index::Dependency;
 pub use crates_index::Version;
-use crates_index;
+use double_checked_cell_async::DoubleCheckedCell;
 use lazyonce::LazyOnce;
 use parking_lot::Mutex;
 use parking_lot::RwLock;
@@ -19,7 +20,6 @@ use std::path::Path;
 use std::sync::Arc;
 use string_interner::StringInterner;
 use string_interner::Sym;
-use double_checked_cell_async::DoubleCheckedCell;
 
 type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 type FxHashSet<V> = std::collections::HashSet<V, ahash::RandomState>;
@@ -171,13 +171,13 @@ impl Index {
     pub fn crate_exists(&self, origin: &Origin) -> bool {
         match origin {
             Origin::CratesIo(lowercase_name) => self.crates_io_crate_by_lowercase_name(lowercase_name).is_ok(),
-            Origin::GitHub {..} | Origin::GitLab {..} => self.git_index.has(origin),
+            Origin::GitHub { .. } | Origin::GitLab { .. } => self.git_index.has(origin),
         }
     }
 
     /// All crates available in the crates.io index and our index
     ///
-    pub fn all_crates(&self) -> impl Iterator<Item=Origin> + '_ {
+    pub fn all_crates(&self) -> impl Iterator<Item = Origin> + '_ {
         self.git_index.crates().cloned().chain(self.crates_io_crates().keys().map(|n| Origin::from_crates_io_name(&n)))
     }
 
@@ -330,7 +330,6 @@ impl Index {
                     (fallback, semver)
                 });
 
-
             let key = {
                 let mut inter = self.inter.write();
                 debug_assert_eq!(crate_name, crate_name.to_ascii_lowercase());
@@ -468,7 +467,7 @@ impl From<SemVer> for MiniVer {
             minor: s.minor as u16,
             patch: s.patch as u16,
             pre: s.pre.into_boxed_slice(),
-            build: if let Some(semver::Identifier::Numeric(m)) = s.build.get(0) {*m as u16} else {0},
+            build: if let Some(semver::Identifier::Numeric(m)) = s.build.get(0) { *m as u16 } else { 0 },
         }
     }
 }

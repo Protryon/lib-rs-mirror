@@ -110,7 +110,7 @@ impl Categories {
         }).collect()
     }
 
-    pub fn filtered_category_slugs(cats: &[String]) -> impl Iterator<Item=&str> {
+    pub fn filtered_category_slugs(cats: &[String]) -> impl Iterator<Item = &str> {
         cats.iter().filter_map(|s| {
             if s.len() < 2 {
                 return None;

@@ -20,16 +20,14 @@ impl GitIndex {
         } else {
             Default::default()
         };
-        Ok(Self {
-            index,
-        })
+        Ok(Self { index })
     }
 
     pub fn has(&self, origin: &Origin) -> bool {
         self.index.get(origin).is_some()
     }
 
-    pub fn crates(&self) -> impl Iterator<Item=&Origin> {
+    pub fn crates(&self) -> impl Iterator<Item = &Origin> {
         self.index.iter()
     }
 }

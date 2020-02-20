@@ -1,8 +1,8 @@
-use futures::future::join_all;
 use either::*;
 use failure;
+use futures::future::join_all;
 use kitchen_sink::RichCrate;
-use kitchen_sink::{self, stopped, stop, KitchenSink, MaintenanceStatus, Origin, RichCrateVersion};
+use kitchen_sink::{self, stop, stopped, KitchenSink, MaintenanceStatus, Origin, RichCrateVersion};
 use parking_lot::Mutex;
 use rand::{seq::SliceRandom, thread_rng};
 use ranking::CrateTemporalInputs;
@@ -16,7 +16,6 @@ use std::sync::Arc;
 use udedokei::LanguageExt;
 #[tokio::main]
 async fn main() {
-
     let crates = Arc::new(match kitchen_sink::KitchenSink::new_default().await {
         Ok(a) => a,
         e => {
@@ -167,7 +166,7 @@ async fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrat
     });
     let langs = k.language_stats();
     let (rust_code_lines, rust_comment_lines) = langs.langs.get(&udedokei::Language::Rust).map(|rs| (rs.code, rs.comments)).unwrap_or_default();
-    let total_code_lines = langs.langs.iter().filter(|(k,_)| k.is_code()).map(|(_,l)| l.code).sum::<u32>();
+    let total_code_lines = langs.langs.iter().filter(|(k, _)| k.is_code()).map(|(_, l)| l.code).sum::<u32>();
     let base_score = ranking::crate_score_version(&CrateVersionInputs {
         versions: all.versions(),
         description: k.description().unwrap_or(""),

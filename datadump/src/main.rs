@@ -1,14 +1,14 @@
 #![allow(unused)]
 #![allow(dead_code)]
 use chrono::prelude::*;
-use std::io::Read;
-use std::io::BufReader;
-use std::fs::File;
+use kitchen_sink::KitchenSink;
 use libflate::gzip::Decoder;
-use tar::Archive;
 use serde_derive::Deserialize;
 use std::collections::HashMap;
-use kitchen_sink::KitchenSink;
+use std::fs::File;
+use std::io::BufReader;
+use std::io::Read;
+use tar::Archive;
 
 const NUM_CRATES: usize = 40000;
 type BoxErr = Box<dyn std::error::Error + Sync + Send>;
@@ -32,7 +32,7 @@ async fn main() -> Result<(), BoxErr> {
             continue;
         }
         if let Some(path) = file.path()?.file_name().and_then(|f| f.to_str()) {
-            eprint!("{} ({}KB): ", path, file.header().size()?/1000);
+            eprint!("{} ({}KB): ", path, file.header().size()? / 1000);
             match path {
                 "crate_owners.csv" => {
                     eprintln!("parse_crate_owners…");
@@ -158,7 +158,6 @@ fn parse_users(file: impl Read) -> Result<HashMap<u32, UserRow>, BoxErr> {
     Ok(out)
 }
 
-
 #[derive(Deserialize)]
 struct CrateVersionRow {
     crate_id: u32,
@@ -201,7 +200,7 @@ fn parse_version_downloads(mut file: impl Read) -> Result<VersionDownloads, BoxE
         let y = date[0..4].parse()?;
         let m = date[5..7].parse()?;
         let d = date[8..10].parse()?;
-        let date = Utc.ymd(y,m,d);
+        let date = Utc.ymd(y, m, d);
         let downloads = r.next().and_then(|s| s.parse().ok()).ok_or("bad dl")?;
         let version_id = r.next().and_then(|s| s.parse().ok()).ok_or("bad dl")?;
         out.entry(version_id).or_insert_with(Vec::new).push((date, downloads));
@@ -230,4 +229,3 @@ fn parse_crates(file: impl Read) -> Result<CratesMap, BoxErr> {
     }
     Ok(out)
 }
-

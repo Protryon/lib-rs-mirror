@@ -1,8 +1,8 @@
 use crate::templates;
-use rich_crate::Readme;
 use crate::Page;
 use kitchen_sink::KitchenSink;
 use render_readme::Renderer;
+use rich_crate::Readme;
 use rich_crate::RichCrateVersion;
 
 pub struct InstallPage<'a> {

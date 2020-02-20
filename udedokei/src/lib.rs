@@ -239,7 +239,7 @@ impl Collect {
             treat_doc_strings_as_comments: Some(true),
             ..Default::default()
         });
-        let stats = self.stats.langs.entry(lang).or_insert(Lines {comments:0, code:0});
+        let stats = self.stats.langs.entry(lang).or_insert(Lines { comments: 0, code: 0 });
         stats.comments += res.comments as u32;
         stats.code += res.code as u32;
     }

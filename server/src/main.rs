@@ -1,38 +1,38 @@
+use crate::writer::*;
 use actix_web::dev::Url;
 use actix_web::http::header::HeaderValue;
-use actix_web::HttpResponse;
 use actix_web::middleware;
+use actix_web::HttpResponse;
 use actix_web::{web, App, HttpRequest, HttpServer};
 use arc_swap::ArcSwap;
 use cap::Cap;
-use categories::CATEGORIES;
 use categories::Category;
+use categories::CATEGORIES;
 use chrono::prelude::*;
-use crate::writer::*;
 use env_logger;
 use failure::ResultExt;
 use front_end;
 use futures::future::Future;
+use kitchen_sink;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::Origin;
-use kitchen_sink;
 use locale::Numeric;
-use render_readme::{Highlighter, ImageOptimAPIFilter, Renderer, Markup};
+use render_readme::{Highlighter, ImageOptimAPIFilter, Markup, Renderer};
 use repo_url::SimpleRepo;
 use search_index::CrateSearchIndex;
 use std::env;
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, SystemTime};
+use tokio::runtime::Runtime;
 use urlencoding::decode;
 use urlencoding::encode;
-use tokio::runtime::Runtime;
 
 mod writer;
 
 #[global_allocator]
-static ALLOCATOR: Cap<std::alloc::System> = Cap::new(std::alloc::System, 1*1024*1024*1024);
+static ALLOCATOR: Cap<std::alloc::System> = Cap::new(std::alloc::System, 1 * 1024 * 1024 * 1024);
 
 static HUP_SIGNAL: AtomicU32 = AtomicU32::new(0);
 
@@ -153,7 +153,7 @@ async fn run_server() -> Result<(), failure::Error> {
     Ok(())
 }
 
-fn find_category<'a>(slugs: impl Iterator<Item=&'a str>) -> Option<&'static Category> {
+fn find_category<'a>(slugs: impl Iterator<Item = &'a str>) -> Option<&'static Category> {
     let mut found = None;
     let mut current_sub = &CATEGORIES.root;
     for slug in slugs {
@@ -175,7 +175,7 @@ fn handle_static_page(state: &ServerState, path: &str) -> Result<Option<HttpResp
 
     let md_path = state.data_dir.as_path().join(format!("page/{}.md", path));
     if !md_path.exists() {
-        return Ok(None)
+        return Ok(None);
     }
 
     let mut chars = path.chars();
@@ -187,7 +187,7 @@ fn handle_static_page(state: &ServerState, path: &str) -> Result<Option<HttpResp
     let md = std::fs::read_to_string(md_path)?
         .replace("$CRATE_NUM", &Numeric::english().format_int(crate_num))
         .replace("$TOTAL_CRATE_NUM", &Numeric::english().format_int(total_crate_num));
-    let mut page = Vec::with_capacity(md.len()*2);
+    let mut page = Vec::with_capacity(md.len() * 2);
     front_end::render_static_page(&mut page, path_capitalized, &Markup::Markdown(md), &state.markup)?;
     Ok(Some(HttpResponse::Ok()
         .content_type("text/html;charset=UTF-8")
@@ -234,7 +234,7 @@ fn render_404_page(state: &AServerState, path: &str) -> Result<HttpResponse, fai
     let decoded = decode(path).ok();
     let rawtext = decoded.as_ref().map(|d| d.as_str()).unwrap_or(path);
 
-    let query = rawtext.chars().map(|c| if c.is_alphanumeric() {c} else {' '}).take(100).collect::<String>();
+    let query = rawtext.chars().map(|c| if c.is_alphanumeric() { c } else { ' ' }).take(100).collect::<String>();
     let query = query.trim();
     let results = state.index.search(query, 5, false).unwrap_or_default();
     let mut page: Vec<u8> = Vec::with_capacity(50000);
@@ -331,7 +331,7 @@ fn get_origin_from_subpath(q: &actix_web::dev::Path<Url>) -> Option<Origin> {
                 "gitlab" | "lab" => Some(Origin::from_gitlab(SimpleRepo::new(owner, repo), package)),
                 _ => None,
             }
-        }
+        },
     }
 }
 
@@ -405,8 +405,8 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
     if let Ok(modified) = std::fs::metadata(&cache_file).and_then(|m| m.modified()) {
         let now = SystemTime::now();
         // rebuild in debug always
-        let is_fresh = !cfg!(debug_assertions) && modified > (now - Duration::from_secs((cache_time/20+5).into()));
-        let is_acceptable = modified > (now - Duration::from_secs((3600*24*7 + cache_time*5).into()));
+        let is_fresh = !cfg!(debug_assertions) && modified > (now - Duration::from_secs((cache_time / 20 + 5).into()));
+        let is_acceptable = modified > (now - Duration::from_secs((3600 * 24 * 7 + cache_time * 5).into()));
 
         let age_secs = now.duration_since(modified).ok().map(|age| age.as_secs() as u32).unwrap_or(0);
 
@@ -425,16 +425,16 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
                                 eprintln!("warning: Failed writing to {}: {}", cache_file.display(), e);
                             }
                             if let Some(last_mod) = last_mod {
-                                let _ = filetime::set_file_mtime(&cache_file, filetime::FileTime::from_unix_time(last_mod.timestamp(),0));
+                                let _ = filetime::set_file_mtime(&cache_file, filetime::FileTime::from_unix_time(last_mod.timestamp(), 0));
                             }
                         },
                         Err(e) => {
                             eprintln!("Cache pre-warm: {}", e);
-                        }
+                        },
                     }
                 });
             }
-            return Ok((page_cached, if !is_fresh {cache_time_remaining/4} else {cache_time_remaining}.max(2), !is_acceptable, Some(last_mod)));
+            return Ok((page_cached, if !is_fresh { cache_time_remaining / 4 } else { cache_time_remaining }.max(2), !is_acceptable, Some(last_mod)));
         }
 
         println!("Cache miss {} {}", cache_file.display(), age_secs);
@@ -449,7 +449,7 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
     Ok((page, cache_time, false, last_mod))
 }
 
-fn render_crate_page(state: AServerState, origin: Origin) -> impl Future<Output=Result<(Vec<u8>, Option<DateTime<FixedOffset>>), failure::Error>> + 'static {
+fn render_crate_page(state: AServerState, origin: Origin) -> impl Future<Output = Result<(Vec<u8>, Option<DateTime<FixedOffset>>), failure::Error>> + 'static {
     run_timeout(30, async move {
         let crates = state.crates.load();
         crates.prewarm();
@@ -474,7 +474,7 @@ async fn render_crate_reverse_dependencies(state: AServerState, origin: Origin) 
 async fn handle_keyword(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
     let q = req.match_info().query("keyword");
     if q.is_empty() {
-        return Ok(HttpResponse::TemporaryRedirect().header("Location", "/").finish())
+        return Ok(HttpResponse::TemporaryRedirect().header("Location", "/").finish());
     }
 
     let query = q.to_owned();
@@ -507,7 +507,7 @@ async fn handle_keyword(req: HttpRequest) -> Result<HttpResponse, failure::Error
 }
 
 fn serve_cached((page, cache_time, refresh, last_modified): (Vec<u8>, u32, bool, Option<DateTime<FixedOffset>>)) -> HttpResponse {
-    let err_max = (cache_time*10).max(3600*24*2);
+    let err_max = (cache_time * 10).max(3600 * 24 * 2);
     HttpResponse::Ok()
         .content_type("text/html;charset=UTF-8")
         .header("Cache-Control", format!("public, max-age={}, stale-while-revalidate={}, stale-if-error={}", cache_time, cache_time*3, err_max))
@@ -537,14 +537,12 @@ async fn handle_search(req: HttpRequest) -> Result<HttpResponse, failure::Error>
             let state: &AServerState = req.app_data().expect("appdata");
             let state = state.clone();
 
-            let results = state
-                .index
-                .search(&query, 50, true)?;
+            let results = state.index.search(&query, 50, true)?;
             let mut page = Vec::with_capacity(50000);
             front_end::render_serp_page(&mut page, &query, &results, &state.markup)?;
 
             Ok(serve_cached((page, 600, false, None)))
-        }
+        },
         _ => Ok(HttpResponse::PermanentRedirect().header("Location", "/").finish()),
     }
 }

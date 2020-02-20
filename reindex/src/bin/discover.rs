@@ -1,9 +1,9 @@
-use std::io::Write;
-use std::io::BufRead;
-use repo_url::*;
-use std::io;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::Origin;
+use repo_url::*;
+use std::io;
+use std::io::BufRead;
+use std::io::Write;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

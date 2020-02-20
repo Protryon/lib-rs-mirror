@@ -32,7 +32,7 @@ pub struct RichCrateVersion {
 impl RichCrateVersion {
     pub fn new(origin: Origin, manifest: Manifest, derived: Derived) -> Self {
         let package = manifest.package.as_ref().expect("package");
-        if let Origin::GitHub {..} = &origin {
+        if let Origin::GitHub { .. } = &origin {
             assert!(package.repository.is_some());
         }
         let s = Self {
@@ -42,7 +42,7 @@ impl RichCrateVersion {
             derived,
             manifest,
         };
-        if let Origin::GitHub {..} = &s.origin {
+        if let Origin::GitHub { .. } = &s.origin {
             debug_assert!(s.repo.is_some());
         }
         s
@@ -207,11 +207,11 @@ impl RichCrateVersion {
 
     pub fn has_badges(&self) -> bool {
         self.manifest.badges.appveyor.is_some() ||
-        self.manifest.badges.circle_ci.is_some() ||
-        self.manifest.badges.gitlab.is_some() ||
-        self.manifest.badges.travis_ci.is_some() ||
-        self.manifest.badges.codecov.is_some() ||
-        self.manifest.badges.coveralls.is_some()
+            self.manifest.badges.circle_ci.is_some() ||
+            self.manifest.badges.gitlab.is_some() ||
+            self.manifest.badges.travis_ci.is_some() ||
+            self.manifest.badges.codecov.is_some() ||
+            self.manifest.badges.coveralls.is_some()
     }
 
     pub fn maintenance(&self) -> MaintenanceStatus {
@@ -275,9 +275,9 @@ impl RichCrateVersion {
     }
 
     pub fn is_no_std(&self) -> bool {
-        self.package().categories.iter().any(|c| c == "no-std")
-            || self.package().keywords.iter().any(|k| k == "no-std" || k == "no_std")
-            || self.features().iter().any(|(k,_)| k == "no-std" || k == "no_std")
+        self.package().categories.iter().any(|c| c == "no-std") ||
+            self.package().keywords.iter().any(|k| k == "no-std" || k == "no_std") ||
+            self.features().iter().any(|(k, _)| k == "no-std" || k == "no_std")
     }
 
     pub fn is_sys(&self) -> bool {

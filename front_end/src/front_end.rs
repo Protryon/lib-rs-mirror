@@ -9,21 +9,21 @@ mod cat_page;
 mod crate_page;
 mod download_graph;
 mod home_page;
+mod install_page;
 mod iter;
 mod not_found_page;
-mod search_page;
-mod install_page;
-mod urler;
 mod reverse_dependencies;
+mod search_page;
+mod urler;
 pub use crate::not_found_page::*;
 pub use crate::search_page::*;
 
-use categories::Category;
-use chrono::prelude::*;
 use crate::crate_page::*;
 use crate::urler::Urler;
-use failure::ResultExt;
+use categories::Category;
+use chrono::prelude::*;
 use failure;
+use failure::ResultExt;
 use kitchen_sink::Compat;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::{stopped, KitchenSinkErr};
@@ -31,10 +31,10 @@ use render_readme::Markup;
 use render_readme::Renderer;
 use rich_crate::RichCrate;
 use rich_crate::RichCrateVersion;
-use std::borrow::Cow;
-use std::io::Write;
-use std::collections::{BTreeMap, BTreeSet};
 use semver::Version as SemVer;
+use std::borrow::Cow;
+use std::collections::{BTreeMap, BTreeSet};
+use std::io::Write;
 
 include!(concat!(env!("OUT_DIR"), "/templates.rs"));
 
@@ -67,7 +67,7 @@ impl Page {
         {
             if let Some(url) = self.critical_css_dev_url {
                 // it's super ugly hack, but just for dev
-                return templates::Html(Box::leak(format!("</style><link rel=stylesheet href='{}'><style>", url).into_boxed_str()))
+                return templates::Html(Box::leak(format!("</style><link rel=stylesheet href='{}'><style>", url).into_boxed_str()));
             }
         }
         let data = self.critical_css_data.unwrap_or(include_str!("../../style/public/critical.css"));
@@ -237,8 +237,8 @@ pub fn limit_text_len<'t>(text: &'t str, mut len_min: usize, mut len_max: usize)
     }
     let mut cut = &text[..len_max];
     let optional = &cut[len_min..];
-    if let Some(pos) = optional.find(&['.',',','!','\n','?',')',']'][..]).or_else(|| optional.find(' ')) {
-        cut = cut[..len_min + pos + 1].trim_end_matches(&['.',',','!','\n','?',' '][..]);
+    if let Some(pos) = optional.find(&['.', ',', '!', '\n', '?', ')', ']'][..]).or_else(|| optional.find(' ')) {
+        cut = cut[..len_min + pos + 1].trim_end_matches(&['.', ',', '!', '\n', '?', ' '][..]);
     };
     return format!("{}…", cut).into();
 }

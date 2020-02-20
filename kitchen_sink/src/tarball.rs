@@ -1,18 +1,17 @@
 use cargo_toml::Manifest;
 use cargo_toml::Package;
+use libflate::gzip::Decoder;
 use render_readme::Markup;
 use render_readme::Readme;
 use repo_url::Repo;
 use std::collections::HashSet;
-use std::io::Read;
 use std::io;
+use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
-use udedokei::LanguageExt;
-use udedokei;
-use libflate::gzip::Decoder;
 use tar::{Archive, Entry, EntryType};
-
+use udedokei;
+use udedokei::LanguageExt;
 
 #[derive(Debug, Fail)]
 pub enum UnarchiverError {
@@ -74,8 +73,7 @@ pub fn read_archive(archive: impl Read, name: &str, ver: &str) -> Result<CrateFi
     read_archive_files(archive, |mut file| {
         let header = file.header();
         match header.entry_type() {
-            EntryType::Regular |
-            EntryType::Char => {
+            EntryType::Regular | EntryType::Char => {
                 let path = header.path()?;
                 if let Ok(relpath) = path.strip_prefix(&prefix) {
                     return collect.add(relpath.to_path_buf(), header.size()?, &mut file);
@@ -278,7 +276,8 @@ fn unpack_crate() {
     assert!(d.lib_file.unwrap().contains("fn nothing"));
     assert_eq!(d.files.len(), 5);
     assert!(match d.readme.unwrap().markup {
-        Markup::Rst(a) => a == "o hi\n", _ => false,
+        Markup::Rst(a) => a == "o hi\n",
+        _ => false,
     });
     assert_eq!(d.language_stats.langs.get(&udedokei::Language::Rust).unwrap().code, 1);
     assert_eq!(d.language_stats.langs.get(&udedokei::Language::C).unwrap().code, 1);
@@ -302,7 +301,8 @@ fn unpack_repo() {
     assert!(d.lib_file.unwrap().contains("fn nothing"));
     assert_eq!(d.files.len(), 5);
     assert!(match d.readme.unwrap().markup {
-        Markup::Rst(a) => a == "o hi\n", _ => false,
+        Markup::Rst(a) => a == "o hi\n",
+        _ => false,
     });
     assert_eq!(d.language_stats.langs.get(&udedokei::Language::Rust).unwrap().code, 1);
     assert_eq!(d.language_stats.langs.get(&udedokei::Language::C).unwrap().code, 1);

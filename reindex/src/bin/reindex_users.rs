@@ -9,7 +9,6 @@ use std::{
 
 #[tokio::main]
 async fn main() {
-
     let crates = Arc::new(match KitchenSink::new_default().await {
         Ok(a) => a,
         Err(e) => {

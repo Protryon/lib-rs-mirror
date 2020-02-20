@@ -2,7 +2,7 @@ use categories;
 use chrono::prelude::*;
 use failure::*;
 use heck::KebabCase;
-use tokio::sync::{RwLock, Mutex};
+use rich_crate::CrateVersionSourceData;
 use rich_crate::Derived;
 use rich_crate::Manifest;
 use rich_crate::ManifestExt;
@@ -11,10 +11,9 @@ use rich_crate::Origin;
 use rich_crate::Readme;
 use rich_crate::Repo;
 use rich_crate::RichCrate;
-use rich_crate::CrateVersionSourceData;
-use rusqlite::*;
-use rusqlite::NO_PARAMS;
 use rusqlite::types::ToSql;
+use rusqlite::NO_PARAMS;
+use rusqlite::*;
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -23,6 +22,7 @@ use std::fmt::Write;
 use std::fs;
 use std::path::Path;
 use thread_local::ThreadLocal;
+use tokio::sync::{Mutex, RwLock};
 type FResult<T> = std::result::Result<T, failure::Error>;
 
 pub mod builddb;
@@ -232,7 +232,7 @@ impl CrateDb {
         let all_explicit_keywords = package.keywords.iter()
             .chain(c.derived.github_keywords.iter().flatten());
         for (i, k) in all_explicit_keywords.enumerate() {
-            let mut w: f64 = 100./(6+i*2) as f64;
+            let mut w: f64 = 100. / (6 + i * 2) as f64;
             if STOPWORDS.get(k.as_str()).is_some() {
                 w *= 0.6;
             }
@@ -240,7 +240,7 @@ impl CrateDb {
         }
 
         for (i, k) in package.name.split(|c: char| !c.is_alphanumeric()).enumerate() {
-            let w: f64 = 100./(8+i*2) as f64;
+            let w: f64 = 100. / (8 + i * 2) as f64;
             insert_keyword.add(k, w, false);
         }
 
@@ -273,7 +273,7 @@ impl CrateDb {
             // replace ' ' with '-'
             // keep if 3 words or less
             for (i, (w2, k)) in rake_keywords.into_iter().chain(keywords).take(25).enumerate() {
-                let w: f64 = w2 * 150./(80+i) as f64;
+                let w: f64 = w2 * 150. / (80 + i) as f64;
                 insert_keyword.add(&k, w, false);
             }
         }
@@ -463,8 +463,7 @@ impl CrateDb {
         let categories = categories
             .into_iter()
             .map(|(relevance_weight, slug)| {
-                let rank_weight = relevance_weight/max_weight
-                    * if relevance_weight >= max_weight*0.99 {1.} else {0.4}; // a crate is only in 1 category
+                let rank_weight = relevance_weight / max_weight * if relevance_weight >= max_weight * 0.99 { 1. } else { 0.4 }; // a crate is only in 1 category
                 (rank_weight, relevance_weight, slug)
             })
             .collect();

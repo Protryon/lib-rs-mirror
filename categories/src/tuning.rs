@@ -1097,9 +1097,7 @@ pub fn adjusted_relevance(mut candidates: HashMap<String, f64>, keywords: &HashS
                 assert!(reqs.len() < 5);
                 reqs.iter().all(|&k| keywords.contains(k))
             },
-            Cond::NotAny(reqs) => {
-                !reqs.iter().any(|&k| keywords.contains(k))
-            },
+            Cond::NotAny(reqs) => !reqs.iter().any(|&k| keywords.contains(k)),
             Cond::Any(reqs) => reqs.iter().any(|&k| keywords.contains(k)),
         } {
             for &(slug, mul, add) in actions.iter() {

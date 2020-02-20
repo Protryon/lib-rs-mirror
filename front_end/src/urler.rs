@@ -28,14 +28,14 @@ impl Urler {
                     RepoHost::GitHub(repo) => format!("/gh/{}/{}/{}", encode(&repo.owner), encode(&repo.repo), encode(&dep.package)),
                     RepoHost::GitLab(repo) => format!("/lab/{}/{}/{}", encode(&repo.owner), encode(&repo.repo), encode(&dep.package)),
                     _ => repo.canonical_http_url("").into_owned(),
-                }
+                };
             }
         } else if dep.dep.detail().map_or(false, |d| d.path.is_some()) {
-            if let Some(Origin::GitHub{ref repo,..}) = self.own_crate {
-                return format!("/gh/{}/{}/{}", encode(&repo.owner), encode(&repo.repo), encode(&dep.package))
+            if let Some(Origin::GitHub { ref repo, .. }) = self.own_crate {
+                return format!("/gh/{}/{}/{}", encode(&repo.owner), encode(&repo.repo), encode(&dep.package));
             }
-            if let Some(Origin::GitLab{ref repo,..}) = self.own_crate {
-                return format!("/lab/{}/{}/{}", encode(&repo.owner), encode(&repo.repo), encode(&dep.package))
+            if let Some(Origin::GitLab { ref repo, .. }) = self.own_crate {
+                return format!("/lab/{}/{}/{}", encode(&repo.owner), encode(&repo.repo), encode(&dep.package));
             }
         }
         format!("/crates/{}", encode(&dep.package))
@@ -70,10 +70,8 @@ impl Urler {
 
     pub fn reverse_deps(&self, origin: &Origin) -> String {
         match origin {
-            Origin::CratesIo(lowercase_name) => {
-                format!("/crates/{}/rev", encode(lowercase_name))
-            },
-            Origin::GitHub {package, ..} | Origin::GitLab {package, ..} => {
+            Origin::CratesIo(lowercase_name) => format!("/crates/{}/rev", encode(lowercase_name)),
+            Origin::GitHub { package, .. } | Origin::GitLab { package, .. } => {
                 format!("/crates/{}/rev", encode(package)) // FIXME: that's bogus, return None
             },
         }
@@ -116,7 +114,6 @@ impl Urler {
             },
         }
     }
-
 
     pub fn keyword(&self, name: &str) -> String {
         format!("/keywords/{}", encode(&name.to_kebab_case()))

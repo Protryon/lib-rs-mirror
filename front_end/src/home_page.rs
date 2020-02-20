@@ -1,22 +1,22 @@
 #![allow(unused_imports)]
-use std::future::Future;
 use crate::Page;
 use categories::Category;
 use categories::CategoryMap;
 use categories::CATEGORIES;
 use failure;
+use futures::prelude::*;
 use kitchen_sink::stopped;
 use kitchen_sink::CrateAuthor;
 use kitchen_sink::KitchenSink;
+use locale::Numeric;
 use rayon::prelude::*;
 use rich_crate::Origin;
 use rich_crate::RichCrate;
 use rich_crate::RichCrateVersion;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::future::Future;
 use std::path::PathBuf;
-use locale::Numeric;
-use futures::prelude::*;
 
 /// The list on the homepage looks flat, but it's actually a tree.
 ///
@@ -137,7 +137,7 @@ impl<'a> HomePage<'a> {
                 cat.dl = dl.max(cat.dl);
             }
 
-            let mut ranked = c.into_iter().map(|(c,_)| (c.cat.slug.as_str(), (c.dl * c.pop, c))).collect::<HashMap<_,_>>();
+            let mut ranked = c.into_iter().map(|(c, _)| (c.cat.slug.as_str(), (c.dl * c.pop, c))).collect::<HashMap<_, _>>();
 
             // this is artificially inflated by popularity of syn/quote in serde
             if let Some(pmh) = ranked.get_mut("development-tools::procedural-macro-helpers") {
@@ -145,7 +145,7 @@ impl<'a> HomePage<'a> {
             }
 
             // move cryptocurrencies out of cryptography for the homepage, so that cryptocurrencies are sorted by their own popularity
-            if let Some(cryptocurrencies) = ranked.get_mut("cryptography").and_then(|(_,c)| c.sub.pop()) {
+            if let Some(cryptocurrencies) = ranked.get_mut("cryptography").and_then(|(_, c)| c.sub.pop()) {
                 ranked.insert(cryptocurrencies.cat.slug.as_str(), (cryptocurrencies.dl * cryptocurrencies.pop, cryptocurrencies));
             }
 
@@ -161,10 +161,10 @@ impl<'a> HomePage<'a> {
             Self::avg_pair(&mut ranked, "database-implementations", "database");
             Self::avg_pair(&mut ranked, "command-line-interface", "command-line-utilities");
 
-            let mut c = ranked.into_iter().map(|(_,v)| v).collect::<Vec<_>>();
+            let mut c = ranked.into_iter().map(|(_, v)| v).collect::<Vec<_>>();
             c.sort_by(|a, b| b.0.cmp(&a.0));
 
-            c.into_iter().map(|(_,c)| c).collect()
+            c.into_iter().map(|(_, c)| c).collect()
         })
     }
 
@@ -185,8 +185,7 @@ impl<'a> HomePage<'a> {
     }
 
     pub fn all_contributors<'c>(&self, krate: &'c RichCrateVersion) -> Option<Vec<CrateAuthor<'c>>> {
-        self.block(self.crates
-            .all_contributors(krate))
+        self.block(self.crates.all_contributors(krate))
             .map(|(mut a, mut o, ..)| {
                 a.append(&mut o);
                 a
@@ -207,7 +206,7 @@ impl<'a> HomePage<'a> {
             })
     }
 
-    fn block<O>(&self, f: impl Future<Output=O>) -> O {
+    fn block<O>(&self, f: impl Future<Output = O>) -> O {
         self.handle.enter(|| futures::executor::block_on(f))
     }
 

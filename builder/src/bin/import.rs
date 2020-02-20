@@ -6,7 +6,6 @@ use std::path::Path;
 
 #[tokio::main]
 async fn main() {
-
     let crates = kitchen_sink::KitchenSink::new_default().await.unwrap();
 
     let db = BuildDb::new(crates.main_cache_dir().join("builds.db")).unwrap();

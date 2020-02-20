@@ -52,16 +52,15 @@ impl AllDownloads {
     }
 }
 
-
 // Serde workaround
 use serde::de::{Deserializer, Error, SeqAccess, Visitor};
 use serde::ser::{SerializeTuple, Serializer};
 
 trait BigArray<'de>: Sized {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer;
+    where S: Serializer;
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer<'de>;
+    where D: Deserializer<'de>;
 }
 
 impl<'de> BigArray<'de> for [u32; 366]
@@ -107,9 +106,9 @@ impl<'de> BigArray<'de> for [u32; 366]
 
 trait BigArrayBool<'de>: Sized {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer;
+    where S: Serializer;
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer<'de>;
+    where D: Deserializer<'de>;
 }
 
 impl<'de> BigArrayBool<'de> for [bool; 366]

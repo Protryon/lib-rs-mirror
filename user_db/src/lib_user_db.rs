@@ -102,7 +102,6 @@ impl UserDb {
         })
     }
 
-
     pub fn index_user(&self, user: &User, email: Option<&str>, name: Option<&str>) -> Result<()> {
         let mut conn = self.conn.lock();
         let tx = conn.transaction()?;

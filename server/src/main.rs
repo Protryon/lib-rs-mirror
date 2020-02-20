@@ -246,11 +246,11 @@ fn render_404_page(state: &AServerState, path: &str) -> Result<HttpResponse, fai
 
 async fn handle_category(req: HttpRequest, cat: &'static Category) -> Result<HttpResponse, failure::Error> {
     let state: &AServerState = req.app_data().expect("appdata");
-    let state = state.clone();
     let crates = state.crates.load();
     crates.prewarm();
     let cache_file = state.page_cache_dir.join(format!("_{}.html", cat.slug));
     Ok(serve_cached(with_file_cache(cache_file, 1800, {
+        let state = state.clone();
         run_timeout(30, async move {
             let mut page: Vec<u8> = Vec::with_capacity(150000);
             front_end::render_category(&mut page, cat, &crates, &state.markup).await?;
@@ -267,9 +267,9 @@ async fn handle_home(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
     }
 
     let state: &AServerState = req.app_data().expect("appdata");
-    let state = state.clone();
     let cache_file = state.page_cache_dir.join("_.html");
     Ok(serve_cached(with_file_cache(cache_file, 3600, {
+        let state = state.clone();
         run_timeout(300, async move {
             let crates = state.crates.load();
             crates.prewarm();

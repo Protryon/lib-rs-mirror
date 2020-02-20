@@ -8,6 +8,8 @@ aquaenv: os::macos-apis, command-line-utilities, gui
 argh: command-line-interface
 balena-temen: parser-implementations
 bao: algorithms
+jsonrpc-core : web-programming
+jsonrpc-core-client  : web-programming
 bb8: asynchronous
 bitcoin_hashes : cryptography::cryptocurrencies
 bnf: parsers
@@ -21,12 +23,20 @@ click: development-tools
 codenano: science
 core-foundation-sys: os::macos-apis
 core-text: os::macos-apis
+calx: os::macos-apis, multimedia::audio
 coremidi: os::macos-apis, multimedia::audio
+coreaudio-sys: os::macos-apis, multimedia::audio
+librdkafka-sys: asynchronous
+rdkafka: asynchronous, network-programming
+kf-protocol : asynchronous, network-programming
+kf-protocol-transport: asynchronous, network-programming
+kf-socket: network-programming
 crates_io_api: web-programming
 crunchy : development-tools
 cute-dnd-dice: game-engines
 deltae: multimedia
 derp: parser-implementations
+redis-cluster : databases
 diesel: databases
 elefren: web-programming
 evcxr_repl: rust-patterns, command-line-utilities

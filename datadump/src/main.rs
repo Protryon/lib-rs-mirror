@@ -99,6 +99,7 @@ fn index_downloads(crates: &CratesMap, versions: &VersionsMap, downloads: &Versi
 struct CrateOwnerRow {
     crate_id: u32,
     created_at: String,
+    created_by_id: Option<u32>,
     owner_id: u32,
     owner_kind: u8,
 }
@@ -109,7 +110,7 @@ fn parse_crate_owners(file: impl Read) -> Result<HashMap<u32, CrateOwnerRow>, Bo
     let mut out = HashMap::with_capacity(NUM_CRATES);
     for r in csv.records() {
         let r = r?;
-        let r = r.deserialize::<CrateOwnerRow>(None)?;
+        let r = r.deserialize::<CrateOwnerRow>(None).map_err(|e| format!("wat? {:#?} {}", r, e))?;
         out.insert(r.crate_id, r);
     }
     Ok(out)

@@ -419,9 +419,12 @@ async fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: F) -
             if !is_fresh {
                 actix_rt::spawn(async move {
                     match generate.await {
-                        Ok((page, _last_mod)) => { // FIXME: set cache file timestamp?
+                        Ok((page, last_mod)) => { // FIXME: set cache file timestamp?
                             if let Err(e) = std::fs::write(&cache_file, &page) {
                                 eprintln!("warning: Failed writing to {}: {}", cache_file.display(), e);
+                            }
+                            if let Some(last_mod) = last_mod {
+                                let _ = filetime::set_file_mtime(&cache_file, filetime::FileTime::from_unix_time(last_mod.timestamp(),0));
                             }
                         },
                         Err(e) => {

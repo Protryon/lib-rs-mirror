@@ -27,7 +27,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{Duration, SystemTime};
 use urlencoding::decode;
 use urlencoding::encode;
-use tokio::runtime::Handle;
+use tokio::runtime::Runtime;
 
 mod writer;
 
@@ -42,6 +42,7 @@ struct ServerState {
     crates: ArcSwap<KitchenSink>,
     page_cache_dir: PathBuf,
     data_dir: PathBuf,
+    rt: Runtime,
 }
 
 type AServerState = web::Data<ServerState>;
@@ -85,17 +86,19 @@ async fn run_server() -> Result<(), failure::Error> {
 
     let index = CrateSearchIndex::new(&data_dir)?;
 
+    let rt = Runtime::new().unwrap();
+
     let state = web::Data::new(ServerState {
         markup,
         index,
         crates: ArcSwap::from_pointee(crates),
         page_cache_dir,
         data_dir: data_dir.clone(),
+        rt,
     });
 
     // refresher thread
-    let handle = Handle::try_current()?;
-    handle.spawn({
+    state.rt.spawn({
         let state = state.clone();
         async move {
             state.crates.load().prewarm();
@@ -249,7 +252,7 @@ async fn handle_category(req: HttpRequest, cat: &'static Category) -> Result<Htt
     let crates = state.crates.load();
     crates.prewarm();
     let cache_file = state.page_cache_dir.join(format!("_{}.html", cat.slug));
-    Ok(serve_cached(with_file_cache(cache_file, 1800, {
+    Ok(serve_cached(with_file_cache(state, cache_file, 1800, {
         let state = state.clone();
         run_timeout(30, async move {
             let mut page: Vec<u8> = Vec::with_capacity(150000);
@@ -268,7 +271,7 @@ async fn handle_home(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
 
     let state: &AServerState = req.app_data().expect("appdata");
     let cache_file = state.page_cache_dir.join("_.html");
-    Ok(serve_cached(with_file_cache(cache_file, 3600, {
+    Ok(serve_cached(with_file_cache(&state, cache_file, 3600, {
         let state = state.clone();
         run_timeout(300, async move {
             let crates = state.crates.load();
@@ -290,13 +293,12 @@ async fn handle_gitlab_crate(req: HttpRequest) -> Result<HttpResponse, failure::
 async fn handle_git_crate(req: HttpRequest, slug: &'static str) -> Result<HttpResponse, failure::Error> {
     let inf = req.match_info();
     let state: &AServerState = req.app_data().expect("appdata");
-    let state = state.clone();
     let owner = inf.query("owner");
     let repo = inf.query("repo");
     let crate_name = inf.query("crate");
     println!("{} crate {}/{}/{}", slug, owner, repo, crate_name);
     if !is_alnum(&owner) || !is_alnum_dot(&repo) || !is_alnum(&crate_name) {
-        return render_404_page(&state, &crate_name);
+        return render_404_page(state, &crate_name);
     }
 
     let cache_file = state.page_cache_dir.join(format!("{},{},{},{}.html", slug, owner, repo, crate_name));
@@ -310,8 +312,8 @@ async fn handle_git_crate(req: HttpRequest, slug: &'static str) -> Result<HttpRe
         return Ok(HttpResponse::TemporaryRedirect().header("Location", url.into_owned()).finish());
     }
 
-    Ok(serve_cached(with_file_cache(cache_file, 86400, {
-        render_crate_page(state, origin)
+    Ok(serve_cached(with_file_cache(&state, cache_file, 86400, {
+        render_crate_page(state.clone(), origin)
     }).await?))
 }
 
@@ -373,15 +375,14 @@ async fn handle_crate(req: HttpRequest) -> Result<HttpResponse, failure::Error> 
     let crate_name = req.match_info().query("crate");
     println!("crate page for {:?}", crate_name);
     let state: &AServerState = req.app_data().expect("appdata");
-    let state = state.clone();
     let crates = state.crates.load();
     let origin = Origin::from_crates_io_name(&crate_name);
     if !is_alnum(&crate_name) || !crates.crate_exists(&origin) {
-        return render_404_page(&state, &crate_name);
+        return render_404_page(state, &crate_name);
     }
     let cache_file = state.page_cache_dir.join(format!("{}.html", crate_name));
-    Ok(serve_cached(with_file_cache(cache_file, 900, {
-        render_crate_page(state, origin)
+    Ok(serve_cached(with_file_cache(state, cache_file, 900, {
+        render_crate_page(state.clone(), origin)
     }).await?))
 }
 
@@ -399,7 +400,7 @@ async fn handle_crate_reverse_dependencies(req: HttpRequest) -> Result<HttpRespo
 
 /// takes path to storage, freshness in seconds, and a function to call on cache miss
 /// returns (page, fresh in seconds)
-async fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: F) -> Result<(Vec<u8>, u32, bool, Option<DateTime<FixedOffset>>), failure::Error>
+async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cache_time: u32, generate: F) -> Result<(Vec<u8>, u32, bool, Option<DateTime<FixedOffset>>), failure::Error>
     where F: Future<Output=Result<(Vec<u8>, Option<DateTime<FixedOffset>>), failure::Error>> + 'static {
     if let Ok(modified) = std::fs::metadata(&cache_file).and_then(|m| m.modified()) {
         let now = SystemTime::now();
@@ -417,7 +418,7 @@ async fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: F) -
             println!("Using cached page {} {}s fresh={:?} acc={:?}", cache_file.display(), cache_time_remaining, is_fresh, is_acceptable);
 
             if !is_fresh {
-                actix_rt::spawn(async move {
+                let _ = state.rt.spawn(async move {
                     match generate.await {
                         Ok((page, last_mod)) => { // FIXME: set cache file timestamp?
                             if let Err(e) = std::fs::write(&cache_file, &page) {
@@ -441,7 +442,7 @@ async fn with_file_cache<F>(cache_file: PathBuf, cache_time: u32, generate: F) -
         println!("Cache miss {} no file", cache_file.display());
     }
 
-    let (page, last_mod) = generate.await?;
+    let (page, last_mod) = state.rt.spawn(generate).await??;
     if let Err(e) = std::fs::write(&cache_file, &page) {
         eprintln!("warning: Failed writing to {}: {}", cache_file.display(), e);
     }

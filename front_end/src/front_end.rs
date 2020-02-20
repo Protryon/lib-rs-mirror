@@ -19,7 +19,6 @@ pub use crate::not_found_page::*;
 pub use crate::search_page::*;
 
 use categories::Category;
-use futures::stream::StreamExt;
 use chrono::prelude::*;
 use crate::crate_page::*;
 use crate::urler::Urler;

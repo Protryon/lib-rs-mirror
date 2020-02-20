@@ -56,7 +56,7 @@ impl<'a> HomePage<'a> {
     }
 
     /// Add most recently updated crates to the list of top crates in each category
-    fn add_updated_to_all_categories<'z, 's: 'z>(&'s self, cats: &'z mut [HomeCategory], seen: &'z mut HashSet<Origin>) -> std::pin::Pin<Box<dyn 'z + Future<Output=()>>> {
+    fn add_updated_to_all_categories<'z, 's: 'z>(&'s self, cats: &'z mut [HomeCategory], seen: &'z mut HashSet<Origin>) -> std::pin::Pin<Box<dyn 'z + Send + Future<Output=()>>> {
         Box::pin(async move {
         // it's not the same order as before, but that's fine, it adds more variety
         for cat in cats {
@@ -79,7 +79,7 @@ impl<'a> HomePage<'a> {
 
     /// A crate can be in multiple categories, so `seen` ensures every crate is shown only once
     /// across all categories.
-    fn make_all_categories<'z, 's: 'z>(&'s self, root: &'static CategoryMap, seen: &'z mut HashSet<Origin>) -> std::pin::Pin<Box<dyn 'z + Future<Output=Vec<HomeCategory>>>> {
+    fn make_all_categories<'z, 's: 'z>(&'s self, root: &'static CategoryMap, seen: &'z mut HashSet<Origin>) -> std::pin::Pin<Box<dyn 'z + Send + Future<Output=Vec<HomeCategory>>>> {
         Box::pin(async move {
             if root.is_empty() {
                 return Vec::new();

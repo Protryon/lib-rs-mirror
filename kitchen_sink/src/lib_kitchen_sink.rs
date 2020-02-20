@@ -70,7 +70,6 @@ use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
-use tokio::runtime::Handle;
 use futures::future::join_all;
 use double_checked_cell_async::DoubleCheckedCell;
 
@@ -160,7 +159,6 @@ pub struct KitchenSink {
     main_cache_dir: PathBuf,
     yearly: AllDownloads,
     category_overrides: HashMap<String, Vec<Cow<'static, str>>>,
-    handle: Handle,
 }
 
 impl KitchenSink {
@@ -178,7 +176,6 @@ impl KitchenSink {
     }
 
     pub async fn new(data_path: &Path, github_token: &str) -> CResult<Self> {
-        let handle = Handle::current();
         let main_cache_dir = data_path.to_owned();
 
         let ((crates_io, gh), index) = rayon::join(|| rayon::join(
@@ -201,7 +198,6 @@ impl KitchenSink {
             yearly: AllDownloads::new(&main_cache_dir),
             main_cache_dir,
             category_overrides: Self::load_category_overrides(&data_path.join("category_overrides.txt"))?,
-            handle,
         })
     }
 
@@ -511,10 +507,6 @@ impl KitchenSink {
     /// This function is quite slow, as it reads everything about the crate.
     ///
     /// There's no support for getting anything else than the latest version.
-    pub fn rich_crate_version(&self, origin: &Origin) -> CResult<RichCrateVersion> {
-        self.handle.enter(|| futures::executor::block_on(self.rich_crate_version_async(origin)))
-    }
-
     pub async fn rich_crate_version_async(&self, origin: &Origin) -> CResult<RichCrateVersion> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
 
@@ -1710,7 +1702,7 @@ impl KitchenSink {
 
         let with_owners = futures::stream::iter(crates.drain(..))
         .filter_map(|(o, score)| async move {
-            let c = match self.rich_crate_version(&o) {
+            let c = match self.rich_crate_version_async(&o).await {
                 Ok(c) => c,
                 Err(e) => {
                     eprintln!("Skipping {:?} because {}", o, e);

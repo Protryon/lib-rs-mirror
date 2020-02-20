@@ -342,7 +342,7 @@ async fn handle_debug(req: HttpRequest) -> Result<HttpResponse, failure::Error> 
     let origin = get_origin_from_subpath(req.match_info()).ok_or(failure::format_err!("boo"))?;
     let mut page: Vec<u8> = Vec::with_capacity(50000);
     let crates = state.crates.load();
-    let ver = crates.rich_crate_version(&origin)?;
+    let ver = crates.rich_crate_version_async(&origin).await?;
     front_end::render_debug_page(&mut page, &ver, &crates)?;
     Ok(HttpResponse::Ok()
         .content_type("text/html;charset=UTF-8")
@@ -361,7 +361,7 @@ async fn handle_install(req: HttpRequest) -> Result<HttpResponse, failure::Error
     let state = state.clone();
     let (page, last_mod) = run_timeout(30, async move {
         let crates = state.crates.load();
-        let ver = crates.rich_crate_version(&origin)?;
+        let ver = crates.rich_crate_version_async(&origin).await?;
         let mut page: Vec<u8> = Vec::with_capacity(50000);
         front_end::render_install_page(&mut page, &ver, &crates, &state.markup).await?;
         Ok::<_, failure::Error>((page, None))
@@ -460,7 +460,7 @@ async fn render_crate_reverse_dependencies(state: AServerState, origin: Origin) 
     run_timeout(30, async move {
         let crates = state.crates.load();
         crates.prewarm();
-        let ver = crates.rich_crate_version(&origin)?;
+        let ver = crates.rich_crate_version_async(&origin).await?;
         let mut page: Vec<u8> = Vec::with_capacity(50000);
         front_end::render_crate_reverse_dependencies(&mut page, &ver, &crates, &state.markup).await?;
         Ok::<_, failure::Error>((page, 24*3600, false, None))

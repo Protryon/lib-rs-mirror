@@ -19,11 +19,13 @@ async fn main() {
     });
     let crates2 = crates.clone();
     let (tx, rx) = mpsc::sync_channel(64);
+    let handle = Arc::new(tokio::runtime::Handle::current());
 
     let t = thread::spawn(move || {
         let tx1 = tx.clone();
         let all_crates = crates.all_crates();
         let crates = Arc::clone(&crates);
+        let handle = Arc::clone(&handle);
         rayon::scope(move |s1| {
             for o in all_crates {
                 if stopped() {
@@ -31,18 +33,21 @@ async fn main() {
                     break;
                 }
                 let crates = Arc::clone(&crates);
+                let handle = Arc::clone(&handle);
                 let tx = tx1.clone();
                 s1.spawn(move |_| {
+                    let res = handle.enter(|| futures::executor::block_on(async move {
                     println!("{:?}", o.short_crate_name());
-                    let r1 = crates.rich_crate_version(&o);
-                    let res = r1.and_then(|c| {
+                    let r1 = crates.rich_crate_version_async(&o).await;
+                    r1.and_then(|c| {
                         for a in c.authors().iter().filter(|a| a.email.is_some()) {
                             if let Some(email) = a.email.as_ref() {
                                 tx.send(Some((email.to_string(), a.name.clone())))?;
                             }
                         }
                         Ok(())
-                    });
+                    })
+                    }));
                     if let Err(e) = res {
                         eprintln!("••• error: {}", e);
                         for c in e.iter_chain() {

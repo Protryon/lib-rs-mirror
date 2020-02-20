@@ -33,7 +33,7 @@ impl<'a> CatPage<'a> {
             crates: futures::stream::iter(crates
                 .top_crates_in_category(&cat.slug).await?.iter())
                 .filter_map(|o| async move {
-                    let c = match crates.rich_crate_version(&o) {
+                    let c = match crates.rich_crate_version_async(&o).await {
                         Ok(c) => c,
                         Err(e) => {
                             eprintln!("Skipping {:?} because {}", o, e);

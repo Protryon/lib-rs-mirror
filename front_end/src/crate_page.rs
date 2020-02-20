@@ -1,6 +1,5 @@
 use futures::future::Future;
 use tokio::runtime::Handle;
-use futures::future::join_all;
 use crate::download_graph::DownloadsGraph;
 use crate::templates;
 use crate::urler::Urler;
@@ -32,6 +31,7 @@ use udedokei::LanguageExt;
 use udedokei::{Language, Lines, Stats};
 use url::Url;
 use std::cmp::Ordering;
+use futures::stream::StreamExt;
 
 pub struct CrateLicense {
     pub origin: Origin,
@@ -219,7 +219,7 @@ impl<'a> CratePage<'a> {
     pub fn parent_crate(&self) -> Option<RichCrateVersion> {
         self.handle.enter(|| futures::executor::block_on(async {
             let origin = self.kitchen_sink.parent_crate(self.ver).await?;
-            self.kitchen_sink.rich_crate_version(&origin)
+            self.kitchen_sink.rich_crate_version_async(&origin).await
                 .map_err(|e| eprintln!("parent crate: {} {:?}", e, origin)).ok()
         }))
     }
@@ -749,9 +749,8 @@ impl<'a> CratePage<'a> {
     /// analyze dependencies checking their weight and their license
     async fn crate_size_and_viral_license(&self, deps: DepInfMap) -> CResult<(CrateSizes, Stats, Option<CrateLicense>)> {
         let mut viral_license: Option<CrateLicense> = None;
-        let tmp: Vec<_> = join_all(deps
-            .into_iter()
-            .filter_map(|(name, (depinf, semver))| {
+        let tmp: Vec<_> = futures::stream::iter(deps)
+            .filter_map(|(name, (depinf, semver))| async move {
                 if depinf.ty == DepTy::Dev {
                     return None;
                 }
@@ -759,15 +758,13 @@ impl<'a> CratePage<'a> {
                     return None; // nobody will enable it
                 }
 
-                let krate = match self.get_crate_of_dependency(&name, ()) {
+                let krate = match self.get_crate_of_dependency(&name, ()).await {
                     Ok(k) => k,
                     Err(e) => {
                         eprintln!("bad dep not counted: {}", e);
                         return None;
                     },
                 };
-
-                Some(async move {
 
                 let commonality = self.kitchen_sink.index.version_global_popularity(&name, &semver).await.expect("depsstats").unwrap_or(0.);
                 let is_heavy_build_dep = match &*name {
@@ -792,9 +789,9 @@ impl<'a> CratePage<'a> {
                 if krate.is_proc_macro() {0.} else {1.} *
                 if depinf.ty == DepTy::Runtime {1.} else {0.};
 
-                (depinf, krate, weight, weight_minimal)
+                Some((depinf, krate, weight, weight_minimal))
             })
-        })).await;
+            .collect::<Vec<_>>().await;
 
         let mut main_lang_stats = self.ver.language_stats().clone();
         let mut main_crate_size = self.ver.crate_size();
@@ -860,9 +857,9 @@ impl<'a> CratePage<'a> {
         }, main_lang_stats, viral_license))
     }
 
-    fn get_crate_of_dependency(&self, name: &str, _semver: ()) -> CResult<RichCrateVersion> {
+    async fn get_crate_of_dependency(&self, name: &str, _semver: ()) -> CResult<RichCrateVersion> {
         // FIXME: caching doesn't hold multiple versions, so fetchnig of precise old versions is super expensive
-        return self.kitchen_sink.rich_crate_version(&Origin::from_crates_io_name(name));
+        return self.kitchen_sink.rich_crate_version_async(&Origin::from_crates_io_name(name)).await;
 
         // let krate = self.kitchen_sink.index.crate_by_name(&Origin::from_crates_io_name(name))?;
         // let ver = krate.versions()

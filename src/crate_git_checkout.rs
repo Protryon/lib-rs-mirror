@@ -3,8 +3,10 @@ use cargo_toml::{Manifest, Package};
 use failure;
 use git2;
 use git2::build::RepoBuilder;
-use git2::{Blob, ObjectType, Reference, Tree};
 use git2::Commit;
+pub use git2::Oid;
+pub use git2::Repository;
+use git2::{Blob, ObjectType, Reference, Tree};
 use lazy_static::lazy_static;
 use render_readme;
 use render_readme::{Markup, Readme};
@@ -18,8 +20,6 @@ use std::process::Command;
 use std::sync::Arc;
 use std::sync::Mutex;
 use urlencoding;
-pub use git2::Oid;
-pub use git2::Repository;
 
 mod iter;
 
@@ -240,7 +240,7 @@ pub fn find_versions(repo: &Repository) -> Result<PackageVersionTimestamps, fail
 
     eprintln!("no tags, falling back to slow versions");
     if package_versions.is_empty() {
-        return find_dependency_changes(repo, |_,_,_| {});
+        return find_dependency_changes(repo, |_, _, _| {});
     }
 
     Ok(package_versions)
@@ -317,12 +317,12 @@ pub fn find_readme(repo: &Repository, package: &Package) -> Result<Option<Readme
     let mut found_best = false; // it'll find many readmes, including fallbacks
 
     let mut prefix = path_in_repo_in_tree(&repo, &tree, &package.name)?;
-    if let Some((ref mut prefix, _, _)) = prefix {
+    if let Some((ref mut prefix, ..)) = prefix {
         if !prefix.ends_with('/') {
             prefix.push('/');
         }
     }
-    let prefix = prefix.as_ref().map(|(s, _, _)| s.as_str()).unwrap_or("");
+    let prefix = prefix.as_ref().map(|(s, ..)| s.as_str()).unwrap_or("");
 
     iter_blobs_in_tree(&repo, &tree, |base, _inner_tree, name, blob| {
         if found_best {

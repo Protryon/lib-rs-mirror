@@ -1,0 +1,21 @@
+[package]
+version = "0.7.2"
+edition = "2018"
+name = "simple_cache"
+authors = ["Kornel <kornel@geekhood.net>"]
+description = "Minimal wrapper for a HTTP client to cache results on disk, forever"
+license = "CC0-1.0"
+
+[dependencies]
+reqwest = "0.10"
+quick-error = "1.2.2"
+serde_json = "1.0.44"
+serde = "1.0.104"
+rusqlite = "0.21.0"
+thread_local = "1.0.0"
+tempfile = "3.1.0"
+rmp-serde = "0.14.0"
+flate2 = "1.0.13"
+parking_lot = "0.10.0"
+ahash = "0.3"
+tokio = { version = "0.2", features = ["macros", "sync"] }

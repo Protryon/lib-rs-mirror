@@ -12,6 +12,7 @@ argh: command-line-interface
 async-codec : asynchronous
 balena-temen: parser-implementations
 bao: algorithms
+baseperm: algorithms
 bb8: asynchronous
 begonia: command-line-interface
 binaryen-sys : wasm
@@ -20,6 +21,7 @@ blip_buf: multimedia::audio
 bloke: game-engines
 bnf: parsers
 boxcars: parser-implementations
+brain: emulators
 bresenham: rendering::engine, algorithms
 bright: command-line-utilities
 bs58: encoding
@@ -33,10 +35,12 @@ click: development-tools
 codec-impl: cryptography::cryptocurrencies
 codenano: science
 collider: science::math, game-engines
+collisions: algorithms
 core-foundation-sys: os::macos-apis
 core-text: os::macos-apis
 coreaudio-sys: os::macos-apis, multimedia::audio
 coremidi: os::macos-apis, multimedia::audio
+crate-race: development-tools::profiling
 crates_io_api: web-programming
 crossterm_style : command-line-interface
 crunchy : development-tools
@@ -48,6 +52,7 @@ derp: parser-implementations
 diesel: databases
 differential-geometry : science::math
 dmg: os::macos-apis, filesystem
+doublepivot-quicksort : algorithms
 eetf: encoding
 elefren: web-programming
 endian-hasher : algorithms
@@ -59,6 +64,12 @@ envoption: config
 eosio_macros_internal: cryptography::cryptocurrencies
 euclid: science::math
 evcxr_repl: rust-patterns, command-line-utilities
+exonum-cli: cryptography::cryptocurrencies
+exonum-configuration: cryptography::cryptocurrencies
+exonum-cryptocurrency-advanced : cryptography::cryptocurrencies
+exonum-testkit : cryptography::cryptocurrencies
+exonum-time : cryptography::cryptocurrencies
+exonum: cryptography::cryptocurrencies
 failure: rust-patterns
 fdfast: filesystem
 fec : encoding
@@ -69,6 +80,7 @@ find-files: filesystem
 findomain: networking
 fitrs: parser-implementations
 fixed_width: parser-implementations
+foreignc_derive: development-tools::procedural-macro-helpers
 forever: rust-patterns
 fractal-matrix-api : network-programming
 fsevent-sys: os::macos-apis
@@ -147,6 +159,8 @@ lsp-codec : asynchronous
 lttb: algorithms
 macchanger: os, network-programming
 mach: os::macos-apis
+magenta-sys : os
+magenta: os
 makepad: text-editors
 mamba: parser-implementations
 matrix_bot_api: network-programming
@@ -157,8 +171,11 @@ moltenvk_deps: os::macos-apis, rendering::graphics-api
 monger: databases
 mqtt-codec: network-programming
 msql-srv: database
+mxruntime-sys : os
+mxruntime: os
 myelin-geometry : science::math
 nat_traversal: network-programming
+naturalize: value-formatting
 neon-sys: web-programming
 netdevice: os, network-programming
 notcurses: command-line-interface
@@ -178,9 +195,11 @@ pdcurses-sys: command-line-interface
 perkv: database-implementations
 persawkv: database-implementations
 pico-sys: web-programming
+pkgman: os
 pngcrush: compression
 pq-sys: database
 prometheus_wireguard_exporter: network-programming
+quicksort: algorithms
 quoted_printable: parser-implementations
 qupla: cryptography::cryptocurrencies
 randrust: web-programming::http-server
@@ -215,6 +234,7 @@ solana-gossip :cryptography::cryptocurrencies
 solana-keygen :cryptography::cryptocurrencies
 solana-logger :cryptography::cryptocurrencies
 solana-vote-program : cryptography::cryptocurrencies
+sorted-json: encoding
 spade: data-structures
 specs_sprite: game-engines
 spinning_top: concurrency

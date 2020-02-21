@@ -547,15 +547,21 @@ async fn handle_search(req: HttpRequest) -> Result<HttpResponse, failure::Error>
     let qs = qstring::QString::from(req.query_string());
     match qs.get("q").unwrap_or("") {
         q if !q.is_empty() => {
-            let query = q.to_owned();
             let state: &AServerState = req.app_data().expect("appdata");
-            let state = state.clone();
+            let query = q.to_owned();
+            let page = state.rt.spawn({
+                let state = state.clone();
+                async move {
+                    tokio::task::spawn_blocking(move || {
+                        let results = state.index.search(&query, 50, true)?;
+                        let mut page = Vec::with_capacity(50000);
+                        front_end::render_serp_page(&mut page, &query, &results, &state.markup)?;
 
-            let results = state.index.search(&query, 50, true)?;
-            let mut page = Vec::with_capacity(50000);
-            front_end::render_serp_page(&mut page, &query, &results, &state.markup)?;
-
-            Ok(serve_cached((page, 600, false, None)))
+                        Ok::<_, failure::Error>((page, 600u32, false, None))
+                    }).await
+                }
+            }).await???;
+            Ok(serve_cached(page))
         },
         _ => Ok(HttpResponse::PermanentRedirect().header("Location", "/").finish()),
     }

@@ -88,7 +88,13 @@ async fn run_server() -> Result<(), failure::Error> {
 
     let index = CrateSearchIndex::new(&data_dir)?;
 
-    let rt = Runtime::new().unwrap();
+    let rt = tokio::runtime::Builder::new()
+        .threaded_scheduler()
+        .enable_all()
+        .max_threads(8)
+        .thread_name("server-bg")
+        .build()
+        .unwrap();
 
     let state = web::Data::new(ServerState {
         markup,

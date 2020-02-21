@@ -81,7 +81,7 @@ async fn run_server() -> Result<(), failure::Error> {
     assert!(data_dir.exists(), "CRATE_DATA_DIR {} does not exist", data_dir.display());
 
     let crates = KitchenSink::new(&data_dir, &github_token).await?;
-    let image_filter = Arc::new(ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_dir().join("images.db"))?);
+    let image_filter = Arc::new(ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_dir().join("images.db")).await?);
     let markup = Renderer::new_filter(Some(Highlighter::new()), image_filter);
 
     let index = CrateSearchIndex::new(&data_dir)?;

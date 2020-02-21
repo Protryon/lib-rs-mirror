@@ -61,6 +61,7 @@ pub struct CratePage<'a> {
     top_category: Option<(u32, &'static Category)>,
     is_build_or_dev: (bool, bool),
     handle: Handle,
+    api_reference_url: Option<String>,
 }
 
 /// Helper used to find most "interesting" versions
@@ -110,6 +111,11 @@ impl<'a> CratePage<'a> {
             kitchen_sink.top_keyword(all),
             kitchen_sink.all_contributors(ver))?;
         let deps = kitchen_sink.all_dependencies_flattened(ver);
+        let api_reference_url = if kitchen_sink.has_docs_rs(ver.origin(), ver.short_name(), ver.version()).await {
+            Some(format!("https://docs.rs/{}", ver.short_name()))
+        } else {
+            None
+        };
         let mut page = Self {
             top_keyword,
             all_contributors,
@@ -123,6 +129,7 @@ impl<'a> CratePage<'a> {
             top_category,
             is_build_or_dev,
             handle: Handle::current(),
+            api_reference_url,
         };
         let (sizes, lang_stats, viral_license) = page.crate_size_and_viral_license(deps?).await?;
         page.sizes = Some(sizes);
@@ -557,12 +564,8 @@ impl<'a> CratePage<'a> {
     }
 
     /// docs.rs link, if available
-    pub fn api_reference_url(&self) -> Option<String> {
-        if self.kitchen_sink.has_docs_rs(self.ver.origin(), self.ver.short_name(), self.ver.version()) {
-            Some(format!("https://docs.rs/{}", self.ver.short_name()))
-        } else {
-            None
-        }
+    pub fn api_reference_url(&self) -> Option<&str> {
+        self.api_reference_url.as_deref()
     }
 
     fn url_domain(url: &str) -> Option<Cow<'static, str>> {
@@ -678,7 +681,7 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn downloads_per_month(&self) -> Option<usize> {
-        self.kitchen_sink.downloads_per_month(self.all.origin()).ok().and_then(|x| x)
+        self.block(self.kitchen_sink.downloads_per_month(self.all.origin())).ok().and_then(|x| x)
     }
 
     pub fn github_stargazers_and_watchers(&self) -> Option<(u32, u32)> {

@@ -347,7 +347,7 @@ impl KitchenSink {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
         match origin {
             Origin::CratesIo(name) => {
-                let meta = self.crates_io_meta(name)?;
+                let meta = self.crates_io_meta(name).await?;
                 let versions = meta.meta.versions().map(|c| CrateVersion {
                     num: c.num,
                     updated_at: c.updated_at,
@@ -451,12 +451,12 @@ impl KitchenSink {
             .get(origin).cloned()
     }
 
-    pub fn downloads_per_month(&self, origin: &Origin) -> CResult<Option<usize>> {
-        self.downloads_recent(origin).map(|dl| dl.map(|n| n / 3))
+    pub async fn downloads_per_month(&self, origin: &Origin) -> CResult<Option<usize>> {
+        self.downloads_recent(origin).await.map(|dl| dl.map(|n| n / 3))
     }
 
     pub async fn downloads_per_month_or_equivalent(&self, origin: &Origin) -> CResult<Option<usize>> {
-        if let Some(dl) = self.downloads_per_month(origin)? {
+        if let Some(dl) = self.downloads_per_month(origin).await? {
             return Ok(Some(dl));
         }
 
@@ -475,25 +475,25 @@ impl KitchenSink {
         Ok(None)
     }
 
-    fn downloads_recent(&self, origin: &Origin) -> CResult<Option<usize>> {
+    async fn downloads_recent(&self, origin: &Origin) -> CResult<Option<usize>> {
         Ok(match origin {
             Origin::CratesIo(name) => {
-                let meta = self.crates_io_meta(name)?;
+                let meta = self.crates_io_meta(name).await?;
                 meta.meta.krate.recent_downloads
             },
             _ => None,
         })
     }
 
-    fn crates_io_meta(&self, name: &str) -> CResult<CratesIoCrate> {
+    async fn crates_io_meta(&self, name: &str) -> CResult<CratesIoCrate> {
         let krate = self.index.crates_io_crate_by_lowercase_name(name).context("rich_crate")?;
         let latest_in_index = krate.latest_version().version(); // most recently published version
-        let meta = self.crates_io.krate(name, latest_in_index)
+        let meta = self.crates_io.krate(name, latest_in_index).await
             .with_context(|_| format!("crates.io meta for {} {}", name, latest_in_index))?;
         let mut meta = meta.ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?;
         if !meta.meta.versions.iter().any(|v| v.num == latest_in_index) {
             eprintln!("Crate data missing latest version {}@{}", name, latest_in_index);
-            meta = self.crates_io.krate(name, &format!("{}-try-again", latest_in_index))?
+            meta = self.crates_io.krate(name, &format!("{}-try-again", latest_in_index)).await?
                 .ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?;
             if !meta.meta.versions.iter().any(|v| v.num == latest_in_index) {
                 eprintln!("Error: crate data is borked {}@{}. Has only: {:?}", name, latest_in_index, meta.meta.versions.iter().map(|v| &v.num).collect::<Vec<_>>());
@@ -594,8 +594,8 @@ impl KitchenSink {
         self.rich_crate_version_data_common(origin.clone(), meta, 0, false, warnings).await
     }
 
-    pub fn tarball(&self, name: &str, ver: &str) -> CResult<Vec<u8>> {
-        let tarball = self.crates_io.crate_data(name, ver)
+    pub async fn tarball(&self, name: &str, ver: &str) -> CResult<Vec<u8>> {
+        let tarball = self.crates_io.crate_data(name, ver).await
             .context("crate_file")?
             .ok_or_else(|| KitchenSinkErr::DataNotFound(format!("{}-{}", name, ver)))?;
         Ok(tarball)
@@ -605,12 +605,13 @@ impl KitchenSink {
         let mut warnings = HashSet::new();
 
         let name = latest.name();
+        let name_lower = name.to_ascii_lowercase();
         let ver = latest.version();
         let origin = Origin::from_crates_io_name(name);
 
-        let (crate_tarball, crates_io_meta) = rayon::join(
-            || self.tarball(name, ver),
-            || self.crates_io_meta(&name.to_ascii_lowercase()));
+        let (crate_tarball, crates_io_meta) = futures::join!(
+            self.tarball(name, ver),
+            self.crates_io_meta(&name_lower));
 
         let crates_io_meta = crates_io_meta?.meta.krate;
         let crate_tarball = crate_tarball?;
@@ -643,7 +644,7 @@ impl KitchenSink {
             }
             // readmes in form of readme="../foo.md" are lost in packaging,
             // and the only copy exists in crates.io own api
-            self.add_readme_from_crates_io(&mut meta, name, ver);
+            self.add_readme_from_crates_io(&mut meta, name, ver).await;
             let has_readme = meta.readme.is_some();
             if !has_readme {
                 warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()));
@@ -703,13 +704,13 @@ impl KitchenSink {
             // Delete the original docs.rs link, because we have our own
             // TODO: what if the link was to another crate or a subpage?
             if package.documentation.as_ref().map_or(false, |s| Self::is_docs_rs_link(s)) {
-                if self.has_docs_rs(&origin, &package.name, &package.version) {
+                if self.has_docs_rs(&origin, &package.name, &package.version).await {
                     package.documentation = None; // docs.rs is not proper docs
                 }
             }
         }
 
-        warnings.extend(self.remove_redundant_links(package, maybe_repo.as_ref()));
+        warnings.extend(self.remove_redundant_links(package, maybe_repo.as_ref()).await);
 
         let mut github_description = None;
         let mut github_name = None;
@@ -727,7 +728,7 @@ impl KitchenSink {
                     } else if let Some(url) = ghrepo.github_page_url {
                         package.homepage = Some(url);
                     }
-                    warnings.extend(self.remove_redundant_links(package, maybe_repo.as_ref()));
+                    warnings.extend(self.remove_redundant_links(package, maybe_repo.as_ref()).await);
                 }
                 if package.description.is_none() {
                     package.description = ghrepo.description;
@@ -899,8 +900,8 @@ impl KitchenSink {
         warnings
     }
 
-    fn add_readme_from_crates_io(&self, meta: &mut CrateFile, name: &str, ver: &str) {
-        if let Ok(Some(html)) = self.crates_io.readme(name, ver) {
+    async fn add_readme_from_crates_io(&self, meta: &mut CrateFile, name: &str, ver: &str) {
+        if let Ok(Some(html)) = self.crates_io.readme(name, ver).await {
             eprintln!("Found readme on crates.io {}@{}", name, ver);
             meta.readme = Some(Readme {
                 markup: Markup::Html(String::from_utf8_lossy(&html).to_string()),
@@ -912,7 +913,7 @@ impl KitchenSink {
         }
     }
 
-    fn remove_redundant_links(&self, package: &mut Package, maybe_repo: Option<&Repo>) -> Warnings {
+    async fn remove_redundant_links(&self, package: &mut Package, maybe_repo: Option<&Repo>) -> Warnings {
         let mut warnings = HashSet::new();
 
         // We show github link prominently, so if homepage = github, that's nothing new
@@ -941,26 +942,29 @@ impl KitchenSink {
             package.homepage = None;
         }
 
-        if package.homepage.as_ref().map_or(false, |url| !self.check_url_is_valid(url)) {
-            warnings.insert(Warning::BrokenLink("homepage".to_string(), package.homepage.as_ref().unwrap().to_string()));
-            package.homepage = None;
+        if let Some(url) = package.homepage.as_ref() {
+            if !self.check_url_is_valid(url).await {
+                warnings.insert(Warning::BrokenLink("homepage".to_string(), package.homepage.as_ref().unwrap().to_string()));
+                package.homepage = None;
+            }
         }
 
-        if package.documentation.as_ref().map_or(false, |url| !self.check_url_is_valid(url)) {
-            warnings.insert(Warning::BrokenLink("documentation".to_string(), package.documentation.as_ref().unwrap().to_string()));
-            package.documentation = None;
+         if let Some(url) = package.documentation.as_ref() {
+            if !self.check_url_is_valid(url).await {
+                warnings.insert(Warning::BrokenLink("documentation".to_string(), package.documentation.as_ref().unwrap().to_string()));
+                package.documentation = None;
+            }
         }
         warnings
     }
 
-    pub fn check_url_is_valid(&self, url: &str) -> bool {
+    pub async fn check_url_is_valid(&self, url: &str) -> bool {
         if let Ok(Some(res)) = self.url_check_cache.get(url) {
             return res;
         }
         eprintln!("CHK: {}", url);
-        let res = reqwest::Client::builder().build()
-        .and_then(|res| res.get(url).send())
-        .map(|res| {
+        let req = reqwest::Client::builder().build().unwrap();
+        let res = req.get(url).send().await.map(|res| {
             res.status().is_success()
         })
         .unwrap_or(false);
@@ -974,9 +978,9 @@ impl KitchenSink {
     }
 
     /// name is case-sensitive!
-    pub fn has_docs_rs(&self, origin: &Origin, name: &str, ver: &str) -> bool {
+    pub async fn has_docs_rs(&self, origin: &Origin, name: &str, ver: &str) -> bool {
         match origin {
-            Origin::CratesIo(_) => self.docs_rs.builds(name, ver).unwrap_or(true), // fail open
+            Origin::CratesIo(_) => self.docs_rs.builds(name, ver).await.unwrap_or(true), // fail open
             _ => false,
         }
     }
@@ -1099,7 +1103,7 @@ impl KitchenSink {
     /// Maintenance: add crate to local db index
     pub async fn index_crate(&self, k: &RichCrate, score: f64) -> CResult<()> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
-        self.crate_db.index_versions(k, score, self.downloads_recent(k.origin())?).await?;
+        self.crate_db.index_versions(k, score, self.downloads_recent(k.origin()).await?).await?;
         Ok(())
     }
 
@@ -1424,7 +1428,7 @@ impl KitchenSink {
 
     /// Merge authors, owners, contributors
     pub async fn all_contributors<'a>(&self, krate: &'a RichCrateVersion) -> CResult<(Vec<CrateAuthor<'a>>, Vec<CrateAuthor<'a>>, bool, usize)> {
-        let owners = self.crate_owners(krate)?;
+        let owners = self.crate_owners(krate).await?;
 
         let (hit_max_contributor_count, mut contributors_by_login) = match krate.repository().as_ref() {
             // Only get contributors from github if the crate has been found in the repo,
@@ -1639,9 +1643,9 @@ impl KitchenSink {
         Err(KitchenSinkErr::OwnerWithoutLogin)?
     }
 
-    fn crate_owners(&self, krate: &RichCrateVersion) -> CResult<Vec<CrateOwner>> {
+    async fn crate_owners(&self, krate: &RichCrateVersion) -> CResult<Vec<CrateOwner>> {
         match krate.origin() {
-            Origin::CratesIo(name) => self.crates_io_crate_owners(name, krate.version()),
+            Origin::CratesIo(name) => self.crates_io_crate_owners(name, krate.version()).await,
             Origin::GitLab {..} => Ok(vec![]),
             Origin::GitHub {repo, ..} => Ok(vec![
                 CrateOwner {
@@ -1658,8 +1662,8 @@ impl KitchenSink {
         }
     }
 
-    pub fn crates_io_crate_owners(&self, crate_name: &str, version: &str) -> CResult<Vec<CrateOwner>> {
-        Ok(self.crates_io.crate_owners(crate_name, version).context("crate_owners")?.unwrap_or_default())
+    pub async fn crates_io_crate_owners(&self, crate_name: &str, version: &str) -> CResult<Vec<CrateOwner>> {
+        Ok(self.crates_io.crate_owners(crate_name, version).await.context("crate_owners")?.unwrap_or_default())
     }
 
     // Sorted from the top, returns origins
@@ -1710,7 +1714,7 @@ impl KitchenSink {
             if c.is_yanked() {
                 return None;
             }
-            Some((o, score, self.crate_owners(&c).unwrap_or_default(), c.into_keywords()))
+            Some((o, score, self.crate_owners(&c).await.unwrap_or_default(), c.into_keywords()))
         })
         .collect::<Vec<_>>().await;
 

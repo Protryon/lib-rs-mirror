@@ -227,7 +227,7 @@ async fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrat
     let mut temp_inp = CrateTemporalInputs {
         versions: all.versions(),
         is_app: k.is_app(),
-        has_docs_rs: crates.has_docs_rs(k.origin(), k.short_name(), k.version()),
+        has_docs_rs: crates.has_docs_rs(k.origin(), k.short_name(), k.version()).await,
         is_nightly: k.is_nightly(),
         downloads_per_month,
         downloads_per_month_minus_most_downloaded_user: downloads_per_month,
@@ -248,9 +248,9 @@ async fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrat
         temp_inp.number_of_direct_reverse_deps = direct_rev_deps;
         temp_inp.number_of_indirect_reverse_deps = deps.runtime.def.max(deps.build.def).into();
         temp_inp.number_of_indirect_reverse_optional_deps = indirect_reverse_optional_deps;
-        let biggest = deps.rev_dep_names.iter()
-            .filter_map(|name| crates.downloads_per_month(&Origin::from_crates_io_name(name)).ok().and_then(|x| x))
-            .max().unwrap_or(0);
+        let tmp = futures::future::join_all(deps.rev_dep_names.iter()
+            .map(|name| async move { crates.downloads_per_month(&Origin::from_crates_io_name(name)).await })).await;
+        let biggest = tmp.into_iter().filter_map(|x| x.ok().and_then(|x| x)).max().unwrap_or(0);
         temp_inp.downloads_per_month_minus_most_downloaded_user = downloads_per_month.saturating_sub(biggest as u32);
     }
 

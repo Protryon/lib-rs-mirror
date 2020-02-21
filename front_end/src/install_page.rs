@@ -11,16 +11,23 @@ pub struct InstallPage<'a> {
     pub ver: &'a RichCrateVersion,
     pub kitchen_sink: &'a KitchenSink,
     pub markup: &'a Renderer,
+    api_reference_url: Option<String>,
 }
 
 impl<'a> InstallPage<'a> {
     pub async fn new(ver: &'a RichCrateVersion, kitchen_sink: &'a KitchenSink, markup: &'a Renderer) -> InstallPage<'a> {
         let (is_build, is_dev) = kitchen_sink.is_build_or_dev(ver.origin()).await.expect("deps");
+        let api_reference_url = if kitchen_sink.has_docs_rs(ver.origin(), ver.short_name(), ver.version()).await {
+            Some(format!("https://docs.rs/{}", ver.short_name()))
+        } else {
+            None
+        };
         Self {
             is_build, is_dev,
             ver,
             kitchen_sink,
             markup,
+            api_reference_url,
         }
     }
 
@@ -36,12 +43,8 @@ impl<'a> InstallPage<'a> {
     }
 
     /// docs.rs link, if available
-    pub fn api_reference_url(&self) -> Option<String> {
-        if self.kitchen_sink.has_docs_rs(self.ver.origin(), self.ver.short_name(), self.ver.version()) {
-            Some(format!("https://docs.rs/{}", self.ver.short_name()))
-        } else {
-            None
-        }
+    pub fn api_reference_url(&self) -> Option<&str> {
+        self.api_reference_url.as_deref()
     }
 
     pub fn render_readme(&self, readme: &Readme) -> templates::Html<String> {

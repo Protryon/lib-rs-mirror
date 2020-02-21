@@ -64,7 +64,7 @@ async fn run(filter: Option<String>) -> Result<(), failure::Error> {
 
     let crates = Arc::new(kitchen_sink::KitchenSink::new_default().await?);
     crates.prewarm();
-    let image_filter = Arc::new(ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_dir().join("images.db"))?);
+    let image_filter = Arc::new(ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_dir().join("images.db")).await?);
     let markup = &Renderer::new_filter(Some(Highlighter::new()), image_filter);
 
     let handle = Arc::new(tokio::runtime::Handle::current());

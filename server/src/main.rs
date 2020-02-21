@@ -417,6 +417,9 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
 
             println!("Using cached page {} {}s fresh={:?} acc={:?}", cache_file.display(), cache_time_remaining, is_fresh, is_acceptable);
 
+            if !is_acceptable {
+                let _ = std::fs::remove_file(&cache_file); // block instead of an endless refresh loop
+            }
             if !is_fresh {
                 let _ = state.rt.spawn(async move {
                     match generate.await {

@@ -119,6 +119,7 @@ async fn run_server() -> Result<(), failure::Error> {
                     println!("HUP!");
                     match KitchenSink::new(&data_dir, &github_token).await {
                         Ok(k) => {
+                            state.crates.load().cleanup();
                             let k = Arc::new(k);
                             k.update();
                             state.crates.store(k);

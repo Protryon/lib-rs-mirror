@@ -112,7 +112,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
             w.writes = 0;
             w.next_autosave *= 2;
             drop(w); // unlock writes
-            self.save()?;
+            self.save_unlocked()?;
         }
         Ok(())
     }
@@ -149,6 +149,14 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
     }
 
     pub fn save(&self) -> Result<(), Error> {
+        if self.data.read().writes > 0 {
+            self.save_unlocked()
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn save_unlocked(&self) -> Result<(), Error> {
         let tmp_path = NamedTempFile::new_in(self.path.parent().expect("tmp"))?;
         let mut file = BufWriter::new(File::create(&tmp_path)?);
         let d = self.lock_for_read()?;
@@ -187,7 +195,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
 impl<T: Serialize + DeserializeOwned + Clone + Send> Drop for TempCache<T> {
     fn drop(&mut self) {
         if self.data.read().writes > 0 {
-            if let Err(err) = self.save() {
+            if let Err(err) = self.save_unlocked() {
                 eprintln!("Temp db save failed: {}", err);
             }
         }

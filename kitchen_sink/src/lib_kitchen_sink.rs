@@ -547,7 +547,7 @@ impl KitchenSink {
 
         let krate = RichCrateVersion::new(origin.clone(), manifest, derived);
         let mut cache = self.loaded_rich_crate_version_cache.write();
-        if cache.len() > 1000 {
+        if cache.len() > 4000 {
             cache.clear();
         }
         cache.insert(origin.clone(), krate.clone());
@@ -1847,6 +1847,14 @@ impl KitchenSink {
 
     fn repo_commits(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Option<Vec<github_info::CommitMeta>>> {
         Ok(self.gh.commits(repo, as_of_version)?)
+    }
+
+    /// Prepare for drop: purge buffers, free memory
+    pub fn cleanup(&self) {
+        self.index.clear_cache();
+        self.loaded_rich_crate_version_cache.write().clear();
+        let _ = self.url_check_cache.save();
+        self.crates_io.cleanup();
     }
 }
 

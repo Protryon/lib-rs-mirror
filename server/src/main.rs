@@ -432,19 +432,20 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
                 let _ = state.rt.spawn({
                     let state = state.clone();
                     async move {
-                    let _s = state.background_job.acquire().await;
-                    match generate.await {
-                        Ok((mut page, last_mod)) => {
-                            let timestamp = last_mod.map(|a| a.timestamp() as u32).unwrap_or(0);
-                            page.extend_from_slice(&timestamp.to_le_bytes()); // The worst data format :)
+                    if let Ok(_s) = state.background_job.try_acquire() {
+                        match generate.await {
+                            Ok((mut page, last_mod)) => {
+                                let timestamp = last_mod.map(|a| a.timestamp() as u32).unwrap_or(0);
+                                page.extend_from_slice(&timestamp.to_le_bytes()); // The worst data format :)
 
-                            if let Err(e) = std::fs::write(&cache_file, &page) {
-                                eprintln!("warning: Failed writing to {}: {}", cache_file.display(), e);
-                            }
-                        },
-                        Err(e) => {
-                            eprintln!("Cache pre-warm: {}", e);
-                        },
+                                if let Err(e) = std::fs::write(&cache_file, &page) {
+                                    eprintln!("warning: Failed writing to {}: {}", cache_file.display(), e);
+                                }
+                            },
+                            Err(e) => {
+                                eprintln!("Cache pre-warm: {}", e);
+                            },
+                        }
                     }
                 }});
             }

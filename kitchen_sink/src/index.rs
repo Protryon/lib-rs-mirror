@@ -20,6 +20,7 @@ use std::path::Path;
 use std::sync::Arc;
 use string_interner::StringInterner;
 use string_interner::Sym;
+use std::time::Duration;
 
 type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 type FxHashSet<V> = std::collections::HashSet<V, ahash::RandomState>;
@@ -182,7 +183,8 @@ impl Index {
     }
 
     pub async fn deps_stats(&self) -> Result<&DepsStats, KitchenSinkErr> {
-        Ok(self.deps_stats.get_or_init(self.get_deps_stats()).await)
+        Ok(tokio::time::timeout(Duration::from_secs(30), self.deps_stats.get_or_init(self.get_deps_stats())).await
+            .map_err(|_| KitchenSinkErr::DepsNotAvailable)?)
     }
 
     #[inline]

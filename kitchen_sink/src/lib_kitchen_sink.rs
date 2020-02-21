@@ -126,6 +126,10 @@ pub enum KitchenSinkErr {
     SemverParsingError,
     #[fail(display = "Stopped")]
     Stopped,
+    #[fail(display = "Deps stats timeout")]
+    DepsNotAvailable,
+    #[fail(display = "Crate timeout")]
+    DataTimedOut,
     #[fail(display = "Missing github login for crate owner")]
     OwnerWithoutLogin,
     #[fail(display = "Git index parsing failed: {}", _0)]
@@ -527,7 +531,9 @@ impl KitchenSink {
             return Ok(krate.clone());
         }
 
-        let (manifest, derived) = match self.crate_db.rich_crate_version_data(origin).await {
+        let data = tokio::time::timeout(Duration::from_secs(30), self.crate_db.rich_crate_version_data(origin))
+            .await.map_err(|_| KitchenSinkErr::DataTimedOut)?;
+        let (manifest, derived) = match data {
             Ok(v) => v,
             Err(e) => {
                 eprintln!("getting {:?}: {}", origin, e);

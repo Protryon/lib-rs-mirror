@@ -43,6 +43,10 @@ impl CratesIoClient {
         })
     }
 
+    pub fn cleanup(&self) {
+        let _= self.cache.save();
+    }
+
     pub fn cache_only(&mut self, no_net: bool) -> &mut Self {
         self.cache.cache_only = no_net;
         self.crates.cache_only = no_net;

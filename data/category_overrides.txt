@@ -1,22 +1,28 @@
+acm: science::math
 afterburn: web-programming
 afterparty-ng : web-programming::http-server
 ag  :  command-line-utilities
+alass-core : algorithms
 alert-after: command-line-utilities
 alfred: development-tools, os::macos-apis
 algorust: algorithms
 allegro_primitives-sys: game-engines
 alphaid: encoding
 alphavantage: web-programming
+amath: parser-implementations
 approvals: development-tools::testing
 apt-cache: os::unix-apis
 aquaenv: os::macos-apis, command-line-utilities, gui
 argh: command-line-interface
+ast_node: parser-implementations
 async-codec : asynchronous
+atomsh: command-line-utilities
 balena-temen: parser-implementations
 bao: algorithms
 baseperm: algorithms
 bb8: asynchronous
 begonia: command-line-interface
+bigbro: os, filesystem
 binaryen-sys : wasm
 bio-types: science, rust-patterns
 bio: science, algorithms, data-structures
@@ -41,6 +47,7 @@ codec-impl: cryptography::cryptocurrencies
 codenano: science
 collider: science::math, game-engines
 collisions: algorithms
+colloquy: command-line-interface
 core-foundation-sys: os::macos-apis
 core-text: os::macos-apis
 coreaudio-sys: os::macos-apis, multimedia::audio
@@ -66,7 +73,10 @@ endian-hasher : algorithms
 endicon: algorithms
 eng-pwasm-abi : cryptography::cryptocurrencies, wasm
 eng-wasm : cryptography::cryptocurrencies, wasm
+env-io: rust-patterns
+env_proc : config
 env_proc: rust-patterns, config
+envoption: config
 envoption: config
 eosio_macros_internal: cryptography::cryptocurrencies
 euclid: science::math
@@ -78,6 +88,7 @@ exonum-testkit : cryptography::cryptocurrencies
 exonum-time : cryptography::cryptocurrencies
 exonum: cryptography::cryptocurrencies
 failure: rust-patterns
+fakesite: web-programming
 fdfast: filesystem
 fec : encoding
 ff: algorithms
@@ -102,6 +113,7 @@ game-loop: game-engines
 gaviota-sys: game-engines
 gcnctrlusb: hardware-support, emulators
 gdnative-video : game-engines, multimedia::video
+geckodriver: development-tools::testing
 geoplaces: science
 geos: science::math
 giphy: web-programming
@@ -126,6 +138,7 @@ imdb: web-programming
 impl-codec: cryptography::cryptocurrencies
 indy-sys  :cryptography::cryptocurrencies
 infer: filesystem
+inheritance: rust-patterns
 iostream: data-structures
 iota-constants: cryptography::cryptocurrencies
 iota-conversion: cryptography::cryptocurrencies
@@ -135,6 +148,7 @@ iota-model : cryptography::cryptocurrencies
 iota-pow: cryptography::cryptocurrencies
 iota-spammer : cryptography::cryptocurrencies
 iota-utils : cryptography::cryptocurrencies
+is-macro : development-tools::procedural-macro-helpers
 json-tools: parser-implementations
 jsonapi: web-programming
 jsonpath_lib: parser-implementations
@@ -174,6 +188,7 @@ loop-rs  : command-line-utilities
 lsp-codec : asynchronous
 lttb: algorithms
 lux: game-engines
+lw-webdriver : development-tools::testing
 macchanger: os, network-programming
 mach: os::macos-apis
 magenta-sys : os
@@ -181,6 +196,7 @@ magenta: os
 makepad-widget: web-programming
 makepad: text-editors
 mamba: parser-implementations
+marionette: development-tools::testing
 matrix_bot_api: network-programming
 mediawiki: web-programming
 minidump-processor:development-tools::debugging
@@ -188,6 +204,7 @@ miniquad  : gui
 mobi: parser-implementations
 moltenvk_deps: os::macos-apis, rendering::graphics-api
 monger: databases
+mothra: command-line-utilities
 mqtt-codec: network-programming
 msql-srv: database
 mxruntime-sys : os
@@ -221,11 +238,14 @@ pico-sys: web-programming
 pkgman: os
 pngcrush: compression
 pq-sys: database
+preftool-env : config
 prometheus_wireguard_exporter: network-programming
+quaternion_averager: science::math
 quicksort: algorithms
 quoted_printable: parser-implementations
 qupla: cryptography::cryptocurrencies
 randrust: web-programming::http-server
+ratio: science::math
 rdkafka: asynchronous, network-programming
 readmouse: os::macos-apis
 redis-cluster : databases
@@ -250,8 +270,11 @@ rustop-rs : command-line-utilities, os::unix-apis
 rustration: emulators
 rustydav: web-programming
 saml2aws-auto: authentication
+scoped-env: config
 scrapmetal: rust-patterns, algorithms
+sekai: science
 semver-parser: parser-implementations
+serenium: development-tools::testing
 sgf-parser: parser-implementations
 shippai:rust-patterns
 sigv4: command-line-utilities, web-programming
@@ -273,10 +296,17 @@ sse-codec: web-programming
 star-history : command-line-utilities
 stemjail: os::unix-apis
 stringlit: rust-patterns
+sulfur: development-tools::testing
 suspicious-pods  : development-tools
 susy-codec-derive :cryptography::cryptocurrencies
 sv-parser: parser-implementations
 svd-parser: parser-implementations
+swc_atoms: parser-implementations
+swc_common: parser-implementations
+swc_ecma_ast: parser-implementations
+swc_ecma_parser: parser-implementations
+swc_ecma_parser_macros: parser-implementations
+swears: command-line-interface
 symbolic-minidump: development-tools::debugging
 symbolic: development-tools::debugging
 syncat-stylesheet: parser-implementations
@@ -300,6 +330,7 @@ ucd-util: text-processing
 urldecode: web-programming
 urlocator: parser-implementations
 users: os::unix-apis
+vad: multimedia::audio
 varlink_parser: parser-implementations
 varlociraptor: science
 veloren-launcher: games

@@ -226,6 +226,7 @@ lazy_static! {
         (Cond::Any(&["precision"]), &[("science::math", 1.1, 0.)]),
         (Cond::All(&["discrete", "transforms"]),
             &[("science::math", 1.25, 0.1), ("algorithms", 1.1, 0.), ("simulation", 0.9, 0.)]),
+        (Cond::Any(&["dep:nalgebra", "dep:num-complex", "dep:alga"]), &[("science::math", 1.2, 0.), ("science", 1.1, 0.), ("algorithms", 1.1, 0.)]),
         (Cond::Any(&["optimization", "floating-point"]),
             &[("science::math", 0.8, 0.), ("science::ml", 0.9, 0.), ("science", 0.9, 0.), ("algorithms", 1.2, 0.1)]),
         (Cond::Any(&["physics", "ncollide", "pressure"]),

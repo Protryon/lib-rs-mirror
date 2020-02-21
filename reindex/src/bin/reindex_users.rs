@@ -1,5 +1,3 @@
-use rayon;
-
 use kitchen_sink::{stopped, KitchenSink};
 use std::{
     collections::HashSet,

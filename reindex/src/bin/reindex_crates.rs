@@ -7,7 +7,6 @@ use parking_lot::Mutex;
 use rand::{seq::SliceRandom, thread_rng};
 use ranking::CrateTemporalInputs;
 use ranking::CrateVersionInputs;
-use rayon;
 use render_readme::Renderer;
 use search_index::*;
 use std::collections::HashSet;

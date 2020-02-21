@@ -9,7 +9,6 @@ use kitchen_sink::stopped;
 use kitchen_sink::CrateAuthor;
 use kitchen_sink::KitchenSink;
 use locale::Numeric;
-use rayon::prelude::*;
 use rich_crate::Origin;
 use rich_crate::RichCrate;
 use rich_crate::RichCrateVersion;

@@ -14,7 +14,6 @@ rusqlite = "0.21.0"
 rich_crate = { path = "../rich_crate" }
 categories = { path = "../categories" }
 failure = "0.1.6"
-rayon = "1.3.0"
 lazy_static = "1.4.0"
 chrono = "0.4.10"
 thread_local = "1.0.0"

@@ -16,6 +16,7 @@ pub use crate::crate_owners::*;
 pub struct CratesIoClient {
     cache: TempCache<(String, Payload)>,
     crates: SimpleCache,
+    sem: tokio::sync::Semaphore,
 }
 
 macro_rules! cioopt {
@@ -38,6 +39,7 @@ impl CratesIoClient {
         Ok(Self {
             cache: TempCache::new(&cache_base_path.join("cratesio.bin"))?,
             crates: SimpleCache::new(&cache_base_path.join("crates.db"))?,
+            sem: tokio::sync::Semaphore::new(4),
         })
     }
 
@@ -115,6 +117,8 @@ impl CratesIoClient {
         }
 
         self.cache.delete(key.0)?; // out of date
+
+        let _s = self.sem.acquire().await;
 
         let url = format!("https://crates.io/api/v1/crates/{}", path.as_ref());
         let res = self.cache.get_json(key.0, url, |raw: B| {

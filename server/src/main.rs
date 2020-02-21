@@ -423,7 +423,9 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
                 let _ = std::fs::remove_file(&cache_file); // block instead of an endless refresh loop
             }
             if !is_fresh {
-                let _ = state.rt.spawn(async move {
+                let _ = state.rt.spawn({
+                    let state = state.clone();
+                    async move {
                     let _s = state.background_job.acquire().await;
                     match generate.await {
                         Ok((page, last_mod)) => { // FIXME: set cache file timestamp?
@@ -438,7 +440,7 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
                             eprintln!("Cache pre-warm: {}", e);
                         },
                     }
-                });
+                }});
             }
             return Ok((page_cached, if !is_fresh { cache_time_remaining / 4 } else { cache_time_remaining }.max(2), !is_acceptable, Some(last_mod)));
         }

@@ -19,9 +19,6 @@
 [submodule "render_readme"]
 	path = render_readme
 	url = https://gitlab.com/crates.rs/render_readme.git
-[submodule "repo_url"]
-	path = repo_url
-	url = https://gitlab.com/crates.rs/repo_url.git
 [submodule "data/index"]
 	path = data/index
 	url = https://github.com/rust-lang/crates.io-index.git

@@ -17,6 +17,7 @@ use std::io::BufWriter;
 use std::marker::PhantomData;
 use std::path::PathBuf;
 use tempfile::NamedTempFile;
+use std::collections::hash_map::Entry;
 
 type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 
@@ -93,11 +94,20 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
         rmp_serde::encode::write_named(&mut e, value)?;
         let compr = e.finish()?;
 
-        let _ = Self::ungz(&compr)?; // sanity check
+        debug_assert!(Self::ungz(&compr).is_ok()); // sanity check
 
         let mut w = self.lock_for_write()?;
+        let compr = compr.into_boxed_slice();
+        match w.data.as_mut().unwrap().entry(key) {
+            Entry::Vacant(e) => { e.insert(compr); },
+            Entry::Occupied(mut e) => {
+                if e.get() == &compr {
+                    return Ok(());
+                }
+                e.insert(compr);
+            }
+        }
         w.writes += 1;
-        w.data.as_mut().unwrap().insert(key, compr.into_boxed_slice());
         if w.writes >= w.next_autosave {
             w.writes = 0;
             w.next_autosave *= 2;

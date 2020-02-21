@@ -3,46 +3,56 @@ afterparty-ng : web-programming::http-server
 ag  :  command-line-utilities
 alert-after: command-line-utilities
 alfred: development-tools, os::macos-apis
+alphaid: encoding
 alphavantage: web-programming
 aquaenv: os::macos-apis, command-line-utilities, gui
 argh: command-line-interface
+async-codec : asynchronous
 balena-temen: parser-implementations
 bao: algorithms
-jsonrpc-core : web-programming
-jsonrpc-core-client  : web-programming
 bb8: asynchronous
+binaryen-sys : wasm
 bitcoin_hashes : cryptography::cryptocurrencies
+blip_buf: multimedia::audio
+bloke: game-engines
 bnf: parsers
 boxcars: parser-implementations
+bright: command-line-utilities
+bs58: encoding
 bspline: rendering
 btc_spv_bin :cryptography::cryptocurrencies
+buffered-reader: rust-patterns
 cage  : development-tools, command-line-utilities
-syncat-stylesheet: parser-implementations
+calx: os::macos-apis, multimedia::audio
 chillup: web-programming
 click: development-tools
+codec-impl: cryptography::cryptocurrencies
 codenano: science
+collider: science::math, game-engines
 core-foundation-sys: os::macos-apis
 core-text: os::macos-apis
-calx: os::macos-apis, multimedia::audio
-coremidi: os::macos-apis, multimedia::audio
 coreaudio-sys: os::macos-apis, multimedia::audio
-librdkafka-sys: asynchronous
-rdkafka: asynchronous, network-programming
-kf-protocol : asynchronous, network-programming
-kf-protocol-transport: asynchronous, network-programming
-kf-socket: network-programming
+coremidi: os::macos-apis, multimedia::audio
 crates_io_api: web-programming
+crossterm_style : command-line-interface
 crunchy : development-tools
 cute-dnd-dice: game-engines
+default-env: rust-patterns
 deltae: multimedia
 derp: parser-implementations
-redis-cluster : databases
 diesel: databases
+differential-geometry : science::math
 elefren: web-programming
+endicon: algorithms
+env_proc: rust-patterns, config
+envoption: config
+euclid: science::math
 evcxr_repl: rust-patterns, command-line-utilities
 failure: rust-patterns
 fdfast: filesystem
+fec : encoding
 ff: algorithms
+finality-grandpa  :cryptography::cryptocurrencies
 find-files: filesystem
 findomain: networking
 fitrs: parser-implementations
@@ -53,23 +63,23 @@ futures-core: asynchronous
 futures-executor: asynchronous
 futures-task: asynchronous
 gaviota-sys: game-engines
+geos: science::math
 httpdate: date-and-time, parser-implementations
 hubcaps: web-programming
 hyper-router : web-programming::http-server
 iban_validate: parser-implementations
 ical: parser-implementations
+imdb-index: web-programming
+imdb: web-programming
+impl-codec: cryptography::cryptocurrencies
+indy-sys  :cryptography::cryptocurrencies
 infer: filesystem
 json-tools: parser-implementations
-geos: science::math
-collider: science::math, game-engines
-myelin-geometry : science::math
-euclid: science::math
-kurbo: science::math, rendering::graphics-api
-spade: data-structures
-differential-geometry : science::math
-pathfinder_geometry: science::math
 jsonapi: web-programming
 jsonpath_lib: parser-implementations
+jsonrpc-codec: web-programming
+jsonrpc-core : web-programming
+jsonrpc-core-client  : web-programming
 jsonrpc-parse : parser-implementations, web-programming
 jsonrpc-v2  : web-programming::http-server
 jubjub: algorithms
@@ -77,35 +87,57 @@ just  : development-tools, command-line-utilities
 k8-client : rust-patterns
 k8s-openapi : development-tools
 k8s-openapi-codegen-common: rust-patterns
+kekbit-codecs : encoding
 ketos : development-tools
 keychain-services: os::macos-apis, authentication
+kf-protocol : asynchronous, network-programming
+kf-protocol-transport: asynchronous, network-programming
+kf-socket: network-programming
 ktmpl : configuration
 kube: development-tools
+kurbo: science::math, rendering::graphics-api
 kx : development-tools
 lapp: parser-implementations
+letter-avatar: multimedia::images
+lib_sens: game-engines
+libass: web-programming
 libloadorder-ffi : game-engines
+librdkafka-sys: asynchronous
+libsbc-sys: hardware-support
 loop-rs  : command-line-utilities
+lsp-codec : asynchronous
 mach: os::macos-apis
 makepad: text-editors
 mamba: parser-implementations
 miniquad  : gui
 mobi: parser-implementations
-parse_cfg: parser-implementations, rust-patterns
 moltenvk_deps: os::macos-apis, rendering::graphics-api
 monger: databases
 mqtt-codec: network-programming
 msql-srv: database
+myelin-geometry : science::math
+neon-sys: web-programming
 notcurses: command-line-interface
+onig_sys: text-processing
+openpol: games
 orgize: parser-implementations
 packapp: os::macos-apis, command-line-utilities
 papyrus  : development-tools, command-line-utilities
+parity-scale-codec-derive: cryptography::cryptocurrencies
+parse_cfg: parser-implementations, rust-patterns
 parse_duration: parser-implementations
+pathfinder_geometry: science::math
 paw: parser-implementations
+pdcurses-sys: command-line-interface
+pico-sys: web-programming
 pngcrush: compression
+pq-sys: database
 prometheus_wireguard_exporter: network-programming
 quoted_printable: parser-implementations
 randrust: web-programming::http-server
+rdkafka: asynchronous, network-programming
 readmouse: os::macos-apis
+redis-cluster : databases
 ressa: parser-implementations
 retrosheet: parser-implementations
 rfind_url: parser-implementations
@@ -120,6 +152,7 @@ rusoto_credential: authentication
 saml2aws-auto: authentication
 semver-parser: parser-implementations
 sgf-parser: parser-implementations
+sip-codec : network-programming
 sitemap: parser-implementations
 solana-clap-utils :cryptography::cryptocurrencies
 solana-client :cryptography::cryptocurrencies
@@ -127,16 +160,21 @@ solana-gossip :cryptography::cryptocurrencies
 solana-keygen :cryptography::cryptocurrencies
 solana-logger :cryptography::cryptocurrencies
 solana-vote-program : cryptography::cryptocurrencies
+spade: data-structures
 sqlparser: parser-implementations
+sse-codec: web-programming
 suspicious-pods  : development-tools
+susy-codec-derive :cryptography::cryptocurrencies
 sv-parser: parser-implementations
 svd-parser: parser-implementations
 symbolic-minidump: development-tools::debugging
 symbolic: development-tools::debugging
+syncat-stylesheet: parser-implementations
 tagref : development-tools
 tealdeer: command-line-utilities
 telegram-client: web-programming
 text_io: text-processing
+thrift_codec : encoding, web-programming
 trackable: development-tools::debugging
 tt-call : rust-patterns
 typename: rust-patterns

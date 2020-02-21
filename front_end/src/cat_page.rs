@@ -8,12 +8,13 @@ use kitchen_sink::KitchenSink;
 use render_readme::Renderer;
 use rich_crate::RichCrateVersion;
 use std::collections::HashSet;
+use std::sync::Arc;
 
 /// Data for category page template
 pub struct CatPage<'a> {
     pub cat: &'a Category,
     pub keywords: Vec<String>,
-    pub crates: Vec<(RichCrateVersion, u32)>,
+    pub crates: Vec<(Arc<RichCrateVersion>, u32)>,
     pub related: Vec<String>,
     pub markup: &'a Renderer,
     pub count: usize,

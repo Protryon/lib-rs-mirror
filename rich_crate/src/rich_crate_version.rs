@@ -108,15 +108,9 @@ impl RichCrateVersion {
     }
 
     /// Either original keywords or guessed ones
-    pub fn keywords(&self) -> impl Iterator<Item = &str> {
+    pub fn keywords(&self) -> &[String] {
         self.derived.keywords.as_ref()
         .unwrap_or(&self.package().keywords)
-        .iter()
-        .map(|s| s.as_str())
-    }
-
-    pub fn into_keywords(self) -> Vec<String> {
-        self.derived.keywords.or(self.manifest.package.map(|p| p.keywords)).unwrap_or_default()
     }
 
     /// Globally unique URL-like string identifying source & the crate within that source

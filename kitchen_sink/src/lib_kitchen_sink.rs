@@ -156,7 +156,7 @@ pub struct KitchenSink {
     crate_db: CrateDb,
     user_db: user_db::UserDb,
     gh: github_info::GitHub,
-    loaded_rich_crate_version_cache: RwLock<FxHashMap<Origin, RichCrateVersion>>,
+    loaded_rich_crate_version_cache: RwLock<FxHashMap<Origin, Arc<RichCrateVersion>>>,
     category_crate_counts: DoubleCheckedCell<Option<HashMap<String, u32>>>,
     removals: DoubleCheckedCell<HashMap<Origin, f64>>,
     top_crates_cached: tokio::sync::RwLock<FxHashMap<String, Arc<Vec<Origin>>>>,
@@ -524,7 +524,7 @@ impl KitchenSink {
     /// This function is quite slow, as it reads everything about the crate.
     ///
     /// There's no support for getting anything else than the latest version.
-    pub async fn rich_crate_version_async(&self, origin: &Origin) -> CResult<RichCrateVersion> {
+    pub async fn rich_crate_version_async(&self, origin: &Origin) -> CResult<Arc<RichCrateVersion>> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
 
         if let Some(krate) = self.loaded_rich_crate_version_cache.read().get(origin) {
@@ -545,7 +545,7 @@ impl KitchenSink {
             },
         };
 
-        let krate = RichCrateVersion::new(origin.clone(), manifest, derived);
+        let krate = Arc::new(RichCrateVersion::new(origin.clone(), manifest, derived));
         let mut cache = self.loaded_rich_crate_version_cache.write();
         if cache.len() > 4000 {
             cache.clear();
@@ -1737,7 +1737,7 @@ impl KitchenSink {
             if c.is_yanked() {
                 return None;
             }
-            Some((o, score, self.crate_owners(&c).await.unwrap_or_default(), c.into_keywords()))
+            Some((o, score, self.crate_owners(&c).await.unwrap_or_default(), c.keywords().to_owned()))
         })
         .collect::<Vec<_>>().await;
 
@@ -1806,7 +1806,7 @@ impl KitchenSink {
 
     /// True if there are multiple crates with that keyword. Populated first.
     pub async fn keywords_populated(&self, krate: &RichCrateVersion) -> Vec<(String, bool)> {
-        let mut keywords: Vec<_> = join_all(krate.keywords()
+        let mut keywords: Vec<_> = join_all(krate.keywords().iter()
         .map(|k| async move {
             let populated = self.crate_db.crates_with_keyword(&k.to_lowercase()).await.unwrap() >= 3;
             (k.to_owned(), populated)

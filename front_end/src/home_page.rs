@@ -15,6 +15,7 @@ use rich_crate::RichCrateVersion;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::future::Future;
+use std::sync::Arc;
 use std::path::PathBuf;
 
 /// The list on the homepage looks flat, but it's actually a tree.
@@ -24,7 +25,7 @@ pub struct HomeCategory {
     pub pop: usize,
     pub cat: &'static Category,
     pub sub: Vec<HomeCategory>,
-    pub top: Vec<RichCrateVersion>,
+    pub top: Vec<Arc<RichCrateVersion>>,
     dl: usize,
 }
 
@@ -192,7 +193,7 @@ impl<'a> HomePage<'a> {
             .ok()
     }
 
-    pub fn recently_updated_crates(&self) -> Vec<(RichCrate, RichCrateVersion)> {
+    pub fn recently_updated_crates(&self) -> Vec<(RichCrate, Arc<RichCrateVersion>)> {
         self.block(async {
             futures::stream::iter(self.crates
                 .recently_updated_crates().await

@@ -22,6 +22,7 @@ use rich_crate::RichDep;
 use semver::Version as SemVer;
 use semver_parser;
 use std::borrow::Cow;
+use std::sync::Arc;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -141,7 +142,7 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn page(&self, url: &Urler) -> Page {
-        let keywords = self.ver.keywords().collect::<Vec<_>>().join(", ");
+        let keywords = self.ver.keywords().join(", ");
         Page {
             title: self.page_title(),
             keywords: if keywords != "" { Some(keywords) } else { None },
@@ -223,7 +224,7 @@ impl<'a> CratePage<'a> {
         }))
     }
 
-    pub fn parent_crate(&self) -> Option<RichCrateVersion> {
+    pub fn parent_crate(&self) -> Option<Arc<RichCrateVersion>> {
         self.handle.enter(|| futures::executor::block_on(async {
             let origin = self.kitchen_sink.parent_crate(self.ver).await?;
             self.kitchen_sink.rich_crate_version_async(&origin).await
@@ -860,7 +861,7 @@ impl<'a> CratePage<'a> {
         }, main_lang_stats, viral_license))
     }
 
-    async fn get_crate_of_dependency(&self, name: &str, _semver: ()) -> CResult<RichCrateVersion> {
+    async fn get_crate_of_dependency(&self, name: &str, _semver: ()) -> CResult<Arc<RichCrateVersion>> {
         // FIXME: caching doesn't hold multiple versions, so fetchnig of precise old versions is super expensive
         return self.kitchen_sink.rich_crate_version_async(&Origin::from_crates_io_name(name)).await;
 

@@ -13,6 +13,7 @@ use std::collections::HashSet;
 use std::sync::mpsc;
 use std::sync::Arc;
 use udedokei::LanguageExt;
+
 #[tokio::main]
 async fn main() {
     let crates = Arc::new(match kitchen_sink::KitchenSink::new_default().await {
@@ -38,7 +39,7 @@ async fn main() {
 
     let mut indexer = Indexer::new(CrateSearchIndex::new(crates.main_cache_dir()).expect("init search")).expect("init search indexer");
 
-    let (tx, rx) = mpsc::sync_channel(64);
+    let (tx, rx) = mpsc::sync_channel::<(Arc<_>, _, _)>(64);
     let index_thread = std::thread::spawn({
         let renderer = renderer.clone();
         move || -> Result<(), failure::Error> {
@@ -126,7 +127,7 @@ async fn main() {
     index_thread.join().unwrap().unwrap();
 }
 
-async fn index_crate(crates: &KitchenSink, origin: &Origin, renderer: &Renderer, search_sender: &mpsc::SyncSender<(RichCrateVersion, usize, f64)>) -> Result<RichCrateVersion, failure::Error> {
+async fn index_crate(crates: &KitchenSink, origin: &Origin, renderer: &Renderer, search_sender: &mpsc::SyncSender<(Arc<RichCrateVersion>, usize, f64)>) -> Result<Arc<RichCrateVersion>, failure::Error> {
     let (k, v) = futures::try_join!(crates.rich_crate_async(origin), crates.rich_crate_version_async(origin))?;
 
     let (downloads_per_month, score) = crate_overall_score(crates, &k, &v, renderer).await;
@@ -136,7 +137,7 @@ async fn index_crate(crates: &KitchenSink, origin: &Origin, renderer: &Renderer,
 }
 
 fn index_search(indexer: &mut Indexer, renderer: &Renderer, k: &RichCrateVersion, downloads_per_month: usize, score: f64) -> Result<(), failure::Error> {
-    let keywords: Vec<_> = k.keywords().collect();
+    let keywords: Vec<_> = k.keywords().iter().map(|s| s.as_str()).collect();
 
     let mut lib_tmp = None;
     let readme = k.readme().map(|readme| &readme.markup).or_else(|| {

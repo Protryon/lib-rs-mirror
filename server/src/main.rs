@@ -25,7 +25,7 @@ use std::env;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use std::time::{Duration, SystemTime, Instant};
 use tokio::runtime::Runtime;
 use urlencoding::decode;
 use urlencoding::encode;
@@ -89,6 +89,7 @@ async fn run_server() -> Result<(), failure::Error> {
 
     let index = CrateSearchIndex::new(&data_dir)?;
 
+
     let rt = tokio::runtime::Builder::new()
         .threaded_scheduler()
         .enable_all()
@@ -108,13 +109,20 @@ async fn run_server() -> Result<(), failure::Error> {
         foreground_job: tokio::sync::Semaphore::new(32),
     });
 
+    let start_time = Arc::new(Instant::now());
+    let timestamp = Arc::new(AtomicU32::new(0));
+
     // refresher thread
     state.rt.spawn({
         let state = state.clone();
+        let start_time = start_time.clone();
+        let timestamp = timestamp.clone();
         async move {
             state.crates.load().prewarm();
             loop {
                 tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
+                let elapsed = start_time.elapsed().as_secs() as u32;
+                timestamp.store(elapsed, Ordering::SeqCst);
                 if 1 == HUP_SIGNAL.swap(0, Ordering::SeqCst) {
                     println!("HUP!");
                     match KitchenSink::new(&data_dir, &github_token).await {
@@ -133,6 +141,22 @@ async fn run_server() -> Result<(), failure::Error> {
                 }
             }
         }});
+
+    // watchdog
+    std::thread::spawn(move || {
+        loop {
+            std::thread::sleep(Duration::from_secs(1));
+            let expected = start_time.elapsed().as_secs() as u32;
+            let rt_timestamp = timestamp.load(Ordering::SeqCst);
+            if rt_timestamp > expected + 2 {
+                eprintln!("Update loop is {}s behind", rt_timestamp - expected);
+                if rt_timestamp - expected > 10 {
+                    eprintln!("tokio is dead");
+                    std::process::exit(1);
+                }
+            }
+        }
+    });
 
     let server = HttpServer::new(move || {
         App::new()

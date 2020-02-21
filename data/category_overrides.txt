@@ -70,6 +70,7 @@ findomain: networking
 fitrs: parser-implementations
 fixed_width: parser-implementations
 forever: rust-patterns
+fractal-matrix-api : network-programming
 fsevent-sys: os::macos-apis
 fsevent: os::macos-apis
 futures-core: asynchronous
@@ -148,6 +149,7 @@ macchanger: os, network-programming
 mach: os::macos-apis
 makepad: text-editors
 mamba: parser-implementations
+matrix_bot_api: network-programming
 mediawiki: web-programming
 miniquad  : gui
 mobi: parser-implementations
@@ -173,6 +175,8 @@ parse_duration: parser-implementations
 pathfinder_geometry: science::math
 paw: parser-implementations
 pdcurses-sys: command-line-interface
+perkv: database-implementations
+persawkv: database-implementations
 pico-sys: web-programming
 pngcrush: compression
 pq-sys: database
@@ -189,12 +193,14 @@ retrosheet: parser-implementations
 rfind_url: parser-implementations
 ritual_build  : development-tools, command-line-utilities
 riven: games
+rmatrix: command-line-utilities
 rnix: parser-implementations
 robinhood: web-programming
 romy-core: game-engines
 romy-wasmer: game-engines
 romy: game-engines
 roux: web-programming
+rsdb: database-implementations
 rusoto_credential: authentication
 rustop-rs : command-line-utilities, os::unix-apis
 saml2aws-auto: authentication
@@ -236,6 +242,7 @@ trompt : authentication, command-line-interface
 try-guard : rust-patterns
 tt-call : rust-patterns
 twapi: web-programming
+typedb: database-implementations
 typename: rust-patterns
 ucd-trie: data-structures, text-processing
 ucd-util: text-processing

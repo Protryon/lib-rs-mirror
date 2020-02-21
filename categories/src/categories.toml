@@ -172,9 +172,8 @@ obvious-keywords = ["database", "db"]
 name = "Database implementations"
 title = "Rust database"
 description = """
-Databases allow clients to store and query large amounts of data in an \
-efficient manner. This category is for database management systems \
-implemented in Rust.\
+Database management systems implemented in Rust. \
+Store and query large amounts of data in an efficient manner.\
 """
 short-description = """
 Database management systems implemented in Rust."""

@@ -18,3 +18,4 @@ rmp-serde = "0.14.0"
 flate2 = "1.0.13"
 parking_lot = "0.10.0"
 ahash = "0.3"
+tokio = { version = "0.2", features = ["macros", "sync"] }

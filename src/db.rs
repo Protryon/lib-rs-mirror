@@ -18,6 +18,7 @@ pub struct SimpleCache {
     url: String,
     conn: ThreadLocal<Result<Connection, rusqlite::Error>>,
     pub cache_only: bool,
+    sem: tokio::sync::Semaphore,
 }
 
 impl SimpleCache {
@@ -26,6 +27,7 @@ impl SimpleCache {
             url: format!("file:{}?cache=shared", db_path.as_ref().display()),
             conn: ThreadLocal::new(),
             cache_only: false,
+            sem: tokio::sync::Semaphore::new(32),
         })
     }
 
@@ -99,6 +101,7 @@ impl SimpleCache {
             if self.cache_only {
                 None
             } else {
+                let _s = self.sem.acquire().await;
                 let data = Self::fetch(url.as_ref()).await?;
                 self.set(key, &data)?;
                 Some(data)

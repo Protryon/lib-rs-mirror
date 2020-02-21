@@ -31,6 +31,7 @@ pub struct TempCache<T: Serialize + DeserializeOwned + Clone + Send> {
     data: RwLock<Inner>,
     _ty: PhantomData<T>,
     pub cache_only: bool,
+    sem: tokio::sync::Semaphore,
 }
 
 impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
@@ -51,6 +52,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
             }),
             _ty: PhantomData,
             cache_only: false,
+            sem: tokio::sync::Semaphore::new(32),
         })
     }
 
@@ -157,6 +159,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
             return Ok(None);
         }
 
+        let _s = self.sem.acquire().await;
         let data = SimpleCache::fetch(url.as_ref()).await?;
         match serde_json::from_slice(&data) {
             Ok(res) => {

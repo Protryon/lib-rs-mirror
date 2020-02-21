@@ -1119,35 +1119,32 @@ impl KitchenSink {
         Ok(())
     }
 
-    pub fn index_crate_downloads(&self, crates_io_name: &str, by_day: &HashMap<&str, &[(Date<Utc>, u32)]>) -> CResult<()> {
+    pub fn index_crate_downloads(&self, crates_io_name: &str, by_ver: &HashMap<&str, &[(Date<Utc>, u32)]>) -> CResult<()> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
-        let mut modified = false;
-        let mut curr_year = Utc::today().year() as u16;
-        let mut curr_year_data = self.yearly.get_crate_year(crates_io_name, curr_year)?.unwrap_or_default();
-        for (version, date_dls) in by_day {
+        let mut year_data = HashMap::new();
+        for (version, date_dls) in by_ver {
             let version = MiniVer::from(semver::Version::parse(version)?);
             for (day, dls) in date_dls.iter() {
-                let y = day.year() as u16;
-                if y != curr_year {
-                    if modified {
-                        modified = false;
-                        self.yearly.set_crate_year(crates_io_name, curr_year, &curr_year_data)?;
-                    }
-                    curr_year = y;
-                    curr_year_data = self.yearly.get_crate_year(crates_io_name, curr_year)?.unwrap_or_default();
-                }
+                let curr_year = day.year() as u16;
+                let mut curr_year_data = match year_data.entry(curr_year) {
+                    Vacant(e) => {
+                        e.insert((false, self.yearly.get_crate_year(crates_io_name, curr_year)?.unwrap_or_default()))
+                    },
+                    Occupied(e) => e.into_mut(),
+                };
 
                 let day_of_year = day.ordinal0() as usize;
-                let year_dls = curr_year_data.entry(version.clone()).or_insert_with(Default::default);
-
+                let year_dls = curr_year_data.1.entry(version.clone()).or_insert_with(Default::default);
                 if year_dls.0[day_of_year] != *dls {
-                    modified = true;
+                    curr_year_data.0 = true;
                     year_dls.0[day_of_year] = *dls;
                 }
             }
         }
-        if modified {
-            self.yearly.set_crate_year(crates_io_name, curr_year, &curr_year_data)?;
+        for (curr_year, (modified, curr_year_data)) in year_data {
+            if modified {
+                self.yearly.set_crate_year(crates_io_name, curr_year, &curr_year_data)?;
+            }
         }
         Ok(())
     }

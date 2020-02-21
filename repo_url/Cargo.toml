@@ -1,0 +1,14 @@
+[package]
+edition = "2018"
+name = "repo_url"
+version = "0.3.1"
+authors = ["Kornel <kornel@geekhood.net>"]
+description = "Basic properties and formatting of URLs of GitHub and GitLab repositories"
+license = "CC0-1.0"
+
+[lib]
+name = "repo_url"
+path = "src/repo.rs"
+
+[dependencies]
+url = "2.1"

@@ -43,6 +43,7 @@ struct ServerState {
     page_cache_dir: PathBuf,
     data_dir: PathBuf,
     rt: Runtime,
+    background_job: tokio::sync::Semaphore,
 }
 
 type AServerState = web::Data<ServerState>;
@@ -95,6 +96,7 @@ async fn run_server() -> Result<(), failure::Error> {
         page_cache_dir,
         data_dir: data_dir.clone(),
         rt,
+        background_job: tokio::sync::Semaphore::new(2),
     });
 
     // refresher thread
@@ -422,6 +424,7 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
             }
             if !is_fresh {
                 let _ = state.rt.spawn(async move {
+                    let _s = state.background_job.acquire().await;
                     match generate.await {
                         Ok((page, last_mod)) => { // FIXME: set cache file timestamp?
                             if let Err(e) = std::fs::write(&cache_file, &page) {

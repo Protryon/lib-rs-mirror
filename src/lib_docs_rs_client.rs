@@ -1,7 +1,7 @@
+use serde_derive::*;
 pub use simple_cache::Error;
 use simple_cache::TempCache;
 use std::path::Path;
-use serde_derive::*;
 
 pub struct DocsRsClient {
     cache: TempCache<Option<Vec<BuildStatus>>>,
@@ -21,25 +21,25 @@ impl DocsRsClient {
         })
     }
 
-    pub fn builds(&self, crate_name: &str, version: &str) -> Result<bool, Error> {
-        let res = self.build_status(crate_name, version)?;
+    pub async fn builds(&self, crate_name: &str, version: &str) -> Result<bool, Error> {
+        let res = self.build_status(crate_name, version).await?;
         Ok(res.and_then(|s| s.get(0).map(|st| st.build_status)).unwrap_or(false))
     }
 
-    pub fn build_status(&self, crate_name: &str, version: &str) -> Result<Option<Vec<BuildStatus>>, Error> {
+    pub async fn build_status(&self, crate_name: &str, version: &str) -> Result<Option<Vec<BuildStatus>>, Error> {
         let key = format!("{}-{}", crate_name, version);
         if let Some(cached) = self.cache.get(&key)? {
             return Ok(cached);
         }
         let url = format!("https://docs.rs/crate/{}/{}/builds.json", crate_name, version);
-        Ok(self.cache.get_json(&key, url, |t| t)?.and_then(|f| f))
+        Ok(self.cache.get_json(&key, url, |t| t).await?.and_then(|f| f))
     }
 }
 
-#[test]
-fn test_docsrsclient() {
+#[tokio::test]
+async fn test_docsrsclient() {
     let client = DocsRsClient::new("../data/docsrs.db").expect("new");
 
-    assert!(client.builds("libc", "0.2.40").expect("libc"));
-    client.build_status("libc", "0.2.40").expect("libc");
+    assert!(client.builds("libc", "0.2.40").await.expect("libc"));
+    client.build_status("libc", "0.2.40").await.expect("libc");
 }

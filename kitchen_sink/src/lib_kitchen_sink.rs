@@ -274,16 +274,28 @@ impl KitchenSink {
         self.index.crates_io_crates()
     }
 
+    #[inline]
+    fn summed_year_downloads(&self, crate_name: &str, curr_year: u16) -> CResult<[u32; 366]> {
+        let curr_year_data = self.yearly.get_crate_year(crate_name, curr_year)?.unwrap_or_default();
+        let mut summed_days = [0; 366];
+        for (_, days) in curr_year_data {
+            for (sd, vd) in summed_days.iter_mut().zip(days.0.iter()) {
+                *sd += *vd;
+            }
+        }
+        Ok(summed_days)
+    }
+
     /// Gets cratesio download data, but not from the API, but from our local copy
     pub fn weekly_downloads(&self, k: &RichCrate, num_weeks: u16) -> CResult<Vec<DownloadWeek>> {
         let mut res = Vec::with_capacity(num_weeks.into());
         let mut now = Utc::today();
 
-        let mut curr_year = now.year();
-        let mut curr_year_data = self.yearly.get_crate_year(k.name(), curr_year as _)?.unwrap_or_default();
+        let mut curr_year = now.year() as u16;
+        let mut summed_days = self.summed_year_downloads(k.name(), curr_year)?;
 
         let day_of_year = now.ordinal0();
-        let missing_data_days = curr_year_data.0[0..day_of_year as usize].iter().cloned().rev().take_while(|&s| s == 0).count();
+        let missing_data_days = summed_days[0..day_of_year as usize].iter().cloned().rev().take_while(|&s| s == 0).count();
 
         if missing_data_days > 0 {
             now = now - chrono::Duration::days(missing_data_days as _);
@@ -296,16 +308,16 @@ impl KitchenSink {
 
             for d in 0..7 {
                 let this_date = date + chrono::Duration::days(d);
-                let day_of_year = this_date.ordinal0() as usize;
-                let year = this_date.year();
+                let year = this_date.year() as u16;
                 if year != curr_year {
                     curr_year = year;
-                    curr_year_data = self.yearly.get_crate_year(k.name(), curr_year as _)?.unwrap_or_default();
+                    summed_days = self.summed_year_downloads(k.name(), curr_year)?;
                 }
-                if curr_year_data.0[day_of_year] > 0 {
+                let day_of_year = this_date.ordinal0() as usize;
+                if summed_days[day_of_year] > 0 {
                     any_set = true;
                 }
-                total += curr_year_data.0[day_of_year] as usize;
+                total += summed_days[day_of_year] as usize;
             }
             if any_set {
                 res.push(DownloadWeek {
@@ -1107,26 +1119,31 @@ impl KitchenSink {
         Ok(())
     }
 
-    pub fn index_crate_downloads(&self, crates_io_name: &str, by_day: &HashMap<Date<Utc>, u32>) -> CResult<()> {
+    pub fn index_crate_downloads(&self, crates_io_name: &str, by_day: &HashMap<&str, &[(Date<Utc>, u32)]>) -> CResult<()> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
         let mut modified = false;
         let mut curr_year = Utc::today().year() as u16;
         let mut curr_year_data = self.yearly.get_crate_year(crates_io_name, curr_year)?.unwrap_or_default();
-        for (day, &dls) in by_day {
-            let day_of_year = day.ordinal0() as usize;
-            let y = day.year() as u16;
-            if y != curr_year {
-                if modified {
-                    modified = false;
-                    self.yearly.set_crate_year(crates_io_name, curr_year, &curr_year_data)?;
+        for (version, date_dls) in by_day {
+            let version = MiniVer::from(semver::Version::parse(version)?);
+            for (day, dls) in date_dls.iter() {
+                let y = day.year() as u16;
+                if y != curr_year {
+                    if modified {
+                        modified = false;
+                        self.yearly.set_crate_year(crates_io_name, curr_year, &curr_year_data)?;
+                    }
+                    curr_year = y;
+                    curr_year_data = self.yearly.get_crate_year(crates_io_name, curr_year)?.unwrap_or_default();
                 }
-                curr_year = y;
-                curr_year_data = self.yearly.get_crate_year(crates_io_name, curr_year)?.unwrap_or_default();
-            }
 
-            if curr_year_data.0[day_of_year] != dls {
-                modified = true;
-                curr_year_data.0[day_of_year] = dls;
+                let day_of_year = day.ordinal0() as usize;
+                let year_dls = curr_year_data.entry(version.clone()).or_insert_with(Default::default);
+
+                if year_dls.0[day_of_year] != *dls {
+                    modified = true;
+                    year_dls.0[day_of_year] = *dls;
+                }
             }
         }
         if modified {

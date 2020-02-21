@@ -4,6 +4,7 @@ use std::collections::hash_map::Entry::*;
 use std::collections::HashMap;
 use std::fmt;
 use std::path::PathBuf;
+use crate::MiniVer;
 
 /// Downloads each day of the year
 #[derive(Serialize, Deserialize, Clone)]
@@ -12,8 +13,10 @@ pub struct DailyDownloads(
     pub [u32; 366]
 );
 
+type PerVersionDownloads = HashMap<MiniVer, DailyDownloads>;
+
 pub struct AllDownloads {
-    by_year: Mutex<HashMap<u16, TempCache<DailyDownloads>>>,
+    by_year: Mutex<HashMap<u16, TempCache<PerVersionDownloads>>>,
     base_path: PathBuf,
 }
 
@@ -28,23 +31,23 @@ impl AllDownloads {
     }
 
     /// Crates.io crate name
-    pub fn get_crate_year(&self, crate_name: &str, year: u16) -> Result<Option<DailyDownloads>, simple_cache::Error> {
+    pub fn get_crate_year(&self, crate_name: &str, year: u16) -> Result<Option<PerVersionDownloads>, simple_cache::Error> {
         let mut t = self.by_year.lock();
         let cache = match t.entry(year) {
             Occupied(e) => e.into_mut(),
             Vacant(e) => {
-                e.insert(TempCache::new(self.base_path.join(format!("{}-small.rmpz", year)))?)
+                e.insert(TempCache::new(self.base_path.join(format!("{}-big.rmpz", year)))?)
             },
         };
         Ok(cache.get(crate_name)?)
     }
 
-    pub fn set_crate_year(&self, crate_name: &str, year: u16, v: &DailyDownloads) -> Result<(), simple_cache::Error> {
+    pub fn set_crate_year(&self, crate_name: &str, year: u16, v: &PerVersionDownloads) -> Result<(), simple_cache::Error> {
         let mut t = self.by_year.lock();
         let cache = match t.entry(year) {
             Occupied(e) => e.into_mut(),
             Vacant(e) => {
-                e.insert(TempCache::new(self.base_path.join(format!("{}-small.rmpz", year)))?)
+                e.insert(TempCache::new(self.base_path.join(format!("{}-big.rmpz", year)))?)
             },
         };
         cache.set(crate_name, v)?;

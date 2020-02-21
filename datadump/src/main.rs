@@ -78,19 +78,17 @@ async fn main() -> Result<(), BoxErr> {
 #[inline(never)]
 fn index_downloads(crates: &CratesMap, versions: &VersionsMap, downloads: &VersionDownloads, ksink: &KitchenSink) -> Result<(), BoxErr> {
     for (crate_id, name) in crates {
-        let mut by_day = HashMap::new();
-        if let Some(v) = versions.get(crate_id) {
-            for version in v {
+        if let Some(vers) = versions.get(crate_id) {
+            let data = vers.iter().filter_map(|version| {
                 if let Some(d) = downloads.get(&version.id) {
-                    for (day, dl) in d.iter().cloned() {
-                        *by_day.entry(day).or_insert(0) += dl;
-                    }
+                    return Some((version.num.as_str(), d.as_slice()));
                 }
-            }
+                None
+            }).collect();
+            ksink.index_crate_downloads(name, &data)?;
         } else {
             eprintln!("Bad crate? {} {}", crate_id, name);
         }
-        ksink.index_crate_downloads(name, &by_day)?;
     }
     Ok(())
 }

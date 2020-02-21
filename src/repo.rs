@@ -135,7 +135,7 @@ impl Repo {
     /// Base dir is without leading or trailing `/`, i.e. `""` for root, `"foo/bar"`, etc.
     pub fn readme_base_url(&self, base_dir_in_repo: &str) -> String {
         assert!(!base_dir_in_repo.starts_with('/'));
-        let slash = if base_dir_in_repo != "" && !base_dir_in_repo.ends_with('/') {"/"} else {""};
+        let slash = if base_dir_in_repo != "" && !base_dir_in_repo.ends_with('/') { "/" } else { "" };
         match self.host {
             RepoHost::GitHub(SimpleRepo {ref owner, ref repo}) => {
                 format!("https://github.com/{}/{}/blob/master/{}{}", owner, repo, base_dir_in_repo, slash)
@@ -153,7 +153,7 @@ impl Repo {
     /// Base dir is without leading or trailing `/`, i.e. `""` for root, `"foo/bar"`, etc.
     pub fn readme_base_image_url(&self, base_dir_in_repo: &str) -> String {
         assert!(!base_dir_in_repo.starts_with('/'));
-        let slash = if base_dir_in_repo != "" && !base_dir_in_repo.ends_with('/') {"/"} else {""};
+        let slash = if base_dir_in_repo != "" && !base_dir_in_repo.ends_with('/') { "/" } else { "" };
         match self.host {
             RepoHost::GitHub(SimpleRepo {ref owner, ref repo}) => {
                 format!("https://raw.githubusercontent.com/{}/{}/master/{}{}", owner, repo, base_dir_in_repo, slash)
@@ -208,7 +208,7 @@ impl RepoHost {
     /// URL for browsing the repository via web browser
     pub fn canonical_http_url(&self, base_dir_in_repo: &str) -> Option<Cow<'_, str>> {
         assert!(!base_dir_in_repo.starts_with('/'));
-        let slash = if base_dir_in_repo != "" {"/tree/master/"} else {""};
+        let slash = if base_dir_in_repo != "" { "/tree/master/" } else { "" };
         match self {
             RepoHost::GitHub(SimpleRepo {ref owner, ref repo}) => {
                 Some(format!("https://github.com/{}/{}{}{}", owner, repo, slash, base_dir_in_repo).into())
@@ -246,9 +246,9 @@ impl RepoHost {
     }
 }
 
-
 impl TryFrom<RepoHost> for Repo {
     type Error = &'static str;
+
     fn try_from(host: RepoHost) -> Result<Self, Self::Error> {
         host.canonical_git_url()
             .and_then(|url| url.parse().ok())

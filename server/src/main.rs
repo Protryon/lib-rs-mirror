@@ -45,6 +45,7 @@ struct ServerState {
     data_dir: PathBuf,
     rt: Runtime,
     background_job: tokio::sync::Semaphore,
+    foreground_job: tokio::sync::Semaphore,
 }
 
 type AServerState = web::Data<ServerState>;
@@ -104,6 +105,7 @@ async fn run_server() -> Result<(), failure::Error> {
         data_dir: data_dir.clone(),
         rt,
         background_job: tokio::sync::Semaphore::new(2),
+        foreground_job: tokio::sync::Semaphore::new(32),
     });
 
     // refresher thread
@@ -363,14 +365,14 @@ async fn handle_debug(req: HttpRequest) -> Result<HttpResponse, failure::Error> 
 }
 
 async fn handle_install(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
-    let state: &AServerState = req.app_data().expect("appdata");
+    let state2: &AServerState = req.app_data().expect("appdata");
     let origin = if let Some(o) = get_origin_from_subpath(req.match_info()) {o}
     else {
-        return render_404_page(&state, req.path().trim_start_matches("/install"));
+        return render_404_page(&state2, req.path().trim_start_matches("/install"));
     };
 
-    let state = state.clone();
-    let (page, last_mod) = run_timeout(30, async move {
+    let state = state2.clone();
+    let (page, last_mod) = rt_run_timeout(&state2.rt, 30, async move {
         let crates = state.crates.load();
         let ver = crates.rich_crate_version_async(&origin).await?;
         let mut page: Vec<u8> = Vec::with_capacity(50000);
@@ -463,7 +465,11 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
         println!("Cache miss {} no file", cache_file.display());
     }
 
-    let (page, last_mod) = state.rt.spawn(generate).await??;
+    let state = state.clone();
+    let (page, last_mod) = state.rt.spawn(async move {
+        let _s = state.foreground_job.acquire().await;
+        generate.await
+    }).await??;
     if let Err(e) = std::fs::write(&cache_file, &page) {
         eprintln!("warning: Failed writing to {}: {}", cache_file.display(), e);
     }
@@ -482,7 +488,8 @@ fn render_crate_page(state: AServerState, origin: Origin) -> impl Future<Output 
 }
 
 async fn render_crate_reverse_dependencies(state: AServerState, origin: Origin) -> Result<(Vec<u8>, u32, bool, Option<DateTime<FixedOffset>>), failure::Error> {
-    run_timeout(30, async move {
+    let s = state.clone();
+    rt_run_timeout(&s.rt, 30, async move {
         let crates = state.crates.load();
         crates.prewarm();
         let ver = crates.rich_crate_version_async(&origin).await?;
@@ -501,7 +508,7 @@ async fn handle_keyword(req: HttpRequest) -> Result<HttpResponse, failure::Error
     let query = q.to_owned();
     let state: &AServerState = req.app_data().expect("appdata");
     let state2 = state.clone();
-    let (query, page) = run_timeout(15, async move {
+    let (query, page) = rt_run_timeout(&state.rt, 15, async move {
         if !is_alnum(&query) {
             return Ok::<_, failure::Error>((query, None));
         }
@@ -577,9 +584,9 @@ async fn handle_search(req: HttpRequest) -> Result<HttpResponse, failure::Error>
 async fn handle_sitemap(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
     let (w, page) = writer::<_, failure::Error>().await;
     let state: &AServerState = req.app_data().expect("appdata");
-    let state = state.clone();
-
-    tokio::runtime::Handle::current().spawn(async move {
+    let _ = state.rt.spawn({
+        let state = state.clone();
+        async move {
         let mut w = std::io::BufWriter::with_capacity(16000, w);
         let crates = state.crates.load();
         if let Err(e) = front_end::render_sitemap(&mut w, &crates).await {
@@ -587,7 +594,7 @@ async fn handle_sitemap(req: HttpRequest) -> Result<HttpResponse, failure::Error
                 w.fail(e.into());
             }
         }
-    });
+    }});
 
     Ok::<_, failure::Error>(HttpResponse::Ok()
         .content_type("application/xml;charset=UTF-8")
@@ -598,7 +605,7 @@ async fn handle_sitemap(req: HttpRequest) -> Result<HttpResponse, failure::Error
 async fn handle_feed(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
     let state: &AServerState = req.app_data().expect("appdata");
     let state2 = state.clone();
-    let page = run_timeout(60, async move {
+    let page = rt_run_timeout(&state.rt, 60, async move {
         let crates = state2.crates.load();
         crates.prewarm();
         let mut page: Vec<u8> = Vec::with_capacity(50000);
@@ -613,7 +620,11 @@ async fn handle_feed(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
 }
 
 async fn run_timeout<R, T: 'static + Send>(secs: u64, fut: R) -> Result<T, failure::Error> where R: Future<Output=Result<T, failure::Error>> {
-    tokio::time::timeout(Duration::from_secs(secs*4), fut).await?
+    tokio::time::timeout(Duration::from_secs(secs), fut).await?
+}
+
+async fn rt_run_timeout<R, T: 'static + Send>(rt: &Runtime, secs: u64, fut: R) -> Result<T, failure::Error> where R: 'static + Send + Future<Output=Result<T, failure::Error>> {
+    rt.spawn(tokio::time::timeout(Duration::from_secs(secs), fut)).await??
 }
 
 

@@ -56,7 +56,7 @@ impl ImageFilter for ImageOptimAPIFilter {
         // and show uncacheable info that needs to be up to date.
         // Can't let them all through, because of CSP.
         if url.starts_with("https://img.shields.io/") && url.contains(".svg") {
-            return (url.into(), None)
+            return (url.into(), None);
         }
         (
             format!("{}{}", self.img_prefix, url).into(),

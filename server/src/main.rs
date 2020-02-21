@@ -493,9 +493,9 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
     let (page, last_mod) = state.rt.spawn({
         let state = state.clone();
         async move {
-        let _s = state.foreground_job.acquire().await;
-        generate.await
-    }}).await??;
+            let _s = tokio::time::timeout(Duration::from_secs(10), state.foreground_job.acquire()).await?;
+            Ok::<_, failure::Error>(generate.await?)
+        }}).await??;
     if let Err(e) = std::fs::write(&cache_file, &page) {
         eprintln!("warning: Failed writing to {}: {}", cache_file.display(), e);
     }

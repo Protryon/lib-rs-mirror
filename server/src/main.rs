@@ -434,7 +434,7 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
                     async move {
                     let _s = state.background_job.acquire().await;
                     match generate.await {
-                        Ok((page, last_mod)) => {
+                        Ok((mut page, last_mod)) => {
                             let timestamp = last_mod.map(|a| a.timestamp() as u32).unwrap_or(0);
                             page.extend_from_slice(&timestamp.to_le_bytes()); // The worst data format :)
 

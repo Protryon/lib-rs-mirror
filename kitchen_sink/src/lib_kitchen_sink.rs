@@ -72,6 +72,7 @@ use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
+use std::time::Duration;
 
 type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 
@@ -1683,14 +1684,16 @@ impl KitchenSink {
     // Sorted from the top, returns origins
     pub async fn top_crates_in_category(&self, slug: &str) -> CResult<Arc<Vec<Origin>>> {
         {
-            let cache = self.top_crates_cached.read().await;
+            let cache = tokio::time::timeout(Duration::from_secs(10), self.top_crates_cached.read()).await?;
             if let Some(category) = cache.get(slug) {
                 return Ok(category.clone());
             }
         }
+
+        let mut cache = tokio::time::timeout(Duration::from_secs(20), self.top_crates_cached.write()).await?;
+
         let total_count = self.category_crate_count(slug).await?;
         let wanted_num = ((total_count / 2 + 25) / 50 * 50).max(100);
-        let mut cache = self.top_crates_cached.write().await;
 
         use std::collections::hash_map::Entry::*;
         Ok(match cache.entry(slug.to_owned()) {
@@ -1740,8 +1743,8 @@ impl KitchenSink {
         }
         let mut top_keywords: Vec<_> = top_keywords.into_iter().collect();
         top_keywords.sort_by(|a, b| b.1.cmp(&a.1));
-        eprintln!("top cat keywords {:?}", top_keywords);
         let top_keywords: HashSet<_> = top_keywords.iter().take((top_keywords.len() / 10).min(10).max(2)).map(|(k, _)| k.to_string()).collect();
+        eprintln!("top cat keywords {:?}", top_keywords);
 
         crates.clear();
         for (origin, score, owners, keywords) in with_owners {
@@ -1775,7 +1778,9 @@ impl KitchenSink {
             // +7 here allows some duplication, and penalizes harder only after a few crates
             // adding original score means it'll never get lower than 1/3rd
             let new_score = score * 0.5 + (score + 7.) / (7. + dupe_points);
-            eprintln!("Knocking {}p {} to {} (by {})", dupe_points, origin.short_crate_name(), new_score, new_score / score);
+            if dupe_points > 0. {
+                eprintln!("Knocking {}p {} to {} (by {})", dupe_points, origin.short_crate_name(), new_score, new_score / score);
+            }
             crates.push((origin, new_score));
         }
         crates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));

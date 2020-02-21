@@ -119,6 +119,7 @@ monger: databases
 mqtt-codec: network-programming
 msql-srv: database
 myelin-geometry : science::math
+nat_traversal: network-programming
 neon-sys: web-programming
 notcurses: command-line-interface
 onig_sys: text-processing
@@ -164,6 +165,7 @@ solana-keygen :cryptography::cryptocurrencies
 solana-logger :cryptography::cryptocurrencies
 solana-vote-program : cryptography::cryptocurrencies
 spade: data-structures
+spinning_top: concurrency
 sqlparser: parser-implementations
 sse-codec: web-programming
 star-history : command-line-utilities
@@ -186,6 +188,7 @@ ucd-trie: data-structures, text-processing
 ucd-util: text-processing
 urlocator: parser-implementations
 varlink_parser: parser-implementations
+w_result: rust-patterns
 webhook_listener : web-programming::http-server
 webidl: parser-implementations
 wlambda: parser-implementations

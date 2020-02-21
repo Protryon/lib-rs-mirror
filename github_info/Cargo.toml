@@ -11,8 +11,7 @@ path = "src/lib_github.rs"
 [dependencies]
 repo_url = { git = "https://gitlab.com/crates.rs/repo_url.git" }
 simple_cache = { git = "https://gitlab.com/crates.rs/simple_cache.git", version = "0.7.0" }
-serde = "1.0.104"
-serde_derive = "1.0.104"
+serde = { version = "1.0.104", features = ["derive"] }
 serde_json = "1.0.44"
 urlencoding = "1.0.0"
 quick-error = "1.2.2"

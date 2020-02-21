@@ -1,19 +1,15 @@
-use github_rs;
-use serde;
-
-use std::path::Path;
-
-use github_rs::client;
 use github_rs::client::Executor;
+use github_rs::client;
 use github_rs::headers::{rate_limit_remaining, rate_limit_reset};
 use github_rs::{HeaderMap, StatusCode};
 use repo_url::SimpleRepo;
-use serde_derive::*;
 use simple_cache::TempCache;
+use std::path::Path;
 use std::thread;
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 use urlencoding::encode;
+use serde::{Serialize, Deserialize};
 
 mod model;
 pub use crate::model::*;

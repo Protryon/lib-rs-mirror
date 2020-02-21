@@ -1,3 +1,4 @@
+use std::convert::TryInto;
 use crate::writer::*;
 use actix_web::dev::Url;
 use actix_web::http::header::HeaderValue;
@@ -412,28 +413,33 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
 
         let age_secs = now.duration_since(modified).ok().map(|age| age.as_secs() as u32).unwrap_or(0);
 
-        if let Ok(page_cached) = std::fs::read(&cache_file) {
-            let timestamp = modified.duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
-            let last_mod = DateTime::from_utc(NaiveDateTime::from_timestamp(timestamp as _, 0), FixedOffset::east(0));
+        if let Ok(mut page_cached) = std::fs::read(&cache_file) {
+            if !is_acceptable {
+                let _ = std::fs::remove_file(&cache_file); // next req will block instead of an endless refresh loop
+            }
+
+            assert!(page_cached.len() > 4);
+            let trailer_pos = page_cached.len() - 4; // The worst data format :)
+            let timestamp = u32::from_le_bytes(page_cached.get(trailer_pos..).unwrap().try_into().unwrap());
+            page_cached.truncate(trailer_pos);
+
+            let last_mod = if timestamp > 0 {Some(DateTime::from_utc(NaiveDateTime::from_timestamp(timestamp as _, 0), FixedOffset::east(0)))} else {None};
             let cache_time_remaining = cache_time.saturating_sub(age_secs);
 
             println!("Using cached page {} {}s fresh={:?} acc={:?}", cache_file.display(), cache_time_remaining, is_fresh, is_acceptable);
 
-            if !is_acceptable {
-                let _ = std::fs::remove_file(&cache_file); // block instead of an endless refresh loop
-            }
             if !is_fresh {
                 let _ = state.rt.spawn({
                     let state = state.clone();
                     async move {
                     let _s = state.background_job.acquire().await;
                     match generate.await {
-                        Ok((page, last_mod)) => { // FIXME: set cache file timestamp?
+                        Ok((page, last_mod)) => {
+                            let timestamp = last_mod.map(|a| a.timestamp() as u32).unwrap_or(0);
+                            page.extend_from_slice(&timestamp.to_le_bytes()); // The worst data format :)
+
                             if let Err(e) = std::fs::write(&cache_file, &page) {
                                 eprintln!("warning: Failed writing to {}: {}", cache_file.display(), e);
-                            }
-                            if let Some(last_mod) = last_mod {
-                                let _ = filetime::set_file_mtime(&cache_file, filetime::FileTime::from_unix_time(last_mod.timestamp(), 0));
                             }
                         },
                         Err(e) => {
@@ -442,7 +448,7 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
                     }
                 }});
             }
-            return Ok((page_cached, if !is_fresh { cache_time_remaining / 4 } else { cache_time_remaining }.max(2), !is_acceptable, Some(last_mod)));
+            return Ok((page_cached, if !is_fresh { cache_time_remaining / 4 } else { cache_time_remaining }.max(2), !is_acceptable, last_mod));
         }
 
         println!("Cache miss {} {}", cache_file.display(), age_secs);

@@ -64,7 +64,7 @@ impl<'a> HomePage<'a> {
             self.add_updated_to_all_categories(&mut cat.sub, seen).await;
 
             let mut n = 0u16;
-            for c in self.crates.recently_updated_crates_in_category(&cat.cat.slug).await.unwrap() {
+            for c in self.crates.recently_updated_crates_in_category(&cat.cat.slug).await.expect("recently_updated_crates_in_category") {
                 if let Ok(c) = self.crates.rich_crate_version_async(&c).await {
                     seen.insert(c.origin().to_owned());
                     cat.top.push(c);
@@ -112,7 +112,7 @@ impl<'a> HomePage<'a> {
             for (cat, top) in c.iter_mut().rev() {
                 let mut dl = 0;
                 let top: Vec<_> = top.as_ref()
-                    .unwrap()
+                    .expect("top_crates_in_category fail")
                     .iter()
                     .take(35)
                     .filter(|c| seen.get(c).is_none())
@@ -171,8 +171,8 @@ impl<'a> HomePage<'a> {
     fn avg_pair(ranked: &mut HashMap<&str, (usize, HomeCategory)>, a: &str, b: &str) {
         if let Some(&(a_rank, _)) = ranked.get(a) {
             let b_rank = ranked.get(b).expect("sibling category").0;
-            ranked.get_mut(a).unwrap().0 = (a_rank * 17 + b_rank * 15) / 32;
-            ranked.get_mut(b).unwrap().0 = (a_rank * 15 + b_rank * 17) / 32;
+            ranked.get_mut(a).expect("avg cat").0 = (a_rank * 17 + b_rank * 15) / 32;
+            ranked.get_mut(b).expect("avg cat").0 = (a_rank * 15 + b_rank * 17) / 32;
         }
     }
 

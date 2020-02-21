@@ -22,9 +22,6 @@
 [submodule "repo_url"]
 	path = repo_url
 	url = https://gitlab.com/crates.rs/repo_url.git
-[submodule "simple_cache"]
-	path = simple_cache
-	url = https://gitlab.com/crates.rs/simple_cache.git
 [submodule "data/index"]
 	path = data/index
 	url = https://github.com/rust-lang/crates.io-index.git

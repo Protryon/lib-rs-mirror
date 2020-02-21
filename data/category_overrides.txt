@@ -64,7 +64,9 @@ futures-executor: asynchronous
 futures-task: asynchronous
 gaviota-sys: game-engines
 geos: science::math
+github-rs : web-programming
 httpdate: date-and-time, parser-implementations
+hubcaps: web-programming
 hubcaps: web-programming
 hyper-router : web-programming::http-server
 iban_validate: parser-implementations
@@ -104,6 +106,7 @@ libass: web-programming
 libloadorder-ffi : game-engines
 librdkafka-sys: asynchronous
 libsbc-sys: hardware-support
+lightning :cryptography::cryptocurrencies
 loop-rs  : command-line-utilities
 lsp-codec : asynchronous
 mach: os::macos-apis
@@ -163,6 +166,7 @@ solana-vote-program : cryptography::cryptocurrencies
 spade: data-structures
 sqlparser: parser-implementations
 sse-codec: web-programming
+star-history : command-line-utilities
 suspicious-pods  : development-tools
 susy-codec-derive :cryptography::cryptocurrencies
 sv-parser: parser-implementations

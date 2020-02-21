@@ -465,11 +465,12 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
         println!("Cache miss {} no file", cache_file.display());
     }
 
-    let state = state.clone();
-    let (page, last_mod) = state.rt.spawn(async move {
+    let (page, last_mod) = state.rt.spawn({
+        let state = state.clone();
+        async move {
         let _s = state.foreground_job.acquire().await;
         generate.await
-    }).await??;
+    }}).await??;
     if let Err(e) = std::fs::write(&cache_file, &page) {
         eprintln!("warning: Failed writing to {}: {}", cache_file.display(), e);
     }

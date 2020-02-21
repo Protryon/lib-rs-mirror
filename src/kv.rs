@@ -146,11 +146,9 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
         Ok(())
     }
 
-
     #[inline]
-    pub fn get_json<B>(&self, key: &str, url: impl AsRef<str>, on_miss: impl FnOnce(B) -> Option<T>) -> Result<Option<T>, Error>
-        where B: for<'a> Deserialize<'a>
-    {
+    pub async fn get_json<B>(&self, key: &str, url: impl AsRef<str>, on_miss: impl FnOnce(B) -> Option<T>) -> Result<Option<T>, Error>
+    where B: for<'a> Deserialize<'a> {
         if let Some(res) = self.get(key)? {
             return Ok(Some(res));
         }
@@ -159,7 +157,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
             return Ok(None);
         }
 
-        let data = SimpleCache::fetch(url.as_ref())?;
+        let data = SimpleCache::fetch(url.as_ref()).await?;
         match serde_json::from_slice(&data) {
             Ok(res) => {
                 let res = on_miss(res);

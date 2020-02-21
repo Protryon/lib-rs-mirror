@@ -7,7 +7,7 @@ use rusqlite::Error::SqliteFailure;
 use rusqlite::ErrorCode::DatabaseLocked;
 use serde;
 use serde_json;
-use std::panic;
+
 use std::path::Path;
 use std::thread;
 use std::time::Duration;
@@ -50,10 +50,9 @@ impl SimpleCache {
         }
     }
 
-    pub fn get_json<B>(&self, key: (&str, &str), url: impl AsRef<str>) -> Result<Option<B>, Error>
-        where B: for<'a> serde::Deserialize<'a>
-    {
-        if let Some(data) = self.get_cached(key, url)? {
+    pub async fn get_json<B>(&self, key: (&str, &str), url: impl AsRef<str>) -> Result<Option<B>, Error>
+    where B: for<'a> serde::Deserialize<'a> {
+        if let Some(data) = self.get_cached(key, url).await? {
             match serde_json::from_slice(&data) {
                 Ok(res) => Ok(Some(res)),
                 Err(parse) => Err(Error::Parse(parse, data)),
@@ -93,14 +92,14 @@ impl SimpleCache {
         })
     }
 
-    pub fn get_cached(&self, key: (&str, &str), url: impl AsRef<str>) -> Result<Option<Vec<u8>>, Error> {
+    pub async fn get_cached(&self, key: (&str, &str), url: impl AsRef<str>) -> Result<Option<Vec<u8>>, Error> {
         Ok(if let Some(data) = self.get(key)? {
             Some(data)
         } else {
             if self.cache_only {
                 None
             } else {
-                let data = Self::fetch(url.as_ref())?;
+                let data = Self::fetch(url.as_ref()).await?;
                 self.set(key, &data)?;
                 Some(data)
             }
@@ -128,20 +127,13 @@ impl SimpleCache {
         })
     }
 
-    pub(crate) fn fetch(url: &str) -> Result<Vec<u8>, Error> {
-        panic::catch_unwind(|| {
+    pub(crate) async fn fetch(url: &str) -> Result<Vec<u8>, Error> {
             println!("REQ {}", url);
             let client = reqwest::Client::builder().build()?;
-            let mut res = client.get(url)
-                .header(reqwest::header::USER_AGENT, "crates.rs/1.0")
-                .send()?;
+            let res = client.get(url).header(reqwest::header::USER_AGENT, "crates.rs/1.0").send().await?;
             if res.status() != reqwest::StatusCode::OK {
                 Err(res.status())?;
             }
-            let mut buf = Vec::new();
-            res.copy_to(&mut buf)?;
-            Ok(buf)
-        }).unwrap_or_else(|e| {panic!("bad url: {}: {:?}", url, e);})
+            Ok(res.bytes().await?.to_vec())
     }
 }
-

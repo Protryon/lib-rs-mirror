@@ -944,11 +944,9 @@ fn virality_score(license: &str) -> u8 {
                 Some(5)
             } else if l.starts_with("CC-") {
                 Some(4)
-            } else if l.starts_with("MPL") {
-                Some(3)
             } else if l.starts_with("LGPL") {
                 Some(2)
-            } else if l.starts_with("GFDL") {
+            } else if l.starts_with("GFDL") || l.starts_with("MPL") {
                 Some(1)
             } else {
                 None
@@ -963,7 +961,7 @@ fn test_vir() {
     assert_eq!(0, virality_score("FTL / GPL-2.0"));
     assert_eq!(0, virality_score("AGPL OR MIT"));
     assert_eq!(0, virality_score("MIT/Apache/LGPL"));
-    assert_eq!(2, virality_score("MPL/LGPL"));
+    assert_eq!(1, virality_score("MPL/LGPL"));
     assert_eq!(2, virality_score("Apache/MIT AND LGPL"));
     assert_eq!(Ordering::Greater, compare_virality("LGPL", Some("MIT")));
     assert_eq!(Ordering::Greater, compare_virality("AGPL", Some("LGPL")));

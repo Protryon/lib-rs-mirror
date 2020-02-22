@@ -123,8 +123,12 @@ impl<'a> CratePageRevDeps<'a> {
 
     // version, deps, normalized popularity 0..100
     pub fn version_breakdown(&self) -> Vec<DlRow> {
-         // fixmeL always add current ver there
-        let mut ver: Vec<_> = self.stats.map(|s| s.versions.iter().map(|(k, v)| {
+        let stats = match self.stats {
+            None => return Vec::new(),
+            Some(s) => s,
+        };
+
+        let mut ver: Vec<_> = stats.versions.iter().map(|(k, v)| {
             DlRow {
                 ver: k.to_semver(),
                 num: *v,
@@ -136,7 +140,41 @@ impl<'a> CratePageRevDeps<'a> {
                 num_str: String::new(),
                 dl_str: (String::new(),""),
             }
-        }).collect()).unwrap_or_default();
+        }).collect();
+
+        // Ensure the (latest) version is always included
+        let own_ver_semver: SemVer = self.ver.version().parse().expect("semver2");
+        if !ver.iter().any(|v| v.ver == own_ver_semver) {
+            ver.push(DlRow {
+                ver: own_ver_semver,
+                num: 0,
+                perc: 0.,
+                num_width: 0.,
+                dl: 0,
+                dl_perc: 0.,
+                dl_num_width: 0.,
+                num_str: String::new(),
+                dl_str: (String::new(),""),
+            });
+        }
+
+        // Download data may be older and not match exactly, so at least avoid
+        // accidentally omitting the most popular version
+        if let Some(biggest) = self.downloads_by_ver.iter().max_by_key(|v| v.1) {
+            if !ver.iter().any(|v| v.ver == biggest.0) {
+                ver.push(DlRow {
+                    ver: biggest.0.clone(),
+                    num: 0,
+                    perc: 0.,
+                    num_width: 0.,
+                    dl: 0,
+                    dl_perc: 0.,
+                    dl_num_width: 0.,
+                    num_str: String::new(),
+                    dl_str: (String::new(),""),
+                });
+            }
+        }
 
         // align selected versions and their (or older) downloads
         let mut dl_vers = self.downloads_by_ver.iter().rev().peekable();

@@ -41,7 +41,7 @@
             <thead><th>Number of dependers</th><th>@p.ver.capitalized_name() version</th><th>Downloads/month</th></thead>
             @for x in p.version_breakdown() {
               <tr>
-                <td class="rv">@if x.perc <= x.num_width {@x.num_str} <span style="width:@x.perc%">@if x.perc > x.num_width {@x.num_str}</span></td>
+                <td class="rv">@if x.num == 0 || x.perc <= x.num_width {@x.num_str} @if x.num > 0 {<span style="width:@x.perc%">@if x.perc > x.num_width {@x.num_str}</span>}</td>
                 <th>@x.ver</th>
                 <td class="dl">
                   @if x.dl > 0 {
@@ -82,7 +82,7 @@
 
   <footer>
     <div class="inner-col">
-        <p>Back to <a href="@url.krate(&p.ver)" rel="up">@p.ver.capitalized_name()</a>.</p>
+        <p><a href="/revdeps">How this data is computed</a>. Back to <a href="@url.krate(&p.ver)" rel="up">@p.ver.capitalized_name()</a>.</p>
     </div>
   </footer>
 })

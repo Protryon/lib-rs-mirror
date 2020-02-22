@@ -85,14 +85,16 @@ impl CrateDb {
     async fn with_read<F, T>(&self, context: &'static str, cb: F) -> FResult<T> where F: FnOnce(&mut Connection) -> FResult<T> {
         let mut _sqlite_sucks = self.concurrency_control.read().await;
 
-        let conn = self.conn.get_or(|| self.connect().map(|conn| {
-            let _ = conn.busy_timeout(std::time::Duration::from_secs(3));
-            RefCell::new(conn)
-        }));
-        match conn {
-            Ok(conn) => Ok(cb(&mut *conn.borrow_mut()).context(context)?),
-            Err(err) => bail!("{} (in {})", err, context),
-        }
+        tokio::task::block_in_place(|| {
+            let conn = self.conn.get_or(|| self.connect().map(|conn| {
+                let _ = conn.busy_timeout(std::time::Duration::from_secs(3));
+                RefCell::new(conn)
+            }));
+            match conn {
+                Ok(conn) => Ok(cb(&mut *conn.borrow_mut()).context(context)?),
+                Err(err) => bail!("{} (in {})", err, context),
+            }
+        })
     }
 
     #[inline]
@@ -100,12 +102,14 @@ impl CrateDb {
         let mut _sqlite_sucks = self.concurrency_control.write().await;
 
         let mut conn = self.exclusive_conn.lock().await;
-        let conn = conn.get_or_insert_with(|| self.connect().unwrap());
+        tokio::task::block_in_place(|| {
+            let conn = conn.get_or_insert_with(|| self.connect().unwrap());
 
-        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let res = cb(&tx).context(context)?;
-        tx.commit().context(context)?;
-        Ok(res)
+            let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            let res = cb(&tx).context(context)?;
+            tx.commit().context(context)?;
+            Ok(res)
+        })
     }
 
     fn connect(&self) -> std::result::Result<Connection, rusqlite::Error> {

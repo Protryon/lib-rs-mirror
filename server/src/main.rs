@@ -83,13 +83,6 @@ async fn run_server() -> Result<(), failure::Error> {
     assert!(public_document_root.exists(), "DOCUMENT_ROOT {} does not exist", public_document_root.display());
     assert!(data_dir.exists(), "CRATE_DATA_DIR {} does not exist", data_dir.display());
 
-    let crates = KitchenSink::new(&data_dir, &github_token).await?;
-    let image_filter = Arc::new(ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_dir().join("images.db")).await?);
-    let markup = Renderer::new_filter(Some(Highlighter::new()), image_filter);
-
-    let index = CrateSearchIndex::new(&data_dir)?;
-
-
     let rt = tokio::runtime::Builder::new()
         .threaded_scheduler()
         .enable_all()
@@ -97,6 +90,18 @@ async fn run_server() -> Result<(), failure::Error> {
         .thread_name("server-bg")
         .build()
         .unwrap();
+
+    let crates = rt.spawn({
+        let data_dir = data_dir.clone();
+        let github_token = github_token.clone();
+        async move {
+            KitchenSink::new(&data_dir, &github_token).await
+        }
+    }).await??;
+    let image_filter = Arc::new(ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_dir().join("images.db")).await?);
+    let markup = Renderer::new_filter(Some(Highlighter::new()), image_filter);
+
+    let index = CrateSearchIndex::new(&data_dir)?;
 
     let state = web::Data::new(ServerState {
         markup,

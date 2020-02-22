@@ -181,6 +181,7 @@ impl KitchenSink {
     }
 
     pub async fn new(data_path: &Path, github_token: &str) -> CResult<Self> {
+        tokio::task::block_in_place(|| {
         let main_cache_dir = data_path.to_owned();
 
         let ((crates_io, gh), index) = rayon::join(|| rayon::join(
@@ -203,6 +204,7 @@ impl KitchenSink {
             yearly: AllDownloads::new(&main_cache_dir),
             main_cache_dir,
             category_overrides: Self::load_category_overrides(&data_path.join("category_overrides.txt"))?,
+        })
         })
     }
 
@@ -368,7 +370,9 @@ impl KitchenSink {
 
     pub async fn all_new_crates(&self) -> CResult<Vec<RichCrate>> {
         let min_timestamp = self.crate_db.latest_crate_update_timestamp().await?.unwrap_or(0);
-        let all = self.index.crates_io_crates(); // too slow to scan all GH crates
+        let all = tokio::task::block_in_place(|| {
+            self.index.crates_io_crates() // too slow to scan all GH crates
+        });
         let stream = futures::stream::iter(all.into_iter())
             .filter_map(move |(name, _)| async move {
                 self.rich_crate_async(&Origin::from_crates_io_name(&*name)).await.map_err(|e| eprintln!("{}: {}", name, e)).ok()
@@ -472,23 +476,25 @@ impl KitchenSink {
             return Ok(versions);
         }
         eprintln!("Need to scan repo {:?}", repo);
-        let checkout = crate_git_checkout::checkout(repo, &self.git_checkout_path)?;
-        let mut pkg_ver = crate_git_checkout::find_versions(&checkout)?;
-        if let Some(v) = pkg_ver.remove(&**package) {
-            let versions: Vec<_> = v.into_iter().map(|(num, timestamp)| {
-                let date = Utc.timestamp(timestamp, 0).to_rfc3339();
-                CrateVersion {
-                    num,
-                    yanked: false,
-                    updated_at: date.clone(),
-                    created_at: date,
+        tokio::task::block_in_place(|| {
+            let checkout = crate_git_checkout::checkout(repo, &self.git_checkout_path)?;
+            let mut pkg_ver = crate_git_checkout::find_versions(&checkout)?;
+            if let Some(v) = pkg_ver.remove(&**package) {
+                let versions: Vec<_> = v.into_iter().map(|(num, timestamp)| {
+                    let date = Utc.timestamp(timestamp, 0).to_rfc3339();
+                    CrateVersion {
+                        num,
+                        yanked: false,
+                        updated_at: date.clone(),
+                        created_at: date,
+                    }
+                }).collect();
+                if !versions.is_empty() {
+                    return Ok(versions);
                 }
-            }).collect();
-            if !versions.is_empty() {
-                return Ok(versions);
             }
-        }
-        Err(KitchenSinkErr::CrateNotFound(origin.clone())).context("missing releases, even tags")?
+            Err(KitchenSinkErr::CrateNotFound(origin.clone())).context("missing releases, even tags")?
+        })
     }
 
     /// Fudge-factor score proprtional to how many times a crate has been removed from some project
@@ -534,7 +540,9 @@ impl KitchenSink {
     }
 
     async fn crates_io_meta(&self, name: &str) -> CResult<CratesIoCrate> {
-        let krate = self.index.crates_io_crate_by_lowercase_name(name).context("rich_crate")?;
+        let krate = tokio::task::block_in_place(|| {
+            self.index.crates_io_crate_by_lowercase_name(name).context("rich_crate")
+        })?;
         let latest_in_index = krate.latest_version().version(); // most recently published version
         let meta = self.crates_io.krate(name, latest_in_index).await
             .with_context(|_| format!("crates.io meta for {} {}", name, latest_in_index))?;
@@ -607,41 +615,42 @@ impl KitchenSink {
             _ => unreachable!()
         };
 
-        let checkout = crate_git_checkout::checkout(&repo, &self.git_checkout_path)?;
-        let (path_in_repo, tree_id, manifest) = crate_git_checkout::path_in_repo(&checkout, package)?
-            .ok_or_else(|| {
-                let (has, err) = crate_git_checkout::find_manifests(&checkout).unwrap_or_default();
-                for e in err {
-                    eprintln!("parse err: {}", e.0);
-                }
-                for h in has {
-                    eprintln!("has: {} -> {}", h.0, h.2.package.as_ref().map(|p| p.name.as_str()).unwrap_or("?"));
-                }
-                KitchenSinkErr::CrateNotFoundInRepo(package.to_string(), repo.canonical_git_url().into_owned())
-            })?;
+        tokio::task::block_in_place(|| {
+            let checkout = crate_git_checkout::checkout(&repo, &self.git_checkout_path)?;
+            let (path_in_repo, tree_id, manifest) = crate_git_checkout::path_in_repo(&checkout, package)?
+                .ok_or_else(|| {
+                    let (has, err) = crate_git_checkout::find_manifests(&checkout).unwrap_or_default();
+                    for e in err {
+                        eprintln!("parse err: {}", e.0);
+                    }
+                    for h in has {
+                        eprintln!("has: {} -> {}", h.0, h.2.package.as_ref().map(|p| p.name.as_str()).unwrap_or("?"));
+                    }
+                    KitchenSinkErr::CrateNotFoundInRepo(package.to_string(), repo.canonical_git_url().into_owned())
+                })?;
 
-        let mut warnings = HashSet::new();
+            let mut warnings = HashSet::new();
 
-        let mut meta = tarball::read_repo(&checkout, tree_id)?;
-        debug_assert_eq!(meta.manifest.package, manifest.package);
-        let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
+            let mut meta = tarball::read_repo(&checkout, tree_id)?;
+            debug_assert_eq!(meta.manifest.package, manifest.package);
+            let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
 
-        // Allowing any other URL would allow spoofing
-        package.repository = Some(repo.canonical_git_url().into_owned());
+            // Allowing any other URL would allow spoofing
+            package.repository = Some(repo.canonical_git_url().into_owned());
 
-        let has_readme = meta.readme.is_some();
-        if !has_readme {
-            let maybe_repo = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
-            warnings.insert(Warning::NoReadmeProperty);
-            warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()));
-        }
+            let has_readme = meta.readme.is_some();
+            if !has_readme {
+                let maybe_repo = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
+                warnings.insert(Warning::NoReadmeProperty);
+                warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()));
+            }
 
-        meta.readme.as_mut().map(|readme| {
-            readme.base_url = Some(repo.readme_base_url(&path_in_repo));
-            readme.base_image_url = Some(repo.readme_base_image_url(&path_in_repo));
-        });
-
-        self.rich_crate_version_data_common(origin.clone(), meta, 0, false, warnings).await
+            meta.readme.as_mut().map(|readme| {
+                readme.base_url = Some(repo.readme_base_url(&path_in_repo));
+                readme.base_image_url = Some(repo.readme_base_image_url(&path_in_repo));
+            });
+            Ok::<_, CError>(self.rich_crate_version_data_common(origin.clone(), meta, 0, false, warnings))
+        })?.await
     }
 
     pub async fn tarball(&self, name: &str, ver: &str) -> CResult<Vec<u8>> {
@@ -666,7 +675,9 @@ impl KitchenSink {
         let crates_io_meta = crates_io_meta?.meta.krate;
         let crate_tarball = crate_tarball?;
         let crate_compressed_size = crate_tarball.len();
-        let mut meta = crate::tarball::read_archive(&crate_tarball[..], name, ver)?;
+        let mut meta = tokio::task::block_in_place(|| {
+            crate::tarball::read_archive(&crate_tarball[..], name, ver)
+        })?;
         drop(crate_tarball);
 
         let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
@@ -1317,68 +1328,72 @@ impl KitchenSink {
     pub async fn index_repo(&self, repo: &Repo, as_of_version: &str) -> CResult<()> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
         let url = repo.canonical_git_url();
-        let checkout = crate_git_checkout::checkout(repo, &self.git_checkout_path)?;
+        let (checkout, manif) = tokio::task::block_in_place(|| {
+            let checkout = crate_git_checkout::checkout(repo, &self.git_checkout_path)?;
 
-        let (manif, warnings) = crate_git_checkout::find_manifests(&checkout)
-            .with_context(|_| format!("find manifests in {}", url))?;
-        for warn in warnings {
-            eprintln!("warning: {}", warn.0);
-        }
-        let manif = manif.into_iter().filter_map(|(subpath, _, manifest)| {
-            manifest.package.map(|p| (subpath, p.name))
-        });
+            let (manif, warnings) = crate_git_checkout::find_manifests(&checkout)
+                .with_context(|_| format!("find manifests in {}", url))?;
+            for warn in warnings {
+                eprintln!("warning: {}", warn.0);
+            }
+            Ok::<_, CError>((checkout, manif.into_iter().filter_map(|(subpath, _, manifest)| {
+                manifest.package.map(|p| (subpath, p.name))
+            })))
+        })?;
         self.crate_db.index_repo_crates(repo, manif).await.context("index rev repo")?;
-
-        if let Repo { host: RepoHost::GitHub(ref repo), .. } = repo {
-            if let Some(commits) = self.repo_commits(repo, as_of_version)? {
-                for c in commits {
-                    if let Some(a) = c.author {
-                        self.index_user(&a, &c.commit.author)?;
-                    }
-                    if let Some(a) = c.committer {
-                        self.index_user(&a, &c.commit.committer)?;
+        let mut changes = Vec::new();
+        tokio::task::block_in_place(|| {
+            if let Repo { host: RepoHost::GitHub(ref repo), .. } = repo {
+                if let Some(commits) = self.repo_commits(repo, as_of_version)? {
+                    for c in commits {
+                        if let Some(a) = c.author {
+                            self.index_user(&a, &c.commit.author)?;
+                        }
+                        if let Some(a) = c.committer {
+                            self.index_user(&a, &c.commit.committer)?;
+                        }
                     }
                 }
             }
-        }
 
-        if stopped() {Err(KitchenSinkErr::Stopped)?;}
+            if stopped() {Err(KitchenSinkErr::Stopped)?;}
 
-        let mut changes = Vec::new();
-        crate_git_checkout::find_dependency_changes(&checkout, |added, removed, age| {
-            if removed.is_empty() {
-                if added.len() > 1 {
-                    // Divide evenly between all recommendations
-                    // and decay with age, assuming older changes are less relevant now.
-                    let weight = (1.0 / added.len().pow(2) as f64) * 30.0 / (30.0 + age as f64);
-                    if weight > 0.002 {
-                        for dep1 in added.iter().take(8) {
-                            for dep2 in added.iter().take(5) {
-                                if dep1 == dep2 {
-                                    continue;
+
+            crate_git_checkout::find_dependency_changes(&checkout, |added, removed, age| {
+                if removed.is_empty() {
+                    if added.len() > 1 {
+                        // Divide evenly between all recommendations
+                        // and decay with age, assuming older changes are less relevant now.
+                        let weight = (1.0 / added.len().pow(2) as f64) * 30.0 / (30.0 + age as f64);
+                        if weight > 0.002 {
+                            for dep1 in added.iter().take(8) {
+                                for dep2 in added.iter().take(5) {
+                                    if dep1 == dep2 {
+                                        continue;
+                                    }
+                                    // Not really a replacement, but a recommendation if A then B
+                                    changes.push(RepoChange::Replaced { crate_name: dep1.to_string(), replacement: dep2.to_string(), weight })
                                 }
-                                // Not really a replacement, but a recommendation if A then B
-                                changes.push(RepoChange::Replaced { crate_name: dep1.to_string(), replacement: dep2.to_string(), weight })
                             }
                         }
                     }
-                }
-            } else {
-                for crate_name in removed {
-                    if !added.is_empty() {
-                        // Assuming relevance falls a bit when big changes are made.
-                        // Removals don't decay with age (if we see great comebacks, maybe it should be split by semver-major).
-                        let weight = 8.0 / (7.0 + added.len() as f64);
-                        for replacement in &added {
-                            changes.push(RepoChange::Replaced { crate_name: crate_name.clone(), replacement: replacement.to_string(), weight })
+                } else {
+                    for crate_name in removed {
+                        if !added.is_empty() {
+                            // Assuming relevance falls a bit when big changes are made.
+                            // Removals don't decay with age (if we see great comebacks, maybe it should be split by semver-major).
+                            let weight = 8.0 / (7.0 + added.len() as f64);
+                            for replacement in &added {
+                                changes.push(RepoChange::Replaced { crate_name: crate_name.clone(), replacement: replacement.to_string(), weight })
+                            }
+                            changes.push(RepoChange::Removed { crate_name, weight });
+                        } else {
+                            // ??? maybe use sliiight recommendation score based on existing (i.e. newer) state of deps in the repo?
+                            changes.push(RepoChange::Removed { crate_name, weight: 0.95 });
                         }
-                        changes.push(RepoChange::Removed { crate_name, weight });
-                    } else {
-                        // ??? maybe use sliiight recommendation score based on existing (i.e. newer) state of deps in the repo?
-                        changes.push(RepoChange::Removed { crate_name, weight: 0.95 });
                     }
                 }
-            }
+            })
         })?;
         self.crate_db.index_repo_changes(repo, &changes).await?;
 

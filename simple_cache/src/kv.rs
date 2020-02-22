@@ -125,11 +125,6 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
         Ok(())
     }
 
-    // pub fn get_all<F: FnOnce(&HashMap<Box<str>, T>)>(&self, cb: F) -> Result<(), Error> {
-    //     cb(&self.lock_for_read()?.data);
-    //     Ok(())
-    // }
-
     pub fn get(&self, key: &str) -> Result<Option<T>, Error> {
         let kw = self.lock_for_read()?;
         Ok(match kw.data.as_ref().unwrap().get(key) {

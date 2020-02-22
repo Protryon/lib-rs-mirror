@@ -38,9 +38,17 @@
 
         @if stats.versions.len() > 1 {
           <table class="version-pop">
-            <thead><th>Number of dependers</th><th>@p.ver.capitalized_name() version</th></thead>
-            @for (ver, num, perc, num_width) in p.version_breakdown() {
-              <tr><td>@if perc <= num_width {@num} <span style="width:@perc%">@if perc > num_width {@num}</span></td><th>@ver</th></tr>
+            <thead><th>Number of dependers</th><th>@p.ver.capitalized_name() version</th><th>Downloads/month</th></thead>
+            @for x in p.version_breakdown() {
+              <tr>
+                <td class="rv">@if x.perc <= x.num_width {@x.num_str} <span style="width:@x.perc%">@if x.perc > x.num_width {@x.num_str}</span></td>
+                <th>@x.ver</th>
+                <td class="dl">
+                  @if x.dl > 0 {
+                    <span style="width:@x.dl_perc%">@if x.dl_perc > x.dl_num_width {@x.dl_str.0<b>@x.dl_str.1</b>}</span>
+                  }
+                  @if x.dl == 0 || x.dl_perc <= x.dl_num_width {@x.dl_str.0<b>@x.dl_str.1</b>}
+                </td>
             }
           </table>
         }

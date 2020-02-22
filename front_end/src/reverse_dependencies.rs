@@ -9,6 +9,7 @@ use render_readme::Renderer;
 
 use rich_crate::RichCrateVersion;
 use semver::VersionReq;
+
 use std::fmt::Display;
 
 pub struct CratePageRevDeps<'a> {
@@ -16,6 +17,7 @@ pub struct CratePageRevDeps<'a> {
     pub deps: Vec<RevDepInf<'a>>,
     pub stats: Option<&'a RevDependencies>,
     pub has_download_columns: bool,
+    downloads_by_ver: Vec<(SemVer, u32)>,
 }
 
 pub struct RevDepInf<'a> {
@@ -29,6 +31,18 @@ pub struct RevDepInf<'a> {
     pub rev_dep_count: u32,
 }
 
+pub struct DlRow {
+    pub ver: SemVer,
+    pub num: u16,
+    pub num_str: String,
+    pub perc: f32,
+    pub num_width: f32,
+    pub dl: u32,
+    pub dl_str: (String, &'static str),
+    pub dl_perc: f32,
+    pub dl_num_width: f32,
+}
+
 impl<'a> CratePageRevDeps<'a> {
     pub async fn new(ver: &'a RichCrateVersion, kitchen_sink: &'a KitchenSink, _markup: &'a Renderer) -> CResult<CratePageRevDeps<'a>> {
         let all_deps_stats = kitchen_sink.index.deps_stats().await?;
@@ -36,6 +50,9 @@ impl<'a> CratePageRevDeps<'a> {
         // RichCrateVersion may be unstable
         let latest_stable_semver = &kitchen_sink.index.crate_highest_version(&own_name, true)?.version().parse()?;
         let stats = all_deps_stats.counts.get(own_name.as_str());
+
+        let mut downloads_by_ver: Vec<_> = kitchen_sink.recent_downloads_by_version(ver)?.into_iter().map(|(v,d)| (v.to_semver(), d)).collect();
+        downloads_by_ver.sort_by(|a,b| b.0.cmp(&a.0));
 
         let mut deps: Vec<_> = match stats {
             Some(s) => futures::future::join_all(s.rev_dep_names.iter().map(|rev_dep| async move {
@@ -81,6 +98,7 @@ impl<'a> CratePageRevDeps<'a> {
             ver,
             deps,
             stats,
+            downloads_by_ver,
             has_download_columns,
         })
     }
@@ -88,7 +106,7 @@ impl<'a> CratePageRevDeps<'a> {
     /// Nicely rounded number of downloads
     ///
     /// To show that these numbers are just approximate.
-    pub fn downloads(&self, num: usize) -> (String, &str) {
+    pub fn downloads(&self, num: usize) -> (String, &'static str) {
         match num {
             a @ 0..=99 => (format!("{}", a), ""),
             a @ 0..=500 => (format!("{}", a / 10 * 10), ""),
@@ -104,17 +122,51 @@ impl<'a> CratePageRevDeps<'a> {
     }
 
     // version, deps, normalized popularity 0..100
-    pub fn version_breakdown(&self) -> Vec<(SemVer, u16, f32, f32)> {
+    pub fn version_breakdown(&self) -> Vec<DlRow> {
+         // fixmeL always add current ver there
         let mut ver: Vec<_> = self.stats.map(|s| s.versions.iter().map(|(k, v)| {
-            (k.to_semver(), *v, 0., 0.)
+            DlRow {
+                ver: k.to_semver(),
+                num: *v,
+                perc: 0.,
+                num_width: 0.,
+                dl: 0,
+                dl_perc: 0.,
+                dl_num_width: 0.,
+                num_str: String::new(),
+                dl_str: (String::new(),""),
+            }
         }).collect()).unwrap_or_default();
 
-        let max = ver.iter().map(|(_, n, ..)| *n).max().unwrap_or(1) as f32;
-        for i in ver.iter_mut() {
-            i.2 = i.1 as f32 / max * 100.0;
-            i.3 = 3. + 5. * (i.1 as f32 + 1.).log10().ceil(); // approx visual width of the number
+        // align selected versions and their (or older) downloads
+        let mut dl_vers = self.downloads_by_ver.iter().rev().peekable();
+        ver.sort_by(|a, b| b.ver.cmp(&a.ver));
+        for curr in ver.iter_mut().rev() {
+            let mut sum = 0;
+            while let Some((next_ver, dl)) = dl_vers.peek() {
+                if next_ver > &curr.ver {
+                    break;
+                }
+                if next_ver.major == curr.ver.major &&
+                (next_ver.major != 0 || next_ver.minor == curr.ver.minor) {
+                    sum += dl;
+                }
+                dl_vers.next();
+            }
+            curr.dl = sum;
         }
-        ver.sort_by(|a, b| b.0.cmp(&a.0));
+
+        let max = ver.iter().map(|v| v.num).max().unwrap_or(1) as f32;
+        let dl_max = ver.iter().map(|v| v.dl).max().unwrap_or(1) as f32;
+        for i in ver.iter_mut() {
+            i.perc = i.num as f32 / max * 100.0;
+            i.num_str = self.format_number(i.num);
+            i.num_width = 4. + 7. * i.num_str.len() as f32; // approx visual width of the number
+
+            i.dl_perc = i.dl as f32 / dl_max * 100.0;
+            i.dl_str = self.downloads(i.dl as usize);
+            i.dl_num_width = 4. + 7. * (i.dl_str.0.len() + i.dl_str.1.len()) as f32; // approx visual width of the number
+        }
         ver
     }
 

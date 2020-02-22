@@ -102,7 +102,7 @@ impl<'a> CatPage<'a> {
     /// Nicely rounded number of downloads
     ///
     /// To show that these numbers are just approximate.
-    pub fn downloads(&self, num: u32) -> (String, &str) {
+    pub fn downloads(&self, num: u32) -> (String, &'static str) {
         match num {
             a @ 0..=99 => (format!("{}", a), ""),
             a @ 0..=500 => (format!("{}", a / 10 * 10), ""),

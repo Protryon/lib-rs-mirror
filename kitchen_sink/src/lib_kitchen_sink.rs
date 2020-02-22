@@ -291,6 +291,37 @@ impl KitchenSink {
         Ok(summed_days)
     }
 
+    // Monthly downloads, sampled from last few days or weeks
+    pub fn recent_downloads_by_version(&self, k: &RichCrateVersion) -> CResult<HashMap<MiniVer, u32>> {
+        let now = Utc::today();
+        let curr_year = now.year() as u16;
+        let curr_year_data = self.yearly.get_crate_year(k.name(), curr_year)?.unwrap_or_default();
+
+        let mut out = HashMap::new();
+        let mut total = 0;
+        let mut days = 0;
+        let mut end_day = now.ordinal0() as usize; // we'll have garbage data in january…
+        loop {
+            let start_day = end_day.saturating_sub(4);
+            days += end_day - start_day;
+
+            for (ver, dl) in &curr_year_data {
+                let cnt = out.entry(ver).or_insert(0);
+                for d in dl.0[start_day..end_day].iter().copied() {
+                    *cnt += d;
+                    total += d;
+                }
+            }
+            if start_day == 0 || total > 10000 || days >= 30 {
+                break;
+            }
+            end_day = start_day;
+        }
+        Ok(out.into_iter().map(|(k,v)|
+            (k.clone(), (v as usize * 30 / days) as u32)
+        ).collect())
+    }
+
     /// Gets cratesio download data, but not from the API, but from our local copy
     pub fn weekly_downloads(&self, k: &RichCrate, num_weeks: u16) -> CResult<Vec<DownloadWeek>> {
         let mut res = Vec::with_capacity(num_weeks.into());

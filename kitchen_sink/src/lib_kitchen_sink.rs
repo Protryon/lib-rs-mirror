@@ -1069,8 +1069,8 @@ impl KitchenSink {
         }
     }
 
-    pub fn prewarm(&self) {
-        let _ = self.index.deps_stats();
+    pub async fn prewarm(&self) {
+        let _ = self.index.deps_stats().await;
     }
 
     pub fn update(&self) {

@@ -1,3 +1,5 @@
+use futures::future::FutureExt;
+use futures::stream::StreamExt;
 use either::*;
 use failure;
 use futures::future::join_all;
@@ -27,9 +29,9 @@ async fn main() {
         },
     });
     let renderer = Arc::new(Renderer::new(None));
-    let pre = std::thread::spawn({
-        let crates = crates.clone();
-        move || crates.prewarm()
+    let pre = handle.spawn({
+        let c = Arc::clone(&crates);
+        async move { c.prewarm().await }
     });
 
     let everything = std::env::args().nth(1).map_or(false, |a| a == "--all");
@@ -64,11 +66,12 @@ async fn main() {
         }
     });
 
-    let handle = Arc::new(tokio::runtime::Handle::current());
-    let seen_repos = Arc::new(Mutex::new(HashSet::new()));
-    let concurrency = Arc::new(tokio::sync::Semaphore::new(16));
-    let repo_concurrency = Arc::new(tokio::sync::Semaphore::new(4));
-    let _ = pre.join().unwrap();
+        let handle = Arc::new(tokio::runtime::Handle::current());
+        let seen_repos = Arc::new(Mutex::new(HashSet::new()));
+        let concurrency = Arc::new(tokio::sync::Semaphore::new(16));
+        let repo_concurrency = Arc::new(tokio::sync::Semaphore::new(4));
+        let _ = pre.await;
+        let waiting = futures::stream::FuturesUnordered::new();
         let c = if everything {
             let mut c: Vec<_> = crates.all_crates().collect::<Vec<_>>();
             c.shuffle(&mut thread_rng());
@@ -89,7 +92,7 @@ async fn main() {
             let renderer = Arc::clone(&renderer);
             let seen_repos = Arc::clone(&seen_repos);
             let tx = tx.clone();
-            handle.clone().spawn(async move {
+            waiting.push(handle.clone().spawn(async move {
                 let index_finished = concurrency.acquire().await;
                 if stopped() {
                     return;
@@ -123,9 +126,10 @@ async fn main() {
                     },
                     err => print_res(err),
                 }
-            });
+            }).map(drop));
         }
         drop(tx);
+        let _ = waiting.collect::<()>().await;
         tokio::task::block_in_place(|| {
             index_thread.join().unwrap().unwrap();
         });

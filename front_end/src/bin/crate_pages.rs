@@ -11,7 +11,8 @@ use std::sync::Arc;
 
 #[tokio::main]
 async fn main() {
-    if let Err(e) = run(std::env::args().nth(1)).await {
+    let handle = tokio::runtime::Handle::current();
+    if let Err(e) = handle.spawn(run(std::env::args().nth(1))).await.unwrap() {
         eprintln!("error: {}", e);
         for c in e.iter_chain() {
             eprintln!("error: -- {}", c);
@@ -60,7 +61,6 @@ async fn render(origin: &Origin, crates: &KitchenSink, path: &PathBuf, markup: &
 
 async fn run(filter: Option<String>) -> Result<(), failure::Error> {
     let crates = Arc::new(kitchen_sink::KitchenSink::new_default().await?);
-    crates.prewarm();
     let image_filter = Arc::new(ImageOptimAPIFilter::new("czjpqfbdkz", crates.main_cache_dir().join("images.db")).await?);
     let markup = &Renderer::new_filter(Some(Highlighter::new()), image_filter);
 

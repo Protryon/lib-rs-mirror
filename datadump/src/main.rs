@@ -1,7 +1,10 @@
 #![allow(unused)]
 #![allow(dead_code)]
+use std::convert::TryInto;
 use chrono::prelude::*;
 use kitchen_sink::KitchenSink;
+use kitchen_sink::OwnerKind;
+use kitchen_sink::CrateOwner;
 use libflate::gzip::Decoder;
 use serde_derive::Deserialize;
 use std::collections::HashMap;
@@ -15,6 +18,7 @@ type BoxErr = Box<dyn std::error::Error + Sync + Send>;
 
 #[tokio::main]
 async fn main() -> Result<(), BoxErr> {
+    tokio::runtime::Handle::current().spawn(async move {
     let mut a = Archive::new(Decoder::new(BufReader::new(File::open("db-dump.tar.gz")?))?);
     let ksink = KitchenSink::new_default().await?;
 
@@ -70,9 +74,16 @@ async fn main() -> Result<(), BoxErr> {
                     index_downloads(crates, versions, &downloads, &ksink)?;
                 }
             }
+            if let (Some(crates), Some(teams), Some(users)) = (&crates, &teams, &users) {
+                if let Some(crate_owners) = crate_owners.take() {
+                    eprintln!("Indexing {} owners", crate_owners.len());
+                    index_owners(crates, crate_owners, teams, users, &ksink)?;
+                }
+            }
         }
     }
     Ok(())
+    }).await.unwrap()
 }
 
 #[inline(never)]
@@ -93,6 +104,50 @@ fn index_downloads(crates: &CratesMap, versions: &VersionsMap, downloads: &Versi
     Ok(())
 }
 
+#[inline(never)]
+fn index_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users: &Users, ksink: &KitchenSink) -> Result<(), BoxErr> {
+    for (crate_id, owners) in owners {
+        if let Some(k) = crates.get(&crate_id) {
+            let owners: Vec<_> = owners.into_iter().map(|o| {
+                let invited_by_github_id = o.created_by_id.and_then(|id| users.get(&id).map(|u| u.github_id as u32).or_else(|| teams.get(&id).map(|t| t.github_id)));
+                match o.owner_kind {
+                    0 => {
+                        let u = users.get(&o.owner_id).expect("owner consistency");
+                        CrateOwner {
+                            id: o.owner_id as _,
+                            login: u.login.to_owned(),
+                            invited_at: Some(o.created_at),
+                            invited_by_github_id,
+                            github_id: u.github_id.try_into().ok(),
+                            name: Some(u.name.to_owned()),
+                            avatar: None,
+                            url: String::new(),
+                            kind: OwnerKind::User,
+                        }
+                    },
+                    1 => {
+                        let u = teams.get(&o.owner_id).expect("owner consistency");
+                        CrateOwner {
+                            id: o.owner_id as _,
+                            login: u.login.to_owned(),
+                            invited_at: Some(o.created_at),
+                            github_id: Some(u.github_id),
+                            invited_by_github_id,
+                            name: Some(u.name.to_owned()),
+                            avatar: None,
+                            url: String::new(),
+                            kind: OwnerKind::Team,
+                        }
+                    },
+                    _ => panic!("bad owner type"),
+                }
+            }).collect();
+            ksink.set_crates_io_crate_owners(&k.to_ascii_lowercase(), owners).map_err(|_| "ugh")?;
+        }
+    }
+    Ok(())
+}
+
 #[derive(Deserialize)]
 struct CrateOwnerRow {
     crate_id: u32,
@@ -102,14 +157,16 @@ struct CrateOwnerRow {
     owner_kind: u8,
 }
 
+type CrateOwners = HashMap<u32, Vec<CrateOwnerRow>>;
+
 #[inline(never)]
-fn parse_crate_owners(file: impl Read) -> Result<HashMap<u32, CrateOwnerRow>, BoxErr> {
+fn parse_crate_owners(file: impl Read) -> Result<CrateOwners, BoxErr> {
     let mut csv = csv::ReaderBuilder::new().has_headers(true).flexible(false).from_reader(file);
     let mut out = HashMap::with_capacity(NUM_CRATES);
     for r in csv.records() {
         let r = r?;
         let r = r.deserialize::<CrateOwnerRow>(None).map_err(|e| format!("wat? {:#?} {}", r, e))?;
-        out.insert(r.crate_id, r);
+        out.entry(r.crate_id).or_insert_with(|| Vec::with_capacity(1)).push(r);
     }
     Ok(out)
 }
@@ -119,12 +176,14 @@ struct TeamRow {
     avatar: String,
     github_id: u32,
     id: u32,
-    login: String,
-    name: String,
+    login: String, // in the funny format
+    name: String, // human str
 }
 
+type Teams = HashMap<u32, TeamRow>;
+
 #[inline(never)]
-fn parse_teams(file: impl Read) -> Result<HashMap<u32, TeamRow>, BoxErr> {
+fn parse_teams(file: impl Read) -> Result<Teams, BoxErr> {
     let mut csv = csv::ReaderBuilder::new().has_headers(true).flexible(false).from_reader(file);
     let mut out = HashMap::with_capacity(NUM_CRATES);
     for r in csv.records() {
@@ -138,14 +197,16 @@ fn parse_teams(file: impl Read) -> Result<HashMap<u32, TeamRow>, BoxErr> {
 #[derive(Deserialize)]
 struct UserRow {
     avatar: String,
-    github_id: i32, // -1 happens :(
+    github_id: i32, // there is -1 :(
     login: String,
     id: u32,
     name: String,
 }
 
+type Users = HashMap<u32, UserRow>;
+
 #[inline(never)]
-fn parse_users(file: impl Read) -> Result<HashMap<u32, UserRow>, BoxErr> {
+fn parse_users(file: impl Read) -> Result<Users, BoxErr> {
     let mut csv = csv::ReaderBuilder::new().has_headers(true).flexible(false).from_reader(file);
     let mut out = HashMap::with_capacity(NUM_CRATES);
     for r in csv.records() {

@@ -25,6 +25,15 @@ pub struct CrateOwner {
     pub url: String,            // "https://github.com/rust-bus",
     pub name: Option<String>,   // "maintainers",
     pub avatar: Option<String>, // "https://avatars1.githubusercontent.com/u/38887296?v=4"
+
+    #[serde(default)]
+    pub github_id: Option<u32>,
+
+    #[serde(default)]
+    pub invited_at: Option<String>,
+
+    #[serde(default)]
+    pub invited_by_github_id: Option<u32>,
 }
 
 impl CrateOwner {

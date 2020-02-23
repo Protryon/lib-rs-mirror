@@ -46,7 +46,7 @@ use categories::Category;
 use chrono::prelude::*;
 use chrono::DateTime;
 use crate_db::{builddb::BuildDb, CrateDb, CrateVersionData, RepoChange};
-use crates_io_client::CrateOwner;
+pub use crates_io_client::CrateOwner;
 use double_checked_cell_async::DoubleCheckedCell;
 use failure::ResultExt;
 use futures::future::join_all;
@@ -165,6 +165,7 @@ pub struct KitchenSink {
     main_cache_dir: PathBuf,
     yearly: AllDownloads,
     category_overrides: HashMap<String, Vec<Cow<'static, str>>>,
+    crates_io_owners_cache: TempCache<Vec<CrateOwner>>,
 }
 
 impl KitchenSink {
@@ -205,6 +206,7 @@ impl KitchenSink {
             yearly: AllDownloads::new(&main_cache_dir),
             main_cache_dir,
             category_overrides: Self::load_category_overrides(&data_path.join("category_overrides.txt"))?,
+            crates_io_owners_cache: TempCache::new(&data_path.join("cio-owners.tmp"))?,
         })
         })
     }
@@ -424,6 +426,10 @@ impl KitchenSink {
                         login: o.login,
                         kind: OwnerKind::User, // FIXME: crates-io uses teams, and we'd need to find the right team? is "owners" a guaranteed thing?
                         name: o.name,
+                        github_id: Some(o.id),
+
+                        invited_at: None,
+                        invited_by_github_id: None,
                     }
                 }).collect(),
                 format!("github/{}/{}", repo.owner, package),
@@ -1713,7 +1719,12 @@ impl KitchenSink {
 
     async fn crate_owners(&self, krate: &RichCrateVersion) -> CResult<Vec<CrateOwner>> {
         match krate.origin() {
-            Origin::CratesIo(name) => self.crates_io_crate_owners(name, krate.version()).await,
+            Origin::CratesIo(name) => {
+                if let Some(o) = self.crates_io_owners_cache.get(krate.name())? {
+                    return Ok(o);
+                }
+                self.crates_io_crate_owners(name, krate.version()).await
+            },
             Origin::GitLab {..} => Ok(vec![]),
             Origin::GitHub {repo, ..} => Ok(vec![
                 CrateOwner {
@@ -1725,6 +1736,10 @@ impl KitchenSink {
                     login: repo.owner.to_string(),
                     kind: OwnerKind::User, // FIXME: crates-io uses teams, and we'd need to find the right team? is "owners" a guaranteed thing?
                     name: None,
+
+                    invited_at: None,
+                    github_id: None,
+                    invited_by_github_id: None,
                 }
             ]),
         }
@@ -1732,6 +1747,10 @@ impl KitchenSink {
 
     pub async fn crates_io_crate_owners(&self, crate_name: &str, version: &str) -> CResult<Vec<CrateOwner>> {
         Ok(self.crates_io.crate_owners(crate_name, version).await.context("crate_owners")?.unwrap_or_default())
+    }
+
+    pub fn set_crates_io_crate_owners(&self, crate_name: &str, owners: Vec<CrateOwner>) -> Result<(), ()> {
+        self.crates_io_owners_cache.set(crate_name, owners).map_err(drop)
     }
 
     // Sorted from the top, returns origins

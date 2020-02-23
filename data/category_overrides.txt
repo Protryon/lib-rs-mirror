@@ -127,6 +127,17 @@ grin_keychain: cryptography::cryptocurrencies
 grin_store: cryptography::cryptocurrencies
 grin_wallet_impls: cryptography::cryptocurrencies
 hdwallet-bitcoin: cryptography::cryptocurrencies
+holochain :cryptography::cryptocurrencies
+holochain_common :cryptography::cryptocurrencies
+holochain_conductor_lib :cryptography::cryptocurrencies
+holochain_conductor_lib_api :cryptography::cryptocurrencies
+holochain_core :cryptography::cryptocurrencies
+holochain_dpki :cryptography::cryptocurrencies
+holochain_json_derive :cryptography::cryptocurrencies
+holochain_locksmith :cryptography::cryptocurrencies
+holochain_logging :cryptography::cryptocurrencies
+holochain_metrics :cryptography::cryptocurrencies
+holochain_persistence_api :cryptography::cryptocurrencies
 httpdate: date-and-time, parser-implementations
 hubcaps: web-programming
 hyper-router : web-programming::http-server

@@ -7,7 +7,6 @@ use crates_index::Crate;
 use crates_index::Dependency;
 pub use crates_index::Version;
 use double_checked_cell_async::DoubleCheckedCell;
-use lazyonce::LazyOnce;
 use parking_lot::Mutex;
 use parking_lot::RwLock;
 use rich_crate::Origin;
@@ -21,6 +20,7 @@ use std::sync::Arc;
 use string_interner::StringInterner;
 use string_interner::Sym;
 use std::time::Duration;
+use rayon::prelude::*;
 
 type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 type FxHashSet<V> = std::collections::HashSet<V, ahash::RandomState>;
@@ -127,7 +127,7 @@ impl ICrate for RichCrateVersion {
 }
 
 pub struct Index {
-    indexed_crates: LazyOnce<FxHashMap<Box<str>, Crate>>,
+    indexed_crates: FxHashMap<Box<str>, Crate>,
     pub(crate) crates_io_index: crates_index::Index,
     git_index: GitIndex,
 
@@ -143,12 +143,18 @@ impl Index {
 
     pub fn new(data_dir: &Path) -> Result<Self, KitchenSinkErr> {
         let crates_io_index = crates_index::Index::new(data_dir.join("index"));
+        let indexed_crates = crates_io_index.crate_index_paths().par_bridge()
+                .filter_map(|path| {
+                    let c = crates_index::Crate::new_checked(path).ok()?;
+                    Some((c.name().to_ascii_lowercase().into(), c))
+                })
+                .collect();
         Ok(Self {
             git_index: GitIndex::new(data_dir)?,
             cache: RwLock::new(FxHashMap::with_capacity_and_hasher(5000, Default::default())),
             inter: RwLock::new(StringInterner::new()),
             deps_stats: DoubleCheckedCell::new(),
-            indexed_crates: LazyOnce::new(),
+            indexed_crates,
             crates_io_index,
         })
     }
@@ -162,11 +168,7 @@ impl Index {
     /// It returns only a thin and mostly useless data from the index itself,
     /// so `rich_crate`/`rich_crate_version` is needed to do more.
     pub fn crates_io_crates(&self) -> &FxHashMap<Box<str>, Crate> {
-        self.indexed_crates.get(|| {
-            self.crates_io_index.crates()
-                .map(|c| (c.name().to_ascii_lowercase().into(), c))
-                .collect()
-        })
+        &self.indexed_crates
     }
 
     pub fn crate_exists(&self, origin: &Origin) -> bool {

@@ -19,5 +19,5 @@ ranking = { path = "../ranking" }
 either = "1.5.3"
 parking_lot = "0.10.0"
 udedokei = { path = "../udedokei" }
-tokio = { version = "0.2.11", features = ["rt-threaded", "macros"] }
+tokio = { version = "0.2.11", features = ["rt-threaded", "macros", "sync", "blocking"] }
 futures = "0.3.4"

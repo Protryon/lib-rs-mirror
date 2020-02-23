@@ -1129,8 +1129,10 @@ fn none_rows<T>(res: std::result::Result<T, rusqlite::Error>) -> std::result::Re
     }
 }
 
-#[tokio::test]
-async fn try_indexing() {
+#[test]
+fn try_indexing() {
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let f = rt.spawn(async move {
     let t = tempfile::NamedTempFile::new().unwrap();
 
     let db = CrateDb::new_with_synonyms(t.as_ref(), Path::new("../data/tag-synonyms.csv")).unwrap();
@@ -1173,5 +1175,7 @@ categories = ["1", "two", "GAMES", "science", "::science::math::"]
     assert_eq!(new_derived.has_buildrs, derived.has_buildrs);
     assert_eq!(new_derived.has_code_of_conduct, derived.has_code_of_conduct);
     assert_eq!(new_derived.is_yanked, derived.is_yanked);
+    });
+    rt.block_on(f).unwrap();
 }
 

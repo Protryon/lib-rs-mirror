@@ -16,6 +16,9 @@ use udedokei::LanguageExt;
 
 #[tokio::main]
 async fn main() {
+    let handle = Arc::new(tokio::runtime::Handle::current());
+    handle.clone().spawn(async move {
+
     let crates = Arc::new(match kitchen_sink::KitchenSink::new_default().await {
         Ok(a) => a,
         e => {
@@ -61,12 +64,11 @@ async fn main() {
         }
     });
 
-    let rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().build().unwrap();
-    rt.spawn(async move {
     let handle = Arc::new(tokio::runtime::Handle::current());
-    let seen_repos = &Mutex::new(HashSet::new());
+    let seen_repos = Arc::new(Mutex::new(HashSet::new()));
+    let concurrency = Arc::new(tokio::sync::Semaphore::new(16));
+    let repo_concurrency = Arc::new(tokio::sync::Semaphore::new(4));
     let _ = pre.join().unwrap();
-    rayon::scope(move |scope| {
         let c = if everything {
             let mut c: Vec<_> = crates.all_crates().collect::<Vec<_>>();
             c.shuffle(&mut thread_rng());
@@ -82,51 +84,52 @@ async fn main() {
             }
             let crates = Arc::clone(&crates);
             let handle = Arc::clone(&handle);
+            let concurrency = Arc::clone(&concurrency);
+            let repo_concurrency = Arc::clone(&repo_concurrency);
             let renderer = Arc::clone(&renderer);
+            let seen_repos = Arc::clone(&seen_repos);
             let tx = tx.clone();
-            scope.spawn(move |scope| {
+            handle.clone().spawn(async move {
+                let index_finished = concurrency.acquire().await;
                 if stopped() {
                     return;
                 }
-                print!("{} ", i);
-                match handle.enter(|| futures::executor::block_on(crates.index_crate_highest_version(&origin))) {
+                println!("{}…", i);
+                match crates.index_crate_highest_version(&origin).await {
                     Ok(()) => {},
                     err => {
                         print_res(err);
                         return;
                     },
                 }
-                scope.spawn(move |scope| {
-                    match handle.enter(|| futures::executor::block_on(index_crate(&crates, &origin, &renderer, &tx))) {
-                        Ok(v) => {
-                            if repos {
-                                scope.spawn(move |_| {
-                                    if let Some(ref repo) = v.repository() {
-                                        {
-                                            let mut s = seen_repos.lock();
-                                            let url = repo.canonical_git_url().to_string();
-                                            if s.contains(&url) {
-                                                return;
-                                            }
-                                            println!("Indexing {}", url);
-                                            s.insert(url);
-                                        }
-                                        print_res(
-                                            handle.enter(|| futures::executor::block_on(crates.index_repo(repo, v.version()))));
+                match index_crate(&crates, &origin, &renderer, &tx).await {
+                    Ok(v) => {
+                        drop(index_finished);
+                        if repos {
+                            if let Some(ref repo) = v.repository() {
+                                {
+                                    let mut s = seen_repos.lock();
+                                    let url = repo.canonical_git_url().to_string();
+                                    if s.contains(&url) {
+                                        return;
                                     }
-                                })
+                                    println!("Indexing {}", url);
+                                    s.insert(url);
+                                }
+                                let _finished = repo_concurrency.acquire().await;
+                                print_res(crates.index_repo(repo, v.version()).await);
                             }
-                        },
-                        err => print_res(err),
-                    }
-                });
+                        }
+                    },
+                    err => print_res(err),
+                }
             });
         }
         drop(tx);
-    });
+        tokio::task::block_in_place(|| {
+            index_thread.join().unwrap().unwrap();
+        });
     }).await.unwrap();
-
-    index_thread.join().unwrap().unwrap();
 }
 
 async fn index_crate(crates: &KitchenSink, origin: &Origin, renderer: &Renderer, search_sender: &mpsc::SyncSender<(Arc<RichCrateVersion>, usize, f64)>) -> Result<Arc<RichCrateVersion>, failure::Error> {
@@ -163,16 +166,15 @@ async fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrat
         all.owners().len() as u32
     };
 
-    let readme = k.readme().map(|readme| {
-        renderer.page_node(&readme.markup, None, false, None)
-    });
     let langs = k.language_stats();
     let (rust_code_lines, rust_comment_lines) = langs.langs.get(&udedokei::Language::Rust).map(|rs| (rs.code, rs.comments)).unwrap_or_default();
     let total_code_lines = langs.langs.iter().filter(|(k, _)| k.is_code()).map(|(_, l)| l.code).sum::<u32>();
     let base_score = ranking::crate_score_version(&CrateVersionInputs {
         versions: all.versions(),
         description: k.description().unwrap_or(""),
-        readme: readme.as_ref(),
+        readme: k.readme().map(|readme| {
+            renderer.page_node(&readme.markup, None, false, None)
+        }).as_ref(),
         owners: all.owners(),
         authors: k.authors(),
         contributors: Some(contributors_count),

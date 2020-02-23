@@ -7,9 +7,6 @@
 [submodule "style"]
 	path = style
 	url = https://gitlab.com/crates.rs/style.git
-[submodule "docs_rs_client"]
-	path = docs_rs_client
-	url = https://gitlab.com/crates.rs/docs_rs_client.git
 [submodule "lazyonce"]
 	path = lazyonce
 	url = https://gitlab.com/crates.rs/lazyonce.git

@@ -13,7 +13,9 @@ amath: parser-implementations
 approvals: development-tools::testing
 apt-cache: os::unix-apis
 aquaenv: os::macos-apis, command-line-utilities, gui
+arcon: science
 argh: command-line-interface
+ascon: cryptography
 ast_node: parser-implementations
 async-codec : asynchronous
 atomsh: command-line-utilities
@@ -27,6 +29,7 @@ binaryen-sys : wasm
 bio-types: science, rust-patterns
 bio: science, algorithms, data-structures
 bitcoin_hashes : cryptography::cryptocurrencies
+bitvector: data-structures
 blip_buf: multimedia::audio
 bloke: game-engines
 bnf: parsers
@@ -50,6 +53,7 @@ collisions: algorithms
 colloquy: command-line-interface
 core-foundation-sys: os::macos-apis
 core-text: os::macos-apis
+core-video-sys: os::macos-apis
 coreaudio-sys: os::macos-apis, multimedia::audio
 coremidi: os::macos-apis, multimedia::audio
 cox: web-programming
@@ -73,6 +77,8 @@ endian-hasher : algorithms
 endicon: algorithms
 eng-pwasm-abi : cryptography::cryptocurrencies, wasm
 eng-wasm : cryptography::cryptocurrencies, wasm
+entity_store_code_gen : game-engines
+entity_store_helper  : game-engines
 env-io: rust-patterns
 env_proc : config
 env_proc: rust-patterns, config
@@ -89,6 +95,7 @@ exonum-time : cryptography::cryptocurrencies
 exonum: cryptography::cryptocurrencies
 failure: rust-patterns
 fakesite: web-programming
+fastdl: caching
 fdfast: filesystem
 fec : encoding
 ff: algorithms
@@ -98,6 +105,7 @@ find-files: filesystem
 findomain: networking
 fitrs: parser-implementations
 fixed_width: parser-implementations
+follow: command-line-utilities
 foreignc_derive: development-tools::procedural-macro-helpers
 forever: rust-patterns
 forismatic: web-programming
@@ -140,6 +148,7 @@ holochain_metrics :cryptography::cryptocurrencies
 holochain_persistence_api :cryptography::cryptocurrencies
 httpdate: date-and-time, parser-implementations
 hubcaps: web-programming
+hybrid-clocks : algorithms
 hyper-router : web-programming::http-server
 iban_validate: parser-implementations
 ical: parser-implementations
@@ -171,6 +180,7 @@ jsonrpc-v2  : web-programming::http-server
 jsonsv: encoding
 jubjub: algorithms
 just  : development-tools, command-line-utilities
+k2hash-sys : databases
 k8-client : rust-patterns
 k8s-openapi : development-tools
 k8s-openapi-codegen-common: rust-patterns
@@ -188,7 +198,9 @@ lapp: parser-implementations
 letter-avatar: multimedia::images
 lib_sens: game-engines
 libass: web-programming
+libblas-sys : science::math
 libinput-sys: os
+liblapack-sys : science::math
 libloadorder-ffi : game-engines
 librdkafka-sys: asynchronous
 librsyncr: network-programming
@@ -227,9 +239,13 @@ ndless-static-vars: rust-patterns
 neocom: emulators
 neon-sys: web-programming
 netdevice: os, network-programming
+newrelic: development-tools
 newrelic_plugin: web-programming
+nite2-sys: science::machine-learning
 notcurses: command-line-interface
+num_sys : value-formatting
 onig_sys: text-processing
+openni2: science::machine-learning
 openpol: games
 orgize: parser-implementations
 packapp: os::macos-apis, command-line-utilities
@@ -268,12 +284,14 @@ ritual_build  : development-tools, command-line-utilities
 riven: games
 rmatrix: command-line-utilities
 rnix: parser-implementations
+roads-from-nd  : multimedia::images
 robinhood: web-programming
 romy-core: game-engines
 romy-wasmer: game-engines
 romy: game-engines
 rosalind: algorithms, science
 roux: web-programming
+rqr : multimedia::images
 rsdb: database-implementations
 rusoto_credential: authentication
 rust_fixed_width: data-structures
@@ -321,6 +339,7 @@ swears: command-line-interface
 symbolic-minidump: development-tools::debugging
 symbolic: development-tools::debugging
 syncat-stylesheet: parser-implementations
+sys_util : os
 tagref : development-tools
 tarkov: games
 tealdeer: command-line-utilities
@@ -331,7 +350,9 @@ thrift_codec : encoding, web-programming
 trackable: development-tools::debugging
 trashmap: data-structures
 trompt : authentication, command-line-interface
+truth: parser-implementations
 try-guard : rust-patterns
+try_from: rust-patterns
 tt-call : rust-patterns
 twapi: web-programming
 typedb: database-implementations
@@ -345,6 +366,7 @@ vad: multimedia::audio
 varlink_parser: parser-implementations
 varlociraptor: science
 veloren-launcher: games
+vhdl_lang : development-tools
 w_result: rust-patterns
 webhook_listener : web-programming::http-server
 webidl: parser-implementations

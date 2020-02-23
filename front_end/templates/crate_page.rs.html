@@ -211,6 +211,7 @@
                         Used in <a href="@url.crate_by_origin(&Origin::from_crates_io_name(name))">@name</a>
                       }
                     } else {
+                      @if direct > 0 {
                       @if deps != direct {
                         Used in <b>@c.format_number(deps)</b> crate@if deps != 1 {s}
                           @if direct == 1 {
@@ -224,7 +225,7 @@
                       } else {
                         Used in <a href="@url.reverse_deps(c.ver.origin())"><b>@c.format_number(deps)</b>&nbsp;crate@if deps != 1 {s}</a>
                       }
-                    }
+                    }}
                 }
               </p>
             </section>

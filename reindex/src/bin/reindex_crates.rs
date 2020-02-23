@@ -94,9 +94,7 @@ async fn main() {
             let tx = tx.clone();
             waiting.push(handle.clone().spawn(async move {
                 let index_finished = concurrency.acquire().await;
-                if stopped() {
-                    return;
-                }
+                if stopped() {return;}
                 println!("{}…", i);
                 match crates.index_crate_highest_version(&origin).await {
                     Ok(()) => {},
@@ -105,6 +103,7 @@ async fn main() {
                         return;
                     },
                 }
+                if stopped() {return;}
                 match index_crate(&crates, &origin, &renderer, &tx).await {
                     Ok(v) => {
                         drop(index_finished);
@@ -120,6 +119,7 @@ async fn main() {
                                     s.insert(url);
                                 }
                                 let _finished = repo_concurrency.acquire().await;
+                                if stopped() {return;}
                                 print_res(crates.index_repo(repo, v.version()).await);
                             }
                         }
@@ -129,7 +129,9 @@ async fn main() {
             }).map(drop));
         }
         drop(tx);
+        if stopped() {return;}
         let _ = waiting.collect::<()>().await;
+        if stopped() {return;}
         tokio::task::block_in_place(|| {
             index_thread.join().unwrap().unwrap();
         });

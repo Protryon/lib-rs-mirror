@@ -53,6 +53,7 @@ async fn main() {
                 let _f = concurrency.acquire().await;
                 println!("{}…", o.short_crate_name());
                 let r1 = crates.rich_crate_version_async(&o).await;
+                if stopped() {return;}
                 let res = r1.and_then(|c| {
                     for a in c.authors().iter().filter(|a| a.email.is_some()) {
                         if let Some(email) = a.email.as_ref() {
@@ -69,9 +70,11 @@ async fn main() {
                 }
             }).map(drop));
         }
+        if stopped() {return;}
         let _ = waiting.collect::<()>().await;
         eprintln!("Finished sending");
         tx.send(None).unwrap();
+        if stopped() {return;}
         t.join().unwrap();
     }).await.unwrap();
 }

@@ -529,7 +529,9 @@ lazy_static! {
 
         (Cond::Any(&["oauth", "authentication", "authorization", "credentials"]),
             &[("authentication", 1.4, 0.2), ("command-line-utilities", 0.6, 0.), ("hardware-support", 0.7, 0.), ("config", 0.9, 0.), ("web-programming::http-client", 0.8, 0.), ("parsing", 0.7, 0.)]),
-        (Cond::Any(&["authorize", "authenticate", "2fa", "oauth2", "totp", "u2f", "credential"]),
+        (Cond::Any(&["diceware", "totp", "credentials"]),
+            &[("authentication", 1.4, 0.2), ("hardware-support", 0.8, 0.), ("parsing", 0.7, 0.)]),
+        (Cond::Any(&["authorize", "authenticate", "2fa", "oauth2", "u2f", "credential", "passphrase"]),
             &[("authentication", 1.4, 0.2), ("command-line-utilities", 0.9, 0.), ("hardware-support", 0.8, 0.), ("config", 0.8, 0.), ("web-programming::http-client", 0.8, 0.), ("parsing", 0.7, 0.)]),
 
         (Cond::NotAny(&["database", "db", "databases", "datastore", "persistence", "wal", "queryable", "indexed", "columnar", "persistent", "relational", "dbms", "migrations", "key-value", "kv", "kvs", "sql", "nosql", "geoip", "key-value", "orm", "schema", "lmdb", "odbc", "transactions", "transactional",
@@ -825,7 +827,7 @@ lazy_static! {
             ("science::math", 0.8, 0.), ("hardware-support", 0.7, 0.), ("command-line-utilities", 0.75, 0.), ("internationalization", 0.9, 0.),
             ("development-tools::procedural-macro-helpers", 0.7, 0.), ("memory-management", 0.5, 0.), ("rendering::engine", 0.8, 0.), ("emulators", 0.6, 0.)]),
         (Cond::Any(&["has:bin"]), &[("command-line-utilities", 1.1, 0.), ("development-tools::cargo-plugins", 0.9, 0.), ("no-std", 0.7, 0.), ("game-engines", 0.9, 0.),
-            ("development-tools::procedural-macro-helpers", 0.7, 0.), ("memory-management", 0.4, 0.), ("algorithms", 0.8, 0.)]),
+            ("development-tools::procedural-macro-helpers", 0.7, 0.), ("memory-management", 0.4, 0.), ("algorithms", 0.5, 0.)]),
         (Cond::NotAny(&["has:bin"]), &[("games", 0.7, 0.), ("development-tools::cargo-plugins", 0.9, 0.), ("command-line-utilities", 0.4, 0.)]),
 
         (Cond::Any(&["hardware", "verilog", "bluetooth", "drone", "rs232","enclave", "adafruit", "laser", "altimeter", "sensor"]),

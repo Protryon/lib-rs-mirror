@@ -10,6 +10,7 @@ mod yearly;
 pub use crate::yearly::*;
 mod deps_stats;
 pub use crate::deps_stats::*;
+pub mod filter;
 
 mod ctrlcbreak;
 mod git_crates_index;

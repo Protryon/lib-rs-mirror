@@ -1,28 +1,7 @@
+use render_readme::ImageFilter;
 use simple_cache::{Error, TempCache};
 use std::borrow::Cow;
 use std::path::PathBuf;
-
-/// Callbacks for every image URL in the document
-pub trait ImageFilter: Send + Sync + 'static {
-    /// Ability to change the image URL
-    /// Returns 1x image and 2x image
-    fn filter_url<'a>(&self, url: &'a str) -> (Cow<'a, str>, Option<Cow<'a, str>>);
-
-    /// Given the URL, get image size in CSS pixels
-    ///
-    /// This will be used to add `width`/`height` attributes to `<img>` elements.
-    fn image_size(&self, url: &str) -> Option<(u32, u32)>;
-}
-
-impl ImageFilter for () {
-    fn filter_url<'a>(&self, url: &'a str) -> (Cow<'a, str>, Option<Cow<'a, str>>) {
-        (url.into(), None)
-    }
-
-    fn image_size(&self, _url: &str) -> Option<(u32, u32)> {
-        None
-    }
-}
 
 #[derive(Clone, Copy, Deserialize, Serialize, Debug)]
 struct ImageOptimImageMeta {

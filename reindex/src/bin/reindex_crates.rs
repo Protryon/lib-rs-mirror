@@ -61,8 +61,9 @@ async fn main() {
         }
     });
 
+    let rt = tokio::runtime::Builder::new().threaded_scheduler().enable_all().build().unwrap();
+    rt.spawn(async move {
     let handle = Arc::new(tokio::runtime::Handle::current());
-
     let seen_repos = &Mutex::new(HashSet::new());
     let _ = pre.join().unwrap();
     rayon::scope(move |scope| {
@@ -123,6 +124,7 @@ async fn main() {
         }
         drop(tx);
     });
+    }).await.unwrap();
 
     index_thread.join().unwrap().unwrap();
 }

@@ -1,5 +1,5 @@
 [package]
-version = "0.7.2"
+version = "0.7.4"
 edition = "2018"
 name = "simple_cache"
 authors = ["Kornel <kornel@geekhood.net>"]

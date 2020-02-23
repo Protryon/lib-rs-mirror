@@ -33,6 +33,19 @@ opt-level = 1
 [profile.release]
 debug = true
 
+[profile.dev.package.miniz_oxide]
+opt-level = 3
+
+[profile.dev.package.flate2]
+opt-level = 3
+
+[profile.dev.package.serde]
+opt-level = 3
+
+[profile.dev.package.rmp-serde]
+opt-level = 3
+
+
 [patch.crates-io]
 cargo_toml = { path = "cargo_toml" }
 cargo_author = { path = "cargo_author" }
@@ -43,9 +56,6 @@ onig_sys = { git = "https://github.com/kornelski/rust-onig" }
 [patch.'https://gitlab.com/crates.rs/crate_git_checkout.git']
 crate_git_checkout = { path = "crate_git_checkout" }
 
-[patch.'https://gitlab.com/crates.rs/crates_io_client.git']
-crates_io_client = { path = "crates_io_client" }
-
 [patch.'https://gitlab.com/crates.rs/docs_rs_client.git']
 docs_rs_client = { path = "docs_rs_client" }
 
@@ -54,7 +64,3 @@ render_readme = { path = "render_readme" }
 
 [patch.'https://gitlab.com/crates.rs/repo_url.git']
 repo_url = { path = "repo_url" }
-
-[patch.'https://gitlab.com/crates.rs/simple_cache.git']
-simple_cache = { path = "simple_cache" }
-

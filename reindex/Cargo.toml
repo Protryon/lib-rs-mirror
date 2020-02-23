@@ -8,7 +8,7 @@ authors = ["Kornel <kornel@geekhood.net>"]
 crate_db = { path = "../crate_db", version = "0.4.0" }
 github_info = { path = "../github_info", version = "0.8.0" }
 kitchen_sink = { path = "../kitchen_sink", version = "0.8" }
-repo_url = { git = "https://gitlab.com/crates.rs/repo_url.git" }
+repo_url = { path = "../repo_url" }
 user_db = { path = "../user_db", version = "0.3" }
 failure = "0.1.6"
 rayon = "1.3.0"

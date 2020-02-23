@@ -186,6 +186,9 @@ iota-pow: cryptography::cryptocurrencies
 iota-spammer : cryptography::cryptocurrencies
 iota-utils : cryptography::cryptocurrencies
 is-macro : development-tools::procedural-macro-helpers
+iso639-1 : internationalization
+iso639_2: internationalization
+iso_currency : internationalization
 jeepers : science::machine-learning
 json-tools: parser-implementations
 jsonapi: web-programming
@@ -208,6 +211,7 @@ keychain-services: os::macos-apis, authentication
 kf-protocol : asynchronous, network-programming
 kf-protocol-transport: asynchronous, network-programming
 kf-socket: network-programming
+kodict: internationalization
 ktmpl : configuration
 kube: development-tools
 kurbo: science::math, rendering::graphics-api

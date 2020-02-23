@@ -104,7 +104,7 @@ impl CrateSearchIndex {
         let searcher = reader.searcher();
         let top_docs = searcher.search(&*query, &TopDocs::with_limit((limit+50+limit/2).max(250)))?; // 250 is a hack for https://github.com/tantivy-search/tantivy/issues/700
 
-        let mut docs = top_docs.into_iter().enumerate().map(|(i, (relevance_score, doc_address))| {
+        let mut docs = top_docs.into_iter().map(|(relevance_score, doc_address)| {
             let retrieved_doc = searcher.doc(doc_address)?;
             let mut doc = self.tantivy_index.schema().to_named_doc(&retrieved_doc).0;
             let mut crate_base_score = take_int(doc.get("crate_score")) as f64;
@@ -112,13 +112,11 @@ impl CrateSearchIndex {
             let origin = Origin::from_str(take_string(doc.remove("origin")));
             Ok(CrateFound {
                 score: if sort_by_query_relevance {
-                    // first few crates can be ordered by tantivy's relevance
-                    let position_bonus = if i < 4 {CRATE_SCORE_MAX / (i as f64 + 8.)} else {0.};
                     // bonus for exact match
                     if crate_name == query_text {
                         crate_base_score += CRATE_SCORE_MAX / 8.;
                     }
-                    (relevance_score as f64 * (crate_base_score + position_bonus)) as f32
+                    (relevance_score as f64 * crate_base_score) as f32
                 } else {
                     crate_base_score as f32
                 },

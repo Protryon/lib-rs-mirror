@@ -256,17 +256,32 @@ async fn default_handler(req: HttpRequest) -> Result<HttpResponse, failure::Erro
         Err(err) => return Err(err),
     }
 
+    let name = path.trim_matches('/').to_owned();
     let crates = state.crates.load();
-    let name = path.trim_matches('/');
-    if let Ok(k) = crates.rich_crate_async(&Origin::from_crates_io_name(name)).await {
+    let (found_crate, found_keyword) = rt_run_timeout(&state.rt, 10, async move {
+        match crates.rich_crate_async(&Origin::from_crates_io_name(&name)).await {
+            Ok(c) => Ok((Some(c), None)),
+            Err(_) => {
+                let inverted_hyphens: String = name.chars().map(|c| if c == '-' {'_'} else if c == '_' {'-'} else {c.to_ascii_lowercase()}).collect();
+                match crates.rich_crate_async(&Origin::from_crates_io_name(&inverted_hyphens)).await {
+                    Ok(c) => Ok((Some(c), None)),
+                    Err(_) => {
+                        if crates.is_it_a_keyword(&inverted_hyphens).await {
+                            Ok((None, Some(inverted_hyphens)))
+                        } else {
+                            Ok((None, None))
+                        }
+                    }
+                }
+            }
+        }
+    }).await?;
+
+    if let Some(k) = found_crate {
         return Ok(HttpResponse::PermanentRedirect().header("Location", format!("/crates/{}", encode(k.name()))).body(""));
     }
-    let inverted_hyphens: String = name.chars().map(|c| if c == '-' {'_'} else if c == '_' {'-'} else {c.to_ascii_lowercase()}).collect();
-    if let Ok(k) = crates.rich_crate_async(&Origin::from_crates_io_name(&inverted_hyphens)).await {
-        return Ok(HttpResponse::TemporaryRedirect().header("Location", format!("/crates/{}", encode(k.name()))).body(""));
-    }
-    if crates.is_it_a_keyword(&inverted_hyphens).await {
-        return Ok(HttpResponse::TemporaryRedirect().header("Location", format!("/keywords/{}", encode(&inverted_hyphens))).body(""));
+    if let Some(keyword) = found_keyword {
+        return Ok(HttpResponse::TemporaryRedirect().header("Location", format!("/keywords/{}", encode(&keyword))).body(""));
     }
 
     render_404_page(state, path)

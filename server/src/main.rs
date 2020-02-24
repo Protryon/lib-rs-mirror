@@ -586,9 +586,10 @@ fn is_alnum_dot(q: &str) -> bool {
 }
 
 async fn handle_search(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
-    let qs = qstring::QString::from(req.query_string());
+    let qs = req.query_string().replace('+',"%2b");
+    let qs = qstring::QString::from(qs.as_str());
     match qs.get("q").unwrap_or("") {
-        q if !q.is_empty() => {
+        q if !q.trim_start().is_empty() => {
             let state: &AServerState = req.app_data().expect("appdata");
             let query = q.to_owned();
             let page = state.rt.spawn({

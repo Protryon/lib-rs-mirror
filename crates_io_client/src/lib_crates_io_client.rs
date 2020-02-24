@@ -28,12 +28,6 @@ macro_rules! cioopt {
     };
 }
 
-#[derive(Debug)]
-pub struct CratesIoCrate {
-    pub meta: CrateMetaFile,
-    pub owners: Vec<CrateOwner>,
-}
-
 impl CratesIoClient {
     pub fn new(cache_base_path: &Path) -> Result<Self, Error> {
         Ok(Self {
@@ -69,19 +63,6 @@ impl CratesIoClient {
         let key = format!("{}.html", crate_name);
         let url = format!("https://crates.io/api/v1/crates/{}/{}/readme", encode(crate_name), encode(version));
         self.crates.get_cached((&key, version), &url).await
-    }
-
-    pub async fn krate(&self, crate_name: &str, cache_buster: &str) -> Result<Option<CratesIoCrate>, Error> {
-        let (meta, owners) = futures::join!(
-                self.crate_meta(crate_name, cache_buster),
-                self.crate_owners(crate_name, cache_buster));
-        let meta = cioopt!(meta?);
-        let owners = cioopt!(owners?);
-
-        Ok(Some(CratesIoCrate {
-            meta,
-            owners,
-        }))
     }
 
     pub async fn crate_meta(&self, crate_name: &str, as_of_version: &str) -> Result<Option<CrateMetaFile>, Error> {

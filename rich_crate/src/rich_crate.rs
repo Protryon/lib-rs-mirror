@@ -8,7 +8,6 @@ pub use crates_io_client::CrateOwner;
 #[derive(Debug)]
 pub struct RichCrate {
     origin: Origin,
-    // crates_io: CratesIoCrate,
     name: String,
     owners: Vec<CrateOwner>,
     versions: Vec<CrateVersion>,

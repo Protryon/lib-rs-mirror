@@ -20,10 +20,10 @@ pub use crate::ctrlcbreak::*;
 pub use crate_db::builddb::Compat;
 pub use crate_db::builddb::CompatibilityInfo;
 pub use crates_index::Crate as CratesIndexCrate;
+use crates_io_client::CrateMetaFile;
 pub use crates_io_client::CrateDepKind;
 pub use crates_io_client::CrateDependency;
 pub use crates_io_client::CrateMetaVersion;
-pub use crates_io_client::CratesIoCrate;
 pub use crates_io_client::OwnerKind;
 pub use github_info::User;
 pub use github_info::UserOrg;
@@ -402,14 +402,17 @@ impl KitchenSink {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
         match origin {
             Origin::CratesIo(name) => {
-                let meta = self.crates_io_meta(name).await?;
-                let versions = meta.meta.versions().map(|c| CrateVersion {
+                let (meta, owners) = futures::try_join!(
+                    self.crates_io_meta(name),
+                    self.crate_owners(origin),
+                )?;
+                let versions = meta.versions().map(|c| CrateVersion {
                     num: c.num,
                     updated_at: c.updated_at,
                     created_at: c.created_at,
                     yanked: c.yanked,
                 }).collect();
-                Ok(RichCrate::new(origin.clone(), meta.owners, meta.meta.krate.name, versions))
+                Ok(RichCrate::new(origin.clone(), owners, meta.krate.name, versions))
             },
             Origin::GitHub { repo, package } => {
                 let host = RepoHost::GitHub(repo.clone()).try_into().map_err(|_| KitchenSinkErr::CrateNotFound(origin.clone())).context("ghrepo host bad")?;
@@ -540,26 +543,26 @@ impl KitchenSink {
         Ok(match origin {
             Origin::CratesIo(name) => {
                 let meta = self.crates_io_meta(name).await?;
-                meta.meta.krate.recent_downloads
+                meta.krate.recent_downloads
             },
             _ => None,
         })
     }
 
-    async fn crates_io_meta(&self, name: &str) -> CResult<CratesIoCrate> {
+    async fn crates_io_meta(&self, name: &str) -> CResult<CrateMetaFile> {
         let krate = tokio::task::block_in_place(|| {
             self.index.crates_io_crate_by_lowercase_name(name).context("rich_crate")
         })?;
         let latest_in_index = krate.latest_version().version(); // most recently published version
-        let meta = self.crates_io.krate(name, latest_in_index).await
+        let meta = self.crates_io.crate_meta(name, latest_in_index).await
             .with_context(|_| format!("crates.io meta for {} {}", name, latest_in_index))?;
         let mut meta = meta.ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?;
-        if !meta.meta.versions.iter().any(|v| v.num == latest_in_index) {
+        if !meta.versions.iter().any(|v| v.num == latest_in_index) {
             eprintln!("Crate data missing latest version {}@{}", name, latest_in_index);
-            meta = self.crates_io.krate(name, &format!("{}-try-again", latest_in_index)).await?
+            meta = self.crates_io.crate_meta(name, &format!("{}-try-again", latest_in_index)).await?
                 .ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?;
-            if !meta.meta.versions.iter().any(|v| v.num == latest_in_index) {
-                eprintln!("Error: crate data is borked {}@{}. Has only: {:?}", name, latest_in_index, meta.meta.versions.iter().map(|v| &v.num).collect::<Vec<_>>());
+            if !meta.versions.iter().any(|v| v.num == latest_in_index) {
+                eprintln!("Error: crate data is borked {}@{}. Has only: {:?}", name, latest_in_index, meta.versions.iter().map(|v| &v.num).collect::<Vec<_>>());
             }
         }
         Ok(meta)
@@ -660,7 +663,7 @@ impl KitchenSink {
         })?.await
     }
 
-    pub async fn tarball(&self, name: &str, ver: &str) -> CResult<Vec<u8>> {
+    async fn tarball(&self, name: &str, ver: &str) -> CResult<Vec<u8>> {
         let tarball = self.crates_io.crate_data(name, ver).await
             .context("crate_file")?
             .ok_or_else(|| KitchenSinkErr::DataNotFound(format!("{}-{}", name, ver)))?;
@@ -679,7 +682,7 @@ impl KitchenSink {
             self.tarball(name, ver),
             self.crates_io_meta(&name_lower));
 
-        let crates_io_meta = crates_io_meta?.meta.krate;
+        let crates_io_krate = crates_io_meta?.krate;
         let crate_tarball = crate_tarball?;
         let crate_compressed_size = crate_tarball.len();
         let mut meta = tokio::task::block_in_place(|| {
@@ -691,12 +694,12 @@ impl KitchenSink {
 
         // it may contain data from nowhere! https://github.com/rust-lang/crates.io/issues/1624
         if package.homepage.is_none() {
-            if let Some(repo) = crates_io_meta.homepage {
+            if let Some(repo) = crates_io_krate.homepage {
                 package.homepage = Some(repo);
             }
         }
         if package.documentation.is_none() {
-            if let Some(repo) = crates_io_meta.documentation {
+            if let Some(repo) = crates_io_krate.documentation {
                 package.documentation = Some(repo);
             }
         }
@@ -725,7 +728,7 @@ impl KitchenSink {
         if package.repository.is_none() {
             warnings.insert(Warning::NoRepositoryProperty);
             // it may contain data from nowhere! https://github.com/rust-lang/crates.io/issues/1624
-            if let Some(repo) = crates_io_meta.repository {
+            if let Some(repo) = crates_io_krate.repository {
                 package.repository = Some(repo);
             } else {
                 if package.homepage.as_ref().map_or(false, |h| Repo::looks_like_repo_url(h)) {
@@ -1502,7 +1505,7 @@ impl KitchenSink {
 
     /// Merge authors, owners, contributors
     pub async fn all_contributors<'a>(&self, krate: &'a RichCrateVersion) -> CResult<(Vec<CrateAuthor<'a>>, Vec<CrateAuthor<'a>>, bool, usize)> {
-        let owners = self.crate_owners(krate).await?;
+        let owners = self.crate_owners(krate.origin()).await?;
 
         let (hit_max_contributor_count, mut contributors_by_login) = match krate.repository().as_ref() {
             // Only get contributors from github if the crate has been found in the repo,
@@ -1717,13 +1720,13 @@ impl KitchenSink {
         Err(KitchenSinkErr::OwnerWithoutLogin)?
     }
 
-    async fn crate_owners(&self, krate: &RichCrateVersion) -> CResult<Vec<CrateOwner>> {
-        match krate.origin() {
+    async fn crate_owners(&self, origin: &Origin) -> CResult<Vec<CrateOwner>> {
+        match origin {
             Origin::CratesIo(name) => {
-                if let Some(o) = self.crates_io_owners_cache.get(krate.name())? {
+                if let Some(o) = self.crates_io_owners_cache.get(name)? {
                     return Ok(o);
                 }
-                self.crates_io_crate_owners(name, krate.version()).await
+                Ok(self.crates_io.crate_owners(name, "fallback").await?.unwrap_or_default())
             },
             Origin::GitLab {..} => Ok(vec![]),
             Origin::GitHub {repo, ..} => Ok(vec![
@@ -1743,10 +1746,6 @@ impl KitchenSink {
                 }
             ]),
         }
-    }
-
-    pub async fn crates_io_crate_owners(&self, crate_name: &str, version: &str) -> CResult<Vec<CrateOwner>> {
-        Ok(self.crates_io.crate_owners(crate_name, version).await.context("crate_owners")?.unwrap_or_default())
     }
 
     pub fn set_crates_io_crate_owners(&self, crate_name: &str, owners: Vec<CrateOwner>) -> Result<(), ()> {
@@ -1803,7 +1802,7 @@ impl KitchenSink {
             if c.is_yanked() {
                 return None;
             }
-            Some((o, score, self.crate_owners(&c).await.unwrap_or_default(), c.keywords().to_owned()))
+            Some((o, score, self.crate_owners(c.origin()).await.unwrap_or_default(), c.keywords().to_owned()))
         })
         .collect::<Vec<_>>().await;
 

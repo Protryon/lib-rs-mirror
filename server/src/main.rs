@@ -601,7 +601,7 @@ fn is_alnum_dot(q: &str) -> bool {
 }
 
 async fn handle_search(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
-    let qs = req.query_string().replace('+',"%2b");
+    let qs = req.query_string().replace('+',"%20");
     let qs = qstring::QString::from(qs.as_str());
     match qs.get("q").unwrap_or("") {
         q if !q.trim_start().is_empty() => {

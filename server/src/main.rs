@@ -124,7 +124,7 @@ async fn run_server() -> Result<(), failure::Error> {
         let start_time = start_time.clone();
         let timestamp = timestamp.clone();
         async move {
-            state.crates.load().prewarm();
+            state.crates.load().prewarm().await;
             loop {
                 tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
                 let elapsed = start_time.elapsed().as_secs() as u32;
@@ -137,7 +137,7 @@ async fn run_server() -> Result<(), failure::Error> {
                             let k = Arc::new(k);
                             k.update();
                             state.crates.store(k);
-                            state.crates.load().prewarm();
+                            state.crates.load().prewarm().await
                         },
                         Err(e) => {
                             eprintln!("Refresh failed: {}", e);
@@ -292,7 +292,6 @@ fn render_404_page(state: &AServerState, path: &str) -> Result<HttpResponse, fai
 async fn handle_category(req: HttpRequest, cat: &'static Category) -> Result<HttpResponse, failure::Error> {
     let state: &AServerState = req.app_data().expect("appdata");
     let crates = state.crates.load();
-    crates.prewarm();
     let cache_file = state.page_cache_dir.join(format!("_{}.html", cat.slug));
     Ok(serve_cached(with_file_cache(state, cache_file, 1800, {
         let state = state.clone();
@@ -317,7 +316,6 @@ async fn handle_home(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
         let state = state.clone();
         run_timeout(300, async move {
             let crates = state.crates.load();
-            crates.prewarm();
             let mut page: Vec<u8> = Vec::with_capacity(50000);
             front_end::render_homepage(&mut page, &crates).await?;
             Ok::<_, failure::Error>((page, None))
@@ -511,7 +509,6 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
 fn render_crate_page(state: AServerState, origin: Origin) -> impl Future<Output = Result<(Vec<u8>, Option<DateTime<FixedOffset>>), failure::Error>> + 'static {
     run_timeout(30, async move {
         let crates = state.crates.load();
-        crates.prewarm();
         let (all, ver) = futures::try_join!(crates.rich_crate_async(&origin), crates.rich_crate_version_async(&origin))?;
         let mut page: Vec<u8> = Vec::with_capacity(50000);
         let last_mod = front_end::render_crate_page(&mut page, &all, &ver, &crates, &state.markup).await?;
@@ -523,7 +520,6 @@ async fn render_crate_reverse_dependencies(state: AServerState, origin: Origin) 
     let s = state.clone();
     rt_run_timeout(&s.rt, 30, async move {
         let crates = state.crates.load();
-        crates.prewarm();
         let ver = crates.rich_crate_version_async(&origin).await?;
         let mut page: Vec<u8> = Vec::with_capacity(50000);
         front_end::render_crate_reverse_dependencies(&mut page, &ver, &crates, &state.markup).await?;
@@ -639,7 +635,6 @@ async fn handle_feed(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
     let state2 = state.clone();
     let page = rt_run_timeout(&state.rt, 60, async move {
         let crates = state2.crates.load();
-        crates.prewarm();
         let mut page: Vec<u8> = Vec::with_capacity(50000);
         front_end::render_feed(&mut page, &crates).await?;
         Ok::<_, failure::Error>(page)

@@ -166,6 +166,7 @@ pub struct KitchenSink {
     yearly: AllDownloads,
     category_overrides: HashMap<String, Vec<Cow<'static, str>>>,
     crates_io_owners_cache: TempCache<Vec<CrateOwner>>,
+    throttle: tokio::sync::Semaphore,
 }
 
 impl KitchenSink {
@@ -207,6 +208,7 @@ impl KitchenSink {
             main_cache_dir,
             category_overrides: Self::load_category_overrides(&data_path.join("category_overrides.txt"))?,
             crates_io_owners_cache: TempCache::new(&data_path.join("cio-owners.tmp"))?,
+            throttle: tokio::sync::Semaphore::new(40),
         })
         })
     }
@@ -485,6 +487,7 @@ impl KitchenSink {
         if !versions.is_empty() {
             return Ok(versions);
         }
+        let _f = self.throttle.acquire().await;
         eprintln!("Need to scan repo {:?}", repo);
         tokio::task::block_in_place(|| {
             let checkout = crate_git_checkout::checkout(repo, &self.git_checkout_path)?;
@@ -625,6 +628,7 @@ impl KitchenSink {
             _ => unreachable!()
         };
 
+        let _f = self.throttle.acquire().await;
         tokio::task::block_in_place(|| {
             let checkout = crate_git_checkout::checkout(&repo, &self.git_checkout_path)?;
             let (path_in_repo, tree_id, manifest) = crate_git_checkout::path_in_repo(&checkout, package)?
@@ -671,6 +675,8 @@ impl KitchenSink {
     }
 
     async fn rich_crate_version_data_from_crates_io(&self, latest: &crates_index::Version) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
+        let _f = self.throttle.acquire().await;
+
         let mut warnings = HashSet::new();
 
         let name = latest.name();
@@ -1336,6 +1342,7 @@ impl KitchenSink {
     }
 
     pub async fn index_repo(&self, repo: &Repo, as_of_version: &str) -> CResult<()> {
+        let _f = self.throttle.acquire().await;
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
         let url = repo.canonical_git_url();
         let (checkout, manif) = tokio::task::block_in_place(|| {

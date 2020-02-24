@@ -16,7 +16,7 @@
 
     <style>@props.critical_css()</style>
     @if let Some(l) = props.local_css_data() {<style>@l</style>}
-    <link rel=stylesheet href="/index.css?re" crossorigin="anonymous">
+    <link rel=stylesheet href="/index.css" crossorigin="anonymous">
 
     @if props.noindex {
       <meta name="robots" content="noindex, follow">

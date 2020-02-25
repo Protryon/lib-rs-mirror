@@ -46,10 +46,13 @@ buffered-reader: rust-patterns
 c2rust-ast-exporter : value-formatting, encoding
 cage  : development-tools, command-line-utilities
 calx: os::macos-apis, multimedia::audio
+capstone-sys : development-tools::debugging
+capstone3: development-tools::debugging
 captcha: web-programming
 cargo-xbuild : development-tools::build-tools, development-tools::cargo-plugins
 celery-rs-core : asynchronous
 celery: asynchronous
+checkm: science, parser-implementations
 chillup: web-programming
 click: development-tools
 codec-impl: cryptography::cryptocurrencies
@@ -64,6 +67,7 @@ core-text: os::macos-apis
 core-video-sys: os::macos-apis
 coreaudio-sys: os::macos-apis, multimedia::audio
 coremidi: os::macos-apis, multimedia::audio
+coverm: science
 cox: web-programming
 crate-race: development-tools::profiling
 crates_io_api: web-programming
@@ -138,6 +142,7 @@ futures-task: asynchronous
 g13-rs: hardware-support
 ga  : science::machine-learning, algorithms
 ga-v4-flattener: web-programming
+galah: science
 game-loop: game-engines
 gaviota-sys: game-engines
 gcnctrlusb: hardware-support, emulators
@@ -146,10 +151,12 @@ geckodriver: development-tools::testing
 genp: authentication
 geoplaces: science
 geos: science::math
+getch: os
 giphy: web-programming
 girage: cryptography, gui
 github-rs : web-programming
 glutin_cocoa: os::macos-apis
+graphcore: data-structures
 grin-miner: cryptography::cryptocurrencies
 grin: cryptography::cryptocurrencies
 grin_api: cryptography::cryptocurrencies
@@ -180,6 +187,8 @@ image-capture-core : os::macos-apis
 imdb-index: web-programming
 imdb: web-programming
 impl-codec: cryptography::cryptocurrencies
+indradb : database-implementations
+indradb-lib : database-implementations
 indy-sys  :cryptography::cryptocurrencies
 infer: filesystem
 inheritance: rust-patterns
@@ -219,6 +228,7 @@ kf-protocol : asynchronous, network-programming
 kf-protocol-transport: asynchronous, network-programming
 kf-socket: network-programming
 kodict: internationalization
+krates: visualization
 ktmpl : configuration
 kube: development-tools
 kurbo: science::math, rendering::graphics-api
@@ -314,6 +324,7 @@ pq-sys: database
 preftool-env : config
 prometheus_wireguard_exporter: network-programming
 psyche-core : science::machine-learning
+qeda: command-line-utilities
 quaternion_averager: science::math
 quicksort: algorithms
 quoted_printable: parser-implementations
@@ -329,11 +340,14 @@ redisearch_api : databases
 rendy-memory: memory-management
 ressa: parser-implementations
 retrosheet: parser-implementations
+retworkx: data-structures
 rfind_url: parser-implementations
+rgraph: concurrency
 ritual_build  : development-tools, command-line-utilities
 riven: games
 rmatrix: command-line-utilities
 rnix: parser-implementations
+roadmap: data-structures
 roads-from-nd  : multimedia::images
 robinhood: web-programming
 romy-core: game-engines
@@ -406,9 +420,11 @@ thrift_codec : encoding, web-programming
 trackable: development-tools::debugging
 trashmap: data-structures
 trompt : authentication, command-line-interface
+trousers-sys : hardware-support
 truth: parser-implementations
 try-guard : rust-patterns
 try_from: rust-patterns
+tss-tspi : hardware-support
 tt-call : rust-patterns
 ttyaskpass: command-line-interface, authentication
 tw_pack_lib: games

@@ -157,7 +157,7 @@ lazy_static! {
         (Cond::Any(&["astronomy", "ephemeris", "planet", "chemistry", "astro", "electromagnetism"]), &[("science", 1.2, 0.2), ("rust-patterns", 0.5, 0.), ("concurrency", 0.7, 0.), ("command-line-utilities", 0.75, 0.)]),
         (Cond::Any(&["bioinformatics", "benzene", "chemical", "biological", "rna", "genotype", "genbank"]),
             &[("science", 1.2, 0.3), ("science::math", 0.6, 0.), ("visualization", 1.1, 0.), ("algorithms", 0.7, 0.), ("embedded", 0.7, 0.), ("asynchronous", 0.7, 0.), ("command-line-utilities", 0.8, 0.)]),
-        (Cond::Any(&["chemistry", "dep:bio", "sensory", "phenotype", "interactomics", "molecules", "transcriptomics"]),
+        (Cond::Any(&["chemistry", "dep:bio", "sensory", "phenotype", "interactomics", "genomics", "molecules", "transcriptomics"]),
             &[("science", 1.2, 0.3), ("science::math", 0.6, 0.), ("visualization", 1.1, 0.), ("rust-patterns", 0.5, 0.), ("algorithms", 0.7, 0.), ("config", 0.8, 0.), ("command-line-utilities", 0.7, 0.)]),
 
         (Cond::All(&["validation", "api"]), &[("email", 0.7, 0.), ("multimedia::encoding", 0.7, 0.)]),

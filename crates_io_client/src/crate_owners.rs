@@ -22,7 +22,7 @@ pub struct CrateOwner {
     pub id: usize,              // 362,
     pub login: String,          // "github:rust-bus:maintainers",
     pub kind: OwnerKind,        // "team" || "user"
-    pub url: String,            // "https://github.com/rust-bus",
+    pub url: Option<String>,            // "https://github.com/rust-bus",
     pub name: Option<String>,   // "maintainers",
     pub avatar: Option<String>, // "https://avatars1.githubusercontent.com/u/38887296?v=4"
 
@@ -39,13 +39,17 @@ pub struct CrateOwner {
 impl CrateOwner {
     pub fn name(&self) -> &str {
         match self.kind {
-            OwnerKind::User => self.name.as_ref().unwrap_or(&self.login),
+            OwnerKind::User => match &self.name.as_ref() {
+                Some(name) if !name.trim_start().is_empty() => name,
+                _ => &self.login,
+            },
             // teams get crappy names
             OwnerKind::Team => {
-                if self.url.starts_with("https://github.com/") {
-                    &self.url["https://github.com/".len()..]
-                } else {
-                    &self.login
+                match &self.url {
+                    Some(url) if url.starts_with("https://github.com/") => {
+                        &url["https://github.com/".len()..]
+                    },
+                    _ => self.login.trim_start_matches("github:")
                 }
             },
         }

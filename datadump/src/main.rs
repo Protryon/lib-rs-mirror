@@ -124,7 +124,7 @@ fn index_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users: &
                             github_id: u.github_id.try_into().ok(),
                             name: Some(u.name.to_owned()),
                             avatar: None,
-                            url: String::new(),
+                            url: None,
                             kind: OwnerKind::User,
                         }
                     },
@@ -138,7 +138,7 @@ fn index_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users: &
                             invited_by_github_id,
                             name: Some(u.name.to_owned()),
                             avatar: None,
-                            url: String::new(),
+                            url: None,
                             kind: OwnerKind::Team,
                         }
                     },

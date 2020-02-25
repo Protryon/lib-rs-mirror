@@ -8,9 +8,11 @@ alert-after: command-line-utilities
 alfred: development-tools, os::macos-apis
 algorust: algorithms
 allegro_primitives-sys: game-engines
+allegro_util: game-engines
 alphaid: encoding
 alphavantage: web-programming
 amath: parser-implementations
+anybar_rs: os::macos-apis
 approvals: development-tools::testing
 apt-cache: os::unix-apis
 aquaenv: os::macos-apis, command-line-utilities, gui
@@ -35,6 +37,7 @@ bitvector: data-structures
 blip_buf: multimedia::audio
 bloke: game-engines
 bnf: parsers
+bnf: parsers
 boxcars: parser-implementations
 brain: emulators
 bresenham: rendering::engine, algorithms
@@ -55,6 +58,7 @@ celery: asynchronous
 checkm: science, parser-implementations
 chillup: web-programming
 click: development-tools
+coap: network-programming
 codec-impl: cryptography::cryptocurrencies
 codenano: science
 collider: science::math, game-engines
@@ -69,6 +73,7 @@ coreaudio-sys: os::macos-apis, multimedia::audio
 coremidi: os::macos-apis, multimedia::audio
 coverm: science
 cox: web-programming
+cqc: simulation
 crate-race: development-tools::profiling
 crates_io_api: web-programming
 crossterm_style : command-line-interface
@@ -78,15 +83,21 @@ cute-dnd-dice: game-engines
 default-env: rust-patterns
 delegatemethod: rust-patterns
 deltae: multimedia
+deribit: web-programming
 derp: parser-implementations
 derpy: development-tools
+dia-args: command-line-interface
 diceware : command-line-utilities, authentication
 diceware-rs : command-line-utilities, authentication
 diesel: databases
 differential-geometry : science::math
 dmg: os::macos-apis, filesystem
 doublepivot-quicksort : algorithms
+doubter: development-tools::testing
+dwm-status : os, gui
+dynamic_reload: os, development-tools
 easyunits: rust-patterns
+eclectica: development-tools
 eetf: encoding
 elefren: web-programming
 endian-hasher : algorithms
@@ -114,18 +125,21 @@ failure: rust-patterns
 fakesite: web-programming
 fast-floats : rust-patterns
 fastdl: caching
+fddf: command-line-utilities, filesystem
 fdfast: filesystem
 fec : encoding
 ff: algorithms
 fin_data: value-formatting
 finality-grandpa  :cryptography::cryptocurrencies
 find-files: filesystem
+findomain: network-programming
 findomain: networking
 finite: science::math
 fitrs: parser-implementations
 fixed_width: parser-implementations
 flightmath: command-line-utilities, science
 float-ord : rust-patterns
+fluminurs: development-tools, web-programming
 follow: command-line-utilities
 ForceFeedback-sys : os::macos-apis,hardware-support
 foreignc_derive: development-tools::procedural-macro-helpers
@@ -147,8 +161,10 @@ game-loop: game-engines
 gaviota-sys: game-engines
 gcnctrlusb: hardware-support, emulators
 gdnative-video : game-engines, multimedia::video
+gdnative_bindings_generator: game-engines
 geckodriver: development-tools::testing
 genp: authentication
+genpass: authentication, command-line-utilities
 geoplaces: science
 geos: science::math
 getch: os
@@ -180,6 +196,7 @@ httpdate: date-and-time, parser-implementations
 hubcaps: web-programming
 hybrid-clocks : algorithms
 hyper-router : web-programming::http-server
+i3ipc : hardware-support
 iban_validate: parser-implementations
 ical: parser-implementations
 igdb-rs: games
@@ -206,6 +223,7 @@ iso639-1 : internationalization
 iso639_2: internationalization
 iso_currency : internationalization
 jeepers : science::machine-learning
+jokeyrhyme-dotfiles : development-tools
 json-tools: parser-implementations
 jsonapi: web-programming
 jsonpath_lib: parser-implementations
@@ -248,10 +266,12 @@ lightning :cryptography::cryptocurrencies
 line_drawing: game-engines, algorithms
 llvm-passgen : development-tools
 log_domain: science::math
+log_kv: database-implementations
 loop-rs  : command-line-utilities
 lsp-codec : asynchronous
 lttb: algorithms
 lux: game-engines
+lv2-urid-derive : development-tools::procedural-macro-helpers
 lw-webdriver : development-tools::testing
 macchanger: os, network-programming
 mach: os::macos-apis
@@ -261,11 +281,15 @@ makepad-widget: web-programming
 makepad: text-editors
 mamba: parser-implementations
 marionette: development-tools::testing
+markdust: text-processing
 matrix_bot_api: network-programming
+mdtoc: text-processing
 mediawiki: web-programming
 meson: development-tools::build-tools
 minidump-processor:development-tools::debugging
+minimad: text-processing, parser-implementations
 miniquad  : gui
+mlc: command-line-utilities, text-processing
 mnemonic : command-line-utilities, authentication
 mobi: parser-implementations
 moltenvk_deps: os::macos-apis, rendering::graphics-api
@@ -274,6 +298,7 @@ moonlander-gp : science::machine-learning
 mothra: command-line-utilities
 mqtt-codec: network-programming
 msql-srv: database
+multiboot2: os
 mxruntime-sys : os
 mxruntime: os
 myelin-geometry : science::math
@@ -283,8 +308,10 @@ naturalize: value-formatting
 nd : web-programming, command-line-utilities
 nd_lib  : web-programming
 ndless-static-vars: rust-patterns
+neli: network-programming, os::unix-apis
 neocom: emulators
 neon-sys: web-programming
+nessus: development-tools, network-programming
 netdevice: os, network-programming
 new-ordered-float: rust-patterns
 newrelic: development-tools
@@ -296,6 +323,7 @@ num_sys : value-formatting
 nv-xml : parser-implementations
 objc-encode : os::macos-apis, development-tools::ffi
 onig_sys: text-processing
+openldap: network-programming
 openni2: science::machine-learning
 openpol: games
 orgize: parser-implementations
@@ -332,6 +360,7 @@ qupla: cryptography::cryptocurrencies
 qwerty : command-line-utilities, authentication
 randnum: command-line-utilities
 randrust: web-programming::http-server
+raptorq: network-programming
 ratio: science::math
 rdkafka: asynchronous, network-programming
 readmouse: os::macos-apis
@@ -340,6 +369,7 @@ redisearch_api : databases
 rendy-memory: memory-management
 ressa: parser-implementations
 retrosheet: parser-implementations
+rettle: databases
 retworkx: data-structures
 rfind_url: parser-implementations
 rgraph: concurrency
@@ -350,6 +380,7 @@ rnix: parser-implementations
 roadmap: data-structures
 roads-from-nd  : multimedia::images
 robinhood: web-programming
+rocket-etag-if-none-match : web-programming::http-server
 romy-core: game-engines
 romy-wasmer: game-engines
 romy: game-engines
@@ -361,21 +392,26 @@ rqr : multimedia::images
 rsdb: database-implementations
 rubrail: os::macos-apis
 rusoto_credential: authentication
+rusp: network-programming
 rust_fixed_width: data-structures
 rustop-rs : command-line-utilities, os::unix-apis
 rustration: emulators
+rusty_sword_arena: game-engines
 rustydav: web-programming
 salad : command-line-utilities, authentication
 saml2aws-auto: authentication
 sample_planning  : science::machine-learning, algorithms
+scan4df: command-line-utilities, filesystem
 scoped-env: config
 scrapmetal: rust-patterns, algorithms
+seahorse: command-line-interface
 sekai: science
 semver-parser: parser-implementations
 serenium: development-tools::testing
 sgf-parser: parser-implementations
 shippai:rust-patterns
 sigv4: command-line-utilities, web-programming
+single_source: text-processing, command-line-utilities
 sip-codec : network-programming
 sitemap: parser-implementations
 smalltree: data-structures
@@ -405,19 +441,24 @@ swc_ecma_ast: parser-implementations
 swc_ecma_parser: parser-implementations
 swc_ecma_parser_macros: parser-implementations
 swears: command-line-interface
+symbolic-common  : development-tools::debugging
+symbolic-debuginfo : development-tools::debugging
 symbolic-minidump: development-tools::debugging
 symbolic: development-tools::debugging
 syncat-stylesheet: parser-implementations
 sys_util : os
 tagref : development-tools
 tarkov: games
+tcalc: command-line-utilities
 tdo-core :command-line-interface
 tealdeer: command-line-utilities
 telegram-client: web-programming
 telnetify: network-programming
 text_io: text-processing
 thrift_codec : encoding, web-programming
+tmux-thumbs: text-editors
 trackable: development-tools::debugging
+transit_model: filesystem
 trashmap: data-structures
 trompt : authentication, command-line-interface
 trousers-sys : hardware-support

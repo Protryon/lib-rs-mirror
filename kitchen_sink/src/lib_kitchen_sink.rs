@@ -427,7 +427,7 @@ impl KitchenSink {
                     CrateOwner {
                         id: 0,
                         avatar: o.avatar_url,
-                        url: o.html_url,
+                        url: Some(o.html_url),
                         login: o.login,
                         kind: OwnerKind::User, // FIXME: crates-io uses teams, and we'd need to find the right team? is "owners" a guaranteed thing?
                         name: o.name,
@@ -1577,7 +1577,7 @@ impl KitchenSink {
                             e.info = Some(Cow::Owned(Author{
                                 name: Some(owner.name().to_owned()),
                                 email: None,
-                                url: Some(owner.url.clone()),
+                                url: owner.url.clone(),
                             }));
                         }
                         if e.github.is_none() {
@@ -1595,7 +1595,7 @@ impl KitchenSink {
                             info: Some(Cow::Owned(Author{
                                 name: Some(owner.name().to_owned()),
                                 email: None,
-                                url: Some(owner.url.clone()),
+                                url: owner.url.clone(),
                             })),
                             nth_author: None,
                             owner: true,
@@ -1741,7 +1741,7 @@ impl KitchenSink {
                     id: 0,
                     avatar: None,
                     // FIXME: read from GH
-                    url: format!("https://github.com/{}", repo.owner),
+                    url: Some(format!("https://github.com/{}", repo.owner)),
                     // FIXME: read from GH
                     login: repo.owner.to_string(),
                     kind: OwnerKind::User, // FIXME: crates-io uses teams, and we'd need to find the right team? is "owners" a guaranteed thing?

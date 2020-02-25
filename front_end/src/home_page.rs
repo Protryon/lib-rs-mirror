@@ -220,6 +220,7 @@ impl<'a> HomePage<'a> {
             noindex: false,
             search_meta: true,
             critical_css_data: Some(include_str!("../../style/public/home.css")),
+            critical_css_dev_url: Some("/home.css"),
             ..Default::default()
         }
     }

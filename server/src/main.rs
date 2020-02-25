@@ -172,6 +172,7 @@ async fn run_server() -> Result<(), failure::Error> {
             .route("/", web::get().to(handle_home))
             .route("/search", web::get().to(handle_search))
             .route("/index", web::get().to(handle_search)) // old crates.rs/index url
+            .route("/new", web::get().to(handle_new_trending))
             .route("/keywords/{keyword}", web::get().to(handle_keyword))
             .route("/crates/{crate}", web::get().to(handle_crate))
             .route("/crates/{crate}/rev", web::get().to(handle_crate_reverse_dependencies))
@@ -451,6 +452,18 @@ async fn handle_crate_reverse_dependencies(req: HttpRequest) -> Result<HttpRespo
         return render_404_page(&state, &crate_name);
     }
     Ok(serve_cached(render_crate_reverse_dependencies(state.clone(), origin).await?))
+}
+
+async fn handle_new_trending(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
+    let state: &AServerState = req.app_data().expect("appdata");
+    Ok(serve_cached(with_file_cache(state, state.page_cache_dir.join("_new_.html"), 12*3600, {
+        let state = state.clone();
+        run_timeout(60, async move {
+            let crates = state.crates.load();
+            let mut page: Vec<u8> = Vec::with_capacity(50000);
+            front_end::render_trending_crates(&mut page, &crates).await?;
+            Ok::<_, failure::Error>((page, None))
+    })}).await?))
 }
 
 /// takes path to storage, freshness in seconds, and a function to call on cache miss

@@ -1,0 +1,35 @@
+@use crate::templates::base;
+@use crate::Page;
+@use kitchen_sink::RichCrateVersion;
+@use crate::Urler;
+@use std::sync::Arc;
+
+@(page: &Page, crates: &[Arc<RichCrateVersion>], url: &Urler)
+
+@:base(page, {
+    <header id="home">
+        <div class="inner-col" role="banner">
+            <h1><a href="/">Lib.rs</a></h1>
+            <p>Trending crates</p>
+            <form role="search" id=search method="get" action="/search">
+                <input autofocus placeholder="name, keywords, description" autocapitalize="off" autocorrect="off" autocomplete="off" tabindex="1" type=search name=q><button type=submit>Search</button>
+            </form>
+        </div>
+    </header>
+
+    <main>
+        <section id="trending">
+            <nav class="inner-col">
+                <ul>
+                    @for k in crates {
+                        <li><a href="@url.krate(&k)">@k.short_name()</a></li>
+                    }
+                </ul>
+            </nav>
+        </section>
+    </main>
+
+    <footer>
+        <div class="inner-col" role="contentinfo">
+        <p><a href="/about">About the site</a>. By <a href=https://kornel.ski>kornelski</a>. (<a href="https://gitlab.com/crates.rs?sort=stars_desc">Source code</a>). <a href="/atom.xml">Feed</a>. <a href="https://gitlab.com/crates.rs/crates.rs/issues/new">Feedback and feature requests</a> are welcome!</p></div></footer>
+})

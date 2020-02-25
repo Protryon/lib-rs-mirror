@@ -15,6 +15,7 @@ mod not_found_page;
 mod reverse_dependencies;
 mod search_page;
 mod urler;
+use futures::future::try_join_all;
 pub use crate::not_found_page::*;
 pub use crate::search_page::*;
 
@@ -33,7 +34,7 @@ use rich_crate::RichCrate;
 use rich_crate::RichCrateVersion;
 use semver::Version as SemVer;
 use std::borrow::Cow;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::io::Write;
 
 include!(concat!(env!("OUT_DIR"), "/templates.rs"));
@@ -169,6 +170,35 @@ pub async fn render_install_page(out: &mut impl Write, ver: &RichCrateVersion, k
 pub struct CompatRange {
     oldest_ok: SemVer,
     newest_bad: SemVer,
+}
+
+pub async fn render_trending_crates(out: &mut impl Write, kitchen_sink: &KitchenSink) -> Result<(), failure::Error> {
+    let (t1w, t4w) = tokio::task::block_in_place(|| {
+        kitchen_sink.trending_crates(50)
+    });
+    let urler = Urler::new(None);
+    let mut tmp = Vec::new();
+    let mut seen = HashSet::new();
+    for (k1, k2) in t1w.iter().zip(t4w.iter()) {
+        if seen.insert(k1) {
+            tmp.push(kitchen_sink.rich_crate_version_async(k1));
+        }
+        if seen.insert(k2) {
+            tmp.push(kitchen_sink.rich_crate_version_async(k2));
+        }
+    }
+    tmp.truncate(50);
+    let crates = try_join_all(tmp).await?;
+    templates::trending(out, &Page {
+        title: "New and trending crates".to_owned(),
+        description: Some("Rust packages that have been recently published or gained popularity. See what's new.".to_owned()),
+        noindex: false,
+        search_meta: true,
+        critical_css_data: Some(include_str!("../../style/public/home.css")),
+        critical_css_dev_url: Some("/home.css"),
+        ..Default::default()
+    }, &crates, &urler)?;
+    Ok(())
 }
 
 pub fn render_debug_page(out: &mut impl Write, ver: &RichCrateVersion, kitchen_sink: &KitchenSink) -> Result<(), failure::Error> {

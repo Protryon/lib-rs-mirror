@@ -39,6 +39,7 @@ pub use rich_crate::RichDep;
 pub use rich_crate::{Cfg, Target};
 pub use semver::Version as SemVer;
 
+use rayon::prelude::*;
 use crate::tarball::CrateFile;
 use cargo_toml::Manifest;
 use cargo_toml::Package;
@@ -296,6 +297,63 @@ impl KitchenSink {
             }
         }
         Ok(summed_days)
+    }
+
+    // Get top n crates-io crates with most sharply increasing downloads
+    // (last week, last month)
+    pub fn trending_crates(&self, top_n: usize) -> (Vec<Origin>, Vec<Origin>) {
+        let now = Utc::today();
+        let curr_year = now.year() as u16;
+        let day_of_year = now.ordinal0() as usize;
+        if day_of_year < 14 {
+            return (Vec::new(), Vec::new()); // December stats are useless anyway
+        }
+        let longerlen = (day_of_year/2).min(28);
+
+        fn average_nonzero(slice: &[u32]) -> f32 {
+            let mut sum = 0u32;
+            let mut n = 0u32;
+            for val in slice.iter().copied().filter(|&n| n > 0) {
+                sum += val;
+                n += 1;
+            }
+            sum as f32 / (n as f32)
+        }
+
+        let mut ratios = self.all_crates().par_bridge().filter_map(|origin| {
+            match &origin {
+                Origin::CratesIo(crate_name) => {
+                    let d = self.summed_year_downloads(crate_name, curr_year).ok()?;
+                    let prev_week_avg = average_nonzero(&d[day_of_year-14 .. day_of_year-7]);
+                    if prev_week_avg < 50. { // it's too easy to trend from zero downloads!
+                        return None;
+                    }
+
+                    let this_week_avg = average_nonzero(&d[day_of_year-7 .. day_of_year]);
+                    if prev_week_avg >= this_week_avg {
+                        return None;
+                    }
+
+                    let this_4w_avg = average_nonzero(&d[day_of_year-longerlen .. day_of_year]);
+                    let prev_4w_avg = average_nonzero(&d[day_of_year-longerlen*2 .. day_of_year-longerlen]);
+                    if prev_4w_avg >= this_4w_avg || prev_4w_avg >= prev_week_avg || prev_4w_avg >= this_week_avg {
+                        return None;
+                    }
+
+                    let ratio1 = (800. + this_week_avg) / (900. + prev_week_avg) * prev_week_avg.sqrt().min(10.);
+                    let ratio4 = (8000. + this_4w_avg) / (9000. + prev_4w_avg) * prev_4w_avg.sqrt().min(200.);
+
+                    Some((origin, ratio1, ratio4))
+                },
+                _ => None,
+            }
+        }).collect::<Vec<_>>();
+
+        ratios.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
+        let top_1w = ratios.iter().map(|(o, ..)| o).cloned().take(top_n).collect();
+        ratios.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(Ordering::Equal));
+        let top_4w = ratios.iter().map(|(o, ..)| o).cloned().take(top_n).collect();
+        (top_1w, top_4w)
     }
 
     // Monthly downloads, sampled from last few days or weeks

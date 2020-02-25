@@ -3,8 +3,9 @@
 @use kitchen_sink::RichCrateVersion;
 @use crate::Urler;
 @use std::sync::Arc;
+@use render_readme::Renderer;
 
-@(page: &Page, crates: &[Arc<RichCrateVersion>], url: &Urler)
+@(page: &Page, crates: &[Arc<RichCrateVersion>], url: &Urler, markup: &Renderer)
 
 @:base(page, {
     <header id="home">
@@ -17,15 +18,27 @@
         </div>
     </header>
 
-    <main>
-        <section id="trending">
-            <nav class="inner-col">
+    <main id="trending">
+        <section class="trending">
+            <div class="inner-col">
                 <ul>
-                    @for k in crates {
-                        <li><a href="@url.krate(&k)">@k.short_name()</a></li>
-                    }
+                    @:simple_list(crates, url, markup)
                 </ul>
-            </nav>
+            </div>
+        </section>
+        <section class="new">
+            <div class="inner-col">
+                <ul>
+                    @:simple_list(crates, url, markup)
+                </ul>
+            </div>
+        </section>
+        <section class="updated">
+            <div class="inner-col">
+                <ul>
+                    @:simple_list(crates, url, markup)
+                </ul>
+            </div>
         </section>
     </main>
 

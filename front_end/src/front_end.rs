@@ -172,19 +172,14 @@ pub struct CompatRange {
     newest_bad: SemVer,
 }
 
-pub async fn render_trending_crates(out: &mut impl Write, kitchen_sink: &KitchenSink) -> Result<(), failure::Error> {
-    let (t1w, t4w) = tokio::task::block_in_place(|| {
-        kitchen_sink.trending_crates(50)
-    });
+pub async fn render_trending_crates(out: &mut impl Write, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
+    let top = kitchen_sink.trending_crates(50).await;
     let urler = Urler::new(None);
     let mut tmp = Vec::new();
     let mut seen = HashSet::new();
-    for (k1, k2) in t1w.iter().zip(t4w.iter()) {
-        if seen.insert(k1) {
-            tmp.push(kitchen_sink.rich_crate_version_async(k1));
-        }
-        if seen.insert(k2) {
-            tmp.push(kitchen_sink.rich_crate_version_async(k2));
+    for (k, _) in top.iter() {
+        if seen.insert(k) {
+            tmp.push(kitchen_sink.rich_crate_version_async(k));
         }
     }
     tmp.truncate(50);
@@ -197,7 +192,7 @@ pub async fn render_trending_crates(out: &mut impl Write, kitchen_sink: &Kitchen
         critical_css_data: Some(include_str!("../../style/public/home.css")),
         critical_css_dev_url: Some("/home.css"),
         ..Default::default()
-    }, &crates, &urler)?;
+    }, &crates, &urler, renderer)?;
     Ok(())
 }
 
@@ -296,4 +291,9 @@ impl<S: AsRef<str>> MyAsStr for Option<S> {
 
 pub(crate) fn date_now() -> String {
     Utc::now().format("%Y-%m-%d").to_string()
+}
+
+/// Used to render descriptions
+pub(crate) fn render_markdown_str(s: &str, markup: &Renderer) -> templates::Html<String> {
+    templates::Html(markup.markdown_str(s, false, None))
 }

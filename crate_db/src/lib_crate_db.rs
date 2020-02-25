@@ -953,6 +953,13 @@ impl CrateDb {
         }).await
     }
 
+    pub async fn crate_rank(&self, origin: &Origin) -> FResult<f64> {
+        self.with_read("crate_rank", |conn| {
+            let mut query = conn.prepare_cached("SELECT ranking FROM crates WHERE origin = ?1)")?;
+            Ok(none_rows(query.query_row(&[&origin.to_str()], |row| row.get(0)))?.unwrap_or(0.))
+        }).await
+    }
+
     /// List of all notable crates
     /// Returns origin, rank, last updated unix timestamp
     pub async fn sitemap_crates(&self) -> FResult<Vec<(Origin, f64, i64)>> {

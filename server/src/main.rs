@@ -461,7 +461,7 @@ async fn handle_new_trending(req: HttpRequest) -> Result<HttpResponse, failure::
         run_timeout(60, async move {
             let crates = state.crates.load();
             let mut page: Vec<u8> = Vec::with_capacity(50000);
-            front_end::render_trending_crates(&mut page, &crates).await?;
+            front_end::render_trending_crates(&mut page, &crates, &state.markup).await?;
             Ok::<_, failure::Error>((page, None))
     })}).await?))
 }

@@ -300,60 +300,104 @@ impl KitchenSink {
     }
 
     // Get top n crates-io crates with most sharply increasing downloads
-    // (last week, last month)
-    pub fn trending_crates(&self, top_n: usize) -> (Vec<Origin>, Vec<Origin>) {
+    pub async fn trending_crates(&self, top_n: usize) -> Vec<(Origin, f64)> {
+        let mut top = tokio::task::block_in_place(|| {
+            self.trending_crates_raw(top_n)
+        });
+        let crates_present: HashSet<_> = top.iter().filter_map(|(o, _)| match o {
+                Origin::CratesIo(name) => Some(name.clone()),
+                _ => None,
+        }).collect();
+        if let Ok(stats) = self.index.deps_stats().await {
+            for (o, score) in &mut top {
+                match o {
+                    Origin::CratesIo(name) => {
+                        if let Some(s) = stats.counts.get(name) {
+                            // if it's a dependency of another top crate, its not trending, it's riding that crate
+                            if s.rev_dep_names.iter().any(|parent| crates_present.contains(parent)) {
+                                *score = 0.;
+                            } else {
+                                // it should be trending users, not just download hits
+                                *score *= (5 + s.direct.all()) as f64;
+                            }
+                        }
+                    },
+                    _ => {},
+                }
+            }
+
+            top.retain(|&(_, score)| score > 0.);
+        }
+
+        // apply some rank weight to downgrade spam, and pull main crates before their -sys or -derive
+        for (origin, score) in &mut top {
+            *score *= 0.5 + self.crate_db.crate_rank(origin).await.unwrap_or(0.);
+        }
+        top.sort_by(|a,b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
+
+        self.knock_duplicates(&mut top).await;
+        top.truncate(top_n);
+        top
+    }
+
+    // actually gives 2*top_n…
+    fn trending_crates_raw(&self, top_n: usize) -> Vec<(Origin, f64)> {
         let now = Utc::today();
         let curr_year = now.year() as u16;
         let day_of_year = now.ordinal0() as usize;
         if day_of_year < 14 {
-            return (Vec::new(), Vec::new()); // December stats are useless anyway
+            return Vec::new(); // December stats are useless anyway
         }
-        let longerlen = (day_of_year/2).min(28);
+        let shortlen = (day_of_year/2).min(14);
+        let longerlen = (day_of_year/2).min(6*7);
 
-        fn average_nonzero(slice: &[u32]) -> f32 {
+        fn average_nonzero(slice: &[u32], min_days: u32) -> f32 {
             let mut sum = 0u32;
             let mut n = 0u32;
             for val in slice.iter().copied().filter(|&n| n > 0) {
                 sum += val;
                 n += 1;
             }
-            sum as f32 / (n as f32)
+            sum as f32 / (n.max(min_days) as f32) // too few days are too noisy, and div/0
         }
 
         let mut ratios = self.all_crates().par_bridge().filter_map(|origin| {
             match &origin {
                 Origin::CratesIo(crate_name) => {
                     let d = self.summed_year_downloads(crate_name, curr_year).ok()?;
-                    let prev_week_avg = average_nonzero(&d[day_of_year-14 .. day_of_year-7]);
-                    if prev_week_avg < 50. { // it's too easy to trend from zero downloads!
+                    let prev_week_avg = average_nonzero(&d[day_of_year-shortlen*2 .. day_of_year-shortlen], 7);
+                    if prev_week_avg < 80. { // it's too easy to trend from zero downloads!
                         return None;
                     }
 
-                    let this_week_avg = average_nonzero(&d[day_of_year-7 .. day_of_year]);
+                    let this_week_avg = average_nonzero(&d[day_of_year-shortlen .. day_of_year], 8);
                     if prev_week_avg >= this_week_avg {
                         return None;
                     }
 
-                    let this_4w_avg = average_nonzero(&d[day_of_year-longerlen .. day_of_year]);
-                    let prev_4w_avg = average_nonzero(&d[day_of_year-longerlen*2 .. day_of_year-longerlen]);
+                    let prev_4w_avg = average_nonzero(&d[day_of_year-longerlen*2 .. day_of_year-longerlen], 7).max(average_nonzero(&d[.. day_of_year-longerlen*2], 7));
+                    let this_4w_avg = average_nonzero(&d[day_of_year-longerlen .. day_of_year], 14);
                     if prev_4w_avg >= this_4w_avg || prev_4w_avg >= prev_week_avg || prev_4w_avg >= this_week_avg {
                         return None;
                     }
 
                     let ratio1 = (800. + this_week_avg) / (900. + prev_week_avg) * prev_week_avg.sqrt().min(10.);
-                    let ratio4 = (8000. + this_4w_avg) / (9000. + prev_4w_avg) * prev_4w_avg.sqrt().min(200.);
+                    let ratio4 = (800. + this_4w_avg) / (900. + prev_4w_avg) * prev_4w_avg.sqrt().min(11.);
 
+                    // combine short term and long term trends
                     Some((origin, ratio1, ratio4))
                 },
                 _ => None,
             }
         }).collect::<Vec<_>>();
 
-        ratios.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
-        let top_1w = ratios.iter().map(|(o, ..)| o).cloned().take(top_n).collect();
-        ratios.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(Ordering::Equal));
-        let top_4w = ratios.iter().map(|(o, ..)| o).cloned().take(top_n).collect();
-        (top_1w, top_4w)
+        ratios.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(Ordering::Equal));
+        let len = ratios.len();
+        let mut top: Vec<_> = ratios.drain(len.saturating_sub(top_n)..).map(|(o, s, _)| (o, s as f64)).collect();
+        ratios.sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap_or(Ordering::Equal));
+        let len = ratios.len();
+        top.extend(ratios.drain(len.saturating_sub(top_n)..).map(|(o, _, s)| (o, s as f64)).take(top_n));
+        top
     }
 
     // Monthly downloads, sampled from last few days or weeks

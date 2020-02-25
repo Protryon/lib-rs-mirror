@@ -1,0 +1,22 @@
+@use crate::limit_text_len;
+@use crate::render_markdown_str;
+@use crate::Urler;
+@use kitchen_sink::RichCrateVersion;
+@use render_readme::Renderer;
+@use std::sync::Arc;
+
+@(crates: &[Arc<RichCrateVersion>], url: &Urler, markup: &Renderer)
+
+@for k in crates {
+    <li>
+        <a href="@url.krate(&k)">
+            <div class=h>
+                <h4>@if let Some((repo, _)) = k.origin().repo() {@repo.owner/}@k.short_name()</h4>
+                @if let Some(desc) = k.description() {
+                  <p class=desc>@render_markdown_str(&limit_text_len(desc, 100, 120), markup)</p>
+                }
+            </div>
+        </a>
+    </li>
+}
+

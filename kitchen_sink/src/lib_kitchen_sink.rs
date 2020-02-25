@@ -1982,17 +1982,24 @@ impl<'a> CrateAuthor<'a> {
     }
 }
 
-#[tokio::test]
-async fn is_build_or_dev_test() {
-    let c = KitchenSink::new_default().await.expect("uhg");
-    assert_eq!((false, false), c.is_build_or_dev(&Origin::from_crates_io_name("semver")).await.unwrap());
-    assert_eq!((false, true), c.is_build_or_dev(&Origin::from_crates_io_name("version-sync")).await.unwrap());
-    assert_eq!((true, false), c.is_build_or_dev(&Origin::from_crates_io_name("cc")).await.unwrap());
+#[test]
+fn is_build_or_dev_test() {
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(rt.spawn(async move {
+        let c = KitchenSink::new_default().await.expect("uhg");
+        assert_eq!((false, false), c.is_build_or_dev(&Origin::from_crates_io_name("semver")).await.unwrap());
+        assert_eq!((false, true), c.is_build_or_dev(&Origin::from_crates_io_name("version-sync")).await.unwrap());
+        assert_eq!((true, false), c.is_build_or_dev(&Origin::from_crates_io_name("cc")).await.unwrap());
+    })).unwrap();
 }
 
-#[tokio::test]
-async fn fetch_uppercase_name() {
-    let k = KitchenSink::new_default().await.expect("Test if configured");
-    let _ = k.rich_crate_async(&Origin::from_crates_io_name("Inflector")).await.unwrap();
-    let _ = k.rich_crate_async(&Origin::from_crates_io_name("inflector")).await.unwrap();
+#[test]
+fn fetch_uppercase_name() {
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(rt.spawn(async move {
+        let k = KitchenSink::new_default().await.expect("Test if configured");
+        let _ = k.rich_crate_async(&Origin::from_crates_io_name("Inflector")).await.unwrap();
+        let _ = k.rich_crate_async(&Origin::from_crates_io_name("inflector")).await.unwrap();
+    })).unwrap();
 }
+

@@ -352,7 +352,7 @@ async fn handle_git_crate(req: HttpRequest, slug: &'static str) -> Result<HttpRe
     let repo = inf.query("repo");
     let crate_name = inf.query("crate");
     println!("{} crate {}/{}/{}", slug, owner, repo, crate_name);
-    if !is_alnum(&owner) || !is_alnum_dot(&repo) || !is_alnum(&crate_name) {
+    if !is_alnum_dot(&owner) || !is_alnum_dot(&repo) || !is_alnum(&crate_name) {
         return render_404_page(state, &crate_name);
     }
 
@@ -589,15 +589,15 @@ fn serve_cached((page, cache_time, refresh, last_modified): (Vec<u8>, u32, bool,
 }
 
 fn is_alnum(q: &str) -> bool {
-    q.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    q.as_bytes().iter().copied().all(|c| c.is_ascii_alphanumeric() || c == b'_' || c == b'-')
 }
 
 fn is_alnum_dot(q: &str) -> bool {
-    let mut chars = q.chars();
-    if !chars.next().map_or(false, |first| first.is_ascii_alphanumeric() || first == '_') {
+    let mut chars = q.as_bytes().iter().copied();
+    if !chars.next().map_or(false, |first| first.is_ascii_alphanumeric() || first == b'_') {
         return false;
     }
-    chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.')
+    chars.all(|c| c.is_ascii_alphanumeric() || c == b'_' || c == b'-' || c == b'.')
 }
 
 async fn handle_search(req: HttpRequest) -> Result<HttpResponse, failure::Error> {

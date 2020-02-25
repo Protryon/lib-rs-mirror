@@ -333,7 +333,7 @@ async fn handle_home(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
             let crates = state.crates.load();
             let mut page: Vec<u8> = Vec::with_capacity(50000);
             front_end::render_homepage(&mut page, &crates).await?;
-            Ok::<_, failure::Error>((page, Some(Utc::now())))
+            Ok::<_, failure::Error>((page, Some(Utc::now().into())))
         })
     }).await?))
 }

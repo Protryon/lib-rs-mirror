@@ -400,6 +400,9 @@ github:zacstewart/comm/comm
 github:zesterer/atto/atto
 github:zonyitoo/coio-rs/coio
 gitlab:bartmassey/woodpieces/woodpieces
+gitlab:crates.rs/crates.rs/crates-server
+gitlab:crates.rs/crates.rs/kitchen_sink
+gitlab:crates.rs/render_readme/render_readme
 gitlab:derrickcope/rustbar/rustbar
 gitlab:edsu-org/rust/edsu-client
 gitlab:edsu-org/rust/edsu-server

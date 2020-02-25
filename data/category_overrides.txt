@@ -1,3 +1,5 @@
+meson: development-tools::build-tools
+cargo-xbuild : development-tools::build-tools, development-tools::cargo-plugins
 acm: science::math
 afterburn: web-programming
 afterparty-ng : web-programming::http-server
@@ -7,6 +9,7 @@ alass-core : algorithms
 alert-after: command-line-utilities
 alfred: development-tools, os::macos-apis
 algorust: algorithms
+llvm-passgen : development-tools
 allegro_primitives-sys: game-engines
 alphaid: encoding
 alphavantage: web-programming

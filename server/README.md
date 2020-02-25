@@ -1,3 +1,3 @@
-# Dynamic pages of crates.rs
+# Dynamic pages of lib.rs
 
-This is a part of the [crates.rs project](https://gitlab.com/crates.rs/crates.rs).
+This is an actix server that generates pages for the [lib.rs website](https://gitlab.com/crates.rs/crates.rs).

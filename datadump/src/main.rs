@@ -22,6 +22,8 @@ async fn main() -> Result<(), BoxErr> {
     let mut a = Archive::new(Decoder::new(BufReader::new(File::open("db-dump.tar.gz")?))?);
     let ksink = KitchenSink::new_default().await?;
 
+    tokio::task::block_in_place(move || {
+
     let mut crate_owners = None;
     let mut crates = None;
     let mut metadata = None;
@@ -83,6 +85,7 @@ async fn main() -> Result<(), BoxErr> {
         }
     }
     Ok(())
+    })
     }).await.unwrap()
 }
 

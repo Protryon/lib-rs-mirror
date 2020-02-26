@@ -594,8 +594,13 @@ fn serve_cached((page, cache_time, refresh, last_modified): (Vec<u8>, u32, bool,
     let err_max = (cache_time * 10).max(3600 * 24 * 2);
     HttpResponse::Ok()
         .content_type("text/html;charset=UTF-8")
-        .header("Cache-Control", format!("public, max-age={}, stale-while-revalidate={}, stale-if-error={}", cache_time, cache_time*3, err_max))
-        .if_true(refresh, |h| {h.header("Refresh", "5");})
+        .if_true(!refresh, |h| {
+            h.header("Cache-Control", format!("public, max-age={}, stale-while-revalidate={}, stale-if-error={}", cache_time, cache_time*3, err_max));
+        })
+        .if_true(refresh, |h| {
+            h.header("Refresh", "5");
+            h.header("Cache-Control", format!("public, max-age={}, must-revalidate", cache_time));
+        })
         .if_some(last_modified, |l, h| {h.header("Last-Modified", l.to_rfc2822());})
         .content_length(page.len() as u64)
         .body(page)

@@ -456,7 +456,7 @@ async fn handle_crate_reverse_dependencies(req: HttpRequest) -> Result<HttpRespo
 
 async fn handle_new_trending(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
     let state: &AServerState = req.app_data().expect("appdata");
-    Ok(serve_cached(with_file_cache(state, state.page_cache_dir.join("_new_.html"), 12*3600, {
+    Ok(serve_cached(with_file_cache(state, state.page_cache_dir.join("_new_.html"), 3*3600, {
         let state = state.clone();
         run_timeout(60, async move {
             let crates = state.crates.load();

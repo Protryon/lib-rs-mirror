@@ -207,6 +207,8 @@ grin_core: cryptography::cryptocurrencies
 grin_keychain: cryptography::cryptocurrencies
 grin_store: cryptography::cryptocurrencies
 grin_wallet_impls: cryptography::cryptocurrencies
+gtfs-structures : parser-implementations
+gtrans: command-line-utilities, internationalization
 hash-db : rust-patterns, databases, no-std
 hash256-std-hasher : rust-patterns, no-std
 hdwallet-bitcoin: cryptography::cryptocurrencies
@@ -363,7 +365,9 @@ newrelic: development-tools
 newrelic_plugin: web-programming
 nite2-sys: science::machine-learning
 nokiahealth: databases
+nordselect: network-programming, command-line-utilities
 notcurses: command-line-interface
+notif: gui
 nq: development-tools, command-line-utilities
 num_sys : value-formatting
 nv-xml : parser-implementations
@@ -393,6 +397,7 @@ pickpocket: web-programming
 pico-sys: web-programming
 pinentry: command-line-interface, authentication
 pkgman: os
+plagiarismbasic_lib: text-processing
 pngcrush: compression
 polygraph: database-implementations
 pomodoro: command-line-utilities
@@ -516,6 +521,7 @@ tdo-core :command-line-interface
 tealdeer: command-line-utilities
 telegram-client: web-programming
 telnetify: network-programming
+teloxide: web-programming
 tempus_fugit: development-tools::profiling
 termcodes: command-line-interface, no-std
 text_io: text-processing
@@ -545,6 +551,7 @@ ucd-trie: data-structures, text-processing
 ucd-util: text-processing
 urldecode: web-programming
 urlocator: parser-implementations
+usereport-rs : development-tools::profiling, command-line-utilities
 users: os::unix-apis
 vad: multimedia::audio
 validjson: encoding, command-line-utilities
@@ -572,4 +579,5 @@ xpc-connection: os::macos-apis
 yellowsun: cryptography::cryptocurrencies
 ymlctx: config
 yoga: gui
+yubirs: authentication
 zemeroth: games

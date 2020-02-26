@@ -1,6 +1,6 @@
 [package]
 name = "crates-server"
-version = "0.11.3"
+version = "0.12.0"
 authors = ["Kornel <kornel@geekhood.net>"]
 edition = "2018"
 description = "Crates.rs web server"
@@ -23,7 +23,7 @@ render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git", versio
 search_index = { path = "../search_index" }
 repo_url = { path = "../repo_url" }
 kitchen_sink = { path = "../kitchen_sink", version = "0.8" }
-front_end = { path = "../front_end", version = "0.3.4" }
+front_end = { path = "../front_end", version = "0.4" }
 urlencoding = "1.0.0"
 failure = "0.1.5"
 tokio = { version = "0.2.11", features = ["rt-threaded", "macros", "time"] }

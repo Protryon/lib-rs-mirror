@@ -1,48 +1,45 @@
+@use crate::templates::simple_list_html;
 @use crate::templates::base;
 @use crate::Page;
 @use kitchen_sink::RichCrateVersion;
+@use kitchen_sink::RichCrate;
 @use crate::Urler;
 @use std::sync::Arc;
 @use render_readme::Renderer;
 
-@(page: &Page, crates: &[Arc<RichCrateVersion>], url: &Urler, markup: &Renderer)
+@(page: &Page, trending: &[(Arc<RichCrateVersion>, RichCrate)], updated: &[(Arc<RichCrateVersion>, RichCrate)], url: &Urler, markup: &Renderer)
 
 @:base(page, {
     <header id="home">
         <div class="inner-col" role="banner">
-            <h1><a href="/">Lib.rs</a></h1>
-            <p>Trending crates</p>
+            <h1><a href="/">Lib.rs</a> › New</h1>
             <form role="search" id=search method="get" action="/search">
                 <input autofocus placeholder="name, keywords, description" autocapitalize="off" autocorrect="off" autocomplete="off" tabindex="1" type=search name=q><button type=submit>Search</button>
             </form>
+            <nav>
+                <ul><li><a href="/">Categories</a></li>
+                <li  class="active">New releases</li>
+            </ul></nav>
         </div>
     </header>
 
     <main id="trending">
-        <section class="trending">
-            <div class="inner-col">
-                <ul>
-                    @:simple_list(crates, url, markup)
-                </ul>
-            </div>
-        </section>
+        <div class="inner-col">
         <section class="new">
-            <div class="inner-col">
-                <ul>
-                    @:simple_list(crates, url, markup)
-                </ul>
-            </div>
+            <h3>New and updated</h3>
+            <ul>
+                @:simple_list_html(updated, url, markup, true)
+            </ul>
         </section>
-        <section class="updated">
-            <div class="inner-col">
-                <ul>
-                    @:simple_list(crates, url, markup)
-                </ul>
-            </div>
+        <section class="trending">
+            <h3>Trending</h3>
+            <ul>
+                @:simple_list_html(trending, url, markup, false)
+            </ul>
         </section>
     </main>
 
     <footer>
         <div class="inner-col" role="contentinfo">
-        <p><a href="/about">About the site</a>. By <a href=https://kornel.ski>kornelski</a>. (<a href="https://gitlab.com/crates.rs?sort=stars_desc">Source code</a>). <a href="/atom.xml">Feed</a>. <a href="https://gitlab.com/crates.rs/crates.rs/issues/new">Feedback and feature requests</a> are welcome!</p></div></footer>
+        <p><a href="/">All categories</a>. <a href="/about">About the site</a>. <a href="/atom.xml">Feed</a>. <a href="https://gitlab.com/crates.rs/crates.rs/issues/new">Feedback and feature requests</a> are welcome!</p> By <a href=https://kornel.ski>kornelski</a>.</div></footer>
 })

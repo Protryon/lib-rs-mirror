@@ -68,7 +68,7 @@ impl<'a> HomePage<'a> {
                 if let Ok(c) = self.crates.rich_crate_version_async(&c).await {
                     seen.insert(c.origin().to_owned());
                     cat.top.push(c);
-                    if n >= 3 {
+                    if n >= 2 {
                         break;
                     }
                     n += 1;
@@ -116,7 +116,7 @@ impl<'a> HomePage<'a> {
                     .iter()
                     .take(35)
                     .filter(|c| seen.get(c).is_none())
-                    .take(7)
+                    .take(8)
                     .cloned()
                     .collect();
 

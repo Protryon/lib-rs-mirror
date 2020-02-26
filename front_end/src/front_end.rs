@@ -173,17 +173,38 @@ pub struct CompatRange {
 }
 
 pub async fn render_trending_crates(out: &mut impl Write, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
-    let top = kitchen_sink.trending_crates(50).await;
-    let urler = Urler::new(None);
-    let mut tmp = Vec::new();
+    let (top, upd) = futures::join!(kitchen_sink.trending_crates(50), kitchen_sink.recently_updated_crates());
+    let upd = upd?;
+
     let mut seen = HashSet::new();
-    for (k, _) in top.iter() {
+    let mut tmp1 = Vec::with_capacity(upd.len());
+    for k in upd.iter() {
         if seen.insert(k) {
-            tmp.push(kitchen_sink.rich_crate_version_async(k));
+            let f1 = kitchen_sink.rich_crate_version_async(k);
+            let f2 = kitchen_sink.rich_crate_async(k);
+            tmp1.push(async move { futures::try_join!(f1, f2) });
         }
     }
-    tmp.truncate(50);
-    let crates = try_join_all(tmp).await?;
+    tmp1.truncate(50);
+
+    let mut tmp2 = Vec::with_capacity(top.len());
+    for (k, _) in top.iter() {
+        if seen.insert(k) {
+            let f1 = kitchen_sink.rich_crate_version_async(k);
+            let f2 = kitchen_sink.rich_crate_async(k);
+            tmp2.push(async move { futures::try_join!(f1, f2) });
+        }
+    }
+    tmp2.truncate(50);
+
+    let (mut updated, trending) = futures::try_join!(try_join_all(tmp1), try_join_all(tmp2))?;
+
+    // updated were sorted by rank…
+    updated.sort_by_cached_key(|(_, all)| {
+        std::cmp::Reverse(all.versions().iter().map(|v| &v.created_at).max().map(|v| v.to_string()))
+    });
+
+    let urler = Urler::new(None);
     templates::trending(out, &Page {
         title: "New and trending crates".to_owned(),
         description: Some("Rust packages that have been recently published or gained popularity. See what's new.".to_owned()),
@@ -192,7 +213,7 @@ pub async fn render_trending_crates(out: &mut impl Write, kitchen_sink: &Kitchen
         critical_css_data: Some(include_str!("../../style/public/home.css")),
         critical_css_dev_url: Some("/home.css"),
         ..Default::default()
-    }, &crates, &urler, renderer)?;
+    }, &trending, &updated, &urler, renderer)?;
     Ok(())
 }
 

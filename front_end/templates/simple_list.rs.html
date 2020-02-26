@@ -1,19 +1,39 @@
+@use chrono_humanize::HumanTime;
 @use crate::limit_text_len;
 @use crate::render_markdown_str;
+@use crate::templates::labels;
 @use crate::Urler;
+@use kitchen_sink::Origin;
+@use kitchen_sink::RichCrate;
 @use kitchen_sink::RichCrateVersion;
 @use render_readme::Renderer;
 @use std::sync::Arc;
 
-@(crates: &[Arc<RichCrateVersion>], url: &Urler, markup: &Renderer)
+@(crates: &[(Arc<RichCrateVersion>, RichCrate)], url: &Urler, markup: &Renderer, with_ver_and_date: bool)
 
-@for k in crates {
+@for (k, all) in crates {
     <li>
         <a href="@url.krate(&k)">
             <div class=h>
                 <h4>@if let Some((repo, _)) = k.origin().repo() {@repo.owner/}@k.short_name()</h4>
                 @if let Some(desc) = k.description() {
                   <p class=desc>@render_markdown_str(&limit_text_len(desc, 100, 120), markup)</p>
+                }
+            </div>
+            <div class=meta>
+                @if with_ver_and_date {
+                    <span class="version"><span>@if let Origin::GitHub{..} = k.origin() {GitHub } else {v}</span>@k.version()</span>
+                    @:labels(k, (false, false))
+                    @if let Some(at) = all.versions().iter().map(|v| &v.created_at).max() {
+                        @if let Ok(d) = chrono::DateTime::parse_from_rfc3339(at) {
+                            <span class=pubdate>@HumanTime::from(d)</span>
+                        }
+                    }
+                } else {
+                    @:labels(k, (false, false))
+                    @for k in k.keywords() {
+                        <span class=k><span>#</span>@k</span>
+                    }
                 }
             </div>
         </a>

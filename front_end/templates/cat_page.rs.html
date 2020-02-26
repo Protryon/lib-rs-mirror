@@ -18,19 +18,19 @@
                 <meta property="position" content="1">
               </span>
             </h1>
-            &rsaquo;
+            ›
             <span property="itemListElement" typeof="ListItem">
               <a href="/#home-categories" property="item" typeof="WebPage"><span property="name">Categories</span></a>
               <meta property="position" content="2">
             </span>
-            &rsaquo;
+            ›
             <span class="categories has-keywords">
             @for (i, subcat) in p.parent_categories().iter().enumerate() {
                 <span property="itemListElement" typeof="ListItem">
                   <a href="@url.category(subcat)" title="@subcat.short_description" property="item" typeof="WebPage"><span property="name">@subcat.name</span></a>
                   <meta property="position" content="@(i+3)">
                 </span>
-                &rsaquo;
+                ›
             }
             </span>
             <span class="keywords">
@@ -117,7 +117,7 @@
             @for (last, cat) in related.iter().identify_last() {
             @for (last, subcat) in cat.iter().identify_last() {
               <a href="@url.category(subcat)" title="@subcat.short_description">@subcat.name</a>
-              @if !last {&rsaquo;}
+              @if !last {›}
             }
             @if !last {|}
           }

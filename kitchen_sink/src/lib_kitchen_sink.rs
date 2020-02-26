@@ -318,7 +318,12 @@ impl KitchenSink {
                                 *score = 0.;
                             } else {
                                 // it should be trending users, not just download hits
-                                *score *= (5 + s.direct.all()) as f64;
+                                if s.direct.all() > 10 {
+                                    *score *= 1.1;
+                                }
+                                if s.direct.all() > 100 {
+                                    *score *= 1.1;
+                                }
                             }
                         }
                     },

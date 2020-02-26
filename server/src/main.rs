@@ -424,7 +424,7 @@ async fn handle_install(req: HttpRequest) -> Result<HttpResponse, failure::Error
         front_end::render_install_page(&mut page, &ver, &crates, &state.markup).await?;
         Ok::<_, failure::Error>((page, None))
     }).await?;
-    Ok(serve_cached((page, 3600, false, last_mod)))
+    Ok(serve_cached((page, 7200, false, last_mod)))
 }
 
 async fn handle_crate(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
@@ -456,7 +456,7 @@ async fn handle_crate_reverse_dependencies(req: HttpRequest) -> Result<HttpRespo
 
 async fn handle_new_trending(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
     let state: &AServerState = req.app_data().expect("appdata");
-    Ok(serve_cached(with_file_cache(state, state.page_cache_dir.join("_new_.html"), 3*3600, {
+    Ok(serve_cached(with_file_cache(state, state.page_cache_dir.join("_new_.html"), 3600, {
         let state = state.clone();
         run_timeout(60, async move {
             let crates = state.crates.load();
@@ -500,6 +500,7 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
                     if let Ok(_s) = state.background_job.try_acquire() {
                         match generate.await {
                             Ok((mut page, last_mod)) => {
+                                eprintln!("Done refresh of {}", cache_file.display());
                                 let timestamp = last_mod.map(|a| a.timestamp() as u32).unwrap_or(0);
                                 page.extend_from_slice(&timestamp.to_le_bytes()); // The worst data format :)
 
@@ -508,9 +509,11 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
                                 }
                             },
                             Err(e) => {
-                                eprintln!("Cache pre-warm: {}", e);
+                                eprintln!("Refresh err: {} {}", e, cache_file.display());
                             },
                         }
+                    } else {
+                        eprintln!("Skipped refresh of {}", cache_file.display());
                     }
                 }});
             }
@@ -599,7 +602,7 @@ fn serve_cached((page, cache_time, refresh, last_modified): (Vec<u8>, u32, bool,
         })
         .if_true(refresh, |h| {
             h.header("Refresh", "5");
-            h.header("Cache-Control", format!("public, max-age={}, must-revalidate", cache_time));
+            h.header("Cache-Control", "no-cache, s-maxage=4, must-revalidate");
         })
         .if_some(last_modified, |l, h| {h.header("Last-Modified", l.to_rfc2822());})
         .content_length(page.len() as u64)

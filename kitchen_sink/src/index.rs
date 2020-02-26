@@ -396,8 +396,13 @@ impl Index {
 
         let krate = self.crates_io_crate_by_lowercase_name(&crate_name.to_ascii_lowercase())?;
 
-        let matches_latest = Self::highest_crates_io_version(krate, true).version().parse().ok()
-            .map_or(false, |latest| requirement.matches(&latest));
+        fn matches(ver: &Version, req: &VersionReq) -> bool {
+            ver.version().parse().ok().map_or(false, |ver| req.matches(&ver))
+        }
+
+        let matches_latest = matches(Self::highest_crates_io_version(krate, true), requirement) ||
+            // or match latest unstable
+            matches(Self::highest_crates_io_version(krate, false), requirement);
 
         let stats = self.deps_stats().await?;
         let pop = stats.counts.get(crate_name)
@@ -405,7 +410,6 @@ impl Index {
             let mut matches = 0;
             let mut unmatches = 0;
             for (ver, count) in &stats.versions {
-
                 if requirement.matches(&ver.to_semver()) {
                     matches += count; // TODO: this should be (slighly) weighed by crate's popularity?
                 } else {

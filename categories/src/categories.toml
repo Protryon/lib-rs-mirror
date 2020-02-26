@@ -564,7 +564,7 @@ obvious-keywords = ["parser", "parsing", "parse", "file"]
 name = "Parser tooling"
 title = "Parser"
 description = """
-Low-level, file-format-independent libraries for writing or generating parsers.
+Utility libraries for writing or generating parsers for any file format.
 """
 short-description = """
 Low-level tools and parser generators."""

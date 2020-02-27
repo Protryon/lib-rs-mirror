@@ -107,7 +107,7 @@ impl DownloadsGraph {
                 let overdraw = 1; // mix with border for style
                 let left_tick = ((i as f32) * item_width).round() as usize;
                 let right_tick = (((i + 1) as f32) * item_width).round() as usize;
-                (left + left_tick, chart_y + chart_height - h, right_tick - left_tick, h + overdraw, color.clone(), label)
+                (left + left_tick, chart_y + chart_height - h, right_tick - left_tick, h + overdraw, color, label)
             })
             .collect()
     }

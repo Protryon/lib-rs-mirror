@@ -57,7 +57,7 @@ impl std::fmt::Display for GitError {
 impl Repo {
     /// Parse the given URL
     pub fn new(url: &str) -> GResult<Self> {
-        let url = Url::parse(url).map_err(|e| GitError::InvalidUrl(e))?;
+        let url = Url::parse(url).map_err(GitError::InvalidUrl)?;
         Ok(Repo {
             host: match (&url.host_str(), url.path_segments()) {
                 (Some("www.github.com"), Some(path)) |
@@ -227,7 +227,7 @@ impl RepoHost {
         match self {
             RepoHost::GitHub(SimpleRepo { ref owner, .. }) |
             RepoHost::BitBucket(SimpleRepo { ref owner, .. }) |
-            RepoHost::GitLab(SimpleRepo { ref owner, .. }) => return Some(owner),
+            RepoHost::GitLab(SimpleRepo { ref owner, .. }) => Some(owner),
             RepoHost::Other => None,
         }
     }
@@ -240,7 +240,7 @@ impl RepoHost {
         match self {
             RepoHost::GitHub(repo) |
             RepoHost::BitBucket(repo) |
-            RepoHost::GitLab(repo) => return Some(repo),
+            RepoHost::GitLab(repo) => Some(repo),
             RepoHost::Other => None,
         }
     }

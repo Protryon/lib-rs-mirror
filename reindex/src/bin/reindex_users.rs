@@ -71,7 +71,7 @@ async fn main() {
             }).map(drop));
         }
         if stopped() {return;}
-        let _ = waiting.collect::<()>().await;
+        waiting.collect::<()>().await;
         eprintln!("Finished sending");
         tx.send(None).unwrap();
         if stopped() {return;}

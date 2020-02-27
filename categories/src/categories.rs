@@ -132,11 +132,9 @@ impl Categories {
             let mut chars = s.chars().peekable();
             while let Some(cur) = chars.next() {
                 // look for a:b instead of a::b
-                if cur == ':' {
-                    if chars.peek().map_or(false, |&c| c == ':') {
-                        chars.next(); // OK, skip second ':'
-                        continue;
-                    }
+                if cur == ':' && chars.peek().map_or(false, |&c| c == ':') {
+                    chars.next(); // OK, skip second ':'
+                    continue;
                 }
                 if cur == '-' || cur.is_ascii_lowercase() || cur.is_ascii_digit() {
                     continue;
@@ -151,7 +149,7 @@ impl Categories {
                 return Some((depth, idx, slug.into()));
             }
             let depth = s.split("::").count();
-            Some((depth, idx, Cow::Borrowed(s.as_ref())))
+            Some((depth, idx, Cow::Borrowed(s)))
         })
         .filter(|(_, _, s)| {
             if CATEGORIES.from_slug(s).next().is_none() {

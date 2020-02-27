@@ -1094,7 +1094,7 @@ lazy_static! {
         (Cond::All(&["3d", "format"]), &[("rendering::data-formats", 1.3, 0.3), ("value-formatting", 0.5, 0.), ("filesystem", 0.7, 0.), ("development-tools::ffi", 0.8, 0.)]),
         (Cond::Any(&["2d", "3d", "sprite"]), &[("rendering::graphics-api", 1.11, 0.), ("data-structures", 1.1, 0.), ("rendering::data-formats", 1.2, 0.), ("rendering", 1.1, 0.), ("games", 0.8, 0.), ("multimedia::audio", 0.8, 0.), ("rendering::graphics-api", 1.1, 0.)]),
 
-    ].iter().map(|s|*s).collect();
+    ].iter().copied().collect();
 }
 
 /// Based on the set of keywords, adjust relevance of given categories
@@ -1127,7 +1127,7 @@ pub fn adjusted_relevance(mut candidates: HashMap<String, f64>, keywords: &HashS
 
     let min_category_match_threshold = min_category_match_threshold.max(max_score * 0.951);
 
-    let mut res: Vec<_> = candidates.clone().into_iter()
+    let mut res: Vec<_> = candidates.into_iter()
         .filter(|&(_, v)| v >= min_category_match_threshold)
         .filter(|&(ref k, _)| CATEGORIES.from_slug(k).next().is_some() /* FIXME: that checks top level only */)
         .take(max_num_categories)

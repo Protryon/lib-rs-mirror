@@ -76,7 +76,7 @@ impl Page {
     }
 
     pub fn local_css_data(&self) -> Option<templates::Html<&'static str>> {
-        self.local_css_data.map(|data| templates::Html(data))
+        self.local_css_data.map(templates::Html)
     }
 }
 
@@ -288,7 +288,7 @@ pub fn limit_text_len<'t>(text: &'t str, mut len_min: usize, mut len_max: usize)
     let mut cut = &text[..len_max];
     let optional = &cut[len_min..];
     if let Some(pos) = optional.find(&['.', ',', '!', '\n', '?', ')', ']'][..]).or_else(|| optional.find(' ')) {
-        cut = cut[..len_min + pos + 1].trim_end_matches(&['.', ',', '!', '\n', '?', ' '][..]);
+        cut = cut[..=len_min + pos].trim_end_matches(&['.', ',', '!', '\n', '?', ' '][..]);
     };
     return format!("{}…", cut).into();
 }

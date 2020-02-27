@@ -18,9 +18,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let docker_root = crates.main_cache_dir().join("docker");
     prepare_docker(&docker_root)?;
 
-    let filter = std::env::args().skip(1).next();
+    let filter = std::env::args().nth(1);
 
-    for (_, all) in crates.all_crates_io_crates() {
+    for all in crates.all_crates_io_crates().values() {
         if stopped() {
             break;
         }
@@ -38,7 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn analyze_crate(all: &CratesIndexCrate, db: &BuildDb, crates: &KitchenSink, docker_root: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let ref origin = Origin::from_crates_io_name(all.name());
+    let origin = &Origin::from_crates_io_name(all.name());
 
     let compat_info = db.get_compat(origin)?;
     // look for missing 1.24 tests (ignoring the "probably" ones that aren't authoritative)

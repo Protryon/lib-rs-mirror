@@ -97,15 +97,13 @@ impl SimpleCache {
     pub async fn get_cached(&self, key: (&str, &str), url: impl AsRef<str>) -> Result<Option<Vec<u8>>, Error> {
         Ok(if let Some(data) = self.get(key)? {
             Some(data)
+        } else if self.cache_only {
+            None
         } else {
-            if self.cache_only {
-                None
-            } else {
-                let _s = self.sem.acquire().await;
-                let data = Self::fetch(url.as_ref()).await?;
-                self.set(key, &data)?;
-                Some(data)
-            }
+            let _s = self.sem.acquire().await;
+            let data = Self::fetch(url.as_ref()).await?;
+            self.set(key, &data)?;
+            Some(data)
         })
     }
 

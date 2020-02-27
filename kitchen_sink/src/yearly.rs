@@ -94,8 +94,8 @@ impl<'de> BigArray<'de> for [u32; 366]
                 where A: SeqAccess<'de>
             {
                 let mut arr = [u32::default(); 366];
-                for i in 0..366 {
-                    arr[i] = seq.next_element()?
+                for (i, a) in arr.iter_mut().enumerate() {
+                    *a = seq.next_element()?
                         .ok_or_else(|| Error::invalid_length(i, &self))?;
                 }
                 Ok(arr)

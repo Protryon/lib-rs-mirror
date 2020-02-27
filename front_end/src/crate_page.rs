@@ -837,7 +837,7 @@ impl<'a> CratePage<'a> {
                 main_crate_size.1 += uncompr_weighed;
 
                 for (&lang, val) in &crate_stats.langs {
-                    let e = main_lang_stats.langs.entry(lang).or_insert(Lines::default());
+                    let e = main_lang_stats.langs.entry(lang).or_insert_with(Lines::default);
                     e.code += (val.code as f32 * weight) as u32;
                     e.comments += (val.comments as f32 * weight) as u32;
                 }
@@ -863,7 +863,7 @@ impl<'a> CratePage<'a> {
 
     async fn get_crate_of_dependency(&self, name: &str, _semver: ()) -> CResult<Arc<RichCrateVersion>> {
         // FIXME: caching doesn't hold multiple versions, so fetchnig of precise old versions is super expensive
-        return self.kitchen_sink.rich_crate_version_async(&Origin::from_crates_io_name(name)).await;
+        self.kitchen_sink.rich_crate_version_async(&Origin::from_crates_io_name(name)).await
 
         // let krate = self.kitchen_sink.index.crate_by_name(&Origin::from_crates_io_name(name))?;
         // let ver = krate.versions()
@@ -875,7 +875,7 @@ impl<'a> CratePage<'a> {
 
     fn is_same_project(one: &RichCrateVersion, two: &RichCrateVersion) -> bool {
         match (one.repository(), two.repository()) {
-            (Some(a), Some(b)) if a.host == b.host => return true,
+            (Some(a), Some(b)) if a.host == b.host => true,
             _ => false,
         }
     }

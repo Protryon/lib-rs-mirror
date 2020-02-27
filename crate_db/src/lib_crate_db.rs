@@ -276,7 +276,7 @@ impl CrateDb {
 
             // replace ' ' with '-'
             // keep if 3 words or less
-            for (i, (w2, k)) in rake_keywords.into_iter().chain(keywords).take(25).enumerate() {
+            for (i, (w2, k)) in rake_keywords.chain(keywords).take(25).enumerate() {
                 let w: f64 = w2 * 150. / (80 + i) as f64;
                 insert_keyword.add(&k, w, false);
             }

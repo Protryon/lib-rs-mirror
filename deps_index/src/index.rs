@@ -254,7 +254,7 @@ impl Index {
                     let mut t = enable.splitn(2, '/');
                     let dep_name = t.next().unwrap();
                     let enabled = to_enable.entry(dep_name.to_owned())
-                        .or_insert(FxHashSet::default());
+                        .or_insert_with(FxHashSet::default);
                     if let Some(enable) = t.next() {
                         enabled.insert(enable);
                     }
@@ -340,7 +340,7 @@ impl Index {
                 .or_insert_with(|| (has_default_features, matched.clone(), semver, FxHashSet::default()));
             all_features.extend(features.iter().cloned());
             if let Some(s) = enable_dep_features {
-                all_features.extend(s.iter().map(|s| s.to_string()));
+                all_features.extend(s.iter().copied().map(|s| s.to_string()));
             }
         }
 

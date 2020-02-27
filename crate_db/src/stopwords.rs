@@ -143,5 +143,5 @@ lazy_static! {
         ("squatting", None), // spam
         ("malware", None), // spam
         ("unfinished", None), // spam
-    ].iter().map(|s|*s).collect();
+    ].iter().copied().collect();
 }

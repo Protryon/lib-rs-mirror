@@ -307,24 +307,21 @@ impl KitchenSink {
         }).collect();
         if let Ok(stats) = self.index.deps_stats().await {
             for (o, score) in &mut top {
-                match o {
-                    Origin::CratesIo(name) => {
-                        if let Some(s) = stats.counts.get(name) {
-                            // if it's a dependency of another top crate, its not trending, it's riding that crate
-                            if s.rev_dep_names.iter().any(|parent| crates_present.contains(parent)) {
-                                *score = 0.;
-                            } else {
-                                // it should be trending users, not just download hits
-                                if s.direct.all() > 10 {
-                                    *score *= 1.1;
-                                }
-                                if s.direct.all() > 100 {
-                                    *score *= 1.1;
-                                }
+                if let Origin::CratesIo(name) = o {
+                    if let Some(s) = stats.counts.get(name) {
+                        // if it's a dependency of another top crate, its not trending, it's riding that crate
+                        if s.rev_dep_names.iter().any(|parent| crates_present.contains(parent)) {
+                            *score = 0.;
+                        } else {
+                            // it should be trending users, not just download hits
+                            if s.direct.all() > 10 {
+                                *score *= 1.1;
+                            }
+                            if s.direct.all() > 100 {
+                                *score *= 1.1;
                             }
                         }
-                    },
-                    _ => {},
+                    }
                 }
             }
 
@@ -482,7 +479,7 @@ impl KitchenSink {
         let all = tokio::task::block_in_place(|| {
             self.index.crates_io_crates() // too slow to scan all GH crates
         });
-        let stream = futures::stream::iter(all.into_iter())
+        let stream = futures::stream::iter(all.iter())
             .filter_map(move |(name, _)| async move {
                 self.rich_crate_async(&Origin::from_crates_io_name(&*name)).await.map_err(|e| eprintln!("{}: {}", name, e)).ok()
             });
@@ -696,7 +693,7 @@ impl KitchenSink {
                 self.index_crate_highest_version(origin).await?;
                 match self.crate_db.rich_crate_version_data(origin).await {
                     Ok(v) => v,
-                    Err(e) => Err(e)?,
+                    Err(e) => return Err(e),
                 }
             },
         };
@@ -840,10 +837,8 @@ impl KitchenSink {
             // it may contain data from nowhere! https://github.com/rust-lang/crates.io/issues/1624
             if let Some(repo) = crates_io_krate.repository {
                 package.repository = Some(repo);
-            } else {
-                if package.homepage.as_ref().map_or(false, |h| Repo::looks_like_repo_url(h)) {
-                    package.repository = package.homepage.take();
-                }
+            } else if package.homepage.as_ref().map_or(false, |h| Repo::looks_like_repo_url(h)) {
+                package.repository = package.homepage.take();
             }
         }
 
@@ -953,7 +948,7 @@ impl KitchenSink {
             has_buildrs,
             has_code_of_conduct,
             readme: meta.readme,
-            lib_file: meta.lib_file.map(|s| s.into()),
+            lib_file: meta.lib_file,
             github_description,
             github_keywords,
             is_yanked,
@@ -1925,7 +1920,7 @@ impl KitchenSink {
         }
         let mut top_keywords: Vec<_> = top_keywords.into_iter().collect();
         top_keywords.sort_by(|a, b| b.1.cmp(&a.1));
-        let top_keywords: HashSet<_> = top_keywords.iter().take((top_keywords.len() / 10).min(10).max(2)).map(|(k, _)| k.to_string()).collect();
+        let top_keywords: HashSet<_> = top_keywords.iter().copied().take((top_keywords.len() / 10).min(10).max(2)).map(|(k, _)| k.to_string()).collect();
         eprintln!("top cat keywords {:?}", top_keywords);
 
         crates.clear();
@@ -2015,7 +2010,7 @@ impl KitchenSink {
             .as_ref()
             .ok_or(KitchenSinkErr::CategoryQueryFailed)
             .and_then(|h| {
-                h.get(slug).map(|&c| c).ok_or_else(|| {
+                h.get(slug).copied().ok_or_else(|| {
                     KitchenSinkErr::CategoryNotFound(slug.to_string())
                 })
             })

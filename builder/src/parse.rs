@@ -74,10 +74,8 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                         findings.crates.insert((None, name, ver, Compat::Incompatible));
                     } else if reason == "compiler-artifact" {
                         findings.crates.insert((None, name, ver, Compat::VerifiedWorks));
-                    } else {
-                        if level != "warning" && reason != "build-script-executed" && !(level == "" && reason == "compiler-message") {
-                            eprintln!("unknown line {} {} {}", level, reason, line);
-                        }
+                    } else if level != "warning" && reason != "build-script-executed" && !(level == "" && reason == "compiler-message") {
+                        eprintln!("unknown line {} {} {}", level, reason, line);
                     }
                 }
             } else {

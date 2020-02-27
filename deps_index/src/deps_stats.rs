@@ -1,5 +1,5 @@
 use crate::index::*;
-use crate::KitchenSinkErr;
+use crate::DepsErr;
 use parking_lot::Mutex;
 use rayon::prelude::*;
 use string_interner::Sym;
@@ -105,7 +105,7 @@ impl DepVisitor {
 }
 
 impl Index {
-    pub(crate) fn all_dependencies_flattened(&self, c: &impl ICrate) -> Result<DepInfMap, KitchenSinkErr> {
+    pub fn all_dependencies_flattened(&self, c: &impl ICrate) -> Result<DepInfMap, DepsErr> {
         let mut collected = FxHashMap::with_capacity_and_hasher(120, Default::default());
         let mut visitor = DepVisitor::new();
 
@@ -154,7 +154,7 @@ impl Index {
         Ok(converted)
     }
 
-    pub(crate) async fn get_deps_stats(&self) -> DepsStats {
+    pub async fn get_deps_stats(&self) -> DepsStats {
         let crates = self.crates_io_crates();
         let crates: Vec<(Box<str>, FxHashMap<_,_>)> = crates
         .par_iter()

@@ -3,23 +3,18 @@
 #[macro_use]
 extern crate serde_derive;
 
-mod index;
-pub use crate::index::*;
 use futures::stream::StreamExt;
 mod yearly;
 pub use crate::yearly::*;
-mod deps_stats;
-pub use crate::deps_stats::*;
+pub use deps_index::*;
 pub mod filter;
 
 mod ctrlcbreak;
-mod git_crates_index;
 mod tarball;
 pub use crate::ctrlcbreak::*;
 
 pub use crate_db::builddb::Compat;
 pub use crate_db::builddb::CompatibilityInfo;
-pub use crates_index::Crate as CratesIndexCrate;
 use crates_io_client::CrateMetaFile;
 pub use crates_io_client::CrateDepKind;
 pub use crates_io_client::CrateDependency;
@@ -140,6 +135,8 @@ pub enum KitchenSinkErr {
     GitIndexFile(PathBuf, String),
     #[fail(display = "Git crate '{:?}' can't be indexed, because it's not on the list", _0)]
     GitCrateNotAllowed(Origin),
+    #[fail(display = "Deps err: {}", _0)]
+    Deps(DepsErr),
 }
 
 #[derive(Debug, Clone)]
@@ -781,7 +778,7 @@ impl KitchenSink {
         Ok(tarball)
     }
 
-    async fn rich_crate_version_data_from_crates_io(&self, latest: &crates_index::Version) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
+    async fn rich_crate_version_data_from_crates_io(&self, latest: &CratesIndexVersion) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
         let _f = self.throttle.acquire().await;
 
         let mut warnings = HashSet::new();
@@ -1184,10 +1181,10 @@ impl KitchenSink {
     pub fn all_dependencies_flattened(&self, krate: &RichCrateVersion) -> Result<DepInfMap, KitchenSinkErr> {
         match krate.origin() {
             Origin::CratesIo(name) => {
-                self.index.all_dependencies_flattened(self.index.crates_io_crate_by_lowercase_name(name)?)
+                self.index.all_dependencies_flattened(self.index.crates_io_crate_by_lowercase_name(name).map_err(KitchenSinkErr::Deps)?).map_err(KitchenSinkErr::Deps)
             },
             _ => {
-                self.index.all_dependencies_flattened(krate)
+                self.index.all_dependencies_flattened(krate).map_err(KitchenSinkErr::Deps)
             }
         }
     }
@@ -1203,7 +1200,7 @@ impl KitchenSink {
 
     pub async fn crates_io_dependents_stats_of(&self, origin: &Origin) -> Result<Option<&RevDependencies>, KitchenSinkErr> {
         match origin {
-            Origin::CratesIo(crate_name) => Ok(self.index.deps_stats().await?.counts.get(crate_name)),
+            Origin::CratesIo(crate_name) => Ok(self.index.deps_stats().await.map_err(KitchenSinkErr::Deps)?.counts.get(crate_name)),
             _ => Ok(None),
         }
     }
@@ -1212,7 +1209,7 @@ impl KitchenSink {
     /// 0 = not used
     /// 1 = everyone uses it
     pub async fn version_popularity(&self, crate_name: &str, requirement: &VersionReq) -> Result<Option<(bool, f32)>, KitchenSinkErr> {
-        self.index.version_popularity(crate_name, requirement).await
+        self.index.version_popularity(crate_name, requirement).await.map_err(KitchenSinkErr::Deps)
     }
 
     /// "See also"
@@ -2110,3 +2107,12 @@ fn fetch_uppercase_name() {
     })).unwrap();
 }
 
+
+#[tokio::test]
+async fn index_test() {
+    let idx = Index::new(&KitchenSink::data_path().unwrap()).unwrap();
+    let stats = idx.deps_stats().await.unwrap();
+    assert!(stats.total > 13800);
+    let lode = stats.counts.get("lodepng").unwrap();
+    assert_eq!(12, lode.runtime.def);
+}

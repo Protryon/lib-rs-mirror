@@ -6,7 +6,7 @@ edition = "2018"
 default-run = "builder"
 
 [dependencies]
-kitchen_sink = { path = "../kitchen_sink", version = "0.8" }
+kitchen_sink = { path = "../kitchen_sink", version = "0.9" }
 rusqlite = "0.21.0"
 parking_lot = "0.10.0"
 chrono = "0.4.10"
@@ -18,5 +18,5 @@ scopeguard = "1.0.0"
 rand = "0.7.2"
 crate_db = { path = "../crate_db", version = "0.4.5" }
 lts = "0.1.5"
-crates-index = "0.13.4"
+crates-index = "0.14"
 tokio = { version = "0.2.11", features = ["rt-threaded", "macros"] }

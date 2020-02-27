@@ -1,7 +1,7 @@
 [package]
 edition = "2018"
 name = "kitchen_sink"
-version = "0.8.3"
+version = "0.9.0"
 authors = ["Kornel <kornel@geekhood.net>"]
 publish = false
 
@@ -10,8 +10,8 @@ name = "kitchen_sink"
 path = "src/lib_kitchen_sink.rs"
 
 [dependencies]
-crates-index = "0.13.3"
 crates_io_client = { path = "../crates_io_client" }
+deps_index = { path = "../deps_index" }
 docs_rs_client = { git = "https://gitlab.com/crates.rs/docs_rs_client.git", version = "0.4.0" }
 github_info = { path = "../github_info", version = "0.8.0" }
 crate_git_checkout = { git = "https://gitlab.com/crates.rs/crate_git_checkout.git", version = "0.4.3" }

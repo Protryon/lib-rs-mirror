@@ -1,7 +1,6 @@
 use crate::deps_stats::DepsStats;
 use crate::git_crates_index::*;
-use crate::KitchenSink;
-use crate::KitchenSinkErr;
+use crate::DepsErr;
 use crates_index;
 use crates_index::Crate;
 use crates_index::Dependency;
@@ -21,6 +20,7 @@ use string_interner::StringInterner;
 use string_interner::Sym;
 use std::time::Duration;
 use rayon::prelude::*;
+use serde_derive::*;
 
 type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 type FxHashSet<V> = std::collections::HashSet<V, ahash::RandomState>;
@@ -46,7 +46,7 @@ impl MiniVer {
     }
 }
 
-pub(crate) trait FeatureGetter {
+pub trait FeatureGetter {
     fn get(&self, key: &str) -> Option<&Vec<String>>;
 }
 impl FeatureGetter for std::collections::HashMap<String, Vec<String>> {
@@ -60,7 +60,7 @@ impl FeatureGetter for std::collections::BTreeMap<String, Vec<String>> {
     }
 }
 
-pub(crate) trait IVersion {
+pub trait IVersion {
     type Features: FeatureGetter;
     fn name(&self) -> &str;
     fn version(&self) -> &str;
@@ -78,7 +78,7 @@ impl IVersion for Version {
     fn is_yanked(&self) -> bool {self.is_yanked()}
 }
 
-pub(crate) trait ICrate {
+pub trait ICrate {
     type Ver: IVersion;
     fn latest_version_with_features(&self, all_optional: bool) -> (&Self::Ver, Box<[Box<str>]>);
 }
@@ -100,7 +100,7 @@ impl ICrate for Crate {
     }
 }
 
-pub(crate) enum Fudge<'a> {
+pub enum Fudge<'a> {
     CratesIo(&'a [Dependency]),
     Manifest((Vec<RichDep>, Vec<RichDep>, Vec<RichDep>)),
 }
@@ -128,20 +128,16 @@ impl ICrate for RichCrateVersion {
 
 pub struct Index {
     indexed_crates: FxHashMap<Box<str>, Crate>,
-    pub(crate) crates_io_index: crates_index::Index,
+    pub crates_io_index: crates_index::Index,
     git_index: GitIndex,
 
-    pub(crate) inter: RwLock<StringInterner<Sym>>,
-    pub(crate) cache: RwLock<FxHashMap<(Box<str>, Features), ArcDepSet>>,
+    pub inter: RwLock<StringInterner<Sym>>,
+    pub cache: RwLock<FxHashMap<(Box<str>, Features), ArcDepSet>>,
     deps_stats: DoubleCheckedCell<DepsStats>,
 }
 
 impl Index {
-    pub fn new_default() -> Result<Self, KitchenSinkErr> {
-        Self::new(&KitchenSink::data_path()?)
-    }
-
-    pub fn new(data_dir: &Path) -> Result<Self, KitchenSinkErr> {
+    pub fn new(data_dir: &Path) -> Result<Self, DepsErr> {
         let crates_io_index = crates_index::Index::new(data_dir.join("index"));
         let indexed_crates = crates_io_index.crate_index_paths().par_bridge()
                 .filter_map(|path| {
@@ -184,20 +180,20 @@ impl Index {
         self.git_index.crates().cloned().chain(self.crates_io_crates().keys().map(|n| Origin::from_crates_io_name(&n)))
     }
 
-    pub async fn deps_stats(&self) -> Result<&DepsStats, KitchenSinkErr> {
+    pub async fn deps_stats(&self) -> Result<&DepsStats, DepsErr> {
         Ok(tokio::time::timeout(Duration::from_secs(30), self.deps_stats.get_or_init(self.get_deps_stats())).await
-            .map_err(|_| KitchenSinkErr::DepsNotAvailable)?)
+            .map_err(|_| DepsErr::DepsNotAvailable)?)
     }
 
     #[inline]
-    pub fn crates_io_crate_by_lowercase_name(&self, name: &str) -> Result<&Crate, KitchenSinkErr> {
+    pub fn crates_io_crate_by_lowercase_name(&self, name: &str) -> Result<&Crate, DepsErr> {
         debug_assert_eq!(name, name.to_ascii_lowercase());
         self.crates_io_crates()
         .get(name)
-        .ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))
+        .ok_or_else(|| DepsErr::CrateNotFound(Origin::from_crates_io_name(name)))
     }
 
-    pub fn crate_highest_version(&self, name: &str, stable_only: bool) -> Result<&Version, KitchenSinkErr> {
+    pub fn crate_highest_version(&self, name: &str, stable_only: bool) -> Result<&Version, DepsErr> {
         debug_assert_eq!(name, name.to_ascii_lowercase());
         Ok(Self::highest_crates_io_version(self.crates_io_crate_by_lowercase_name(name)?, stable_only))
     }
@@ -215,12 +211,12 @@ impl Index {
             .unwrap_or_else(|| krate.latest_version()) // latest_version = most recently published version
     }
 
-    pub(crate) fn deps_of_crate(&self, krate: &impl ICrate, query: DepQuery) -> Result<Dep, KitchenSinkErr> {
+    pub fn deps_of_crate(&self, krate: &impl ICrate, query: DepQuery) -> Result<Dep, DepsErr> {
         let (latest, features) = krate.latest_version_with_features(query.all_optional);
         self.deps_of_crate_int(latest, features, query)
     }
 
-    fn deps_of_crate_int(&self, latest: &impl IVersion, features: Box<[Box<str>]>, DepQuery { default, all_optional, dev }: DepQuery) -> Result<Dep, KitchenSinkErr> {
+    fn deps_of_crate_int(&self, latest: &impl IVersion, features: Box<[Box<str>]>, DepQuery { default, all_optional, dev }: DepQuery) -> Result<Dep, DepsErr> {
         Ok(Dep {
             semver: semver_parse(latest.version()).into(),
             runtime: self.deps_of_ver(latest, Features {
@@ -240,7 +236,7 @@ impl Index {
         })
     }
 
-    pub(crate) fn deps_of_ver<'a>(&self, ver: &'a impl IVersion, wants: Features) -> Result<ArcDepSet, KitchenSinkErr> {
+    pub fn deps_of_ver<'a>(&self, ver: &'a impl IVersion, wants: Features) -> Result<ArcDepSet, DepsErr> {
         let key = (format!("{}-{}", ver.name(), ver.version()).into(), wants);
         if let Some(cached) = self.cache.read().get(&key) {
             return Ok(cached.clone());
@@ -314,7 +310,7 @@ impl Index {
                 continue;
             }
 
-            let req = VersionReq::parse(requirement).map_err(|_| KitchenSinkErr::SemverParsingError)?;
+            let req = VersionReq::parse(requirement).map_err(|_| DepsErr::SemverParsingError)?;
             let krate = match self.crates_io_crate_by_lowercase_name(&crate_name) {
                 Ok(k) => k,
                 Err(e) => {
@@ -389,7 +385,7 @@ impl Index {
     /// For crate being outdated. Returns (is_latest, popularity)
     /// 0 = not used *or deprecated*
     /// 1 = everyone uses it
-    pub async fn version_popularity(&self, crate_name: &str, requirement: &VersionReq) -> Result<Option<(bool, f32)>, KitchenSinkErr> {
+    pub async fn version_popularity(&self, crate_name: &str, requirement: &VersionReq) -> Result<Option<(bool, f32)>, DepsErr> {
         if is_deprecated(crate_name) {
             return Ok(Some((false, 0.)));
         }
@@ -425,7 +421,7 @@ impl Index {
     }
 
     /// How likely it is that this exact crate will be installed in any project
-    pub async fn version_global_popularity(&self, crate_name: &str, version: &MiniVer) -> Result<Option<f32>, KitchenSinkErr> {
+    pub async fn version_global_popularity(&self, crate_name: &str, version: &MiniVer) -> Result<Option<f32>, DepsErr> {
         match crate_name {
             // bindings' SLoC looks heavier than actual overhead of standard system libs
             "libc" | "winapi" | "kernel32-sys" | "winapi-i686-pc-windows-gnu" | "winapi-x86_64-pc-windows-gnu" => return Ok(Some(0.99)),
@@ -510,13 +506,4 @@ pub struct DepQuery {
     pub default: bool,
     pub all_optional: bool,
     pub dev: bool,
-}
-
-#[tokio::test]
-async fn index_test() {
-    let idx = Index::new_default().unwrap();
-    let stats = idx.deps_stats().await.unwrap();
-    assert!(stats.total > 13800);
-    let lode = stats.counts.get("lodepng").unwrap();
-    assert_eq!(12, lode.runtime.def);
 }

@@ -24,6 +24,7 @@ members = [
 "search_index",
 "ranking",
 "server",
+"deps_index",
 "render_readme/dump",
 ]
 

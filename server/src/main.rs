@@ -604,7 +604,12 @@ fn serve_cached((page, cache_time, refresh, last_modified): (Vec<u8>, u32, bool,
             h.header("Refresh", "5");
             h.header("Cache-Control", "no-cache, s-maxage=4, must-revalidate");
         })
-        .if_some(last_modified, |l, h| {h.header("Last-Modified", l.to_rfc2822());})
+        .if_some(last_modified, |l, h| {
+            // can't give validator, because then 304 leaves refresh
+            if !refresh {
+                h.header("Last-Modified", l.to_rfc2822());
+            }
+        })
         .content_length(page.len() as u64)
         .body(page)
 }

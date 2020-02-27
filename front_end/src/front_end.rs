@@ -249,6 +249,10 @@ pub fn render_debug_page(out: &mut impl Write, ver: &RichCrateVersion, kitchen_s
     Ok(())
 }
 
+pub fn render_error(out: &mut impl Write, err: &failure::Error) {
+    templates::error_page(out, err).expect("error rendering error page");
+}
+
 /// See `crate_page.rs.html`
 pub fn render_static_page(out: &mut impl Write, title: String, page: &Markup, renderer: &Renderer) -> Result<(), failure::Error> {
     if stopped() {

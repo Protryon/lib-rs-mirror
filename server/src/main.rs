@@ -1,3 +1,5 @@
+use actix_web::http::StatusCode;
+use actix_web::body::Body;
 use std::convert::TryInto;
 use crate::writer::*;
 use actix_web::dev::Url;
@@ -210,7 +212,7 @@ fn find_category<'a>(slugs: impl Iterator<Item = &'a str>) -> Option<&'static Ca
     found
 }
 
-fn handle_static_page(state: &ServerState, path: &str) -> Result<Option<HttpResponse>, failure::Error> {
+fn handle_static_page(state: &ServerState, path: &str) -> Result<Option<HttpResponse>, ServerError> {
     let path = &path[1..]; // remove leading /
     if !is_alnum(path) {
         return Ok(None);
@@ -227,7 +229,7 @@ fn handle_static_page(state: &ServerState, path: &str) -> Result<Option<HttpResp
     let crate_num = crates.all_crates_io_crates().len();
     let total_crate_num = crates.all_crates().count();
 
-    let md = std::fs::read_to_string(md_path)?
+    let md = std::fs::read_to_string(md_path).context("reading static page")?
         .replace("$CRATE_NUM", &Numeric::english().format_int(crate_num))
         .replace("$TOTAL_CRATE_NUM", &Numeric::english().format_int(total_crate_num));
     let mut page = Vec::with_capacity(md.len() * 2);
@@ -239,7 +241,7 @@ fn handle_static_page(state: &ServerState, path: &str) -> Result<Option<HttpResp
         .body(page)))
 }
 
-async fn default_handler(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
+async fn default_handler(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let state: &AServerState = req.app_data().expect("appdata");
     let path = req.uri().path();
     assert!(path.starts_with('/'));
@@ -288,7 +290,7 @@ async fn default_handler(req: HttpRequest) -> Result<HttpResponse, failure::Erro
     render_404_page(state, path)
 }
 
-fn render_404_page(state: &AServerState, path: &str) -> Result<HttpResponse, failure::Error> {
+fn render_404_page(state: &AServerState, path: &str) -> Result<HttpResponse, ServerError> {
     let decoded = decode(path).ok();
     let rawtext = decoded.as_ref().map(|d| d.as_str()).unwrap_or(path);
 
@@ -305,7 +307,7 @@ fn render_404_page(state: &AServerState, path: &str) -> Result<HttpResponse, fai
         .body(page))
 }
 
-async fn handle_category(req: HttpRequest, cat: &'static Category) -> Result<HttpResponse, failure::Error> {
+async fn handle_category(req: HttpRequest, cat: &'static Category) -> Result<HttpResponse, ServerError> {
     let state: &AServerState = req.app_data().expect("appdata");
     let crates = state.crates.load();
     let cache_file = state.page_cache_dir.join(format!("_{}.html", cat.slug));
@@ -319,7 +321,7 @@ async fn handle_category(req: HttpRequest, cat: &'static Category) -> Result<Htt
     }).await?))
 }
 
-async fn handle_home(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
+async fn handle_home(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     println!("home route");
     let query = req.query_string().trim_start_matches('?');
     if !query.is_empty() && query.find('=').is_none() {
@@ -339,14 +341,14 @@ async fn handle_home(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
     }).await?))
 }
 
-async fn handle_github_crate(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
+async fn handle_github_crate(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     handle_git_crate(req, "gh").await
 }
-async fn handle_gitlab_crate(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
+async fn handle_gitlab_crate(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     handle_git_crate(req, "lab").await
 }
 
-async fn handle_git_crate(req: HttpRequest, slug: &'static str) -> Result<HttpResponse, failure::Error> {
+async fn handle_git_crate(req: HttpRequest, slug: &'static str) -> Result<HttpResponse, ServerError> {
     let inf = req.match_info();
     let state: &AServerState = req.app_data().expect("appdata");
     let owner = inf.query("owner");
@@ -391,7 +393,7 @@ fn get_origin_from_subpath(q: &actix_web::dev::Path<Url>) -> Option<Origin> {
     }
 }
 
-async fn handle_debug(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
+async fn handle_debug(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     if !cfg!(debug_assertions) {
         Err(failure::err_msg("off"))?
     }
@@ -409,7 +411,7 @@ async fn handle_debug(req: HttpRequest) -> Result<HttpResponse, failure::Error> 
         .body(page))
 }
 
-async fn handle_install(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
+async fn handle_install(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let state2: &AServerState = req.app_data().expect("appdata");
     let origin = if let Some(o) = get_origin_from_subpath(req.match_info()) {o}
     else {
@@ -427,7 +429,7 @@ async fn handle_install(req: HttpRequest) -> Result<HttpResponse, failure::Error
     Ok(serve_cached((page, 7200, false, last_mod)))
 }
 
-async fn handle_crate(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
+async fn handle_crate(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let crate_name = req.match_info().query("crate");
     println!("crate page for {:?}", crate_name);
     let state: &AServerState = req.app_data().expect("appdata");
@@ -442,7 +444,7 @@ async fn handle_crate(req: HttpRequest) -> Result<HttpResponse, failure::Error> 
     }).await?))
 }
 
-async fn handle_crate_reverse_dependencies(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
+async fn handle_crate_reverse_dependencies(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let crate_name = req.match_info().query("crate");
     println!("rev deps for {:?}", crate_name);
     let state: &AServerState = req.app_data().expect("appdata");
@@ -454,7 +456,7 @@ async fn handle_crate_reverse_dependencies(req: HttpRequest) -> Result<HttpRespo
     Ok(serve_cached(render_crate_reverse_dependencies(state.clone(), origin).await?))
 }
 
-async fn handle_new_trending(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
+async fn handle_new_trending(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let state: &AServerState = req.app_data().expect("appdata");
     Ok(serve_cached(with_file_cache(state, state.page_cache_dir.join("_new_.html"), 3600, {
         let state = state.clone();
@@ -558,7 +560,7 @@ async fn render_crate_reverse_dependencies(state: AServerState, origin: Origin) 
     }).await
 }
 
-async fn handle_keyword(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
+async fn handle_keyword(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let q = req.match_info().query("keyword");
     if q.is_empty() {
         return Ok(HttpResponse::TemporaryRedirect().header("Location", "/").finish());
@@ -626,7 +628,7 @@ fn is_alnum_dot(q: &str) -> bool {
     chars.all(|c| c.is_ascii_alphanumeric() || c == b'_' || c == b'-' || c == b'.')
 }
 
-async fn handle_search(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
+async fn handle_search(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let qs = req.query_string().replace('+',"%20");
     let qs = qstring::QString::from(qs.as_str());
     match qs.get("q").unwrap_or("") {
@@ -651,7 +653,7 @@ async fn handle_search(req: HttpRequest) -> Result<HttpResponse, failure::Error>
     }
 }
 
-async fn handle_sitemap(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
+async fn handle_sitemap(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let (w, page) = writer::<_, failure::Error>().await;
     let state: &AServerState = req.app_data().expect("appdata");
     let _ = state.rt.spawn({
@@ -666,13 +668,13 @@ async fn handle_sitemap(req: HttpRequest) -> Result<HttpResponse, failure::Error
         }
     }});
 
-    Ok::<_, failure::Error>(HttpResponse::Ok()
+    Ok(HttpResponse::Ok()
         .content_type("application/xml;charset=UTF-8")
         .header("Cache-Control", "public, max-age=259200, stale-while-revalidate=72000, stale-if-error=72000")
         .streaming(page))
 }
 
-async fn handle_feed(req: HttpRequest) -> Result<HttpResponse, failure::Error> {
+async fn handle_feed(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let state: &AServerState = req.app_data().expect("appdata");
     let state2 = state.clone();
     let page = rt_run_timeout(&state.rt, 60, async move {
@@ -694,6 +696,70 @@ async fn run_timeout<R, T: 'static + Send>(secs: u64, fut: R) -> Result<T, failu
 
 async fn rt_run_timeout<R, T: 'static + Send>(rt: &Runtime, secs: u64, fut: R) -> Result<T, failure::Error> where R: 'static + Send + Future<Output=Result<T, failure::Error>> {
     rt.spawn(tokio::time::timeout(Duration::from_secs(secs), fut)).await??
+}
+
+struct ServerError {
+    err: failure::Error
+}
+
+impl ServerError {
+    pub fn new(err: failure::Error) -> Self {
+        for cause in err.iter_chain() {
+            eprintln!("• {}", cause);
+            // The server is stuck and useless
+            if cause.to_string().contains("Too many open files") {
+                eprintln!("Fatal error. Too many open files.");
+                std::process::exit(2);
+            }
+        }
+        Self {
+            err
+        }
+    }
+}
+
+impl From<failure::Error> for ServerError {
+    fn from(err: failure::Error) -> Self {
+        Self::new(err)
+    }
+}
+
+impl<T: Send + Sync + fmt::Display> From<failure::Context<T>> for ServerError {
+    fn from(err: failure::Context<T>) -> Self {
+        Self::new(err.into())
+    }
+}
+
+impl From<tokio::task::JoinError> for ServerError {
+    fn from(err: tokio::task::JoinError) -> Self {
+        Self::new(err.into())
+    }
+}
+
+use std::fmt;
+impl fmt::Display for ServerError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.err.fmt(f)
+    }
+}
+impl fmt::Debug for ServerError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.err.fmt(f)
+    }
+}
+
+impl actix_web::ResponseError for ServerError {
+    fn status_code(&self) -> StatusCode {
+        StatusCode::INTERNAL_SERVER_ERROR
+    }
+    fn error_response(&self) -> HttpResponse<Body> {
+        let mut page = Vec::with_capacity(20000);
+        front_end::render_error(&mut page, &self.err);
+        HttpResponse::InternalServerError()
+            .content_type("text/html;charset=UTF-8")
+            .content_length(page.len() as u64)
+            .body(page)
+    }
 }
 
 

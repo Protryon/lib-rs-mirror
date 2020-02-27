@@ -1,0 +1,38 @@
+@use failure::Error;
+
+@(err: &Error)
+
+<!doctype html>
+<html lang="en">
+    <meta charset="utf-8">
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>error[E0500]: lib.rs:1</title>
+    <link rel=stylesheet href="/index.css" crossorigin="anonymous">
+    <link rel=stylesheet href="/critical.css" crossorigin="anonymous">
+    <link rel=icon href="/favicon.png">
+    <link rel="mask-icon" href="/logo.svg">
+    <meta name="theme-color" content="#aaaaaa">
+    <meta name="color-scheme" value="light dark">
+  <body>
+    <header>
+      <div class=inner-col>
+      <h1><code>error[E0500]: lib.rs:1</code></h1>
+      </div>
+    </header>
+    <main>
+      <div class=inner-col>
+        <h2>Sorry, something went wrong!</h2>
+        <p>@err</p>
+        <ol>
+          @for cause in err.iter_causes() {
+            <li>@cause</li>
+          }
+        </ol>
+        <hr />
+        <p>Try refreshing the page.</p>
+        <a href="/">Back to homepage.</a>
+      </div>
+    </main>
+  </body>
+</html>

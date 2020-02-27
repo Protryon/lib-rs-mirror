@@ -17,4 +17,3 @@ repo_url = { git = "https://gitlab.com/crates.rs/repo_url.git" }
 failure = "0.1.6"
 urlencoding = "1.0.0"
 lazy_static = "1.4.0"
-either = "1.5.3"

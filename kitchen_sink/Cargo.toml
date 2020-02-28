@@ -12,9 +12,9 @@ path = "src/lib_kitchen_sink.rs"
 [dependencies]
 crates_io_client = { path = "../crates_io_client" }
 deps_index = { path = "../deps_index" }
-docs_rs_client = { git = "https://gitlab.com/crates.rs/docs_rs_client.git", version = "0.4.0" }
+docs_rs_client = { path = "../docs_rs_client", version = "0.4.0" }
 github_info = { path = "../github_info", version = "0.9" }
-crate_git_checkout = { git = "https://gitlab.com/crates.rs/crate_git_checkout.git", version = "0.4.3" }
+crate_git_checkout = { path = "../crate_git_checkout", version = "0.4.3" }
 user_db = { path = "../user_db", version = "0.3" }
 crate_db = { path = "../crate_db", version = "0.4.0" }
 categories = { path = "../categories" }

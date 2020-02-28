@@ -3,7 +3,7 @@ use futures::stream::StreamExt;
 use kitchen_sink::{stopped, KitchenSink};
 use std::{
     collections::HashSet,
-    sync::{mpsc, Arc},
+    sync::{Arc, Mutex},
 };
 
 #[tokio::main]
@@ -17,30 +17,11 @@ async fn main() {
                 std::process::exit(1);
             },
         });
-        let crates2 = crates.clone();
-        let (tx, rx) = mpsc::sync_channel(64);
-        let tx1 = tx.clone();
-
-        let t = std::thread::spawn(move || {
-            let mut seen = HashSet::new();
-            while let Some((email, name)) = rx.recv().unwrap() {
-                let email: String = email;
-                let name: Option<String> = name;
-
-                if seen.contains(&email) {
-                    continue;
-                }
-                seen.insert(email.clone());
-
-                if let Err(err) = crates2.index_email(&email, name.as_ref().map(|s| s.as_str())) {
-                    eprintln!("•• {}: {}", email, err);
-                }
-            }
-        });
 
         let all_crates = crates.all_crates();
         let waiting = futures::stream::FuturesUnordered::new();
         let concurrency = Arc::new(tokio::sync::Semaphore::new(16));
+        let seen = Arc::new(Mutex::new(HashSet::new()));
         for o in all_crates {
             if stopped() {
                 eprintln!("STOPPING");
@@ -48,33 +29,39 @@ async fn main() {
             }
             let crates = Arc::clone(&crates);
             let concurrency = Arc::clone(&concurrency);
-            let tx = tx1.clone();
+            let seen = Arc::clone(&seen);
             waiting.push(handle.spawn(async move {
                 let _f = concurrency.acquire().await;
                 println!("{}…", o.short_crate_name());
-                let r1 = crates.rich_crate_version_async(&o).await;
-                if stopped() {return;}
-                let res = r1.and_then(|c| {
-                    for a in c.authors().iter().filter(|a| a.email.is_some()) {
-                        if let Some(email) = a.email.as_ref() {
-                            tx.send(Some((email.to_string(), a.name.clone())))?;
+                let c = crates.rich_crate_version_async(&o).await?;
+                if stopped() {failure::bail!("stop");}
+                for a in c.authors().iter().filter(|a| a.email.is_some()) {
+                    if let Some(email) = a.email.as_ref() {
+                        {
+                            let mut seen = seen.lock().unwrap();
+                            if seen.contains(email) {
+                                continue;
+                            }
+                            seen.insert(email.clone());
+                        }
+
+                        if let Err(err) = crates.index_email(&email, a.name.as_deref()).await {
+                            eprintln!("•• {}: {}", email, err);
                         }
                     }
-                    Ok(())
-                });
+                }
+                Ok(())
+            }.then(|res| async move {
                 if let Err(e) = res {
                     eprintln!("••• error: {}", e);
                     for c in e.iter_chain() {
                         eprintln!("•   error: -- {}", c);
                     }
                 }
-            }).map(drop));
+            })).map(drop));
         }
         if stopped() {return;}
         waiting.collect::<()>().await;
-        eprintln!("Finished sending");
-        tx.send(None).unwrap();
-        if stopped() {return;}
-        t.join().unwrap();
+        eprintln!("Finished");
     }).await.unwrap();
 }

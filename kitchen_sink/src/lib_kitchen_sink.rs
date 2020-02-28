@@ -520,7 +520,7 @@ impl KitchenSink {
             Origin::GitHub { repo, package } => {
                 let host = RepoHost::GitHub(repo.clone()).try_into().map_err(|_| KitchenSinkErr::CrateNotFound(origin.clone())).context("ghrepo host bad")?;
                 let cachebust = self.cachebust_string_for_repo(&host).await.context("ghrepo")?;
-                let gh = self.gh.repo(repo, &cachebust)?
+                let gh = self.gh.repo(repo, &cachebust).await?
                     .ok_or_else(|| KitchenSinkErr::CrateNotFound(origin.clone()))
                     .context(format!("ghrepo {:?} not found", repo))?;
                 let versions = self.get_repo_versions(origin, &host, &cachebust).await?;
@@ -554,7 +554,7 @@ impl KitchenSink {
         let package = match origin {
             Origin::GitLab { package, .. } => package,
             Origin::GitHub { repo, package } => {
-                let releases = self.gh.releases(repo, cachebust)?.ok_or_else(|| KitchenSinkErr::CrateNotFound(origin.clone())).context("releases not found")?;
+                let releases = self.gh.releases(repo, cachebust).await?.ok_or_else(|| KitchenSinkErr::CrateNotFound(origin.clone())).context("releases not found")?;
                 let versions: Vec<_> = releases.into_iter().filter_map(|r| {
                     let date = r.published_at.or(r.created_at)?;
                     let num_full = r.tag_name?;
@@ -710,7 +710,7 @@ impl KitchenSink {
     pub async fn changelog_url(&self, k: &RichCrateVersion) -> Option<String> {
         let repo = k.repository()?;
         if let RepoHost::GitHub(ref gh) = repo.host() {
-            let releases = self.gh.releases(gh, &self.cachebust_string_for_repo(repo).await.ok()?).ok()??;
+            let releases = self.gh.releases(gh, &self.cachebust_string_for_repo(repo).await.ok()?).await.ok()??;
             if releases.iter().any(|rel| rel.body.as_ref().map_or(false, |b| b.len() > 15)) {
                 return Some(format!("https://github.com/{}/{}/releases", gh.owner, gh.repo));
             }
@@ -857,7 +857,7 @@ impl KitchenSink {
         // TODO: also ignore useless keywords that are unique db-wide
         let gh = match maybe_repo.as_ref() {
             Some(repo) => if let RepoHost::GitHub(ref gh) = repo.host() {
-                self.gh.topics(gh, &self.cachebust_string_for_repo(repo).await.context("fetch topics")?)?
+                self.gh.topics(gh, &self.cachebust_string_for_repo(repo).await.context("fetch topics")?).await?
             } else {None},
             _ => None,
         };
@@ -1015,7 +1015,7 @@ impl KitchenSink {
         Ok(match crate_repo.host() {
             RepoHost::GitHub(ref repo) => {
                 let cachebust = self.cachebust_string_for_repo(crate_repo).await.context("ghrepo")?;
-                self.gh.repo(repo, &cachebust)?
+                self.gh.repo(repo, &cachebust).await?
             },
             _ => None,
         })
@@ -1259,10 +1259,10 @@ impl KitchenSink {
     }
 
     /// Maintenance: add user to local db index
-    pub fn index_email(&self, email: &str, name: Option<&str>) -> CResult<()> {
+    pub async fn index_email(&self, email: &str, name: Option<&str>) -> CResult<()> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
         if !self.user_db.email_has_github(&email)? {
-            match self.gh.user_by_email(&email) {
+            match self.gh.user_by_email(&email).await {
                 Ok(Some(users)) => {
                     for user in users {
                         println!("{} == {} ({:?})", user.login, email, name);
@@ -1458,9 +1458,9 @@ impl KitchenSink {
         })?;
         self.crate_db.index_repo_crates(repo, manif).await.context("index rev repo")?;
         let mut changes = Vec::new();
-        tokio::task::block_in_place(|| {
+
             if let Repo { host: RepoHost::GitHub(ref repo), .. } = repo {
-                if let Some(commits) = self.repo_commits(repo, as_of_version)? {
+                if let Some(commits) = self.repo_commits(repo, as_of_version).await? {
                     for c in commits {
                         if let Some(a) = c.author {
                             self.index_user(&a, &c.commit.author)?;
@@ -1474,7 +1474,7 @@ impl KitchenSink {
 
             if stopped() {Err(KitchenSinkErr::Stopped)?;}
 
-
+        tokio::task::block_in_place(|| {
             crate_git_checkout::find_dependency_changes(&checkout, |added, removed, age| {
                 if removed.is_empty() {
                     if added.len() > 1 {
@@ -1520,13 +1520,13 @@ impl KitchenSink {
         Ok(self.user_db.user_by_email(email).context("user_by_email")?)
     }
 
-    pub fn user_by_github_login(&self, github_login: &str) -> CResult<Option<User>> {
+    pub async fn user_by_github_login(&self, github_login: &str) -> CResult<Option<User>> {
         if let Some(gh) = self.user_db.user_by_github_login(github_login)? {
             if gh.name.is_some() {
                 return Ok(Some(gh));
             }
         }
-        Ok(self.gh.user_by_login(github_login)?) // errs on 404
+        Ok(self.gh.user_by_login(github_login).await?) // errs on 404
     }
 
     pub fn rustc_compatibility(&self, origin: &Origin) -> CResult<Vec<CompatibilityInfo>> {
@@ -1565,8 +1565,8 @@ impl KitchenSink {
             }))
     }
 
-    pub fn user_github_orgs(&self, github_login: &str) -> CResult<Option<Vec<UserOrg>>> {
-        Ok(self.gh.user_orgs(github_login)?)
+    pub async fn user_github_orgs(&self, github_login: &str) -> CResult<Option<Vec<UserOrg>>> {
+        Ok(self.gh.user_orgs(github_login).await?)
     }
 
     /// Returns (contrib, github user)
@@ -1582,7 +1582,7 @@ impl KitchenSink {
                 // multiple crates share a repo, which causes cache churn when version "changes"
                 // so pick one of them and track just that one version
                 let cachebust = self.cachebust_string_for_repo(crate_repo).await.context("contrib")?;
-                let contributors = self.gh.contributors(repo, &cachebust).context("contributors")?.unwrap_or_default();
+                let contributors = self.gh.contributors(repo, &cachebust).await.context("contributors")?.unwrap_or_default();
                 if contributors.len() >= 100 {
                     hit_max_contributor_count = true;
                 }
@@ -1620,8 +1620,8 @@ impl KitchenSink {
             None => (false, HashMap::new()),
         };
 
-        let mut authors: HashMap<AuthorId, CrateAuthor<'_>> = krate.authors()
-            .iter().enumerate().map(|(i,author)| {
+        let mut authors = HashMap::with_capacity(krate.authors().len());
+        for (i, author) in krate.authors().iter().enumerate() {
                 let mut ca = CrateAuthor {
                     nth_author: Some(i),
                     contribution: 0.,
@@ -1633,17 +1633,19 @@ impl KitchenSink {
                     if let Ok(Some(github)) = self.user_db.user_by_email(email) {
                         let id = github.id;
                         ca.github = Some(github);
-                        return (AuthorId::GitHub(id), ca);
+                        authors.insert(AuthorId::GitHub(id), ca);
+                        continue;
                     }
                 }
                 if let Some(ref url) = author.url {
                     let gh_url = "https://github.com/";
                     if url.to_ascii_lowercase().starts_with(gh_url) {
                         let login = url[gh_url.len()..].splitn(1, '/').next().expect("can't happen");
-                        if let Ok(Some(gh)) = self.gh.user_by_login(login) {
+                        if let Ok(Some(gh)) = self.gh.user_by_login(login).await {
                             let id = gh.id;
                             ca.github = Some(gh);
-                            return (AuthorId::GitHub(id), ca);
+                            authors.insert(AuthorId::GitHub(id), ca);
+                            continue;
                         }
                     }
                 }
@@ -1655,19 +1657,19 @@ impl KitchenSink {
                             ca.github = Some(github);
                             ca.info = None; // was useless; just a login; TODO: only clear name once it's Option
                             ca.contribution = contribution;
-                            return (AuthorId::GitHub(id), ca);
+                            authors.insert(AuthorId::GitHub(id), ca);
+                            continue;
                         }
                     }
                 }
                 let key = author.email.as_ref().map(|e| AuthorId::Email(e.to_ascii_lowercase()))
                     .or_else(|| author.name.as_ref().map(|n| AuthorId::Name(n.to_lowercase())))
                     .unwrap_or(AuthorId::Meh(i));
-                (key, ca)
-            }).collect();
-
+                authors.insert(key, ca);
+            }
 
         for owner in owners {
-            if let Ok(user) = self.owners_github(&owner) {
+            if let Ok(user) = self.owners_github(&owner).await {
                 match authors.entry(AuthorId::GitHub(user.id)) {
                     Occupied(mut e) => {
                         let e = e.get_mut();
@@ -1772,7 +1774,7 @@ impl KitchenSink {
         for author in &mut authors {
             if let Some(ref mut gh) = author.github {
                 if gh.name.is_none() {
-                    let res = self.user_by_github_login(&gh.login);
+                    let res = self.user_by_github_login(&gh.login).await;
                     if let Ok(Some(new_gh)) = res {
                         *gh = new_gh
                     }
@@ -1803,7 +1805,7 @@ impl KitchenSink {
         Ok((authors, owners, owners_partial, if hit_max_contributor_count { 100 } else { contributors }))
     }
 
-    fn owners_github(&self, owner: &CrateOwner) -> CResult<User> {
+    async fn owners_github(&self, owner: &CrateOwner) -> CResult<User> {
         // this is silly, but crates.io doesn't keep the github ID explicitly
         // (the id field is crates-io's field), but it does keep the avatar URL
         // which contains github's ID
@@ -1814,13 +1816,13 @@ impl KitchenSink {
             if let Some(c) = R.captures(avatar) {
                 let id = c.get(1).expect("regex").as_str();
                 let id = id.parse().expect("regex");
-                if let Some(user) = self.gh.user_by_id(id)? {
+                if let Some(user) = self.gh.user_by_id(id).await? {
                     return Ok(user);
                 }
             }
         }
         // This is a bit weak, since logins are not permanent
-        if let Some(user) = self.gh.user_by_login(owner.github_login().ok_or(KitchenSinkErr::OwnerWithoutLogin)?)? {
+        if let Some(user) = self.gh.user_by_login(owner.github_login().ok_or(KitchenSinkErr::OwnerWithoutLogin)?).await? {
             return Ok(user);
         }
         Err(KitchenSinkErr::OwnerWithoutLogin)?
@@ -2016,8 +2018,8 @@ impl KitchenSink {
             })
     }
 
-    fn repo_commits(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Option<Vec<github_info::CommitMeta>>> {
-        Ok(self.gh.commits(repo, as_of_version)?)
+    async fn repo_commits(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Option<Vec<github_info::CommitMeta>>> {
+        Ok(self.gh.commits(repo, as_of_version).await?)
     }
 
     /// Prepare for drop: purge buffers, free memory

@@ -30,6 +30,7 @@ use kitchen_sink::KitchenSink;
 use kitchen_sink::{stopped, KitchenSinkErr};
 use render_readme::Markup;
 use render_readme::Renderer;
+use render_readme::Links;
 use rich_crate::RichCrate;
 use rich_crate::RichCrateVersion;
 use semver::Version as SemVer;
@@ -259,7 +260,7 @@ pub fn render_static_page(out: &mut impl Write, title: String, page: &Markup, re
         Err(KitchenSinkErr::Stopped)?;
     }
 
-    let (html, warnings) = renderer.page(page, Some(("https://lib.rs", "https://lib.rs")), false, None);
+    let (html, warnings) = renderer.page(page, Some(("https://lib.rs", "https://lib.rs")), Links::Trusted, None);
     if !warnings.is_empty() {
         eprintln!("static: {:?}", warnings);
     }

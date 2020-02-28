@@ -19,7 +19,7 @@ assets = [
 actix-web = "2"
 env_logger = "0.7"
 log = "0.4.6"
-render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git", version = "0.6.1" }
+render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git", version = "0.7" }
 search_index = { path = "../search_index" }
 repo_url = { path = "../repo_url" }
 kitchen_sink = { path = "../kitchen_sink", version = "0.9" }

@@ -2,6 +2,7 @@ use crate::templates;
 use crate::Page;
 use kitchen_sink::KitchenSink;
 use render_readme::Renderer;
+use render_readme::Links;
 use rich_crate::Readme;
 use rich_crate::RichCrateVersion;
 
@@ -53,7 +54,7 @@ impl<'a> InstallPage<'a> {
             (Some(l), None) => Some((l.as_str(), l.as_str())),
             _ => None,
         };
-        let (html, warnings) = self.markup.page(&readme.markup, urls, true, Some(self.ver.short_name()));
+        let (html, warnings) = self.markup.page(&readme.markup, urls, Links::Ugc, Some(self.ver.short_name()));
         if !warnings.is_empty() {
             eprintln!("{} readme: {:?}", self.ver.short_name(), warnings);
         }

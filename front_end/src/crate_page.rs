@@ -14,6 +14,7 @@ use kitchen_sink::DepInfMap;
 use kitchen_sink::{DepTy, KitchenSink, Origin};
 use locale::Numeric;
 use render_readme::Renderer;
+use render_readme::Links;
 use rich_crate::Readme;
 use rich_crate::RepoHost;
 use rich_crate::RichCrate;
@@ -269,9 +270,13 @@ impl<'a> CratePage<'a> {
         templates::Html(html)
     }
 
-    pub fn nofollow(&self) -> bool {
+    pub fn nofollow(&self) -> Links {
         // TODO: take multiple factors into account, like # of contributors, author reputation, dependents
-        self.block(self.kitchen_sink.downloads_per_month_or_equivalent(self.all.origin())).ok().and_then(|x| x).unwrap_or(0) < 50
+        if self.block(self.kitchen_sink.downloads_per_month_or_equivalent(self.all.origin())).ok().and_then(|x| x).unwrap_or(0) < 100 {
+            Links::Ugc
+        } else {
+            Links::FollowUgc
+        }
     }
 
     fn block<O>(&self, f: impl Future<Output = O>) -> O {

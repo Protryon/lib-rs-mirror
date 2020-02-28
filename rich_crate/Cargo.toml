@@ -8,7 +8,7 @@ license = "Apache-2.0 OR MIT"
 
 [dependencies]
 crates_io_client = { path = "../crates_io_client", version = "0.8.2" }
-render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git", version = "0.6.0" }
+render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git", version = "0.7" }
 categories = { path = "../categories" }
 udedokei = { path = "../udedokei" }
 cargo_author = "1.0.2"

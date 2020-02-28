@@ -10,6 +10,7 @@ use rand::{seq::SliceRandom, thread_rng};
 use ranking::CrateTemporalInputs;
 use ranking::CrateVersionInputs;
 use render_readme::Renderer;
+use render_readme::Links;
 use search_index::*;
 use std::collections::HashSet;
 use std::sync::mpsc;
@@ -179,7 +180,7 @@ async fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrat
         versions: all.versions(),
         description: k.description().unwrap_or(""),
         readme: k.readme().map(|readme| {
-            renderer.page_node(&readme.markup, None, false, None)
+            renderer.page_node(&readme.markup, None, Links::Ugc, None)
         }).as_ref(),
         owners: all.owners(),
         authors: k.authors(),

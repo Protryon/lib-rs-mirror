@@ -368,7 +368,7 @@ code
 
 * list
 * items
-".into()), None, false, None);
+".into()), None, render_readme::Links::Ugc, None);
     let mut p = Default::default();
     fill_props(&dom, &mut p, false);
     assert_eq!(p.images, 1);

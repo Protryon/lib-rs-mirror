@@ -374,14 +374,8 @@ fn is_readme_filename(path: &Path, package: Option<&Package>) -> bool {
 
 #[test]
 fn git_fs() {
-    let repo = Repository::open(".git").expect("own git repo");
+    let repo = Repository::open("../.git").expect("own git repo");
     let (m, w) = find_manifests(&repo).expect("has manifests");
-    assert_eq!(1, m.len());
+    assert_eq!(21, m.len());
     assert_eq!(0, w.len());
-    assert_eq!("", &m[0].0);
-    let manif = &m[0].2;
-    let pkg = manif.package.as_ref().expect("package");
-    assert_eq!("crate_git_checkout", &pkg.name);
-    assert!(manif.lib.is_some());
-    assert_eq!(0, manif.bin.len());
 }

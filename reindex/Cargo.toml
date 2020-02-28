@@ -6,7 +6,7 @@ authors = ["Kornel <kornel@geekhood.net>"]
 
 [dependencies]
 crate_db = { path = "../crate_db", version = "0.4.0" }
-github_info = { path = "../github_info", version = "0.8.0" }
+github_info = { path = "../github_info", version = "0.9" }
 kitchen_sink = { path = "../kitchen_sink", version = "0.9" }
 repo_url = { path = "../repo_url" }
 user_db = { path = "../user_db", version = "0.3" }

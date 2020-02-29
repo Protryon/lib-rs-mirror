@@ -187,7 +187,7 @@ impl ClientInner {
 }
 
 async fn error_for_response(res: reqwest::Response) -> GHError {
-    let status = res.status().as_u16();
+    let status = res.status();
     let mime = res.headers().get("content-type").and_then(|h| h.to_str().ok()).unwrap_or("");
     GHError::Response {
         status,
@@ -227,7 +227,7 @@ pub enum GHError {
     #[error("Request error: {}", _0)]
     Request(String),
     #[error("{} ({})", message.as_deref().unwrap_or("HTTP error"), status)]
-    Response { status: u16, message: Option<String> },
+    Response { status: StatusCode, message: Option<String> },
     #[error("Internal error")]
     Internal,
 }
@@ -237,9 +237,9 @@ impl From<reqwest::Error> for GHError {
         if e.is_timeout() {
             return Self::Timeout;
         }
-        if let Some(s) = e.status() {
+        if let Some(status) = e.status() {
             Self::Response {
-                status: s.as_u16(),
+                status,
                 message: Some(e.to_string()),
             }
         } else {

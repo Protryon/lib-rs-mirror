@@ -184,10 +184,19 @@ impl GitHub {
             eprintln!("Cache near miss {}@{} vs {}", key.0, ver, key.1);
         }
 
-        let res = cb(&self.client).await?;
-        let status = res.status();
-        let headers = res.headers();
-        eprintln!("Recvd {}@{} {:?} {:?}", key.0, key.1, status, headers);
+        let (status, res) = match cb(&self.client).await {
+            Ok(res) => {
+                let status = res.status();
+                let headers = res.headers();
+                eprintln!("Recvd {}@{} {:?} {:?}", key.0, key.1, status, headers);
+                (status, Some(res))
+            },
+            Err(github_v3::GHError::Response {status, message}) => {
+                eprintln!("GH Error {} {}", status, message.as_deref().unwrap_or("??"));
+                (status, None)
+            },
+            Err(e) => return Err(e.into()),
+        };
         let non_parsable_body = match status {
             StatusCode::ACCEPTED |
             StatusCode::CREATED => return Err(Error::TryAgainLater),
@@ -204,8 +213,11 @@ impl GitHub {
             StatusCode::MOVED_PERMANENTLY => true,
             _ => status.is_success(),
         };
-        let body = res.obj().await;
-        match body.map_err(|_| Error::NoBody).and_then(|stats| {
+        let body = match res {
+            Some(res) => Some(res.obj().await?),
+            None => None,
+        };
+        match body.ok_or(Error::NoBody).and_then(|stats| {
             let dbg = format!("{:?}", stats);
             Ok(postproc(serde_json::from_value(stats).map_err(|e| {
                 eprintln!("Error matching JSON: {}\n data: {}", e, dbg); e

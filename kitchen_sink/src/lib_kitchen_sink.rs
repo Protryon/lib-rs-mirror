@@ -1299,7 +1299,7 @@ impl KitchenSink {
 
                 let day_of_year = day.ordinal0() as usize;
                 let year_dls = curr_year_data.1.entry(version.clone()).or_insert_with(Default::default);
-                if year_dls.0[day_of_year] != *dls {
+                if year_dls.0[day_of_year] < *dls {
                     curr_year_data.0 = true;
                     year_dls.0[day_of_year] = *dls;
                 }

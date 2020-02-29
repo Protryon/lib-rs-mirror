@@ -71,7 +71,7 @@ impl Urler {
     pub fn reverse_deps(&self, origin: &Origin) -> Option<String> {
         match origin {
             Origin::CratesIo(lowercase_name) => Some(format!("/crates/{}/rev", encode(lowercase_name))),
-            Origin::GitHub { package, .. } | Origin::GitLab { package, .. } => None,
+            Origin::GitHub { .. } | Origin::GitLab { .. } => None,
         }
     }
 

@@ -51,7 +51,7 @@ bitcoincore-rpc : cryptography::cryptocurrencies
 bitvector: data-structures
 blip_buf: multimedia::audio
 bloke: game-engines
-bnf: parsers
+bloomfilter: data-structures
 bnf: parsers
 boxcars: parser-implementations
 brain: emulators
@@ -122,6 +122,7 @@ deno_typescript: web-programming, development-tools
 deribit: web-programming
 derp: parser-implementations
 derpy: development-tools
+dfw: development-tools, network-programming
 dia-args: command-line-interface
 diceware : command-line-utilities, authentication
 diceware-rs : command-line-utilities, authentication
@@ -152,7 +153,6 @@ env-io: rust-patterns
 env_proc : config
 env_proc: rust-patterns, config
 envoption: config
-envoption: config
 eosio : cryptography::cryptocurrencies
 eosio_macros_internal: cryptography::cryptocurrencies
 eosio_numstr : cryptography::cryptocurrencies
@@ -171,7 +171,9 @@ failure: rust-patterns
 fakesite: web-programming
 falcon-raptor : development-tools
 fast-floats : rust-patterns
+fast-socks5 : network-programming, web-programming::http-client, web-programming::http-server
 fast_uaparser : parser-implementations
+fastcgi-client : asynchronous, web-programming::http-client
 fastdl: caching
 fddf: command-line-utilities, filesystem
 fdfast: filesystem
@@ -321,10 +323,12 @@ kurbo: science::math, rendering::graphics-api
 kx : development-tools
 lapp: parser-implementations
 lcov : parser-implementations
+leafrender: gui, rendering::graphics-api
 letter-avatar: multimedia::images
 lib_sens: game-engines
 libass: web-programming
 libblas-sys : science::math
+libdoh : network-programming, asynchronous
 libinput-sys: os
 liblapack-sys : science::math
 libloadorder-ffi : game-engines
@@ -449,7 +453,6 @@ preftool-env : config
 project-cleanup : command-line-utilities, development-tools
 prometheus_wireguard_exporter: network-programming
 psyche-core : science::machine-learning
-psyche-core : science::machine-learning
 pwasm-abi : cryptography::cryptocurrencies
 pwasm-abi-derive : cryptography::cryptocurrencies
 pwasm-ethereum : cryptography::cryptocurrencies
@@ -465,6 +468,7 @@ qwerty : command-line-utilities, authentication
 randnum: command-line-utilities
 randrust: web-programming::http-server
 raptorq: network-programming
+rascam: hardware-support, multimedia::video
 ratio: science::math
 rdkafka: asynchronous, network-programming
 readmouse: os::macos-apis
@@ -498,6 +502,9 @@ rosy: development-tools::ffi
 roulette-wheel : science::machine-learning, algorithms
 round: rust-patterns
 roux: web-programming
+rpi-async : hardware-support, asynchronous
+rpi-led-matrix  : hardware-support
+rpi-video-rs : hardware-support, multimedia::video
 rqr : multimedia::images
 rsdb: database-implementations
 rtm: concurrency, hardware-support, no-std
@@ -611,7 +618,6 @@ urlocator: parser-implementations
 usereport-rs : development-tools::profiling, command-line-utilities
 users: os::unix-apis
 utime: filesystem
-utime: filesystem
 vad: multimedia::audio
 validjson: encoding, command-line-utilities
 varlink_parser: parser-implementations
@@ -620,6 +626,7 @@ veloren-launcher: games
 versionisator: development-tools::build-tools
 vfio-bindings : os::unix-apis
 vhdl_lang : development-tools
+videocore: hardware-support, multimedia::video
 vsphere-api : web-programming
 w_result: rust-patterns
 wagyu : cryptography::cryptocurrencies

@@ -89,6 +89,8 @@ lazy_static! {
         ("editor", Some(&["terminal"])),
         ("build", Some(&["logic"])), // confuses categorization
         ("messaging", Some(&["matrix"])), // confuses categorization
+        ("led", Some(&["matrix"])), // confuses categorization
+        ("rgb", Some(&["matrix"])), // confuses categorization
         ("chat", Some(&["matrix"])), // confuses categorization
         ("math", Some(&["num", "symbolic", "algorithms", "algorithm", "utils"])), // confuses categorization
         ("mathematics", Some(&["num", "numeric", "symbolic", "algorithms", "algorithm", "utils"])), // confuses categorization

@@ -1,6 +1,6 @@
 [package]
 name = "crates-server"
-version = "0.12.5"
+version = "0.12.6"
 authors = ["Kornel <kornel@geekhood.net>"]
 edition = "2018"
 description = "Crates.rs web server"
@@ -39,3 +39,5 @@ actix-threadpool = "0.3.1"
 either = "1.5.3"
 qstring = "0.7.2"
 chrono = "0.4.10"
+blake3 = { version = "0.2.2", default-features = false }
+base64 = "0.11.0"

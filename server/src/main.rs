@@ -169,7 +169,7 @@ async fn run_server() -> Result<(), failure::Error> {
     let server = HttpServer::new(move || {
         App::new()
             .app_data(state.clone())
-            .wrap(middleware::DefaultHeaders::new().header("Server", HeaderValue::from_static(concat!("actix-web/2.0 lib.rs/", env!("CARGO_PKG_VERSION")))))
+            .wrap(middleware::DefaultHeaders::new().header("x-powered-by", HeaderValue::from_static(concat!("actix-web/2 lib.rs/", env!("CARGO_PKG_VERSION")))))
             .wrap(middleware::Logger::default())
             .route("/", web::get().to(handle_home))
             .route("/search", web::get().to(handle_search))
@@ -597,8 +597,16 @@ async fn handle_keyword(req: HttpRequest) -> Result<HttpResponse, ServerError> {
 
 fn serve_cached((page, cache_time, refresh, last_modified): (Vec<u8>, u32, bool, Option<DateTime<FixedOffset>>)) -> HttpResponse {
     let err_max = (cache_time * 10).max(3600 * 24 * 2);
+
+    // last-modified is ambiguous, because it's modification of the content, not the whole state
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(if refresh {b"1"} else {b"0"});
+    hasher.update(&page);
+    let etag = format!("\"{:.16}\"", base64::encode(hasher.finalize().as_bytes()));
+
     HttpResponse::Ok()
         .content_type("text/html;charset=UTF-8")
+        .header("etag", etag)
         .if_true(!refresh, |h| {
             h.header("Cache-Control", format!("public, max-age={}, stale-while-revalidate={}, stale-if-error={}", cache_time, cache_time*3, err_max));
         })

@@ -297,7 +297,7 @@ fn render_404_page(state: &AServerState, path: &str) -> Result<HttpResponse, Ser
     let query = rawtext.chars().map(|c| if c.is_alphanumeric() { c } else { ' ' }).take(100).collect::<String>();
     let query = query.trim();
     let results = state.index.search(query, 5, false).unwrap_or_default();
-    let mut page: Vec<u8> = Vec::with_capacity(50000);
+    let mut page: Vec<u8> = Vec::with_capacity(32000);
     front_end::render_404_page(&mut page, query, &results, &state.markup)?;
 
     Ok(HttpResponse::NotFound()
@@ -334,7 +334,7 @@ async fn handle_home(req: HttpRequest) -> Result<HttpResponse, ServerError> {
         let state = state.clone();
         run_timeout(300, async move {
             let crates = state.crates.load();
-            let mut page: Vec<u8> = Vec::with_capacity(50000);
+            let mut page: Vec<u8> = Vec::with_capacity(32000);
             front_end::render_homepage(&mut page, &crates).await?;
             Ok::<_, failure::Error>((page, Some(Utc::now().into())))
         })
@@ -400,7 +400,7 @@ async fn handle_debug(req: HttpRequest) -> Result<HttpResponse, ServerError> {
 
     let state: &AServerState = req.app_data().expect("appdata");
     let origin = get_origin_from_subpath(req.match_info()).ok_or(failure::format_err!("boo"))?;
-    let mut page: Vec<u8> = Vec::with_capacity(50000);
+    let mut page: Vec<u8> = Vec::with_capacity(32000);
     let crates = state.crates.load();
     let ver = crates.rich_crate_version_async(&origin).await?;
     front_end::render_debug_page(&mut page, &ver, &crates)?;
@@ -422,7 +422,7 @@ async fn handle_install(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let (page, last_mod) = rt_run_timeout(&state2.rt, 30, async move {
         let crates = state.crates.load();
         let ver = crates.rich_crate_version_async(&origin).await?;
-        let mut page: Vec<u8> = Vec::with_capacity(50000);
+        let mut page: Vec<u8> = Vec::with_capacity(32000);
         front_end::render_install_page(&mut page, &ver, &crates, &state.markup).await?;
         Ok::<_, failure::Error>((page, None))
     }).await?;
@@ -462,7 +462,7 @@ async fn handle_new_trending(req: HttpRequest) -> Result<HttpResponse, ServerErr
         let state = state.clone();
         run_timeout(60, async move {
             let crates = state.crates.load();
-            let mut page: Vec<u8> = Vec::with_capacity(50000);
+            let mut page: Vec<u8> = Vec::with_capacity(32000);
             front_end::render_trending_crates(&mut page, &crates, &state.markup).await?;
             Ok::<_, failure::Error>((page, None))
     })}).await?))
@@ -543,7 +543,7 @@ fn render_crate_page(state: AServerState, origin: Origin) -> impl Future<Output 
     run_timeout(30, async move {
         let crates = state.crates.load();
         let (all, ver) = futures::try_join!(crates.rich_crate_async(&origin), crates.rich_crate_version_async(&origin))?;
-        let mut page: Vec<u8> = Vec::with_capacity(50000);
+        let mut page: Vec<u8> = Vec::with_capacity(32000);
         let last_mod = front_end::render_crate_page(&mut page, &all, &ver, &crates, &state.markup).await?;
         Ok::<_, failure::Error>((page, last_mod))
     })
@@ -554,7 +554,7 @@ async fn render_crate_reverse_dependencies(state: AServerState, origin: Origin) 
     rt_run_timeout(&s.rt, 30, async move {
         let crates = state.crates.load();
         let ver = crates.rich_crate_version_async(&origin).await?;
-        let mut page: Vec<u8> = Vec::with_capacity(50000);
+        let mut page: Vec<u8> = Vec::with_capacity(32000);
         front_end::render_crate_reverse_dependencies(&mut page, &ver, &crates, &state.markup).await?;
         Ok::<_, failure::Error>((page, 24*3600, false, None))
     }).await
@@ -576,7 +576,7 @@ async fn handle_keyword(req: HttpRequest) -> Result<HttpResponse, ServerError> {
         let keyword_query = format!("keywords:\"{}\"", query);
         let results = state2.index.search(&keyword_query, 150, false)?;
         if !results.is_empty() {
-            let mut page: Vec<u8> = Vec::with_capacity(50000);
+            let mut page: Vec<u8> = Vec::with_capacity(32000);
             front_end::render_keyword_page(&mut page, &query, &results, &state2.markup)?;
             Ok((query, Some(page)))
         } else {
@@ -648,7 +648,7 @@ async fn handle_search(req: HttpRequest) -> Result<HttpResponse, ServerError> {
                 async move {
                     tokio::task::spawn_blocking(move || {
                         let results = state.index.search(&query, 50, true)?;
-                        let mut page = Vec::with_capacity(50000);
+                        let mut page = Vec::with_capacity(32000);
                         front_end::render_serp_page(&mut page, &query, &results, &state.markup)?;
 
                         Ok::<_, failure::Error>((page, 600u32, false, None))
@@ -687,7 +687,7 @@ async fn handle_feed(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let state2 = state.clone();
     let page = rt_run_timeout(&state.rt, 60, async move {
         let crates = state2.crates.load();
-        let mut page: Vec<u8> = Vec::with_capacity(50000);
+        let mut page: Vec<u8> = Vec::with_capacity(32000);
         front_end::render_feed(&mut page, &crates).await?;
         Ok::<_, failure::Error>(page)
     }).await?;

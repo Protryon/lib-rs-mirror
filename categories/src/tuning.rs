@@ -221,7 +221,7 @@ lazy_static! {
             &[("science::math", 1.25, 0.3), ("algorithms", 1.2, 0.1), ("database", 0.8, 0.), ("web-programming::http-client", 0.9, 0.), ("config", 0.8, 0.), ("rendering::graphics-api", 0.8, 0.), ("games", 0.5, 0.), ("os", 0.8, 0.),("game-engines", 0.75, 0.), ("command-line-utilities", 0.8, 0.), ("command-line-interface", 0.4, 0.)]),
         (Cond::Any(&["polynomial", "numerics", "gaussian", "mathematics", "voronoi", "gmp", "bignum", "prime", "primes", "linear-algebra", "numpy", "lexicographic", "algebra", "euler", "bijective"]),
             &[("science::math", 1.25, 0.3), ("algorithms", 1.2, 0.1), ("web-programming::http-client", 0.9, 0.), ("rendering::graphics-api", 0.8, 0.), ("games", 0.5, 0.), ("os", 0.8, 0.),("game-engines", 0.75, 0.), ("command-line-utilities", 0.8, 0.), ("command-line-interface", 0.4, 0.)]),
-        (Cond::Any(&["arithmetic", "arithmetics", "histogram", "arbitrary-precision", "algebraic"]),
+        (Cond::Any(&["arithmetic", "arithmetics", "histogram", "arbitrary-precision", "algebraic", "topology"]),
             &[("science::math", 1.25, 0.15), ("algorithms", 1.2, 0.), ("text-processing", 0.8, 0.)]),
         (Cond::Any(&["precision"]), &[("science::math", 1.1, 0.)]),
         (Cond::All(&["discrete", "transforms"]),
@@ -328,6 +328,7 @@ lazy_static! {
             &[("development-tools::debugging", 1.2, 0.1), ("concurrency", 0.9, 0.), ("data-structures", 0.9, 0.), ("algorithms", 0.7, 0.), ("wasm", 0.9, 0.), ("emulators", 0.9, 0.),
             ("games", 0.01, 0.), ("multimedia::encoding", 0.8, 0.), ("development-tools::profiling", 0.7, 0.), ("command-line-utilities", 0.8, 0.)]),
         (Cond::Any(&["elf", "archive"]), &[("development-tools::debugging", 0.8, 0.), ("games", 0.4, 0.)]),
+        (Cond::Any(&["monitor", "monitoring"]), &[("development-tools::debugging", 1.1, 0.), ("development-tools::profiling", 1.1, 0.), ("development-tools", 1.1, 0.)]),
         (Cond::Any(&["elf"]), &[("encoding", 1.1, 0.), ("os::unix-apis", 1.1, 0.)]),
         (Cond::Any(&["travis", "jenkins", "ci", "testing", "test-driven", "tdd", "unittest", "unittests", "unit-testing", "pentest", "code-coverage", "testbed", "mocks"]),
             &[("development-tools::testing", 1.2, 0.2), ("development-tools::cargo-plugins", 0.9, 0.), ("rust-patterns", 0.9, 0.),
@@ -415,7 +416,9 @@ lazy_static! {
         (Cond::Any(&["quantization"]), &[("multimedia::images", 1.2, 0.1), ("multimedia", 1.1, 0.), ("command-line-interface", 0.2, 0.)]),
         (Cond::Any(&["webm", "av1", "dvd", "codec"]), &[("multimedia::encoding", 1.5, 0.2), ("multimedia::video", 1.4, 0.3),
             ("encoding", 0.15, 0.), ("parsing", 0.8, 0.), ("data-structures", 0.8, 0.)]),
-        (Cond::Any(&["h265", "h264", "mp4", "ffmpeg", "h263", "vp9", "video", "movies", "movie"]), &[
+        (Cond::Any(&["h265", "h264", "ffmpeg", "h263", "movie"]), &[
+            ("multimedia::video", 1.5, 0.3), ("multimedia::encoding", 1.3, 0.1), ("encoding", 0.15, 0.), ("data-structures", 0.8, 0.)]),
+        (Cond::Any(&["x265", "x264", "mp4", "h263", "vp9", "video", "movies"]), &[
             ("multimedia::video", 1.5, 0.3), ("multimedia::encoding", 1.3, 0.1), ("encoding", 0.15, 0.), ("data-structures", 0.8, 0.)]),
         (Cond::Any(&["webcam", "videocamera"]), &[("multimedia::video", 1.5, 0.3), ("multimedia", 1.1, 0.), ("multimedia::encoding", 1.1, 0.)]),
         (Cond::Any(&["opengl", "interpreter", "ascii", "mesh", "vulkan", "line"]), &[("multimedia::video", 0.5, 0.)]),
@@ -605,7 +608,7 @@ lazy_static! {
             ("command-line-interface", 0.5, 0.), ("development-tools::procedural-macro-helpers", 0.8, 0.), ("development-tools::build-utils", 0.6, 0.)]),
         (Cond::Any(&["ipfs", "io"]), &[("network-programming", 1.2, 0.1), ("filesystem", 1.3, 0.1), ("cryptography", 0.8, 0.), ("text-processing", 0.7, 0.), ("command-line-interface", 0.5, 0.)]),
         (Cond::Any(&["irc", "dht", "bot"]), &[("network-programming", 1.2, 0.1), ("asynchronous", 0.8, 0.)]),
-        (Cond::Any(&["pipe", "read", "write"]), &[("filesystem", 1.1, 0.), ("development-tools::profiling", 0.6, 0.), ("science", 0.8, 0.)]),
+        (Cond::Any(&["pipe", "read", "write", "mtime", "atime"]), &[("filesystem", 1.1, 0.), ("development-tools::profiling", 0.6, 0.), ("science", 0.8, 0.)]),
 
         (Cond::Any(&["pointers", "pointer", "slices", "primitive", "primitives", "clone-on-write"]),
                 &[("rust-patterns", 1.2, 0.1), ("command-line-utilities", 0.7, 0.), ("command-line-interface", 0.8, 0.), ("no-std", 0.95, 0.), ("asynchronous", 0.8, 0.),
@@ -747,8 +750,8 @@ lazy_static! {
         (Cond::Any(&["version"]), &[("development-tools::profiling", 0.8, 0.)]),
         (Cond::Any(&["bump", "changelog"]), &[("development-tools", 1.2, 0.), ("development-tools::profiling", 0.6, 0.)]),
         (Cond::Any(&["git", "vcs"]), &[("development-tools", 1.1, 0.)]),
-        (Cond::Any(&["sourcecode", "commit"]), &[("development-tools", 1.1, 0.)]),
-
+        (Cond::Any(&["sourcecode", "commit", "generates"]), &[("development-tools", 1.1, 0.)]),
+        (Cond::Any(&["installer", "packages"]), &[("development-tools", 1.1, 0.), ("os", 1.1, 0.)]),
 
         (Cond::Any(&["filter", "download", "downloader"]), &[("command-line-utilities", 0.75, 0.), ("command-line-interface", 0.5, 0.), ("data-structures", 0.8, 0.)]),
         (Cond::Any(&["error"]), &[("command-line-utilities", 0.5, 0.), ("command-line-interface", 0.7, 0.), ("games", 0.7, 0.)]),
@@ -775,7 +778,7 @@ lazy_static! {
         (Cond::All(&["elliptic", "curve"]), &[("cryptography", 1.3, 0.1)]),
 
         (Cond::Any(&["command-line-tool", "coreutil", "uutils", "coreutils"]), &[("command-line-utilities", 1.2, 0.4), ("algorithms", 0.8, 0.), ("data-structures", 0.8, 0.), ("no-std", 0.7, 0.)]),
-        (Cond::Any(&["command-line-utility"]), &[("command-line-utilities", 1.2, 0.4)]),
+        (Cond::Any(&["command-line-utility", "command-line-application"]), &[("command-line-utilities", 1.2, 0.4)]),
         (Cond::All(&["command", "line"]), &[("command-line-utilities", 1.15, 0.1), ("command-line-interface", 1.15, 0.)]),
         (Cond::All(&["commandline", "interface"]), &[("command-line-utilities", 1.15, 0.1), ("command-line-interface", 1.15, 0.)]),
         (Cond::Any(&["commandline", "command-line", "cmdline"]),

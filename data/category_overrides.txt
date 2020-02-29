@@ -25,6 +25,7 @@ arcon: science
 argh: command-line-interface
 arthas: database-implementations
 ascon: cryptography
+ass-rs: web-programming
 ast_node: parser-implementations
 async-codec : asynchronous
 atomsh: command-line-utilities
@@ -33,6 +34,8 @@ bao: algorithms
 barfly: gui
 baseperm: algorithms
 bb8: asynchronous
+bcc-sys : development-tools
+bcc: development-tools
 begonia: command-line-interface
 bigbro: os, filesystem
 binaryen-sys : wasm
@@ -63,6 +66,7 @@ captcha: web-programming
 cargo-xbuild : development-tools::build-tools, development-tools::cargo-plugins
 celery-rs-core : asynchronous
 celery: asynchronous
+cgl: rendering::graphics-api, os::macos-apis
 checkm: science, parser-implementations
 chillup: web-programming
 cita_trie: data-structures
@@ -85,6 +89,7 @@ coreaudio-sys: os::macos-apis, multimedia::audio
 coremidi: os::macos-apis, multimedia::audio
 coverm: science
 cox: web-programming
+coz: development-tools::profiling
 cqc: simulation
 crate-race: development-tools::profiling
 crates_io_api: web-programming
@@ -93,12 +98,18 @@ crossterm_style : command-line-interface
 crunchy : development-tools
 cryptoballot: cryptography, authentication, gui
 cryptonote-wallet: cryptography::cryptocurrencies
+csound: multimedia::audio
 cute-dnd-dice: game-engines
 debug_finder: parser-implementations, command-line-utilities
 default-env: rust-patterns
 delegatemethod: rust-patterns
 deltae: multimedia
 deltamap: command-line-utilities, science
+deno: web-programming, development-tools
+deno_cli_snapshots: command-line-utilities, development-tools
+deno_core: web-programming, development-tools
+deno_lib_bindings: development-tools::ffi
+deno_typescript: web-programming, development-tools
 deribit: web-programming
 derp: parser-implementations
 derpy: development-tools
@@ -172,6 +183,7 @@ foreignc_derive: development-tools::procedural-macro-helpers
 forever: rust-patterns
 forismatic: web-programming
 fractal-matrix-api : network-programming
+freeimage : multimedia::images, os::unix-apis
 frotate : command-line-utilities, os
 fsevent-sys: os::macos-apis
 fsevent: os::macos-apis
@@ -199,6 +211,7 @@ giphy: web-programming
 girage: cryptography, gui
 github-rs : web-programming
 glutin_cocoa: os::macos-apis
+glx : rendering::graphics-api, os::unix-apis
 graphcore: data-structures
 grin-miner: cryptography::cryptocurrencies
 grin: cryptography::cryptocurrencies
@@ -233,6 +246,7 @@ iban_validate: parser-implementations
 ical: parser-implementations
 igdb-rs: games
 image-capture-core : os::macos-apis
+image-interlacer : multimedia::images, command-line-utilities
 imdb-index: web-programming
 imdb: web-programming
 impl-codec: cryptography::cryptocurrencies
@@ -284,7 +298,6 @@ kraken: authentication
 krates: visualization
 ktmpl : configuration
 kube: development-tools
-kurbo: science::math, rendering::graphics-api
 kx : development-tools
 lapp: parser-implementations
 lcov : parser-implementations
@@ -295,6 +308,7 @@ libblas-sys : science::math
 libinput-sys: os
 liblapack-sys : science::math
 libloadorder-ffi : game-engines
+libnghttp2-sys : web-programming::http-server
 librdkafka-sys: asynchronous
 librsyncr: network-programming
 libsbc-sys: hardware-support
@@ -318,6 +332,7 @@ mach: os::macos-apis
 magenta-sys : os
 magenta: os
 magic-wormhole : command-line-utilities, network-programming
+makeflow: development-tools
 makepad-widget: web-programming
 makepad: text-editors
 mamba: parser-implementations
@@ -363,6 +378,7 @@ netdevice: os, network-programming
 new-ordered-float: rust-patterns
 newrelic: development-tools
 newrelic_plugin: web-programming
+newt: command-line-interface
 nite2-sys: science::machine-learning
 nokiahealth: databases
 nordselect: network-programming, command-line-utilities
@@ -373,10 +389,12 @@ num_sys : value-formatting
 nv-xml : parser-implementations
 objc-encode : os::macos-apis, development-tools::ffi
 onig_sys: text-processing
+openhmd-rs-sys : multimedia, rendering::graphics-api
 openldap: network-programming
 openni2: science::machine-learning
 openpol: games
 orgize: parser-implementations
+osmesa-sys  : multimedia, os::unix-apis
 ovgu-canteen  : parser-implementations
 packapp: os::macos-apis, command-line-utilities
 papyrus  : development-tools, command-line-utilities
@@ -488,6 +506,7 @@ solana-vote-program : cryptography::cryptocurrencies
 sorted-json: encoding
 spade: data-structures
 specs_sprite: game-engines
+speculo: development-tools
 spinning_top: concurrency
 sqlparser: parser-implementations
 sse-codec: web-programming
@@ -512,6 +531,7 @@ symbolic-debuginfo : development-tools::debugging
 symbolic-minidump: development-tools::debugging
 symbolic: development-tools::debugging
 syncat-stylesheet: parser-implementations
+sys-info: os, filesystem
 sys_util : os
 tagref : development-tools
 taildir: filesystem
@@ -549,15 +569,19 @@ typedb: database-implementations
 typename: rust-patterns
 ucd-trie: data-structures, text-processing
 ucd-util: text-processing
+ul: rendering::graphics-api
 urldecode: web-programming
 urlocator: parser-implementations
 usereport-rs : development-tools::profiling, command-line-utilities
 users: os::unix-apis
+utime: filesystem
+utime: filesystem
 vad: multimedia::audio
 validjson: encoding, command-line-utilities
 varlink_parser: parser-implementations
 varlociraptor: science
 veloren-launcher: games
+vfio-bindings : os::unix-apis
 vhdl_lang : development-tools
 vsphere-api : web-programming
 w_result: rust-patterns
@@ -571,6 +595,7 @@ wlambda: parser-implementations
 wnck-sys: gui
 wooting-sdk: hardware-support
 wrc: memory-management
+wstring: rust-patterns
 x86: hardware-support, os
 x86test-types : development-tools::testing
 x86test: development-tools::testing
@@ -580,4 +605,6 @@ yellowsun: cryptography::cryptocurrencies
 ymlctx: config
 yoga: gui
 yubirs: authentication
+zapper_derive: development-tools::procedural-macro-helpers
 zemeroth: games
+zmq-sys : network-programming

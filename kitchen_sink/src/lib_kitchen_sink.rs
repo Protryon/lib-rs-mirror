@@ -445,7 +445,7 @@ impl KitchenSink {
             now = now - chrono::Duration::days(missing_data_days as _);
         }
 
-        for i in (0..num_weeks).rev() {
+        for i in (1..=num_weeks).rev() {
             let date = now - chrono::Duration::weeks(i.into());
             let mut total = 0;
             let mut any_set = false;

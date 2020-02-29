@@ -66,7 +66,8 @@
               <td>@if r.downloads > 100 {
                 <span class=downloads>@if let Some((num,unit)) = Some(p.downloads(r.downloads)) {@num<b>@unit</b>}</span>
               }</td>
-              <td>@if r.rev_dep_count > 0 {<a href="@url.reverse_deps(&r.origin)">@r.rev_dep_count</a>}</td>
+              <td>@if r.rev_dep_count > 0 {
+                @if let Some(link) = url.reverse_deps(&r.origin) {<a href="@link">@r.rev_dep_count</a>}}</td>
               <td><a href="@url.crate_by_origin(&r.origin)">@r.depender.name()</a></td>
               <td>@if r.is_optional {<span class=feature>optional</span>}
              @if r.kind != "normal" && r.kind != "" {<span class="label label-@r.kind">@r.kind</span>}</td>

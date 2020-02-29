@@ -216,14 +216,19 @@
                         Used in <b>@c.format_number(deps)</b> crate@if deps != 1 {s}
                           @if direct == 1 {
                             @if let Some(name) = name {
-                              (via <a href="@url.reverse_deps(&Origin::from_crates_io_name(name))">@name</a>)
+                              @if let Some(link) = url.reverse_deps(&Origin::from_crates_io_name(name)) {
+                                (via <a href="@link">@name</a>)
+                              }
                             }
                           } else {
-                             (<a href="@url.reverse_deps(c.ver.origin())">@c.format_number(direct)&nbsp;directly</a>)
+                            @if let Some(link) = url.reverse_deps(c.ver.origin()) {
+                              (<a href="@link">@c.format_number(direct)&nbsp;directly</a>)
+                            }
                           }
-
                       } else {
-                        Used in <a href="@url.reverse_deps(c.ver.origin())"><b>@c.format_number(deps)</b>&nbsp;crate@if deps != 1 {s}</a>
+                        @if let Some(link) = url.reverse_deps(c.ver.origin()) {
+                          Used in <a href="@link"><b>@c.format_number(deps)</b>&nbsp;crate@if deps != 1 {s}</a>
+                        }
                       }
                     }}
                 }

@@ -111,11 +111,14 @@ fn index_downloads(crates: &CratesMap, versions: &VersionsMap, downloads: &Versi
 fn index_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users: &Users, ksink: &KitchenSink) -> Result<(), BoxErr> {
     for (crate_id, owners) in owners {
         if let Some(k) = crates.get(&crate_id) {
-            let owners: Vec<_> = owners.into_iter().map(|o| {
+            let owners: Vec<_> = owners.into_iter().filter_map(|o| {
                 let invited_by_github_id = o.created_by_id.and_then(|id| users.get(&id).map(|u| u.github_id as u32).or_else(|| teams.get(&id).map(|t| t.github_id)));
-                match o.owner_kind {
+                Some(match o.owner_kind {
                     0 => {
                         let u = users.get(&o.owner_id).expect("owner consistency");
+                        if u.github_id <= 0 {
+                            return None;
+                        }
                         CrateOwner {
                             id: o.owner_id as _,
                             login: u.login.to_owned(),
@@ -143,7 +146,7 @@ fn index_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users: &
                         }
                     },
                     _ => panic!("bad owner type"),
-                }
+                })
             }).collect();
             ksink.set_crates_io_crate_owners(&k.to_ascii_lowercase(), owners).map_err(|_| "ugh")?;
         }

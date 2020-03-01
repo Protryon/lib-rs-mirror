@@ -157,14 +157,15 @@ impl ClientInner {
             };
             self.wait_sec.store(wait_sec, SeqCst);
 
-            if status == StatusCode::ACCEPTED && retries > 0 {
+            let should_wait_for_content = status == StatusCode::ACCEPTED;
+            if should_wait_for_content && retries > 0 {
                 tokio::time::delay_for(Duration::from_secs(retry_delay)).await;
                 retry_delay *= 2;
                 retries -= 1;
                 continue;
             }
 
-            return if status.is_success() && status != StatusCode::ACCEPTED {
+            return if status.is_success() && !should_wait_for_content {
                 Ok(res)
             } else {
                 Err(error_for_response(res).await)

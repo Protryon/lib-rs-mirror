@@ -214,8 +214,8 @@ impl GitHub {
             _ => status.is_success(),
         };
         let body = match res {
-            Some(res) => Some(res.obj().await?),
-            None => None,
+            Some(res) if !non_parsable_body => Some(res.obj().await?),
+            _ => None,
         };
         match body.ok_or(Error::NoBody).and_then(|stats| {
             let dbg = format!("{:?}", stats);

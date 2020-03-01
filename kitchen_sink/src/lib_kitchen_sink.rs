@@ -1806,21 +1806,6 @@ impl KitchenSink {
     }
 
     async fn owners_github(&self, owner: &CrateOwner) -> CResult<User> {
-        // this is silly, but crates.io doesn't keep the github ID explicitly
-        // (the id field is crates-io's field), but it does keep the avatar URL
-        // which contains github's ID
-        if let Some(ref avatar) = owner.avatar {
-            lazy_static::lazy_static! {
-                static ref R: regex::Regex = regex::Regex::new("https://avatars[0-9]+.githubusercontent.com/u/([0-9]+)").expect("regex");
-            }
-            if let Some(c) = R.captures(avatar) {
-                let id = c.get(1).expect("regex").as_str();
-                let id = id.parse().expect("regex");
-                if let Some(user) = self.gh.user_by_id(id).await? {
-                    return Ok(user);
-                }
-            }
-        }
         // This is a bit weak, since logins are not permanent
         if let Some(user) = self.gh.user_by_login(owner.github_login().ok_or(KitchenSinkErr::OwnerWithoutLogin)?).await? {
             return Ok(user);

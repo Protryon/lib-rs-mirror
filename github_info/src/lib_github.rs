@@ -102,13 +102,6 @@ impl GitHub {
                        .send(), id).await.map_err(|e| e.context("user_by_login"))
     }
 
-    pub async fn user_by_id(&self, user_id: u32) -> CResult<Option<User>> {
-        let user_id = user_id.to_string();
-        self.get_cached(&self.users, (&user_id, ""), |client| client.get()
-                       .path("users").arg(&user_id)
-                       .send(), id).await.map_err(|e| e.context("user_by_id"))
-    }
-
     pub async fn user_orgs(&self, login: &str) -> CResult<Option<Vec<UserOrg>>> {
         let key = login.to_ascii_lowercase();
         self.get_cached(&self.orgs, (&key, ""), |client| client.get()

@@ -3,6 +3,7 @@ use chrono::prelude::*;
 use failure::*;
 use heck::KebabCase;
 use rich_crate::CrateVersionSourceData;
+use rich_crate::CrateOwner;
 use rich_crate::Derived;
 use rich_crate::Manifest;
 use rich_crate::ManifestExt;
@@ -103,7 +104,7 @@ impl CrateDb {
 
         let mut conn = self.exclusive_conn.lock().await;
         tokio::task::block_in_place(|| {
-            let conn = conn.get_or_insert_with(|| self.connect().unwrap());
+            let conn = conn.get_or_insert_with(|| self.connect().expect("db setup"));
 
             let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
             let res = cb(&tx).context(context)?;
@@ -621,6 +622,28 @@ impl CrateDb {
                 insert_version.execute(args).context("insert ver")?;
             }
             Ok(())
+        }).await
+    }
+
+    pub async fn index_crate_owners(&self, origin: &Origin, owners: &[CrateOwner]) -> FResult<bool> {
+        self.with_write("index_crate_owners", |tx| {
+            let mut get_crate_id = tx.prepare_cached("SELECT id FROM crates WHERE origin = ?1")?;
+            let mut insert = tx.prepare_cached("INSERT OR IGNORE INTO author_crates(github_id, crate_id, invited_by_github_id, invited_at) VALUES(?1, ?2, ?3, ?4)")?;
+            let crate_id: u32 = match get_crate_id.query_row(&[&origin.to_str()], |row| row.get(0)) {
+                Ok(id) => id,
+                Err(_) => return Ok(false),
+            };
+            for o in owners {
+                if let Some(github_id) = o.github_id {
+                    let invited_by_github_id = match o.invited_by_github_id {
+                        Some(id) if id != github_id => Some(id),
+                        _ => None,
+                    };
+                    let args: &[&dyn ToSql] = &[&github_id, &crate_id, &invited_by_github_id, &o.invited_at];
+                    insert.execute(args)?;
+                }
+            }
+            Ok(true)
         }).await
     }
 

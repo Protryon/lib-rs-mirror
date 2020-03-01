@@ -13,6 +13,13 @@ impl CrateDb {
                 next_update     INTEGER,
                 recent_downloads INTEGER NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS author_crates (
+                github_id       INTEGER NOT NULL,
+                crate_id        INTEGER NOT NULL,
+                invited_by_github_id INTEGER,
+                invited_at      TEXT
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS author_crates_idx ON author_crates(github_id, crate_id);
             CREATE TABLE IF NOT EXISTS keywords (
                 id              INTEGER PRIMARY KEY,
                 keyword         TEXT NOT NULL UNIQUE,

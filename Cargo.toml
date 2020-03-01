@@ -50,7 +50,6 @@ opt-level = 3
 [patch.crates-io]
 cargo_toml = { path = "cargo_toml" }
 cargo_author = { path = "cargo_author" }
-lazyonce = { path = "lazyonce" }
 onig = { git = "https://github.com/kornelski/rust-onig" }
 onig_sys = { git = "https://github.com/kornelski/rust-onig" }
 

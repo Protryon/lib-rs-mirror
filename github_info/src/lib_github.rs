@@ -1,12 +1,11 @@
-use std::future::Future;
 use repo_url::SimpleRepo;
 use simple_cache::TempCache;
+use std::future::Future;
 use std::path::Path;
 
-
-use urlencoding::encode;
-use serde::{Serialize, Deserialize};
 use github_v3::StatusCode;
+use serde::{Deserialize, Serialize};
+use urlencoding::encode;
 
 mod model;
 pub use crate::model::*;
@@ -191,7 +190,7 @@ impl GitHub {
                 eprintln!("Recvd {}@{} {:?} {:?}", key.0, key.1, status, headers);
                 (status, Some(res))
             },
-            Err(github_v3::GHError::Response {status, message}) => {
+            Err(github_v3::GHError::Response { status, message }) => {
                 eprintln!("GH Error {} {}", status, message.as_deref().unwrap_or("??"));
                 (status, None)
             },
@@ -308,7 +307,6 @@ pub(crate) trait Payloadable: Sized {
     fn to(&self) -> Payload;
     fn from(val: Payload) -> Option<Self>;
 }
-
 
 #[cfg(test)]
 #[tokio::test]

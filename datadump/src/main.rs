@@ -1,13 +1,13 @@
 #![allow(unused)]
 #![allow(dead_code)]
-use std::convert::TryInto;
 use chrono::prelude::*;
+use kitchen_sink::CrateOwner;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::OwnerKind;
-use kitchen_sink::CrateOwner;
 use libflate::gzip::Decoder;
 use serde_derive::Deserialize;
 use std::collections::HashMap;
+use std::convert::TryInto;
 use std::fs::File;
 use std::io::BufReader;
 use std::io::Read;
@@ -18,87 +18,92 @@ type BoxErr = Box<dyn std::error::Error + Sync + Send>;
 
 #[tokio::main]
 async fn main() -> Result<(), BoxErr> {
-    tokio::runtime::Handle::current().spawn(async move {
-    let mut a = Archive::new(Decoder::new(BufReader::new(File::open("db-dump.tar.gz")?))?);
-    let ksink = KitchenSink::new_default().await?;
+    tokio::runtime::Handle::current()
+        .spawn(async move {
+            let mut a = Archive::new(Decoder::new(BufReader::new(File::open("db-dump.tar.gz")?))?);
+            let ksink = KitchenSink::new_default().await?;
 
-    tokio::task::block_in_place(move || {
+            tokio::task::block_in_place(move || {
+                let mut crate_owners = None;
+                let mut crates = None;
+                let mut metadata = None;
+                let mut teams = None;
+                let mut users = None;
+                let mut downloads = None;
+                let mut versions = None;
 
-    let mut crate_owners = None;
-    let mut crates = None;
-    let mut metadata = None;
-    let mut teams = None;
-    let mut users = None;
-    let mut downloads = None;
-    let mut versions = None;
-
-    for file in a.entries()? {
-        let file = file?;
-        if !file.header().entry_type().is_file() {
-            continue;
-        }
-        if let Some(path) = file.path()?.file_name().and_then(|f| f.to_str()) {
-            eprint!("{} ({}KB): ", path, file.header().size()? / 1000);
-            match path {
-                "crate_owners.csv" => {
-                    eprintln!("parse_crate_owners…");
-                    crate_owners = Some(parse_crate_owners(file)?);
-                },
-                "crates.csv" => {
-                    eprintln!("parse_crates…");
-                    crates = Some(parse_crates(file)?);
-                },
-                "metadata.csv" => {
-                    eprintln!("parse_metadata…");
-                    metadata = Some(parse_metadata(file)?);
-                },
-                "teams.csv" => {
-                    eprintln!("parse_teams…");
-                    teams = Some(parse_teams(file)?);
-                },
-                "users.csv" => {
-                    eprintln!("parse_users…");
-                    users = Some(parse_users(file)?);
-                },
-                "version_downloads.csv" => {
-                    eprintln!("parse_version_downloads…");
-                    downloads = Some(parse_version_downloads(file)?);
-                },
-                "versions.csv" => {
-                    eprintln!("parse_versions…");
-                    versions = Some(parse_versions(file)?);
-                },
-                p => eprintln!("Ignored file {}", p),
-            };
-            if let (Some(crates), Some(versions)) = (&crates, &versions) {
-                if let Some(downloads) = downloads.take() {
-                    eprintln!("Indexing {} crates, {} versions, {} downloads", crates.len(), versions.len(), downloads.len());
-                    index_downloads(crates, versions, &downloads, &ksink)?;
+                for file in a.entries()? {
+                    let file = file?;
+                    if !file.header().entry_type().is_file() {
+                        continue;
+                    }
+                    if let Some(path) = file.path()?.file_name().and_then(|f| f.to_str()) {
+                        eprint!("{} ({}KB): ", path, file.header().size()? / 1000);
+                        match path {
+                            "crate_owners.csv" => {
+                                eprintln!("parse_crate_owners…");
+                                crate_owners = Some(parse_crate_owners(file)?);
+                            },
+                            "crates.csv" => {
+                                eprintln!("parse_crates…");
+                                crates = Some(parse_crates(file)?);
+                            },
+                            "metadata.csv" => {
+                                eprintln!("parse_metadata…");
+                                metadata = Some(parse_metadata(file)?);
+                            },
+                            "teams.csv" => {
+                                eprintln!("parse_teams…");
+                                teams = Some(parse_teams(file)?);
+                            },
+                            "users.csv" => {
+                                eprintln!("parse_users…");
+                                users = Some(parse_users(file)?);
+                            },
+                            "version_downloads.csv" => {
+                                eprintln!("parse_version_downloads…");
+                                downloads = Some(parse_version_downloads(file)?);
+                            },
+                            "versions.csv" => {
+                                eprintln!("parse_versions…");
+                                versions = Some(parse_versions(file)?);
+                            },
+                            p => eprintln!("Ignored file {}", p),
+                        };
+                        if let (Some(crates), Some(versions)) = (&crates, &versions) {
+                            if let Some(downloads) = downloads.take() {
+                                eprintln!("Indexing {} crates, {} versions, {} downloads", crates.len(), versions.len(), downloads.len());
+                                index_downloads(crates, versions, &downloads, &ksink)?;
+                            }
+                        }
+                        if let (Some(crates), Some(teams), Some(users)) = (&crates, &teams, &users) {
+                            if let Some(crate_owners) = crate_owners.take() {
+                                eprintln!("Indexing {} owners", crate_owners.len());
+                                handle.spawn(index_owners(crates, crate_owners, teams, users, &ksink));
+                            }
+                        }
+                    }
                 }
-            }
-            if let (Some(crates), Some(teams), Some(users)) = (&crates, &teams, &users) {
-                if let Some(crate_owners) = crate_owners.take() {
-                    eprintln!("Indexing {} owners", crate_owners.len());
-                    index_owners(crates, crate_owners, teams, users, &ksink)?;
-                }
-            }
-        }
-    }
-    Ok(())
-    })
-    }).await.unwrap()
+                Ok(())
+            })
+        })
+        .await
+        .unwrap()
 }
 
 #[inline(never)]
 fn index_downloads(crates: &CratesMap, versions: &VersionsMap, downloads: &VersionDownloads, ksink: &KitchenSink) -> Result<(), BoxErr> {
     for (crate_id, name) in crates {
         if let Some(vers) = versions.get(crate_id) {
-            let data = vers.iter().filter_map(|version| {
-                if let Some(d) = downloads.get(&version.id) {
-                    return Some((version.num.as_str(), d.as_slice()));
-                }
-                None
-            }).collect();
+            let data = vers
+                .iter()
+                .filter_map(|version| {
+                    if let Some(d) = downloads.get(&version.id) {
+                        return Some((version.num.as_str(), d.as_slice()));
+                    }
+                    None
+                })
+                .collect();
             ksink.index_crate_downloads(name, &data)?;
         } else {
             eprintln!("Bad crate? {} {}", crate_id, name);
@@ -111,43 +116,47 @@ fn index_downloads(crates: &CratesMap, versions: &VersionsMap, downloads: &Versi
 fn index_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users: &Users, ksink: &KitchenSink) -> Result<(), BoxErr> {
     for (crate_id, owners) in owners {
         if let Some(k) = crates.get(&crate_id) {
-            let owners: Vec<_> = owners.into_iter().filter_map(|o| {
-                let invited_by_github_id = o.created_by_id.and_then(|id| users.get(&id).map(|u| u.github_id as u32).or_else(|| teams.get(&id).map(|t| t.github_id)));
-                Some(match o.owner_kind {
-                    0 => {
-                        let u = users.get(&o.owner_id).expect("owner consistency");
-                        if u.github_id <= 0 {
-                            return None;
-                        }
-                        CrateOwner {
-                            id: o.owner_id as _,
-                            login: u.login.to_owned(),
-                            invited_at: Some(o.created_at),
-                            invited_by_github_id,
-                            github_id: u.github_id.try_into().ok(),
-                            name: Some(u.name.to_owned()),
-                            avatar: None,
-                            url: None,
-                            kind: OwnerKind::User,
-                        }
-                    },
-                    1 => {
-                        let u = teams.get(&o.owner_id).expect("owner consistency");
-                        CrateOwner {
-                            id: o.owner_id as _,
-                            login: u.login.to_owned(),
-                            invited_at: Some(o.created_at),
-                            github_id: Some(u.github_id),
-                            invited_by_github_id,
-                            name: Some(u.name.to_owned()),
-                            avatar: None,
-                            url: None,
-                            kind: OwnerKind::Team,
-                        }
-                    },
-                    _ => panic!("bad owner type"),
+            let owners: Vec<_> = owners
+                .into_iter()
+                .filter_map(|o| {
+                    let invited_by_github_id =
+                        o.created_by_id.and_then(|id| users.get(&id).map(|u| u.github_id as u32).or_else(|| teams.get(&id).map(|t| t.github_id)));
+                    Some(match o.owner_kind {
+                        0 => {
+                            let u = users.get(&o.owner_id).expect("owner consistency");
+                            if u.github_id <= 0 {
+                                return None;
+                            }
+                            CrateOwner {
+                                id: o.owner_id as _,
+                                login: u.login.to_owned(),
+                                invited_at: Some(o.created_at),
+                                invited_by_github_id,
+                                github_id: u.github_id.try_into().ok(),
+                                name: Some(u.name.to_owned()),
+                                avatar: None,
+                                url: None,
+                                kind: OwnerKind::User,
+                            }
+                        },
+                        1 => {
+                            let u = teams.get(&o.owner_id).expect("owner consistency");
+                            CrateOwner {
+                                id: o.owner_id as _,
+                                login: u.login.to_owned(),
+                                invited_at: Some(o.created_at),
+                                github_id: Some(u.github_id),
+                                invited_by_github_id,
+                                name: Some(u.name.to_owned()),
+                                avatar: None,
+                                url: None,
+                                kind: OwnerKind::Team,
+                            }
+                        },
+                        _ => panic!("bad owner type"),
+                    })
                 })
-            }).collect();
+                .collect();
             ksink.set_crates_io_crate_owners(&k.to_ascii_lowercase(), owners).map_err(|_| "ugh")?;
         }
     }
@@ -183,7 +192,7 @@ struct TeamRow {
     github_id: u32,
     id: u32,
     login: String, // in the funny format
-    name: String, // human str
+    name: String,  // human str
 }
 
 type Teams = HashMap<u32, TeamRow>;

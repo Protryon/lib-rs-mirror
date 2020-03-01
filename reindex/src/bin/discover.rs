@@ -49,8 +49,7 @@ fn check_repo(line: &str, crates: &KitchenSink) -> Result<(), Box<dyn std::error
                     if let Some(d) = &pkg.description {
                         print!("// {} // ", d.trim());
                     }
-                }
-                else if let Some(d) = &pkg.description {
+                } else if let Some(d) = &pkg.description {
                     println!("// {}", d.trim());
                 }
                 println!("github:{}/{}/{}\n,{}", gh.owner, gh.repo, pkg.name, if path != "" && path != pkg.name {format!(" // in {}", path)} else {String::new()});

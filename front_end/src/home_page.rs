@@ -15,8 +15,8 @@ use rich_crate::RichCrateVersion;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::future::Future;
-use std::sync::Arc;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 /// The list on the homepage looks flat, but it's actually a tree.
 ///

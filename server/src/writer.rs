@@ -17,8 +17,7 @@ impl<T, E: std::fmt::Display> Writer<T, E> {
 }
 
 impl<E: 'static> io::Write for Writer<Bytes, E>
-where
-    E: Send + Sync + 'static,
+where E: Send + Sync + 'static
 {
     fn write(&mut self, d: &[u8]) -> io::Result<usize> {
         let len = d.len();
@@ -49,9 +48,6 @@ where
 pub async fn writer<T: 'static, E: 'static + std::fmt::Debug>() -> (Writer<T, E>, impl Stream<Item = Result<T, E>>) {
     let rt = tokio::runtime::Handle::current();
     let (tx, rx) = mpsc::channel(3);
-    let w = Writer {
-        sender: tx,
-        rt,
-    };
+    let w = Writer { sender: tx, rt };
     (w, rx)
 }

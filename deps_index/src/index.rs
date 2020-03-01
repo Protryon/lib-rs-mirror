@@ -8,19 +8,19 @@ pub use crates_index::Version;
 use double_checked_cell_async::DoubleCheckedCell;
 use parking_lot::Mutex;
 use parking_lot::RwLock;
+use rayon::prelude::*;
 use rich_crate::Origin;
 use rich_crate::RichCrateVersion;
 use rich_crate::RichDep;
 use semver::Version as SemVer;
 use semver::VersionReq;
+use serde_derive::*;
 use std::iter;
 use std::path::Path;
 use std::sync::Arc;
+use std::time::Duration;
 use string_interner::StringInterner;
 use string_interner::Sym;
-use std::time::Duration;
-use rayon::prelude::*;
-use serde_derive::*;
 
 type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 type FxHashSet<V> = std::collections::HashSet<V, ahash::RandomState>;
@@ -268,7 +268,7 @@ impl Index {
         let mut set: FxHashMap<DepName, (_, _, SemVer, FxHashSet<String>)> = FxHashMap::with_capacity_and_hasher(60, Default::default());
         let mut iter1;
         let mut iter2;
-        let deps: &mut dyn Iterator<Item=_> = match deps {
+        let deps: &mut dyn Iterator<Item = _> = match deps {
             Fudge::CratesIo(dep) => {
                 iter1 = dep.iter().map(|d| {
                     (d.crate_name().to_ascii_lowercase(), d.kind().unwrap_or("normal"), d.target().is_some(), d.is_optional(), d.requirement(), d.has_default_features(), d.features())

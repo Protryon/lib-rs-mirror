@@ -42,7 +42,6 @@ pub enum GitError {
 }
 
 impl std::error::Error for GitError {
-    fn description(&self) -> &str {"git"}
 }
 
 impl std::fmt::Display for GitError {

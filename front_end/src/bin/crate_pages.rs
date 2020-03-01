@@ -2,7 +2,7 @@ use either::Either;
 use front_end;
 use kitchen_sink;
 use kitchen_sink::RichCrate;
-use kitchen_sink::{stopped, KitchenSink, Origin, filter::ImageOptimAPIFilter};
+use kitchen_sink::{filter::ImageOptimAPIFilter, stopped, KitchenSink, Origin};
 use render_readme::{Highlighter, Renderer};
 use rich_crate::RichCrateVersion;
 use std::fs;

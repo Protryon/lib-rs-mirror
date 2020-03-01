@@ -1,16 +1,16 @@
-use futures::future::FutureExt;
-use futures::stream::StreamExt;
 use either::*;
 use failure;
 use futures::future::join_all;
+use futures::future::FutureExt;
+use futures::stream::StreamExt;
 use kitchen_sink::RichCrate;
 use kitchen_sink::{self, stop, stopped, KitchenSink, MaintenanceStatus, Origin, RichCrateVersion};
 use parking_lot::Mutex;
 use rand::{seq::SliceRandom, thread_rng};
 use ranking::CrateTemporalInputs;
 use ranking::CrateVersionInputs;
-use render_readme::Renderer;
 use render_readme::Links;
+use render_readme::Renderer;
 use search_index::*;
 use std::collections::HashSet;
 use std::sync::mpsc;
@@ -163,7 +163,6 @@ fn index_search(indexer: &mut Indexer, renderer: &Renderer, k: &RichCrateVersion
     indexer.add(k.origin(), k.short_name(), version, k.description().unwrap_or(""), &keywords, readme.as_ref().map(|s| s.as_str()), downloads_per_month as u64, score);
     Ok(())
 }
-
 
 async fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) -> (usize, f64) {
     let contrib_info = crates.all_contributors(&k).await.map_err(|e| eprintln!("{}", e)).ok();

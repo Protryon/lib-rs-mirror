@@ -7,9 +7,9 @@ pub enum UserType {
 
 use serde::de;
 use serde::de::{Deserializer, Visitor};
+use serde::Serializer;
 use serde_derive::Deserialize;
 use serde_derive::Serialize;
-use serde::Serializer;
 use std::fmt;
 
 /// Case-insensitive enum

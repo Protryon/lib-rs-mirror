@@ -129,12 +129,12 @@ impl SimpleCache {
     }
 
     pub(crate) async fn fetch(url: &str) -> Result<Vec<u8>, Error> {
-            println!("REQ {}", url);
-            let client = reqwest::Client::builder().build()?;
-            let res = client.get(url).header(reqwest::header::USER_AGENT, "crates.rs/1.0").send().await?;
-            if res.status() != reqwest::StatusCode::OK {
-                Err(res.status())?;
-            }
-            Ok(res.bytes().await?.to_vec())
+        println!("REQ {}", url);
+        let client = reqwest::Client::builder().build()?;
+        let res = client.get(url).header(reqwest::header::USER_AGENT, "crates.rs/1.0").send().await?;
+        if res.status() != reqwest::StatusCode::OK {
+            Err(res.status())?;
+        }
+        Ok(res.bytes().await?.to_vec())
     }
 }

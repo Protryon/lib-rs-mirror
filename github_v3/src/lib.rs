@@ -1,19 +1,19 @@
-use std::sync::atomic::Ordering::SeqCst;
-use std::sync::atomic::AtomicU32;
-use std::sync::Arc;
-pub use reqwest::StatusCode;
+use futures::Stream;
+pub use futures::StreamExt;
 pub use reqwest::header::HeaderMap;
 pub use reqwest::header::HeaderValue;
-pub use futures::StreamExt;
-use futures::Stream;
+pub use reqwest::StatusCode;
 use serde::de::DeserializeOwned;
+use std::sync::atomic::AtomicU32;
+use std::sync::atomic::Ordering::SeqCst;
+use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 pub mod model;
 
 pub struct Response {
     res: reqwest::Response,
-    client: Arc<ClientInner>
+    client: Arc<ClientInner>,
 }
 
 impl Response {
@@ -21,7 +21,7 @@ impl Response {
         Ok(self.res.json().await?)
     }
 
-    pub fn array<T: DeserializeOwned + std::marker::Unpin + 'static>(self) -> impl Stream<Item=Result<T, GHError>> {
+    pub fn array<T: DeserializeOwned + std::marker::Unpin + 'static>(self) -> impl Stream<Item = Result<T, GHError>> {
         let mut res = self.res;
         let client = self.client;
 
@@ -204,7 +204,7 @@ fn parse_next_link(link: &str) -> Option<String> {
     for part in link.split(',') {
         if part.contains(r#"; rel="next""#) {
             if let Some(start) = link.find('<') {
-                let link = &link[start+1..];
+                let link = &link[start + 1..];
                 if let Some(end) = link.find('>') {
                     return Some(link[..end].to_owned());
                 }

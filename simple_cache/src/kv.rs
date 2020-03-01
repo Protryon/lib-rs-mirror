@@ -1,4 +1,3 @@
-use std::hash::Hash;
 use crate::error::Error;
 use crate::SimpleCache;
 use flate2::read::DeflateDecoder;
@@ -12,13 +11,14 @@ use serde::de::DeserializeOwned;
 use serde::*;
 use serde_json;
 use std::borrow::Borrow;
+use std::collections::hash_map::Entry;
 use std::fs::File;
+use std::hash::Hash;
 use std::io::BufReader;
 use std::io::BufWriter;
 use std::marker::PhantomData;
 use std::path::PathBuf;
 use tempfile::NamedTempFile;
-use std::collections::hash_map::Entry;
 
 type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 
@@ -106,7 +106,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
                     return Ok(());
                 }
                 e.insert(compr);
-            }
+            },
         }
         w.writes += 1;
         if w.writes >= w.next_autosave {

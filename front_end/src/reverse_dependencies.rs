@@ -51,8 +51,8 @@ impl<'a> CratePageRevDeps<'a> {
         let latest_stable_semver = &kitchen_sink.index.crate_highest_version(&own_name, true)?.version().parse()?;
         let stats = all_deps_stats.counts.get(own_name.as_str());
 
-        let mut downloads_by_ver: Vec<_> = kitchen_sink.recent_downloads_by_version(ver)?.into_iter().map(|(v,d)| (v.to_semver(), d)).collect();
-        downloads_by_ver.sort_by(|a,b| b.0.cmp(&a.0));
+        let mut downloads_by_ver: Vec<_> = kitchen_sink.recent_downloads_by_version(ver)?.into_iter().map(|(v, d)| (v.to_semver(), d)).collect();
+        downloads_by_ver.sort_by(|a, b| b.0.cmp(&a.0));
 
         let mut deps: Vec<_> = match stats {
             Some(s) => futures::future::join_all(s.rev_dep_names.iter().map(|rev_dep| async move {
@@ -153,7 +153,7 @@ impl<'a> CratePageRevDeps<'a> {
                 dl_perc: 0.,
                 dl_num_width: 0.,
                 num_str: String::new(),
-                dl_str: (String::new(),""),
+                dl_str: (String::new(), ""),
             });
         }
 
@@ -170,7 +170,7 @@ impl<'a> CratePageRevDeps<'a> {
                     dl_perc: 0.,
                     dl_num_width: 0.,
                     num_str: String::new(),
-                    dl_str: (String::new(),""),
+                    dl_str: (String::new(), ""),
                 });
             }
         }

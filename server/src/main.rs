@@ -1,9 +1,8 @@
-use actix_web::http::StatusCode;
-use actix_web::body::Body;
-use std::convert::TryInto;
 use crate::writer::*;
+use actix_web::body::Body;
 use actix_web::dev::Url;
 use actix_web::http::header::HeaderValue;
+use actix_web::http::StatusCode;
 use actix_web::middleware;
 use actix_web::HttpResponse;
 use actix_web::{web, App, HttpRequest, HttpServer};
@@ -17,18 +16,19 @@ use failure::ResultExt;
 use front_end;
 use futures::future::Future;
 use kitchen_sink;
+use kitchen_sink::filter::ImageOptimAPIFilter;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::Origin;
-use kitchen_sink::filter::ImageOptimAPIFilter;
 use locale::Numeric;
 use render_readme::{Highlighter, Markup, Renderer};
 use repo_url::SimpleRepo;
 use search_index::CrateSearchIndex;
+use std::convert::TryInto;
 use std::env;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, Instant};
+use std::time::{Duration, Instant, SystemTime};
 use tokio::runtime::Runtime;
 use urlencoding::decode;
 use urlencoding::encode;
@@ -144,7 +144,7 @@ async fn run_server() -> Result<(), failure::Error> {
                         Err(e) => {
                             eprintln!("Refresh failed: {}", e);
                             std::process::exit(1);
-                        }
+                        },
                     }
                 }
             }
@@ -274,10 +274,10 @@ async fn default_handler(req: HttpRequest) -> Result<HttpResponse, ServerError> 
                         } else {
                             Ok((None, None))
                         }
+                    },
                     }
+            },
                 }
-            }
-        }
     }).await?;
 
     if let Some(k) = found_crate {
@@ -674,7 +674,8 @@ async fn handle_sitemap(req: HttpRequest) -> Result<HttpResponse, ServerError> {
                 w.fail(e.into());
             }
         }
-    }});
+        }
+    });
 
     Ok(HttpResponse::Ok()
         .content_type("application/xml;charset=UTF-8")
@@ -707,7 +708,7 @@ async fn rt_run_timeout<R, T: 'static + Send>(rt: &Runtime, secs: u64, fut: R) -
 }
 
 struct ServerError {
-    err: failure::Error
+    err: failure::Error,
 }
 
 impl ServerError {
@@ -721,11 +722,9 @@ impl ServerError {
                 std::process::exit(2);
             }
         }
-        Self {
-            err
+        Self { err }
         }
     }
-}
 
 impl From<failure::Error> for ServerError {
     fn from(err: failure::Error) -> Self {
@@ -761,6 +760,7 @@ impl actix_web::ResponseError for ServerError {
     fn status_code(&self) -> StatusCode {
         StatusCode::INTERNAL_SERVER_ERROR
     }
+
     fn error_response(&self) -> HttpResponse<Body> {
         let mut page = Vec::with_capacity(20000);
         front_end::render_error(&mut page, &self.err);
@@ -770,5 +770,3 @@ impl actix_web::ResponseError for ServerError {
             .body(page)
     }
 }
-
-

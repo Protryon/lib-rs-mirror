@@ -26,12 +26,7 @@ pub struct CrateVersion {
 
 impl RichCrate {
     pub fn new(origin: Origin, owners: Vec<CrateOwner>, name: String, versions: Vec<CrateVersion>) -> Self {
-        Self {
-            origin,
-            versions,
-            name,
-            owners,
-        }
+        Self { origin, versions, name, owners }
     }
 
     pub fn name(&self) -> &str {

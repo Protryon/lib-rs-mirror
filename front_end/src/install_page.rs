@@ -1,8 +1,8 @@
 use crate::templates;
 use crate::Page;
 use kitchen_sink::KitchenSink;
-use render_readme::Renderer;
 use render_readme::Links;
+use render_readme::Renderer;
 use rich_crate::Readme;
 use rich_crate::RichCrateVersion;
 

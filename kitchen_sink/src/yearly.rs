@@ -1,10 +1,10 @@
+use crate::MiniVer;
 use parking_lot::Mutex;
 use simple_cache::TempCache;
 use std::collections::hash_map::Entry::*;
 use std::collections::HashMap;
 use std::fmt;
 use std::path::PathBuf;
-use crate::MiniVer;
 
 /// Downloads each day of the year
 #[derive(Serialize, Deserialize, Clone)]
@@ -19,7 +19,6 @@ pub struct AllDownloads {
     by_year: Mutex<HashMap<u16, TempCache<PerVersionDownloads>>>,
     base_path: PathBuf,
 }
-
 
 impl AllDownloads {
     /// Dir where to store years
@@ -66,8 +65,7 @@ trait BigArray<'de>: Sized {
     where D: Deserializer<'de>;
 }
 
-impl<'de> BigArray<'de> for [u32; 366]
-{
+impl<'de> BigArray<'de> for [u32; 366] {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {

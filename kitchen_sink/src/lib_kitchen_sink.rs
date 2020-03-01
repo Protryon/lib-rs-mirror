@@ -15,9 +15,9 @@ pub use crate::ctrlcbreak::*;
 
 pub use crate_db::builddb::Compat;
 pub use crate_db::builddb::CompatibilityInfo;
-use crates_io_client::CrateMetaFile;
 pub use crates_io_client::CrateDepKind;
 pub use crates_io_client::CrateDependency;
+use crates_io_client::CrateMetaFile;
 pub use crates_io_client::CrateMetaVersion;
 pub use crates_io_client::OwnerKind;
 pub use github_info::User;
@@ -34,7 +34,6 @@ pub use rich_crate::RichDep;
 pub use rich_crate::{Cfg, Target};
 pub use semver::Version as SemVer;
 
-use rayon::prelude::*;
 use crate::tarball::CrateFile;
 use cargo_toml::Manifest;
 use cargo_toml::Package;
@@ -50,6 +49,7 @@ use github_info::GitCommitAuthor;
 use github_info::GitHubRepo;
 use itertools::Itertools;
 use parking_lot::RwLock;
+use rayon::prelude::*;
 use repo_url::Repo;
 use repo_url::RepoHost;
 use repo_url::SimpleRepo;
@@ -68,8 +68,8 @@ use std::convert::TryInto;
 use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::SystemTime;
 use std::time::Duration;
+use std::time::SystemTime;
 
 type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 
@@ -332,7 +332,7 @@ impl KitchenSink {
         for (origin, score) in &mut top {
             *score *= 0.5 + self.crate_db.crate_rank(origin).await.unwrap_or(0.);
         }
-        top.sort_by(|a,b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
+        top.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
 
         self.knock_duplicates(&mut top).await;
         top.truncate(top_n);
@@ -347,8 +347,8 @@ impl KitchenSink {
         if day_of_year < 14 {
             return Vec::new(); // December stats are useless anyway
         }
-        let shortlen = (day_of_year/2).min(14);
-        let longerlen = (day_of_year/2).min(6*7);
+        let shortlen = (day_of_year / 2).min(14);
+        let longerlen = (day_of_year / 2).min(6 * 7);
 
         fn average_nonzero(slice: &[u32], min_days: u32) -> f32 {
             let mut sum = 0u32;

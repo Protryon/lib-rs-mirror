@@ -715,8 +715,9 @@ impl ServerError {
         for cause in err.iter_chain() {
             eprintln!("• {}", cause);
             // The server is stuck and useless
-            if cause.to_string().contains("Too many open files") {
-                eprintln!("Fatal error. Too many open files.");
+            let s = cause.to_string();
+            if s.contains("Too many open files") || s.contains("inconsistent park state") || s.contains("failed to allocate an alternative stack") {
+                eprintln!("Fatal error: {}", s);
                 std::process::exit(2);
             }
         }

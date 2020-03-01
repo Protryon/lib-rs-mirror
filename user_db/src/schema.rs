@@ -8,7 +8,7 @@ impl UserDb {
         conn.execute_batch(r#"
             BEGIN;
             CREATE TABLE IF NOT EXISTS github_users (
-                id            INTEGER NOT NULL PRIMARY KEY,
+                id            INTEGER NOT NULL,
                 login         TEXT NOT NULL,
                 name          TEXT,
                 avatar_url    TEXT,
@@ -16,7 +16,8 @@ impl UserDb {
                 html_url      TEXT,
                 type          TEXT NOT NULL DEFAULT 'user'
             );
-            CREATE INDEX IF NOT EXISTS github_users_idx on github_users(login); -- not unique, logins change!
+            DROP INDEX IF EXISTS "github_users_idx";
+            CREATE UNIQUE INDEX IF NOT EXISTS github_users_idx2 on github_users(id, login); -- not just unique login, logins change!
 
             CREATE TABLE IF NOT EXISTS github_emails (
                 github_id     INTEGER NOT NULL,

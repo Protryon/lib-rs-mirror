@@ -28,7 +28,7 @@ impl DocsRsClient {
 
     pub async fn build_status(&self, crate_name: &str, version: &str) -> Result<Option<Vec<BuildStatus>>, Error> {
         let key = format!("{}-{}", crate_name, version);
-        if let Some(cached) = self.cache.get(&key)? {
+        if let Some(cached) = self.cache.get(key.as_str())? {
             return Ok(cached);
         }
         let url = format!("https://docs.rs/crate/{}/{}/builds.json", crate_name, version);

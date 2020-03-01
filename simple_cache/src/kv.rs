@@ -1,3 +1,4 @@
+use std::hash::Hash;
 use crate::error::Error;
 use crate::SimpleCache;
 use flate2::read::DeflateDecoder;
@@ -21,21 +22,21 @@ use std::collections::hash_map::Entry;
 
 type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 
-struct Inner {
-    data: Option<FxHashMap<Box<str>, Box<[u8]>>>,
+struct Inner<K> {
+    data: Option<FxHashMap<K, Box<[u8]>>>,
     writes: usize,
     next_autosave: usize,
 }
 
-pub struct TempCache<T: Serialize + DeserializeOwned + Clone + Send> {
+pub struct TempCache<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeOwned + Clone + Send + Eq + Hash = Box<str>> {
     path: PathBuf,
-    data: RwLock<Inner>,
+    data: RwLock<Inner<K>>,
     _ty: PhantomData<T>,
     pub cache_only: bool,
     sem: tokio::sync::Semaphore,
 }
 
-impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
+impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeOwned + Clone + Send + Eq + Hash> TempCache<T, K> {
     pub fn new(path: impl Into<PathBuf>) -> Result<Self, Error> {
         let path = path.into().with_extension("rmpz");
         let data = if path.exists() {
@@ -58,11 +59,11 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
     }
 
     #[inline]
-    pub fn set(&self, key: impl Into<String>, value: impl Borrow<T>) -> Result<(), Error> {
-        self.set_(key.into().into_boxed_str(), value.borrow())
+    pub fn set(&self, key: impl Into<K>, value: impl Borrow<T>) -> Result<(), Error> {
+        self.set_(key.into(), value.borrow())
     }
 
-    fn lock_for_write(&self) -> Result<RwLockWriteGuard<'_, Inner>, Error> {
+    fn lock_for_write(&self) -> Result<RwLockWriteGuard<'_, Inner<K>>, Error> {
         let mut inner = self.data.write();
         if inner.data.is_none() {
             inner.data = Some(self.load_data()?);
@@ -70,7 +71,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
         Ok(inner)
     }
 
-    fn lock_for_read(&self) -> Result<RwLockReadGuard<'_, Inner>, Error> {
+    fn lock_for_read(&self) -> Result<RwLockReadGuard<'_, Inner<K>>, Error> {
         loop {
             let inner = self.data.read();
             if inner.data.is_some() {
@@ -81,7 +82,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
         }
     }
 
-    fn load_data(&self) -> Result<FxHashMap<Box<str>, Box<[u8]>>, Error> {
+    fn load_data(&self) -> Result<FxHashMap<K, Box<[u8]>>, Error> {
         let mut f = BufReader::new(File::open(&self.path)?);
         Ok(rmp_serde::from_read(&mut f).map_err(|e| {
             eprintln!("File {} is broken: {}", self.path.display(), e);
@@ -89,7 +90,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
         })?)
     }
 
-    pub fn set_(&self, key: Box<str>, value: &T) -> Result<(), Error> {
+    pub fn set_(&self, key: K, value: &T) -> Result<(), Error> {
         let mut e = DeflateEncoder::new(Vec::new(), Compression::best());
         rmp_serde::encode::write_named(&mut e, value)?;
         let compr = e.finish()?;
@@ -118,7 +119,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
         Ok(())
     }
 
-    pub fn delete(&self, key: &str) -> Result<(), Error> {
+    pub fn delete<Q>(&self, key: &Q) -> Result<(), Error> where K: Borrow<Q>, Q: Eq + Hash + ?Sized {
         let mut d = self.lock_for_write()?;
         if d.data.as_mut().unwrap().remove(key).is_some() {
             d.writes += 1;
@@ -126,7 +127,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
         Ok(())
     }
 
-    pub fn get(&self, key: &str) -> Result<Option<T>, Error> {
+    pub fn get<Q>(&self, key: &Q) -> Result<Option<T>, Error> where K: Borrow<Q>, Q: Eq + Hash + std::fmt::Display + ?Sized {
         let kw = self.lock_for_read()?;
         Ok(match kw.data.as_ref().unwrap().get(key) {
             Some(gz) => Some(Self::ungz(gz).map_err(|e| {
@@ -153,7 +154,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
         Ok(())
     }
 
-    fn save_unlocked(&self, d: &Inner) -> Result<(), Error> {
+    fn save_unlocked(&self, d: &Inner<K>) -> Result<(), Error> {
         if let Some(data) = d.data.as_ref() {
             let tmp_path = NamedTempFile::new_in(self.path.parent().expect("tmp"))?;
             let mut file = BufWriter::new(File::create(&tmp_path)?);
@@ -164,8 +165,8 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
     }
 
     #[inline]
-    pub async fn get_json<B>(&self, key: &str, url: impl AsRef<str>, on_miss: impl FnOnce(B) -> Option<T>) -> Result<Option<T>, Error>
-    where B: for<'a> Deserialize<'a> {
+    pub async fn get_json<Q, B>(&self, key: &Q, url: impl AsRef<str>, on_miss: impl FnOnce(B) -> Option<T>) -> Result<Option<T>, Error>
+    where B: for<'a> Deserialize<'a>, K: Borrow<Q> + for<'a> From<&'a Q>, Q: Eq + Hash + std::fmt::Display + ?Sized {
         if let Some(res) = self.get(key)? {
             return Ok(Some(res));
         }
@@ -189,7 +190,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send> TempCache<T> {
     }
 }
 
-impl<T: Serialize + DeserializeOwned + Clone + Send> Drop for TempCache<T> {
+impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeOwned + Clone + Send + Eq + Hash> Drop for TempCache<T, K> {
     fn drop(&mut self) {
         let d = self.data.read();
         if d.writes > 0 {

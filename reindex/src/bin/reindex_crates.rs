@@ -80,7 +80,7 @@ async fn main() {
         } else if !specific.is_empty() {
             Either::Left(specific)
         } else {
-            Either::Right(handle.enter(|| futures::executor::block_on(crates.all_new_crates())).unwrap().into_iter().map(|c| c.origin().clone()))
+            Either::Right(handle.enter(|| futures::executor::block_on(crates.crates_to_reindex())).unwrap().into_iter().map(|c| c.origin().clone()))
         };
         for (i, origin) in c.into_iter().enumerate() {
             if stopped() {

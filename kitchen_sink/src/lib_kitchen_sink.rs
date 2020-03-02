@@ -474,7 +474,7 @@ impl KitchenSink {
         Ok(res)
     }
 
-    pub async fn all_new_crates(&self) -> CResult<Vec<RichCrate>> {
+    pub async fn crates_to_reindex(&self) -> CResult<Vec<RichCrate>> {
         let min_timestamp = self.crate_db.latest_crate_update_timestamp().await?.unwrap_or(0);
         let all = tokio::task::block_in_place(|| {
             self.index.crates_io_crates() // too slow to scan all GH crates
@@ -483,7 +483,7 @@ impl KitchenSink {
             .filter_map(move |(name, _)| async move {
                 self.rich_crate_async(&Origin::from_crates_io_name(&*name)).await.map_err(|e| eprintln!("{}: {}", name, e)).ok()
             });
-        Ok(stream.filter(move |k| {
+        let mut crates = stream.filter(move |k| {
             let latest = k.versions().iter().map(|v| v.created_at.as_str()).max().unwrap_or("");
             let res = if let Ok(timestamp) = DateTime::parse_from_rfc3339(latest) {
                 timestamp.timestamp() >= min_timestamp as i64
@@ -493,7 +493,15 @@ impl KitchenSink {
             };
             async move { res }
         })
-        .collect::<Vec<_>>().await)
+        .collect::<Vec<_>>().await;
+
+        let mut crates2 = futures::stream::iter(self.crate_db.crates_to_reindex().await?.into_iter())
+            .filter_map(move |origin| async move {
+                self.rich_crate_async(&origin).await.map_err(|e| eprintln!("{:?}: {}", origin, e)).ok()
+            }).collect::<Vec<_>>().await;
+
+        crates.append(&mut crates2);
+        Ok(crates)
     }
 
     pub fn crate_exists(&self, origin: &Origin) -> bool {

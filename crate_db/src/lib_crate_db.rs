@@ -1043,6 +1043,19 @@ impl CrateDb {
         }).await
     }
 
+    /// Crates overdue for an update
+    pub async fn crates_to_reindex(&self) -> FResult<Vec<Origin>> {
+        self.with_read("crates_to_reindex", |conn| {
+            let mut q = conn.prepare("SELECT origin FROM crates WHERE next_update < ?1 LIMIT 1000")?;
+            let timestamp = Utc::now().timestamp() as u32;
+            let q = q.query_map(&[&timestamp], |r| {
+                let s = r.get_raw(0).as_str().unwrap();
+                Ok(Origin::from_crates_io_name(s))
+            })?.filter_map(|r| r.ok());
+            Ok(q.collect())
+        }).await
+    }
+
     // returns an array of lowercase phrases
     fn extract_text_phrases(c: &CrateVersionData<'_>) -> Vec<(f64, String)> {
         let mut out = Vec::new();

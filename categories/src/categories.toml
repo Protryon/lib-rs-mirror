@@ -42,6 +42,7 @@ Core algorithms such as hashing, sorting and searching.
 siblings = ["data-structures", "compression"]
 # tags typical for this category that don't differentiate crates in the category
 obvious-keywords = ["algorithms", "algorithm"]
+preference = 0.8
 
 # [api-bindings]
 # name = "API bindings"
@@ -64,6 +65,7 @@ flow, using techniques like futures, promises, waiting, or eventing.\
 short-description = """
 Async program flow using techniques like futures, promises, waiting, or eventing."""
 obvious-keywords = ["asynchronous", "async"]
+preference = 1.1
 
 [authentication]
 name = "Authentication"
@@ -74,6 +76,7 @@ Crates to help with the process of confirming identities.\
 short-description = """
 Help with the process of confirming identities."""
 obvious-keywords = ["authentication", "auth", "authorization"]
+preference = 1.1
 
 [caching]
 name = "Caching"
@@ -85,6 +88,7 @@ the results.\
 short-description = """
 Store the results of previous computations."""
 obvious-keywords = ["cache", "caching"]
+preference = 1.1
 
 [command-line-interface]
 name = "Command-line interface"
@@ -96,6 +100,7 @@ parsers, line-editing, or output coloring and formatting.\
 short-description = """
 Argument parsers, line-editing, or output coloring and formatting."""
 obvious-keywords = ["cli", "command-line"]
+preference = 0.9
 
 [command-line-utilities]
 name = "Command line utilities"
@@ -106,6 +111,7 @@ Applications to run at the command line.\
 short-description = """
 Applications to run at the command line."""
 obvious-keywords = ["cli", "command-line", "command-line-tool", "command-line-utility"]
+preference = 0.8
 
 [compression]
 name = "Compression"
@@ -116,6 +122,7 @@ Algorithms for making data smaller.\
 short-description = """
 Algorithms for making data smaller."""
 obvious-keywords = ["compression", "decompression"]
+preference = 1.1
 
 [config]
 name = "Configuration"
@@ -126,6 +133,7 @@ Crates to facilitate configuration management for applications.\
 short-description = """
 Configuration management for applications."""
 obvious-keywords = ["config", "configuration"]
+preference = 1.2
 
 [concurrency]
 name = "Concurrency"
@@ -136,6 +144,7 @@ Crates for implementing concurrent and parallel computation.\
 short-description = """
 Implementing concurrent and parallel computation."""
 obvious-keywords = ["concurrency", "parallel"]
+preference = 1.1
 
 [cryptography]
 name = "Cryptography"
@@ -146,6 +155,7 @@ Algorithms intended for securing data.\
 short-description = """
 Algorithms intended for securing data."""
 obvious-keywords = ["cryptography", "crypto"]
+preference = 1
 
 [cryptography.categories.cryptocurrencies]
 # fake, like the money
@@ -156,6 +166,7 @@ Libraries and tools for digital currencies, and distributed ledgers.\
 """
 short-description = "Coins, blockchains and wallets."
 obvious-keywords = ["cryptography", "crypto", "cryptocurrency"]
+preference = 1.2
 
 [database]
 name = "Database interfaces"
@@ -167,6 +178,7 @@ short-description = """
 Interface with database management systems."""
 siblings = ["database-implementations"]
 obvious-keywords = ["database", "db"]
+preference = 1.1
 
 [database-implementations]
 name = "Database implementations"
@@ -179,6 +191,7 @@ short-description = """
 Database management systems implemented in Rust."""
 siblings = ["database"]
 obvious-keywords = ["database", "db"]
+preference = 1
 
 [data-structures]
 name = "Data structures"
@@ -190,6 +203,7 @@ specific purposes.\
 short-description = """
 Rust implementations of data structures for specific purposes."""
 obvious-keywords = ["data-structures", "data-structure"]
+preference = 0.9
 
 [date-and-time]
 name = "Date and time"
@@ -200,6 +214,7 @@ dimension.\
 """
 short-description = """
 Dealing with the fourth dimension."""
+preference = 1.1
 
 [development-tools]
 name = "Development tools"
@@ -211,6 +226,7 @@ linting, performance profiling, autocompletion, formatting, and more.\
 short-description = """
 Testing, debugging, linting, performance profiling, autocompletion, formatting, and more."""
 obvious-keywords = ["development-tools"]
+preference = 0.9
 
 [development-tools.categories.build-utils]
 name = "Build Utils"
@@ -221,6 +237,7 @@ Utilities for build scripts and other build time steps.\
 short-description = """
 Utilities for build scripts and other build time steps."""
 obvious-keywords = ["build-utils", "build", "build-dependencies"]
+preference = 1.1
 
 [development-tools.categories.cargo-plugins]
 name = "Cargo plugins"
@@ -231,6 +248,7 @@ Subcommands that extend the capabilities of Cargo.\
 short-description = """
 Subcommands that extend the capabilities of Cargo."""
 obvious-keywords = ["cargo", "cargo-subcommand", "subcommand", "cli", "plugin"]
+preference = 1.1
 
 [development-tools.categories.debugging]
 name = "Debugging"
@@ -241,6 +259,7 @@ logging, tracing, or assertions.\
 """
 short-description = """
 Figure out what is going on with your code via logging, tracing, or assertions."""
+preference = 1
 
 [development-tools.categories.ffi]
 name = "FFI"
@@ -252,6 +271,7 @@ includes binding generators and helpful language constructs.\
 short-description = """
 Interface with other languages. Includes binding generators and helpful language constructs."""
 obvious-keywords = ["ffi"]
+preference = 1.05
 
 [development-tools.categories.procedural-macro-helpers]
 name = "Procedural macro helpers"
@@ -263,6 +283,7 @@ short-description = """
 Extend Rust language with procedural macros.
 """
 obvious-keywords = ["proc-macro", "macro", "macros"]
+preference = 1.1
 
 [development-tools.categories.profiling]
 name = "Profiling"
@@ -273,6 +294,7 @@ Crates to help you figure out the performance of your code.\
 short-description = """
 Figure out the performance of your code."""
 obvious-keywords = ["profiling", "profiler"]
+preference = 1.1
 
 [development-tools.categories.testing]
 name = "Testing"
@@ -283,6 +305,7 @@ Crates to help you verify the correctness of your code.\
 short-description = """
 Verify the correctness of your code."""
 obvious-keywords = ["testing", "test", "tests"]
+preference = 1.1
 
 [email]
 name = "Email"
@@ -293,6 +316,7 @@ Crates to help with Sending, receiving, formatting, and parsing email.\
 short-description = """
 Sending, receiving, formatting, and parsing email."""
 obvious-keywords = ["email"]
+preference = 1.2
 
 [embedded]
 name = "Embedded development"
@@ -306,6 +330,7 @@ For embedded devices or devices without an operating system.
 """
 siblings = ["hardware-support", "no-std"]
 obvious-keywords = ["embedded"]
+preference = 1.2
 
 [emulators]
 name = "Emulators"
@@ -318,6 +343,7 @@ computer. Video game systems are commonly emulated.\
 short-description = """
 Run software or games not available natively on the host computer."""
 obvious-keywords = ["emulator", "emulators"]
+preference = 1.1
 
 [encoding]
 name = "Encoding"
@@ -330,6 +356,7 @@ short-description = """
 Encoding and/or decoding data from one data format to another."""
 siblings = ["parser-implementations"]
 obvious-keywords = ["encoding", "serialization", "encode", "decode"]
+preference = 1
 
 # [external-ffi-bindings]
 # name = "External FFI bindings"
@@ -352,6 +379,7 @@ Crates for dealing with files and filesystems.\
 short-description = """
 Crates for dealing with files and filesystems."""
 obvious-keywords = ["filesystem", "file", "fs"]
+preference = 1.1
 
 [game-engines]
 name = "Game development"
@@ -362,6 +390,7 @@ Crates for creating games.\
 short-description = """
 Crates for creating games."""
 obvious-keywords = ["engine", "gamedev", "game-dev", "game", "game-engine"]
+preference = 1.2
 
 [games]
 name = "Games"
@@ -375,6 +404,7 @@ Game engines category.\
 short-description = """
 Fun and entertainment. Games implemented in the Rust programming language."""
 obvious-keywords = ["game", "games", "play"]
+preference = 1
 
 [gui]
 name = "GUI"
@@ -385,6 +415,7 @@ Crates to help you create a graphical user interface.\
 short-description = """
 Create a graphical user interface."""
 obvious-keywords = ["gui", "ui", "interface"]
+preference = 1.1
 
 [hardware-support]
 name = "Hardware support"
@@ -396,6 +427,7 @@ short-description = """
 Interface with specific CPU or other hardware features."""
 siblings = ["embedded"]
 obvious-keywords = ["hardware", "hw"]
+preference = 1.05
 
 [internationalization]
 name = "Internationalization (i18n)"
@@ -407,6 +439,7 @@ languages and regions. Including localization (L10n) software.\
 short-description = """
 and localization (l10n). Develop software for various languages and regions."""
 obvious-keywords = ["localization", "i18n", "internationalization", "l10n", "text"]
+preference = 1.1
 
 # merged into internationalization
 # [localization]
@@ -429,6 +462,7 @@ reference counting, or interfaces to foreign memory managers.\
 short-description = """
 Allocation, memory mapping, garbage collection, reference counting, or interfaces to foreign memory managers."""
 obvious-keywords = ["memory", "memory-allocator", "memory-management"]
+preference = 1.1
 
 [multimedia]
 name = "Multimedia"
@@ -440,6 +474,7 @@ engines.\
 short-description = """
 Audio, video, and image processing or rendering engines."""
 obvious-keywords = ["multimedia", "media"]
+preference = 0.95
 
 [multimedia.categories.audio]
 name = "Audio"
@@ -451,6 +486,7 @@ short-description = """
 Record, output, or process audio.
 """
 obvious-keywords = ["audio", "media"]
+preference = 1.2
 
 [multimedia.categories.video]
 name = "Video"
@@ -462,6 +498,7 @@ short-description = """
 Record, output, or process video.
 """
 obvious-keywords = ["video"]
+preference = 1.2
 
 [multimedia.categories.images]
 name = "Images"
@@ -473,6 +510,7 @@ short-description = """
 Process or build images.
 """
 obvious-keywords = ["image", "images"]
+preference = 1.1
 
 [multimedia.categories.encoding]
 name = "Encoding"
@@ -485,6 +523,7 @@ short-description = """
 Encode or decode binary data in multimedia formats.
 """
 obvious-keywords = ["codec", "encoding"]
+preference = 0.9
 
 [network-programming]
 name = "Network programming"
@@ -497,6 +536,7 @@ short-description = """
 Network protocols such as FTP, HTTP, or SSH, or lower-level TCP or UDP."""
 siblings = ["authentication", "email"]
 obvious-keywords = ["network", "networking"]
+preference = 1.1
 
 [no-std]
 name = "No standard library"
@@ -509,6 +549,7 @@ Libraries that function without the Rust standard library.
 """
 siblings = ["embedded"]
 obvious-keywords = ["no_std", "no-std"]
+preference = 0.8
 
 [os]
 name = "Operating systems"
@@ -519,6 +560,7 @@ Bindings to operating system-specific APIs.\
 short-description = """
 Bindings to operating system-specific APIs."""
 obvious-keywords = ["os", "system", "platform"]
+preference = 1
 
 [os.categories.macos-apis]
 name = "macOS APIs"
@@ -528,6 +570,7 @@ Bindings to macOS-specific APIs.\
 """
 short-description = """
 Bindings to macOS-specific APIs."""
+preference = 1
 
 [os.categories.unix-apis]
 name = "Unix APIs"
@@ -538,6 +581,7 @@ Bindings to Unix-specific APIs.\
 short-description = """
 Bindings to Unix-specific APIs."""
 obvious-keywords = ["unix", "system"]
+preference = 1.1
 
 [os.categories.windows-apis]
 name = "Windows APIs"
@@ -548,6 +592,7 @@ Bindings to Windows-specific APIs.\
 short-description = """
 Bindings to Windows-specific APIs."""
 obvious-keywords = ["windows", "win32", "winapi"]
+preference = 1.1
 
 [parser-implementations]
 name = "Parser implementations"
@@ -559,6 +604,7 @@ short-description = """
 Parse data formats or languages."""
 siblings = ["parsing"]
 obvious-keywords = ["parser", "parsing", "parse", "file"]
+preference = 1.1
 
 [parsing]
 name = "Parser tooling"
@@ -570,6 +616,7 @@ short-description = """
 Low-level tools and parser generators."""
 siblings = ["parser-implementations"]
 obvious-keywords = ["parser", "parsing", "parse"]
+preference = 0.9
 
 [rendering]
 name = "Rendering"
@@ -581,6 +628,7 @@ usually with the help of a graphics card.\
 short-description = """
 Real-time or offline rendering of 2D or 3D graphics, usually on a GPU."""
 obvious-keywords = ["rendering", "graphics"]
+preference = 0.9
 
 [rendering.categories.engine]
 name = "Rendering engine"
@@ -591,6 +639,7 @@ High-level solutions for rendering on the screen.\
 short-description = """
 High-level solutions for rendering on the screen."""
 obvious-keywords = ["engine", "engines", "rendering"]
+preference = 0.9
 
 [rendering.categories.graphics-api]
 name = "Graphics APIs"
@@ -602,6 +651,7 @@ system's rendering capabilities.\
 short-description = """
 Direct access to the hardware's or the operating system's rendering capabilities."""
 obvious-keywords = ["graphics", "api"]
+preference = 1
 
 [rendering.categories.data-formats]
 name = "Data formats"
@@ -613,6 +663,7 @@ Loading and parsing of data formats related to 2D or 3D rendering, like \
 """
 short-description = """
 Loading and parsing of data for 2D/3D rendering, like 3D models or animations."""
+preference = 1
 
 [rust-patterns]
 name = "Rust patterns"
@@ -625,6 +676,7 @@ short-description = """
 Shared solutions for particular situations specific to programming in Rust."""
 siblings = ["no-std", "memory-management"]
 obvious-keywords = ["rust"]
+preference = 0.95
 
 [science]
 name = "Science"
@@ -635,6 +687,7 @@ biology, machine learning, geoscience, and other scientific fields.\
 """
 short-description = """
 Solving problems involving math, physics, and other scientific fields."""
+preference = 1
 
 [science.categories.math]
 # fake
@@ -646,6 +699,7 @@ Crates related to solving mathematical problems.\
 short-description = """
 Solving problems involving math and logic."""
 obvious-keywords = ["math", "mathematics", "science"]
+preference = 1.1
 
 [science.categories.ml]
 # fake
@@ -656,6 +710,7 @@ Artificial intelligence, neural networks, deep learning, recommendation systems,
 """
 short-description = """AI, ML, NN, etc."""
 obvious-keywords = ["ml", "machine-learning", "ai"]
+preference = 1.2
 
 [simulation]
 name = "Simulation"
@@ -666,6 +721,7 @@ simulate a networking protocol.\
 """
 short-description = """
 Model or construct models for some activity, e.g. to simulate a networking protocol."""
+preference = 1.1
 
 [template-engine]
 name = "Template engine"
@@ -677,6 +733,7 @@ documents, usually with an emphasis on processing text.\
 short-description = """
 Combine templates with data to produce documents, usually with an emphasis on processing text."""
 obvious-keywords = ["template", "templating"]
+preference = 1.1
 
 [text-editors]
 name = "Text editors"
@@ -687,6 +744,7 @@ Applications for editing text.\
 short-description = """
 Applications for editing text."""
 obvious-keywords = ["text", "editor"]
+preference = 1
 
 [text-processing]
 name = "Text processing"
@@ -699,6 +757,7 @@ short-description = """
 Deal with the complexities of human language when expressed in textual form."""
 siblings = ["value-formatting", "template-engine"]
 obvious-keywords = ["text", "processing", "string"]
+preference = 1.1
 
 [value-formatting]
 name = "Value formatting"
@@ -710,6 +769,7 @@ potentially adapting the display to various languages and regions.\
 short-description = """
 Format values for display to a user, potentially adapting the display to various languages and regions."""
 obvious-keywords = ["formatting", "format", "string"]
+preference = 1
 
 [visualization]
 name = "Visualization"
@@ -720,6 +780,7 @@ Ways to view data, such as plotting or graphing.\
 short-description = """
 Ways to view data, such as plotting or graphing."""
 obvious-keywords = ["visualization"]
+preference = 1
 
 [wasm]
 name = "WebAssembly"
@@ -730,6 +791,7 @@ Crates for use when targeting WebAssembly, or for manipulating WebAssembly.\
 short-description = """
 Targeting or manipulating WebAssembly."""
 obvious-keywords = ["web", "wasm", "webassembly", "web-assembly", "webasm"]
+preference = 1.1
 
 [web-programming]
 name = "Web programming"
@@ -741,6 +803,7 @@ short-description = """
 Create applications for the Web."""
 siblings = ["wasm"]
 obvious-keywords = ["web", "http", "wasm", "webasm"]
+preference = 1
 
 [web-programming.categories.http-client]
 name = "HTTP client"
@@ -751,6 +814,7 @@ Crates to make HTTP network requests.\
 short-description = """
 Make HTTP network requests."""
 obvious-keywords = ["web", "http", "client", "http-client"]
+preference = 1
 
 [web-programming.categories.http-server]
 name = "HTTP server"
@@ -761,6 +825,7 @@ Crates to serve data over HTTP.\
 short-description = """
 Serve data over HTTP."""
 obvious-keywords = ["web", "http", "server", "http-server"]
+preference = 1
 
 [web-programming.categories.websocket]
 name = "WebSocket"
@@ -771,6 +836,7 @@ Crates to communicate over the WebSocket protocol.\
 short-description = """
 Communicate over the WebSocket protocol."""
 obvious-keywords = ["websocket", "websockets", "web"]
+preference = 1.2
 
 # [uncategorized]
 # name = "Uncategorized"

@@ -17,6 +17,7 @@ use rusqlite::NO_PARAMS;
 use rusqlite::*;
 use std::borrow::Cow;
 use std::cell::RefCell;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Write;
@@ -437,7 +438,7 @@ impl CrateDb {
 
         let keywords_collected = keywords.chain(invalid_categories).collect();
 
-        let categories: Vec<_> = if had_explicit_categories {
+        let mut categories: Vec<_> = if had_explicit_categories {
             let cat_w = 10.0 / (9.0 + explicit_categories.len() as f64);
             let candidates = explicit_categories
                 .into_iter()
@@ -460,9 +461,14 @@ impl CrateDb {
             }).collect()
         };
 
-        let max_weight = categories.iter().map(|(w, _)| *w)
-            .max_by(|a, b| a.partial_cmp(&b).unwrap())
-            .unwrap_or(0.)
+        // slightly nudge towards specific, leaf categories over root generic ones
+        for (w, slug) in &mut categories {
+            *w *= categories::CATEGORIES.from_slug(slug).last().map(|c| c.preference as f64).unwrap_or(1.);
+        }
+
+        let max_weight = categories.iter().map(|&(w, _)| w)
+            .max_by(|a, b| a.partial_cmp(&b).unwrap_or(Ordering::Equal))
+            .unwrap_or(0.3)
             .max(0.3); // prevents div/0, ensures odd choices stay low
 
         let categories = categories
@@ -644,6 +650,29 @@ impl CrateDb {
                 }
             }
             Ok(true)
+        }).await
+    }
+
+    pub async fn crates_by_author(&self, github_id: u32) -> FResult<Vec<CrateOwnerRow>> {
+        self.with_read("crates_by_author", |conn| {
+            let mut query = conn.prepare_cached(r#"SELECT ac.crate_id, ac.invited_by_github_id, ac.invited_at, max(cv.created)
+                FROM author_crates ac JOIN crate_versions cv USING(crate_id)
+                WHERE ac.github_id = ?1
+                GROUP BY ac.crate_id
+            "#)?;
+            let q = query.query_map(&[&github_id], |row| {
+                let crate_id: u32 = row.get_unwrap(0);
+                let invited_by_github_id: Option<u32> = row.get_unwrap(1);
+                let invited_at = row.get_raw(2).as_str().ok().and_then(|d| DateTime::parse_from_rfc3339(d).ok());
+                let latest_timestamp: u32 = row.get_unwrap(3);
+                Ok(CrateOwnerRow {
+                    crate_id,
+                    invited_by_github_id,
+                    invited_at,
+                    latest_version: DateTime::from_utc(NaiveDateTime::from_timestamp(latest_timestamp as _, 0), FixedOffset::east(0)),
+                })
+            })?;
+            Ok(q.filter_map(|x| x.ok()).collect())
         }).await
     }
 
@@ -1148,6 +1177,13 @@ fn chop3words(s: &str) -> &str {
         }
     }
     s
+}
+
+pub struct CrateOwnerRow {
+    crate_id: u32,
+    invited_by_github_id: Option<u32>,
+    invited_at: Option<DateTime<FixedOffset>>,
+    latest_version: DateTime<FixedOffset>,
 }
 
 #[inline]

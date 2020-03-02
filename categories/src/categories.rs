@@ -27,6 +27,8 @@ pub struct Category {
     pub standalone_name: Option<String>,
     pub title: String,
     pub slug: String,
+    // fudge factor for selecting primary category (how useful and specific it is)
+    pub preference: f32,
     pub sub: CategoryMap,
     pub siblings: Vec<String>,
     pub obvious_keywords: Vec<String>,
@@ -82,6 +84,7 @@ impl Categories {
             let title = details.remove("title").ok_or(CatError::MissingField)?.try_into()?;
             let standalone_name = details.remove("standalone-name").and_then(|v| v.try_into().ok());
             let obvious_keywords = details.remove("obvious-keywords").and_then(|v| v.try_into().ok()).unwrap_or_default();
+            let preference = details.remove("preference").ok_or(CatError::MissingField)?.try_into()?;
             let siblings = details.remove("siblings").and_then(|v| v.try_into().ok()).unwrap_or_default();
 
             let mut full_slug = String::with_capacity(full_slug_start.len() + 2 + slug.len());
@@ -102,6 +105,7 @@ impl Categories {
                 short_description,
                 standalone_name,
                 description,
+                preference,
                 slug: full_slug,
                 sub,
                 siblings,

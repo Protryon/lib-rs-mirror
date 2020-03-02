@@ -25,7 +25,7 @@ lazy_static! {
     "some", "specific", "still", "stuff", "such", "take", "than", "that", "the",
     "their", "them", "then", "there", "therefore", "these", "they", "things",
     "this", "those", "to", "todo", "too", "travis", "two", "under", "us",
-    "usable", "use", "used", "useful", "using", "v1", "v2", "v3", "v4", "various",
+    "usable", "use", "used", "useful", "using", "usage", "v1", "v2", "v3", "v4", "various",
     "very", "via", "want", "way", "well", "we'll", "what", "when", "where", "which",
     "while", "will", "wip", "with", "without", "working", "works", "writing",
     "written", "yet", "you", "your", "build status", "meritbadge", "common",

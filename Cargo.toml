@@ -23,6 +23,7 @@ members = [
 "search_index",
 "ranking",
 "server",
+"feat_extractor",
 "deps_index",
 "render_readme/dump",
 ]

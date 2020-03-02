@@ -1369,8 +1369,9 @@ impl KitchenSink {
             &tmp
         };
 
+        let extracted_auto_keywords = feat_extractor::auto_keywords(&manifest, src.github_description.as_deref(), readme_text.as_deref());
+
         self.crate_db.index_latest(CrateVersionData {
-            readme_text,
             category_slugs,
             authors: &authors,
             origin,
@@ -1379,6 +1380,7 @@ impl KitchenSink {
             is_build, is_dev,
             manifest: &manifest,
             derived: &src,
+            extracted_auto_keywords,
         }).await?;
         Ok(())
     }

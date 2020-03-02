@@ -6,8 +6,7 @@ afterparty-ng : web-programming::http-server
 ag : command-line-utilities
 ai_kit : science::machine-learning
 alass-core : algorithms
-alert-after : gui
-alert-after: command-line-utilities
+alert-after : gui, command-line-utilities
 alfred: development-tools, os::macos-apis
 algorust: algorithms
 allegro_primitives-sys: game-engines
@@ -42,6 +41,7 @@ bcc-sys : development-tools
 bcc: development-tools
 bcfs : cryptography::cryptocurrencies, wasm
 begonia: command-line-interface
+bfc: emulators
 bigbro: os, filesystem
 binaryen-sys : wasm
 binwrite: encoding
@@ -55,7 +55,11 @@ bloke: game-engines
 bloomfilter: data-structures
 bnf: parsers
 boxcars: parser-implementations
+br4infuck: emulators
+brain-brainfuck: emulators, command-line-utilities
+brain-rs : emulators
 brain: emulators
+brainpreter: emulators
 bresenham: rendering::engine, algorithms
 bright: command-line-utilities
 bs58: encoding
@@ -74,6 +78,7 @@ cb2 : command-line-utilities
 celery-rs-core : asynchronous
 celery: asynchronous
 cgl: rendering::graphics-api, os::macos-apis
+chariot_slp : games, parser-implementations
 checkm: science, parser-implementations
 chillup: web-programming
 cita_trie: data-structures
@@ -185,6 +190,7 @@ fast-socks5 : network-programming, web-programming::http-client, web-programming
 fast_uaparser : parser-implementations
 fastcgi-client : asynchronous, web-programming::http-client
 fastdl: caching
+favy: multimedia::images
 fddf: command-line-utilities, filesystem
 fdfast: filesystem
 fec : encoding
@@ -243,6 +249,7 @@ github-rs : web-programming
 glutin_cocoa: os::macos-apis
 glutin_core_foundation : rendering::graphics-api
 glx : rendering::graphics-api, os::unix-apis
+google_geocoding: science, web-programming
 graphcore: data-structures
 graviton_core : development-tools
 grin-miner: cryptography::cryptocurrencies
@@ -259,6 +266,7 @@ hash256-std-hasher : rust-patterns, no-std
 hdf5: data-structures
 hdlc: network-programming
 hdwallet-bitcoin: cryptography::cryptocurrencies
+heliometer: emulators
 hexe_core: game-engines
 holochain :cryptography::cryptocurrencies
 holochain_common :cryptography::cryptocurrencies
@@ -301,6 +309,7 @@ iota-spammer : cryptography::cryptocurrencies
 iota-utils : cryptography::cryptocurrencies
 ipwhois: databases, network-programming
 is-macro : development-tools::procedural-macro-helpers
+isbfc: emulators
 iso639-1 : internationalization
 iso639_2: internationalization
 iso_currency : internationalization
@@ -388,7 +397,9 @@ matrix_bot_api: network-programming
 mdtoc: text-processing
 mediawiki: web-programming
 memorydb: database-implementations
+mermer-rs : text-processing, science
 meson: development-tools::build-tools
+mindjuice: emulators
 mine_sweeper: games
 minidump-processor:development-tools::debugging
 minimad: text-processing, parser-implementations
@@ -446,6 +457,7 @@ openpol: games
 orgize: parser-implementations
 osmesa-sys : multimedia, os::unix-apis
 ostrich-core : asynchronous
+overdose : concurrency, data-structures
 ovgu-canteen : parser-implementations
 oxygengine-core : game-engines, wasm
 packapp: os::macos-apis, command-line-utilities
@@ -601,6 +613,7 @@ speculo: development-tools
 spinning_top: concurrency
 sqlparser: parser-implementations
 sse-codec: web-programming
+stamm : science::machine-learning
 star-history : command-line-utilities
 stemjail: os::unix-apis
 stringlit: rust-patterns
@@ -638,6 +651,7 @@ termcodes: command-line-interface, no-std
 text_io: text-processing
 thrift_codec : encoding, web-programming
 time-parse : date-and-time, parser-implementations
+tls_read_hancock_bin : parser-implementations, science
 tmux-thumbs: text-editors
 trackable: development-tools::debugging
 traitcast_core : rust-patterns
@@ -671,6 +685,7 @@ vad: multimedia::audio
 validjson: encoding, command-line-utilities
 varlink_parser: parser-implementations
 varlociraptor: science
+vec3D: science::math
 veloren-launcher: games
 versionisator: development-tools::build-tools
 vfio-bindings : os::unix-apis

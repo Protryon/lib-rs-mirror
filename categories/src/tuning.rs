@@ -152,9 +152,9 @@ lazy_static! {
 
         (Cond::Any(&["gis", "latitude", "geospatial", "triangulation", "seismology", "lidar"]),
             &[("science", 1.2, 0.2), ("science::math", 0.6, 0.), ("algorithms", 0.9, 0.), ("rust-patterns", 0.5, 0.), ("command-line-utilities", 0.75, 0.), ("config", 0.8, 0.), ("cryptography::cryptocurrencies", 0.6, 0.)]), // geo
-        (Cond::Any(&["openstreetmap", "geojson", "osm", "geography", "geo", "geos", "geodesic", "wgs84", "wgs-84"]),
+        (Cond::Any(&["openstreetmap", "geojson", "osm", "geography", "geo", "geos", "wgs-84", "ephemeris"]),
             &[("science", 1.2, 0.2), ("science::math", 0.6, 0.), ("algorithms", 0.9, 0.), ("command-line-utilities", 0.75, 0.), ("cryptography::cryptocurrencies", 0.6, 0.)]), // geo
-        (Cond::Any(&["astronomy", "ephemeris", "planet", "chemistry", "astro", "electromagnetism"]), &[("science", 1.2, 0.2), ("rust-patterns", 0.5, 0.), ("concurrency", 0.7, 0.), ("command-line-utilities", 0.75, 0.)]),
+        (Cond::Any(&["astronomy", "planet", "chemistry", "astro",  "geodesic", "geocoding", "wgs84", "electromagnetism"]), &[("science", 1.2, 0.2), ("rust-patterns", 0.5, 0.), ("concurrency", 0.7, 0.), ("command-line-utilities", 0.75, 0.)]),
         (Cond::Any(&["bioinformatics", "benzene", "chemical", "biological", "rna", "genotype", "genbank"]),
             &[("science", 1.2, 0.3), ("science::math", 0.6, 0.), ("visualization", 1.1, 0.), ("algorithms", 0.7, 0.), ("embedded", 0.7, 0.), ("asynchronous", 0.7, 0.), ("command-line-utilities", 0.8, 0.)]),
         (Cond::Any(&["chemistry", "dep:bio", "sensory", "phenotype", "interactomics", "genomics", "molecules", "transcriptomics"]),
@@ -211,9 +211,9 @@ lazy_static! {
             ("emulators", 0.2, 0.), ("command-line-utilities", 0.6, 0.), ("development-tools::build-utils", 0.2, 0.)]),
         (Cond::Any(&["fuzzy-logic", "natural-language-processing", "nlp"]),
             &[("science", 1.25, 0.2), ("science::ml", 1.3, 0.1), ("games", 0.5, 0.), ("os", 0.8, 0.), ("game-engines", 0.75, 0.), ("algorithms", 1.2, 0.1), ("command-line-utilities", 0.8, 0.), ("command-line-interface", 0.4, 0.)]),
-        (Cond::Any(&["blas", "tensorflow", "tensor-flow", "word2vec", "torch", "genetic-algorithm", "mnist", "deep-learning", "neuralnetworks", "neuralnetwork", "machine-learning"]),
+        (Cond::Any(&["blas", "tensorflow", "tensor-flow", "word2vec", "torch", "decision-tree", "genetic-algorithm", "mnist", "deep-learning", "neuralnetworks", "neuralnetwork", "machine-learning"]),
             &[("science::ml", 1.25, 0.3), ("science::math", 0.8, 0.), ("science", 0.7, 0.), ("web-programming::http-client", 0.8, 0.), ("games", 0.5, 0.), ("os", 0.8, 0.), ("game-engines", 0.75, 0.), ("algorithms", 1.2, 0.), ("command-line-utilities", 0.8, 0.), ("command-line-interface", 0.4, 0.)]),
-        (Cond::Any(&["neural-network", "machinelearning", "backpropagation", "neural-networks", "deep-neural-networks", "reinforcement", "perceptron"]),
+        (Cond::Any(&["neural-network", "machinelearning", "backpropagation", "randomforest", "neural-networks", "deep-neural-networks", "reinforcement", "perceptron"]),
             &[("science::ml", 1.25, 0.3), ("science::math", 0.8, 0.), ("science", 0.7, 0.), ("web-programming::http-client", 0.8, 0.), ("games", 0.5, 0.), ("os", 0.8, 0.), ("game-engines", 0.75, 0.), ("algorithms", 1.2, 0.), ("command-line-utilities", 0.8, 0.), ("command-line-interface", 0.4, 0.)]),
         (Cond::Any(&["bayesian", "classifier", "classify", "markov", "ai", "cuda", "svm", "nn", "rnn", "tensor", "learning", "statistics"]),
             &[("science::ml", 1.2, 0.), ("science::math", 0.9, 0.), ("algorithms", 1.1, 0.), ("web-programming::http-client", 0.8, 0.), ("development-tools", 0.9, 0.), ("development-tools::build-utils", 0.6, 0.)]),
@@ -397,7 +397,7 @@ lazy_static! {
         (Cond::Any(&["dep:allegro"]), &[("multimedia", 1.1, 0.)]),
         (Cond::Any(&["image", "images", "viewer", "photos"]), &[
             ("multimedia::images", 1.2, 0.1), ("parser-implementations", 0.9, 0.), ("parsing", 0.6, 0.), ("data-structures", 0.9, 0.)]),
-        (Cond::Any(&["icons", "icns", "ico"]), &[("multimedia::images", 1.2, 0.1), ("no-std", 0.5, 0.)]),
+        (Cond::Any(&["icons", "icns", "ico", "favicon"]), &[("multimedia::images", 1.2, 0.1), ("no-std", 0.5, 0.)]),
         (Cond::All(&["kernel", "image"]), &[("multimedia::images", 0.5, 0.)]),
         (Cond::Any(&["dep:dssim", "dep:imgref"]), &[("multimedia::images", 1.2, 0.05), ("no-std", 0.2, 0.)]),
         (Cond::Any(&["dep:mozjpeg", "dep:lodepng", "dep:image"]), &[("multimedia::images", 1.2, 0.05), ("no-std", 0.5, 0.)]),
@@ -454,7 +454,7 @@ lazy_static! {
         (Cond::All(&["emulator", "gb"]), &[("emulators", 1.2, 0.1)]),
         (Cond::All(&["accurate", "cpu"]), &[("emulators", 1.1, 0.)]),
         (Cond::All(&["super", "nintendo"]), &[("emulators", 1.3, 0.1), ("wasm", 0.8, 0.)]),
-        (Cond::Any(&["esolang", "tick-accurate"]), &[("emulators", 1.1, 0.), ("parsing", 0.5, 0.), ("parser-implementations", 0.9, 0.)]),
+        (Cond::Any(&["esolang", "tick-accurate", "brainfuck"]), &[("emulators", 1.1, 0.), ("parsing", 0.5, 0.), ("parser-implementations", 0.9, 0.)]),
         (Cond::Any(&["vte", "virtual-terminal", "terminal-emulator"]), &[("emulators", 0.5, 0.)]),
 
         (Cond::Any(&["radix", "genetic"]), &[("science", 1.4, 0.), ("command-line-utilities", 0.75, 0.)]),

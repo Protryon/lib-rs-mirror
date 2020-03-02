@@ -1,6 +1,7 @@
 @use crate::home_page::HomeCategory;
 @use crate::Urler;
 @use crate::iter::*;
+@use crate::limit_text_len;
 
 @(cats: &[HomeCategory], url: &Urler, toplevel: bool)
 
@@ -18,7 +19,7 @@
             <ul class=crates>
             @for t in &cat.top {
                 <li>
-                    <a href="@url.krate(t)" title="@t.description().unwrap_or("?")"
+                    <a href="@url.krate(t)" title="@limit_text_len(t.description().unwrap_or("").splitn(2, '\n').next().unwrap(), 40, 70)"
                     >@for (last, part) in t.short_name().split('_').identify_last() {@part@if !last {_<wbr>}}</a></li>
             }
             @if cat.pop.saturating_sub(cat.top.len()) > 2 {

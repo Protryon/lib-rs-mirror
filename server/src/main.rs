@@ -146,9 +146,9 @@ async fn run_server() -> Result<(), failure::Error> {
                             eprintln!("Refresh failed: {}", e);
                             std::process::exit(1);
                         },
+                        }
                     }
                 }
-            }
         }});
 
     // watchdog
@@ -179,6 +179,7 @@ async fn run_server() -> Result<(), failure::Error> {
             .route("/keywords/{keyword}", web::get().to(handle_keyword))
             .route("/crates/{crate}", web::get().to(handle_crate))
             .route("/crates/{crate}/rev", web::get().to(handle_crate_reverse_dependencies))
+            .route("/~{author}", web::get().to(handle_author))
             .route("/install/{crate:.*}", web::get().to(handle_install))
             .route("/debug/{crate:.*}", web::get().to(handle_debug))
             .route("/gh/{owner}/{repo}/{crate}", web::get().to(handle_github_crate))
@@ -438,6 +439,30 @@ async fn handle_install(req: HttpRequest) -> Result<HttpResponse, ServerError> {
         Ok::<_, failure::Error>((page, None))
     }).await?;
     Ok(serve_cached((page, 7200, false, last_mod)))
+}
+
+async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
+    let login = req.match_info().query("author");
+    println!("author page for {:?}", login);
+    let state: &AServerState = req.app_data().expect("appdata");
+    if !is_alnum(login) {
+        return render_404_page(state, login);
+    }
+    let cache_file = state.page_cache_dir.join(format!("@{}.html", login));
+    Ok(serve_cached(
+        with_file_cache(state, cache_file, 3600, {
+        let login = login.to_owned();
+        let state = state.clone();
+        run_timeout(60, async move {
+            let crates = state.crates.load();
+            let mut page: Vec<u8> = Vec::with_capacity(32000);
+            let aut = crates.author_by_login(&login).await?;
+            front_end::render_author_page(&mut page, &aut, &crates, &state.markup).await?;
+            Ok::<_, failure::Error>((page, None))
+        })
+        })
+        .await?,
+    ))
 }
 
 async fn handle_crate(req: HttpRequest) -> Result<HttpResponse, ServerError> {

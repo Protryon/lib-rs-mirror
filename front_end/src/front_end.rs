@@ -5,6 +5,7 @@
 //! because the template engine Ructe doesn't support
 //! complex expressions in the templates.
 
+mod author_page;
 mod cat_page;
 mod crate_page;
 mod download_graph;
@@ -19,6 +20,7 @@ pub use crate::not_found_page::*;
 pub use crate::search_page::*;
 use futures::future::try_join_all;
 
+use crate::author_page::*;
 use crate::crate_page::*;
 use crate::urler::Urler;
 use categories::Category;
@@ -26,6 +28,7 @@ use chrono::prelude::*;
 use failure;
 use failure::ResultExt;
 use kitchen_sink::Compat;
+use kitchen_sink::RichAuthor;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::{stopped, KitchenSinkErr};
 use render_readme::Links;
@@ -131,6 +134,18 @@ pub async fn render_sitemap(sitemap: &mut impl Write, crates: &KitchenSink) -> R
     }
 
     sitemap.write_all(b"\n</urlset>\n")?;
+    Ok(())
+}
+
+/// See `author.rs.html`
+pub async fn render_author_page<W: Write>(out: &mut W, aut: &RichAuthor, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
+    if stopped() {
+        Err(KitchenSinkErr::Stopped)?;
+    }
+
+    let urler = Urler::new(None);
+    let c = AuthorPage::new(aut, kitchen_sink, renderer).await.context("New crate page")?;
+    templates::author(out, &urler, &c).context("author page io")?;
     Ok(())
 }
 

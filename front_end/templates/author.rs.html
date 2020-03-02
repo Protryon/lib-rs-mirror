@@ -1,0 +1,39 @@
+@use crate::templates::base;
+@use crate::Urler;
+@use crate::AuthorPage;
+
+@(url: &Urler, c: &AuthorPage)
+
+@:base(&c.page(), {
+  <header id="author">
+    <div class="inner-col">
+    <div class="breadcrumbs">
+      <h1><a href="/">Lib.rs</a></h1> › @if c.is_org() {
+        Orgs
+      } else {
+        Users
+      }
+    </div>
+
+    <h2>
+      @"@"@c.login()
+    </h2>
+
+    <nav><ul>
+      <li><a href="@c.github_url()">GitHub</a></li>
+    </ul></nav>
+    </div>
+  </header>
+  <main>
+    <div class="inner-col">
+      Hi
+    </div>
+  </main>
+  </div>
+
+  <footer>
+    <div class="inner-col">
+      Bye
+    </div>
+  </footer>
+})

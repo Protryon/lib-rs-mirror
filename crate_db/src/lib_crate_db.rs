@@ -643,8 +643,8 @@ impl CrateDb {
         }).await
     }
 
-    pub async fn crates_by_author(&self, github_id: u32) -> FResult<Vec<CrateOwnerRow>> {
-        self.with_read("crates_by_author", |conn| {
+    pub async fn crates_of_author(&self, github_id: u32) -> FResult<Vec<CrateOwnerRow>> {
+        self.with_read("crates_of_author", |conn| {
             let mut query = conn.prepare_cached(r#"SELECT ac.crate_id, ac.invited_by_github_id, ac.invited_at, max(cv.created)
                 FROM author_crates ac JOIN crate_versions cv USING(crate_id)
                 WHERE ac.github_id = ?1

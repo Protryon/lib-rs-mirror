@@ -3,6 +3,7 @@
 use chrono::prelude::*;
 use kitchen_sink::CrateOwner;
 use kitchen_sink::KitchenSink;
+use kitchen_sink::Origin;
 use kitchen_sink::OwnerKind;
 use libflate::gzip::Decoder;
 use serde_derive::Deserialize;
@@ -18,8 +19,8 @@ type BoxErr = Box<dyn std::error::Error + Sync + Send>;
 
 #[tokio::main]
 async fn main() -> Result<(), BoxErr> {
-    tokio::runtime::Handle::current()
-        .spawn(async move {
+    tokio::runtime::Handle::current().spawn(async move {
+            let handle = tokio::runtime::Handle::current();
             let mut a = Archive::new(Decoder::new(BufReader::new(File::open("db-dump.tar.gz")?))?);
             let ksink = KitchenSink::new_default().await?;
 
@@ -76,12 +77,15 @@ async fn main() -> Result<(), BoxErr> {
                                 index_downloads(crates, versions, &downloads, &ksink)?;
                             }
                         }
-                        if let (Some(crates), Some(teams), Some(users)) = (&crates, &teams, &users) {
+                    }
+                }
+
+                if let (Some(crates), Some(teams), Some(users)) = (crates, teams, users) {
                             if let Some(crate_owners) = crate_owners.take() {
                                 eprintln!("Indexing {} owners", crate_owners.len());
-                                index_owners(crates, crate_owners, teams, users, &ksink)?;
-                            }
-                        }
+                        handle.spawn(async move {
+                            index_owners(&crates, crate_owners, &teams, &users, &ksink).await.unwrap();
+                        });
                     }
                 }
                 Ok(())
@@ -113,7 +117,7 @@ fn index_downloads(crates: &CratesMap, versions: &VersionsMap, downloads: &Versi
 }
 
 #[inline(never)]
-fn index_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users: &Users, ksink: &KitchenSink) -> Result<(), BoxErr> {
+async fn index_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users: &Users, ksink: &KitchenSink) -> Result<(), BoxErr> {
     for (crate_id, owners) in owners {
         if let Some(k) = crates.get(&crate_id) {
             let owners: Vec<_> = owners
@@ -157,7 +161,8 @@ fn index_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users: &
                     })
                 })
                 .collect();
-            ksink.set_crates_io_crate_owners(&k.to_ascii_lowercase(), owners).map_err(|_| "ugh")?;
+            let origin = Origin::from_crates_io_name(k);
+            ksink.index_crates_io_crate_owners(&origin, owners).await?;
         }
     }
     Ok(())

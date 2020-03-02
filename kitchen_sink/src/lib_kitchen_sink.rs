@@ -13,6 +13,7 @@ mod ctrlcbreak;
 mod tarball;
 pub use crate::ctrlcbreak::*;
 
+pub use crate_db::CrateOwnerRow;
 pub use crate_db::builddb::Compat;
 pub use crate_db::builddb::CompatibilityInfo;
 pub use crates_io_client::CrateDepKind;
@@ -107,6 +108,8 @@ pub enum KitchenSinkErr {
     CategoryQueryFailed,
     #[fail(display = "crate not found: {:?}", _0)]
     CrateNotFound(Origin),
+    #[fail(display = "author not found: {}", _0)]
+    AuthorNotFound(String),
     #[fail(display = "crate {} not found in repo {}", _0, _1)]
     CrateNotFoundInRepo(String, String),
     #[fail(display = "crate is not a package: {:?}", _0)]
@@ -1865,6 +1868,10 @@ impl KitchenSink {
         Err(KitchenSinkErr::OwnerWithoutLogin)?
     }
 
+    pub async fn crates_of_author(&self, aut: &RichAuthor) -> CResult<Vec<CrateOwnerRow>> {
+        self.crate_db.crates_of_author(aut.github.id).await
+    }
+
     async fn crate_owners(&self, origin: &Origin) -> CResult<Vec<CrateOwner>> {
         match origin {
             Origin::CratesIo(name) => {
@@ -1893,8 +1900,12 @@ impl KitchenSink {
         }
     }
 
-    pub fn set_crates_io_crate_owners(&self, crate_name: &str, owners: Vec<CrateOwner>) -> Result<(), ()> {
-        self.crates_io_owners_cache.set(crate_name, owners).map_err(drop)
+    pub async fn index_crates_io_crate_owners(&self, origin: &Origin, owners: Vec<CrateOwner>) -> CResult<()> {
+        self.crate_db.index_crate_owners(origin, &owners).await?;
+        if let Origin::CratesIo(name) = origin {
+            self.crates_io_owners_cache.set(&**name, owners)?;
+        }
+        Ok(())
     }
 
     // Sorted from the top, returns origins
@@ -2069,6 +2080,18 @@ impl KitchenSink {
         let _ = self.url_check_cache.save();
         self.crates_io.cleanup();
     }
+
+    pub async fn author_by_login(&self, login: &str) -> CResult<RichAuthor> {
+        let github = self.gh.user_by_login(login).await?.ok_or_else(|| KitchenSinkErr::AuthorNotFound(login.to_owned()))?;
+        Ok(RichAuthor {
+            github
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RichAuthor {
+    pub github: User,
 }
 
 /// This is used to uniquely identify authors based on as little information as is available

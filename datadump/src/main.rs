@@ -79,7 +79,7 @@ async fn main() -> Result<(), BoxErr> {
                         if let (Some(crates), Some(teams), Some(users)) = (&crates, &teams, &users) {
                             if let Some(crate_owners) = crate_owners.take() {
                                 eprintln!("Indexing {} owners", crate_owners.len());
-                                handle.spawn(index_owners(crates, crate_owners, teams, users, &ksink));
+                                index_owners(crates, crate_owners, teams, users, &ksink)?;
                             }
                         }
                     }

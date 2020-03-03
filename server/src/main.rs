@@ -287,10 +287,10 @@ async fn default_handler(req: HttpRequest) -> Result<HttpResponse, ServerError> 
         return Ok(HttpResponse::TemporaryRedirect().header("Location", format!("/keywords/{}", encode(&keyword))).body(""));
     }
 
-    render_404_page(state, path)
+    render_404_page(state, path, "crate or category")
 }
 
-fn render_404_page(state: &AServerState, path: &str) -> Result<HttpResponse, ServerError> {
+fn render_404_page(state: &AServerState, path: &str, item_name: &str) -> Result<HttpResponse, ServerError> {
     let decoded = decode(path).ok();
     let rawtext = decoded.as_ref().map(|d| d.as_str()).unwrap_or(path);
 
@@ -298,7 +298,7 @@ fn render_404_page(state: &AServerState, path: &str) -> Result<HttpResponse, Ser
     let query = query.trim();
     let results = state.index.search(query, 5, false).unwrap_or_default();
     let mut page: Vec<u8> = Vec::with_capacity(32000);
-    front_end::render_404_page(&mut page, query, &results, &state.markup)?;
+    front_end::render_404_page(&mut page, query, item_name, &results, &state.markup)?;
 
     Ok(HttpResponse::NotFound()
         .content_type("text/html;charset=UTF-8")
@@ -356,7 +356,7 @@ async fn handle_git_crate(req: HttpRequest, slug: &'static str) -> Result<HttpRe
     let crate_name = inf.query("crate");
     println!("{} crate {}/{}/{}", slug, owner, repo, crate_name);
     if !is_alnum_dot(&owner) || !is_alnum_dot(&repo) || !is_alnum(&crate_name) {
-        return render_404_page(state, &crate_name);
+        return render_404_page(state, &crate_name, "git crate");
     }
 
     let cache_file = state.page_cache_dir.join(format!("{},{},{},{}.html", slug, owner, repo, crate_name));
@@ -415,7 +415,7 @@ async fn handle_install(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let state2: &AServerState = req.app_data().expect("appdata");
     let origin = if let Some(o) = get_origin_from_subpath(req.match_info()) {o}
     else {
-        return render_404_page(&state2, req.path().trim_start_matches("/install"));
+        return render_404_page(&state2, req.path().trim_start_matches("/install"), "crate");
     };
 
     let state = state2.clone();
@@ -436,7 +436,7 @@ async fn handle_crate(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let crates = state.crates.load();
     let origin = Origin::from_crates_io_name(&crate_name);
     if !is_alnum(&crate_name) || !crates.crate_exists(&origin) {
-        return render_404_page(state, &crate_name);
+        return render_404_page(state, &crate_name, "crate");
     }
     let cache_file = state.page_cache_dir.join(format!("{}.html", crate_name));
     Ok(serve_cached(with_file_cache(state, cache_file, 900, {
@@ -451,7 +451,7 @@ async fn handle_crate_reverse_dependencies(req: HttpRequest) -> Result<HttpRespo
     let crates = state.crates.load();
     let origin = Origin::from_crates_io_name(&crate_name);
     if !is_alnum(&crate_name) || !crates.crate_exists(&origin) {
-        return render_404_page(&state, &crate_name);
+        return render_404_page(&state, &crate_name, "crate");
     }
     Ok(serve_cached(render_crate_reverse_dependencies(state.clone(), origin).await?))
 }

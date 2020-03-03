@@ -8,11 +8,12 @@ pub struct NotFoundPage<'a> {
     markup: &'a Renderer,
     pub results: &'a [search_index::CrateFound],
     pub query: &'a str,
+    pub item_name: &'a str,
 }
 
 impl NotFoundPage<'_> {
-    pub fn new<'a>(query: &'a str, results: &'a [search_index::CrateFound], markup: &'a Renderer) -> NotFoundPage<'a> {
-        NotFoundPage { query, markup, results }
+    pub fn new<'a>(query: &'a str, item_name: &'a str, results: &'a [search_index::CrateFound], markup: &'a Renderer) -> NotFoundPage<'a> {
+        NotFoundPage { query, markup, results, item_name }
     }
 
     pub fn page(&self) -> Page {
@@ -63,9 +64,9 @@ impl NotFoundPage<'_> {
     }
 }
 
-pub fn render_404_page(out: &mut dyn Write, query: &str, results: &[search_index::CrateFound], markup: &Renderer) -> Result<(), failure::Error> {
+pub fn render_404_page(out: &mut dyn Write, query: &str, item_name: &str, results: &[search_index::CrateFound], markup: &Renderer) -> Result<(), failure::Error> {
     let urler = Urler::new(None);
-    let page = NotFoundPage::new(query, results, markup);
+    let page = NotFoundPage::new(query, item_name, results, markup);
     templates::not_found(out, &page, &urler)?;
     Ok(())
 }

@@ -497,7 +497,12 @@ impl KitchenSink {
 
         let mut crates2 = futures::stream::iter(self.crate_db.crates_to_reindex().await?.into_iter())
             .filter_map(move |origin| async move {
-                self.rich_crate_async(&origin).await.map_err(|e| eprintln!("{:?}: {}", origin, e)).ok()
+                self.rich_crate_async(&origin).await.map_err(|e| {
+                    eprintln!("Can't reindex {:?}: {}", origin, e);
+                    for e in e.iter_chain() {
+                        eprintln!("• {}", e);
+                    }
+                }).ok()
             }).collect::<Vec<_>>().await;
 
         crates.append(&mut crates2);

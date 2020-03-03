@@ -817,7 +817,7 @@ lazy_static! {
 
         (Cond::Any(&["cli"]), &[("command-line-utilities", 1.1, 0.), ("command-line-interface", 1.1, 0.), ("rust-patterns", 0.6, 0.)]),
         (Cond::Any(&["tui"]), &[("command-line-interface", 1.1, 0.05)]),
-        (Cond::Any(&["dep:clap", "dep:docopt", "dep:structopt", "dep:ncurses"]), &[("command-line-utilities", 1.1, 0.), ("command-line-interface", 0.9, 0.)]),
+        (Cond::Any(&["dep:clap", "dep:docopt", "dep:structopt", "dep:ncurses"]), &[("command-line-utilities", 1.1, 0.1), ("command-line-interface", 0.9, 0.)]),
         (Cond::All(&["curses", "interface"]), &[("command-line-interface", 1.1, 0.05)]),
         (Cond::All(&["terminal", "ui"]), &[("command-line-interface", 1.1, 0.), ("multimedia::encoding", 0.8, 0.)]),
         (Cond::Any(&["terminal", "ncurses", "curses", "ansi", "progressbar", "vt100", "ansi_term"]),
@@ -829,7 +829,7 @@ lazy_static! {
             &[("command-line-interface", 1.2, 0.1), ("multimedia::images", 0.1, 0.), ("multimedia", 0.4, 0.), ("no-std", 0.9, 0.), ("wasm", 0.9, 0.),
             ("science::math", 0.8, 0.), ("hardware-support", 0.7, 0.), ("command-line-utilities", 0.75, 0.), ("internationalization", 0.9, 0.),
             ("development-tools::procedural-macro-helpers", 0.7, 0.), ("memory-management", 0.5, 0.), ("rendering::engine", 0.8, 0.), ("emulators", 0.6, 0.)]),
-        (Cond::Any(&["has:bin"]), &[("command-line-utilities", 1.1, 0.), ("development-tools::cargo-plugins", 0.9, 0.), ("no-std", 0.7, 0.), ("game-engines", 0.9, 0.),
+        (Cond::Any(&["has:bin"]), &[("command-line-utilities", 1.1, 0.1), ("development-tools::cargo-plugins", 0.9, 0.), ("no-std", 0.7, 0.), ("game-engines", 0.9, 0.),
             ("development-tools::procedural-macro-helpers", 0.7, 0.), ("memory-management", 0.4, 0.), ("algorithms", 0.5, 0.)]),
         (Cond::NotAny(&["has:bin"]), &[("games", 0.7, 0.), ("development-tools::cargo-plugins", 0.9, 0.), ("command-line-utilities", 0.4, 0.)]),
 

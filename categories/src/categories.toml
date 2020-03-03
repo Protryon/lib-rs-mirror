@@ -274,7 +274,7 @@ obvious-keywords = ["ffi"]
 preference = 1.05
 
 [development-tools.categories.procedural-macro-helpers]
-name = "Procedural macro helpers"
+name = "Procedural macros"
 title = "Rust proc macro helper"
 description = """
 Crates to help you write procedural macros in Rust.

@@ -43,6 +43,7 @@ bcfs : cryptography::cryptocurrencies, wasm
 begonia: command-line-interface
 bfc: emulators
 bigbro: os, filesystem
+billecta : web-programming
 binaryen-sys : wasm
 binwrite: encoding
 bio-types: science, rust-patterns
@@ -78,6 +79,7 @@ cb2 : command-line-utilities
 celery-rs-core : asynchronous
 celery: asynchronous
 cgl: rendering::graphics-api, os::macos-apis
+ch8asm: emulators, development-tools
 chariot_slp : games, parser-implementations
 checkm: science, parser-implementations
 chillup: web-programming
@@ -94,6 +96,7 @@ colloquy: command-line-interface
 commoncrypto-sys : os::macos-apis
 commoncrypto: os::macos-apis, cryptography
 conllx: parser-implementations
+contralog: development-tools::debugging
 core-foundation-sys: os::macos-apis
 core-graphics : os::macos-apis, rendering::graphics-api
 core-text: os::macos-apis
@@ -184,6 +187,7 @@ exonum-time : cryptography::cryptocurrencies
 exonum: cryptography::cryptocurrencies
 failure: rust-patterns
 fakesite: web-programming
+falcon-mos6502: emulators
 falcon-raptor : development-tools
 fast-floats : rust-patterns
 fast-socks5 : network-programming, web-programming::http-client, web-programming::http-server
@@ -201,6 +205,7 @@ find-files: filesystem
 findomain: network-programming
 findomain: networking
 finite: science::math
+finn-assembler: development-tools
 fitrs: parser-implementations
 fixed_width: parser-implementations
 fixedvec: no-std, data-structures
@@ -246,6 +251,7 @@ getch: os
 giphy: web-programming
 girage: cryptography, gui
 github-rs : web-programming
+global_counter: concurrency, development-tools::debugging
 glutin_cocoa: os::macos-apis
 glutin_core_foundation : rendering::graphics-api
 glx : rendering::graphics-api, os::unix-apis
@@ -360,9 +366,11 @@ librdkafka-sys: asynchronous
 librsyncr: network-programming
 libsbc-sys: hardware-support
 lightning :cryptography::cryptocurrencies
+line: text-editors
 line_drawing: game-engines, algorithms
 llvm-passgen : development-tools
 loc: text-processing
+loc: text-processing, command-line-utilities
 locationsharing: science, web-programming
 log_domain: science::math
 log_kv: database-implementations
@@ -399,6 +407,7 @@ mediawiki: web-programming
 memorydb: database-implementations
 mermer-rs : text-processing, science
 meson: development-tools::build-tools
+metar: parser-implementations
 mindjuice: emulators
 mine_sweeper: games
 minidump-processor:development-tools::debugging
@@ -432,6 +441,7 @@ neli: network-programming, os::unix-apis
 neocom: emulators
 neon-sys: web-programming
 nessus: development-tools, network-programming
+nestools: game-engines, emulators
 netdevice: os, network-programming
 new-ordered-float: rust-patterns
 newrelic: development-tools
@@ -441,6 +451,7 @@ nite2-sys: science::machine-learning
 nokiahealth: databases
 nordselect: network-programming, command-line-utilities
 notcurses: command-line-interface
+notes: command-line-utilities
 notice-core : asynchronous
 notif: gui
 nq: development-tools, command-line-utilities
@@ -489,6 +500,7 @@ ppg : command-line-utilities, authentication
 pq-sys: database
 preftool-env : config
 proc-concat-bytes : data-structures, rust-patterns
+prodash: asynchronous, visualization
 project-cleanup : command-line-utilities, development-tools
 prometheus_wireguard_exporter: network-programming
 psyche-core : science::machine-learning
@@ -516,6 +528,7 @@ redis-cluster : databases
 redisearch_api : databases
 releasetag : development-tools::debugging
 rendy-memory: memory-management
+repoutil: development-tools
 reproto-backend : encoding, network-programming
 reproto-backend-csharp: encoding, development-tools::ffi
 reproto-backend-doc: encoding, development-tools::ffi
@@ -549,6 +562,7 @@ roadmap: data-structures
 roads-from-nd : multimedia::images
 robinhood: web-programming
 rocket-etag-if-none-match : web-programming::http-server
+rojo: development-tools
 romodoro: command-line-utilities
 romy-core: game-engines
 romy-wasmer: game-engines
@@ -569,6 +583,7 @@ rumq-core : network-programming
 rusoto_credential: authentication
 rusp: network-programming
 rust_fixed_width: data-structures
+rustasm6502: emulators
 rustils: rust-patterns
 rustler_sys : development-tools::ffi
 rustop-rs : command-line-utilities, os::unix-apis
@@ -577,6 +592,7 @@ rustup-find: rust-patterns, command-line-utilities
 rusty_sword_arena: game-engines
 rustydav: web-programming
 ruut: command-line-utilities, value-formatting
+rxrust: asynchronous
 salad : command-line-utilities, authentication
 saml2aws-auto: authentication
 sample_planning : science::machine-learning, algorithms
@@ -585,8 +601,10 @@ scannit-core-ffi : development-tools::ffi
 scannit-core-ffi : hardware-support
 scoped-env: config
 scrapmetal: rust-patterns, algorithms
+sdkms: hardware-support
 seahorse: command-line-interface
 sekai: science
+semantic-rs: development-tools
 semver-parser: parser-implementations
 serenium: development-tools::testing
 sgf-parser: parser-implementations
@@ -687,6 +705,7 @@ varlink_parser: parser-implementations
 varlociraptor: science
 vec3D: science::math
 veloren-launcher: games
+verba: text-processing, internationalization
 versionisator: development-tools::build-tools
 vfio-bindings : os::unix-apis
 vhdl_lang : development-tools

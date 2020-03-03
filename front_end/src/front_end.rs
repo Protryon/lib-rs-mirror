@@ -174,12 +174,12 @@ pub struct CompatRange {
 }
 
 pub async fn render_trending_crates(out: &mut impl Write, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
-    let (top, upd) = futures::join!(kitchen_sink.trending_crates(50), kitchen_sink.recently_updated_crates());
+    let (top, upd) = futures::join!(kitchen_sink.trending_crates(50), kitchen_sink.notable_recently_updated_crates(70));
     let upd = upd?;
 
     let mut seen = HashSet::new();
     let mut tmp1 = Vec::with_capacity(upd.len());
-    for k in upd.iter() {
+    for (k, _) in upd.iter() {
         if seen.insert(k) {
             let f1 = kitchen_sink.rich_crate_version_async(k);
             let f2 = kitchen_sink.rich_crate_async(k);

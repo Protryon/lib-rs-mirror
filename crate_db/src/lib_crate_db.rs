@@ -964,20 +964,22 @@ impl CrateDb {
     /// Newly added or updated crates in any category
     ///
     /// Returns `origin` strings
-    pub async fn recently_updated_crates(&self) -> FResult<Vec<Origin>> {
+    pub async fn recently_updated_crates(&self, limit: u32) -> FResult<Vec<(Origin, f64)>> {
         self.with_read("recently_updated_crates", |conn| {
             let mut query = conn.prepare_cached(r#"
                 select max(created) + 3600*24*7 * k.ranking, -- week*rank ~= best this week
+                    k.ranking,
                     k.origin
                     from crate_versions v
                     join crates k on v.crate_id = k.id
                     group by v.crate_id
                     having count(*) > 1 -- so these are updates, not new releases
                     order by 1 desc
-                    limit 50
+                    limit ?1
             "#)?;
-            let q = query.query_map(NO_PARAMS, |row| {
-                Ok(Origin::from_str(row.get_raw(1).as_str().unwrap()))
+            let q = query.query_map(&[&limit], |row| {
+                let origin = Origin::from_str(row.get_raw(2).as_str()?);
+                Ok((origin, row.get(1)?))
             })?;
             let q = q.filter_map(|r| r.ok());
             Ok(q.collect())

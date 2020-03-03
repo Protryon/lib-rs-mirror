@@ -196,10 +196,10 @@ impl<'a> HomePage<'a> {
     pub fn recently_updated_crates(&self) -> Vec<(RichCrate, Arc<RichCrateVersion>)> {
         self.block(async {
             futures::stream::iter(self.crates
-                .recently_updated_crates().await
+                .notable_recently_updated_crates(30).await
                 .expect("recent crates")
                 .into_iter())
-                .filter_map(move |o| async move {
+                .filter_map(move |(o, _)| async move {
                     futures::try_join!(self.crates.rich_crate_async(&o), self.crates.rich_crate_version_async(&o)).ok()
                 })
                 .collect::<Vec<_>>().await

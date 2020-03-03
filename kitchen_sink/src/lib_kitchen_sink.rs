@@ -1983,12 +1983,16 @@ impl KitchenSink {
         keywords
     }
 
+    #[inline]
     pub async fn recently_updated_crates_in_category(&self, slug: &str) -> CResult<Vec<Origin>> {
         Ok(self.crate_db.recently_updated_crates_in_category(slug).await?)
     }
 
-    pub async fn recently_updated_crates(&self) -> CResult<Vec<Origin>> {
-        Ok(self.crate_db.recently_updated_crates().await?)
+    #[inline]
+    pub async fn notable_recently_updated_crates(&self, limit: u32) -> CResult<Vec<(Origin, f64)>> {
+        let mut crates = self.crate_db.recently_updated_crates(limit).await?;
+        self.knock_duplicates(&mut crates).await;
+        Ok(crates)
     }
 
     pub async fn category_crate_count(&self, slug: &str) -> Result<u32, KitchenSinkErr> {

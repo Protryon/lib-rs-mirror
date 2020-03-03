@@ -64,7 +64,7 @@ impl<'a> CatPage<'a> {
     }
 
     pub fn subcategories_and_siblings(&self) -> impl Iterator<Item = &Category> {
-        self.cat.sub.values().chain(self.cat.siblings.iter().flat_map(|slug| CATEGORIES.from_slug(slug)))
+        self.cat.sub.values().chain(self.cat.siblings.iter().flat_map(|slug| CATEGORIES.from_slug(slug).0.into_iter()))
     }
 
     /// Used to render descriptions
@@ -96,7 +96,7 @@ impl<'a> CatPage<'a> {
     /// "See also" feature
     pub fn related_categories(&self) -> Vec<Vec<&Category>> {
         let mut seen = HashSet::with_capacity(self.related.len());
-        self.related.iter().map(|slug| CATEGORIES.from_slug(slug).filter(|c| seen.insert(&c.slug)).collect()).filter(|v: &Vec<_>| !v.is_empty()).collect()
+        self.related.iter().map(|slug| CATEGORIES.from_slug(slug).0.into_iter().filter(|c| seen.insert(&c.slug)).collect()).filter(|v: &Vec<_>| !v.is_empty()).collect()
     }
 
     /// Nicely rounded number of downloads
@@ -129,7 +129,7 @@ impl<'a> CatPage<'a> {
 
     /// For breadcrumbs
     pub fn parent_categories(&self) -> Vec<&Category> {
-        let mut c: Vec<_> = CATEGORIES.from_slug(&self.cat.slug).collect();
+        let mut c: Vec<_> = CATEGORIES.from_slug(&self.cat.slug).0;
         c.pop();
         c
     }

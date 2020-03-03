@@ -60,7 +60,8 @@ impl Categories {
         })
     }
 
-    pub fn from_slug<S: AsRef<str>>(&self, slug: S) -> impl Iterator<Item = &Category> {
+    /// true if full match
+    pub fn from_slug<S: AsRef<str>>(&self, slug: S) -> (Vec<&Category>, bool) {
         let mut out = Vec::new();
         let mut cats = &self.root;
         for name in slug.as_ref().split("::") {
@@ -69,10 +70,10 @@ impl Categories {
                     cats = &cat.sub;
                     out.push(cat);
                 },
-                None => break,
+                None => return (out, false),
             }
         }
-        out.into_iter()
+        (out, true)
     }
 
     fn categories_from_table(full_slug_start: &str, toml: Table) -> CResult<CategoryMap> {
@@ -156,7 +157,7 @@ impl Categories {
             Some((depth, idx, Cow::Borrowed(s)))
         })
         .filter(|(_, _, s)| {
-            if CATEGORIES.from_slug(s).next().is_none() {
+            if !CATEGORIES.from_slug(s).1 {
                 println!("invalid cat name {}", s);
                 return false;
             }

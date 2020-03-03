@@ -106,7 +106,7 @@ pub(crate) struct Contributors<'a> {
 impl<'a> CratePage<'a> {
     pub async fn new(all: &'a RichCrate, ver: &'a RichCrateVersion, kitchen_sink: &'a KitchenSink, markup: &'a Renderer) -> CResult<CratePage<'a>> {
         let top_category = kitchen_sink.top_category(ver).await
-            .and_then(|(top, slug)| CATEGORIES.from_slug(slug).last().map(|c| (top, c)));
+            .and_then(|(top, slug)| CATEGORIES.from_slug(slug).0.last().map(|&c| (top, c)));
         let is_build_or_dev = kitchen_sink.is_build_or_dev(ver.origin()).await?;
 
         let (top_keyword, all_contributors) = futures::try_join!(
@@ -177,7 +177,7 @@ impl<'a> CratePage<'a> {
             }
         } else if self.ver.is_sys() {
             "system library interface for Rust"
-        } else if let Some(cat) = slugs.get(0).and_then(|slug| CATEGORIES.from_slug(slug).last()) {
+        } else if let Some(cat) = slugs.get(0).and_then(|slug| CATEGORIES.from_slug(slug).0.last().copied()) {
             &cat.title
         } else if self.ver.has_lib() {
             "Rust library"
@@ -641,7 +641,7 @@ impl<'a> CratePage<'a> {
             .category_slugs()
             .map(|slug| {
                 CATEGORIES
-                    .from_slug(slug)
+                    .from_slug(slug).0.into_iter()
                     .filter(|c| {
                         if seen.get(&c.slug).is_some() {
                             return false;

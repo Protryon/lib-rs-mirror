@@ -1114,7 +1114,7 @@ pub fn adjusted_relevance(mut candidates: HashMap<String, f64>, keywords: &HashS
             Cond::Any(reqs) => reqs.iter().any(|&k| keywords.contains(k)),
         } {
             for &(slug, mul, add) in actions.iter() {
-                assert!(CATEGORIES.from_slug(slug).next().is_some(), slug);
+                assert!(CATEGORIES.from_slug(slug).1, slug);
                 assert!(mul >= 1.0 || add < 0.0000001, slug);
                 let score = candidates.entry(slug.to_string()).or_insert(0.);
                 *score *= mul;
@@ -1132,7 +1132,7 @@ pub fn adjusted_relevance(mut candidates: HashMap<String, f64>, keywords: &HashS
 
     let mut res: Vec<_> = candidates.into_iter()
         .filter(|&(_, v)| v >= min_category_match_threshold)
-        .filter(|&(ref k, _)| CATEGORIES.from_slug(k).next().is_some() /* FIXME: that checks top level only */)
+        .filter(|&(ref k, _)| CATEGORIES.from_slug(k).1)
         .take(max_num_categories)
         .map(|(k, v)| (v, k))
         .collect();

@@ -432,7 +432,7 @@ impl CrateDb {
     fn extract_crate_categories(&self, conn: &Connection, c: &CrateVersionData<'_>, keywords: impl Iterator<Item=String>, is_important_ish: bool) -> FResult<(Vec<(f64, f64, String)>, bool)> {
         let (explicit_categories, invalid_categories): (Vec<_>, Vec<_>) = c.category_slugs.iter().map(|c| c.to_string())
             .partition(|slug| {
-                categories::CATEGORIES.from_slug(&slug).next().is_some() // FIXME: that checks top level only
+                categories::CATEGORIES.from_slug(&slug).1
             });
         let had_explicit_categories = !explicit_categories.is_empty();
 
@@ -463,7 +463,7 @@ impl CrateDb {
 
         // slightly nudge towards specific, leaf categories over root generic ones
         for (w, slug) in &mut categories {
-            *w *= categories::CATEGORIES.from_slug(slug).last().map(|c| c.preference as f64).unwrap_or(1.);
+            *w *= categories::CATEGORIES.from_slug(slug).0.last().map(|c| c.preference as f64).unwrap_or(1.);
         }
 
         let max_weight = categories.iter().map(|&(w, _)| w)

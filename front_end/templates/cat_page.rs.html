@@ -63,7 +63,7 @@
         @if p.has_subcategories_and_siblings() {
           <nav id="category-subcategories" role="navigation">
             <div class="inner-col">
-              <ul>
+              <ul class="crates-list">
                 @for subcat in p.subcategories_and_siblings() {
                     <li><a href="@url.category(subcat)">
                       <div class=h>
@@ -80,7 +80,7 @@
 
         <div id="category-crates" class="cat-@p.cat.slug">
           <div class="inner-col">
-            <ul>
+            <ul class="crates-list">
                 @for (c, downloads) in &p.crates {
                 <li>
                     <a href="@url.krate(c)">

@@ -181,7 +181,7 @@ impl Index {
     }
 
     pub async fn deps_stats(&self) -> Result<&DepsStats, DepsErr> {
-        Ok(tokio::time::timeout(Duration::from_secs(30), self.deps_stats.get_or_init(self.get_deps_stats())).await
+        Ok(tokio::time::timeout(Duration::from_secs(30), self.deps_stats.get_or_init(async {self.get_deps_stats()})).await
             .map_err(|_| DepsErr::DepsNotAvailable)?)
     }
 
@@ -390,6 +390,7 @@ impl Index {
             return Ok(Some((false, 0.)));
         }
 
+        let stats = self.deps_stats().await?;
         let krate = self.crates_io_crate_by_lowercase_name(&crate_name.to_ascii_lowercase())?;
 
         fn matches(ver: &Version, req: &VersionReq) -> bool {
@@ -400,7 +401,6 @@ impl Index {
             // or match latest unstable
             matches(Self::highest_crates_io_version(krate, false), requirement);
 
-        let stats = self.deps_stats().await?;
         let pop = stats.counts.get(crate_name)
         .map(|stats| {
             let mut matches = 0;

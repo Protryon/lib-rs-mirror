@@ -101,7 +101,7 @@ impl SimpleCache {
             None
         } else {
             let _s = self.sem.acquire().await;
-            let data = Self::fetch(url.as_ref()).await?;
+            let data = Box::pin(Self::fetch(url.as_ref())).await?;
             self.set(key, &data)?;
             Some(data)
         })

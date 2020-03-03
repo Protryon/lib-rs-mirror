@@ -106,9 +106,9 @@ impl CratesIoClient {
         let _s = self.sem.acquire().await;
 
         let url = format!("https://crates.io/api/v1/crates/{}", path.as_ref());
-        let res = self.cache.get_json(key.0, url, |raw: B| {
+        let res = Box::pin(self.cache.get_json(key.0, url, |raw: B| {
             Some((key.1.to_string(), raw.to()))
-        }).await?;
+        })).await?;
         Ok(res.map(|(_, res)| B::from(res)))
     }
 }

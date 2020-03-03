@@ -334,7 +334,7 @@ impl KitchenSink {
         }
         top.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
 
-        self.knock_duplicates(&mut top).await;
+        Box::pin(self.knock_duplicates(&mut top)).await;
         top.truncate(top_n);
         top
     }
@@ -526,36 +526,44 @@ impl KitchenSink {
                 Ok(RichCrate::new(origin.clone(), owners, meta.krate.name, versions))
             },
             Origin::GitHub { repo, package } => {
-                let host = RepoHost::GitHub(repo.clone()).try_into().map_err(|_| KitchenSinkErr::CrateNotFound(origin.clone())).context("ghrepo host bad")?;
-                let cachebust = self.cachebust_string_for_repo(&host).await.context("ghrepo")?;
-                let gh = self.gh.repo(repo, &cachebust).await?
-                    .ok_or_else(|| KitchenSinkErr::CrateNotFound(origin.clone()))
-                    .context(format!("ghrepo {:?} not found", repo))?;
-                let versions = self.get_repo_versions(origin, &host, &cachebust).await?;
-                Ok(RichCrate::new(origin.clone(), gh.owner.into_iter().map(|o| {
-                    CrateOwner {
-                        id: 0,
-                        avatar: o.avatar_url,
-                        url: Some(o.html_url),
-                        login: o.login,
-                        kind: OwnerKind::User, // FIXME: crates-io uses teams, and we'd need to find the right team? is "owners" a guaranteed thing?
-                        name: o.name,
-                        github_id: Some(o.id),
-
-                        invited_at: None,
-                        invited_by_github_id: None,
-                    }
-                }).collect(),
-                format!("github/{}/{}", repo.owner, package),
-                versions))
+                Box::pin(self.rich_crate_gh(origin, repo, package)).await
             },
             Origin::GitLab { repo, package } => {
-                let host = RepoHost::GitLab(repo.clone()).try_into().map_err(|_| KitchenSinkErr::CrateNotFound(origin.clone())).context("ghrepo host bad")?;
-                let cachebust = self.cachebust_string_for_repo(&host).await.context("ghrepo")?;
-                let versions = self.get_repo_versions(origin, &host, &cachebust).await?;
-                Ok(RichCrate::new(origin.clone(), vec![], format!("gitlab/{}/{}", repo.owner, package), versions))
+                Box::pin(self.rich_crate_gitlab(origin, repo, package)).await
             },
         }
+    }
+
+    async fn rich_crate_gh(&self, origin: &Origin, repo: &SimpleRepo, package: &str) -> CResult<RichCrate> {
+        let host = RepoHost::GitHub(repo.clone()).try_into().map_err(|_| KitchenSinkErr::CrateNotFound(origin.clone())).context("ghrepo host bad")?;
+        let cachebust = self.cachebust_string_for_repo(&host).await.context("ghrepo")?;
+        let gh = self.gh.repo(repo, &cachebust).await?
+            .ok_or_else(|| KitchenSinkErr::CrateNotFound(origin.clone()))
+            .context(format!("ghrepo {:?} not found", repo))?;
+        let versions = self.get_repo_versions(origin, &host, &cachebust).await?;
+        Ok(RichCrate::new(origin.clone(), gh.owner.into_iter().map(|o| {
+            CrateOwner {
+                id: 0,
+                avatar: o.avatar_url,
+                url: Some(o.html_url),
+                login: o.login,
+                kind: OwnerKind::User, // FIXME: crates-io uses teams, and we'd need to find the right team? is "owners" a guaranteed thing?
+                name: o.name,
+                github_id: Some(o.id),
+
+                invited_at: None,
+                invited_by_github_id: None,
+            }
+        }).collect(),
+        format!("github/{}/{}", repo.owner, package),
+        versions))
+    }
+
+    async fn rich_crate_gitlab(&self, origin: &Origin, repo: &SimpleRepo, package: &str) -> CResult<RichCrate> {
+        let host = RepoHost::GitLab(repo.clone()).try_into().map_err(|_| KitchenSinkErr::CrateNotFound(origin.clone())).context("ghrepo host bad")?;
+        let cachebust = self.cachebust_string_for_repo(&host).await.context("ghrepo")?;
+        let versions = self.get_repo_versions(origin, &host, &cachebust).await?;
+        Ok(RichCrate::new(origin.clone(), vec![], format!("gitlab/{}/{}", repo.owner, package), versions))
     }
 
     async fn get_repo_versions(&self, origin: &Origin, repo: &Repo, cachebust: &str) -> CResult<Vec<CrateVersion>> {
@@ -622,11 +630,14 @@ impl KitchenSink {
     /// Fudge-factor score proprtional to how many times a crate has been removed from some project
     pub async fn crate_removals(&self, origin: &Origin) -> Option<f64> {
         self.removals
-            .get_or_init(async {self.crate_db.removals().await.expect("fetch crate removals")})
+            .get_or_init(async {
+                Box::pin(self.crate_db.removals()).await.expect("fetch crate removals")
+            })
             .await
             .get(origin).cloned()
     }
 
+    #[inline]
     pub async fn downloads_per_month(&self, origin: &Origin) -> CResult<Option<usize>> {
         self.downloads_recent(origin).await.map(|dl| dl.map(|n| n / 3))
     }
@@ -651,6 +662,7 @@ impl KitchenSink {
         Ok(None)
     }
 
+    #[inline]
     async fn downloads_recent(&self, origin: &Origin) -> CResult<Option<usize>> {
         Ok(match origin {
             Origin::CratesIo(name) => {
@@ -671,7 +683,7 @@ impl KitchenSink {
         let mut meta = meta.ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?;
         if !meta.versions.iter().any(|v| v.num == latest_in_index) {
             eprintln!("Crate data missing latest version {}@{}", name, latest_in_index);
-            meta = self.crates_io.crate_meta(name, &format!("{}-try-again", latest_in_index)).await?
+            meta = Box::pin(self.crates_io.crate_meta(name, &format!("{}-try-again", latest_in_index))).await?
                 .ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?;
             if !meta.versions.iter().any(|v| v.num == latest_in_index) {
                 eprintln!("Error: crate data is borked {}@{}. Has only: {:?}", name, latest_in_index, meta.versions.iter().map(|v| &v.num).collect::<Vec<_>>());
@@ -698,8 +710,8 @@ impl KitchenSink {
             Ok(v) => v,
             Err(e) => {
                 eprintln!("getting {:?}: {}", origin, e);
-                self.index_crate_highest_version(origin).await?;
-                match self.crate_db.rich_crate_version_data(origin).await {
+                Box::pin(self.index_crate_highest_version(origin)).await?; // Pin to lower stack usage
+                match Box::pin(self.crate_db.rich_crate_version_data(origin)).await {
                     Ok(v) => v,
                     Err(e) => return Err(e),
                 }
@@ -830,7 +842,7 @@ impl KitchenSink {
             }
             // readmes in form of readme="../foo.md" are lost in packaging,
             // and the only copy exists in crates.io own api
-            self.add_readme_from_crates_io(&mut meta, name, ver).await;
+            Box::pin(self.add_readme_from_crates_io(&mut meta, name, ver)).await;
             let has_readme = meta.readme.is_some();
             if !has_readme {
                 warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()));
@@ -1146,14 +1158,16 @@ impl KitchenSink {
         if let Ok(Some(res)) = self.url_check_cache.get(url) {
             return res;
         }
-        eprintln!("CHK: {}", url);
-        let req = reqwest::Client::builder().build().unwrap();
-        let res = req.get(url).send().await.map(|res| {
-            res.status().is_success()
-        })
-        .unwrap_or(false);
-        self.url_check_cache.set(url, res).unwrap();
-        res
+        Box::pin(async {
+            eprintln!("CHK: {}", url);
+            let req = reqwest::Client::builder().build().unwrap();
+            let res = req.get(url).send().await.map(|res| {
+                res.status().is_success()
+            })
+            .unwrap_or(false);
+            self.url_check_cache.set(url, res).unwrap();
+            res
+        }).await
     }
 
     fn is_docs_rs_link(d: &str) -> bool {
@@ -1164,7 +1178,7 @@ impl KitchenSink {
     /// name is case-sensitive!
     pub async fn has_docs_rs(&self, origin: &Origin, name: &str, ver: &str) -> bool {
         match origin {
-            Origin::CratesIo(_) => self.docs_rs.builds(name, ver).await.unwrap_or(true), // fail open
+            Origin::CratesIo(_) => Box::pin(self.docs_rs.builds(name, ver)).await.unwrap_or(true), // fail open
             _ => false,
         }
     }
@@ -1201,6 +1215,7 @@ impl KitchenSink {
         let _ = self.index.deps_stats();
     }
 
+    #[inline]
     pub async fn crates_io_dependents_stats_of(&self, origin: &Origin) -> Result<Option<&RevDependencies>, KitchenSinkErr> {
         match origin {
             Origin::CratesIo(crate_name) => Ok(self.index.deps_stats().await.map_err(KitchenSinkErr::Deps)?.counts.get(crate_name)),
@@ -1211,11 +1226,13 @@ impl KitchenSink {
     /// (latest, pop)
     /// 0 = not used
     /// 1 = everyone uses it
+    #[inline]
     pub async fn version_popularity(&self, crate_name: &str, requirement: &VersionReq) -> Result<Option<(bool, f32)>, KitchenSinkErr> {
         self.index.version_popularity(crate_name, requirement).await.map_err(KitchenSinkErr::Deps)
     }
 
     /// "See also"
+    #[inline]
     pub async fn related_categories(&self, slug: &str) -> CResult<Vec<String>> {
         self.crate_db.related_categories(slug).await
     }
@@ -1252,6 +1269,7 @@ impl KitchenSink {
     }
 
     /// Returns (nth, keyword)
+    #[inline]
     pub async fn top_keyword(&self, krate: &RichCrate) -> CResult<Option<(u32, String)>> {
         Ok(self.crate_db.top_keyword(&krate.origin()).await?)
     }
@@ -1536,7 +1554,7 @@ impl KitchenSink {
                 return Ok(Some(gh));
             }
         }
-        Ok(self.gh.user_by_login(github_login).await?) // errs on 404
+        Ok(Box::pin(self.gh.user_by_login(github_login)).await?) // errs on 404
     }
 
     pub fn rustc_compatibility(&self, origin: &Origin) -> CResult<Vec<CompatibilityInfo>> {
@@ -1552,6 +1570,7 @@ impl KitchenSink {
 
     /// If given crate is a sub-crate, return crate that owns it.
     /// The relationship is based on directory layout of monorepos.
+    #[inline]
     pub async fn parent_crate(&self, child: &RichCrateVersion) -> Option<Origin> {
         let repo = child.repository()?;
         self.crate_db.parent_crate(repo, child.short_name()).await.ok()?
@@ -1575,6 +1594,7 @@ impl KitchenSink {
             }))
     }
 
+    #[inline]
     pub async fn user_github_orgs(&self, github_login: &str) -> CResult<Option<Vec<UserOrg>>> {
         Ok(self.gh.user_orgs(github_login).await?)
     }
@@ -1626,7 +1646,7 @@ impl KitchenSink {
         let (hit_max_contributor_count, mut contributors_by_login) = match krate.repository().as_ref() {
             // Only get contributors from github if the crate has been found in the repo,
             // otherwise someone else's repo URL can be used to get fake contributor numbers
-            Some(crate_repo) => self.contributors_from_repo(crate_repo, &owners, krate.has_path_in_repo()).await?,
+            Some(crate_repo) => Box::pin(self.contributors_from_repo(crate_repo, &owners, krate.has_path_in_repo())).await?,
             None => (false, HashMap::new()),
         };
 
@@ -1829,7 +1849,7 @@ impl KitchenSink {
                 if let Some(o) = self.crates_io_owners_cache.get(name)? {
                     return Ok(o);
                 }
-                Ok(self.crates_io.crate_owners(name, "fallback").await?.unwrap_or_default())
+                Ok(Box::pin(self.crates_io.crate_owners(name, "fallback")).await?.unwrap_or_default())
             },
             Origin::GitLab {..} => Ok(vec![]),
             Origin::GitHub {repo, ..} => Ok(vec![
@@ -1874,11 +1894,11 @@ impl KitchenSink {
             Occupied(e) => Arc::clone(e.get()),
             Vacant(e) => {
                 let mut crates = if slug == "uncategorized" {
-                    self.crate_db.top_crates_uncategorized(wanted_num + 50).await?
+                    Box::pin(self.crate_db.top_crates_uncategorized(wanted_num + 50)).await?
                 } else {
                     self.crate_db.top_crates_in_category_partially_ranked(slug, wanted_num + 50).await?
                 };
-                self.knock_duplicates(&mut crates).await;
+                Box::pin(self.knock_duplicates(&mut crates)).await;
                 let crates: Vec<_> = crates.into_iter().map(|(o, _)| o).take(wanted_num as usize).collect();
                 let res = Arc::new(crates);
                 e.insert(Arc::clone(&res));
@@ -1965,6 +1985,7 @@ impl KitchenSink {
     }
 
     /// true if it's useful as a keyword page
+    #[inline]
     pub async fn is_it_a_keyword(&self, k: &str) -> bool {
         self.crate_db.crates_with_keyword(k).await.map(|n| n >= 5).unwrap_or(false)
     }
@@ -2014,6 +2035,7 @@ impl KitchenSink {
             })
     }
 
+    #[inline]
     async fn repo_commits(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Option<Vec<github_info::CommitMeta>>> {
         Ok(self.gh.commits(repo, as_of_version).await?)
     }

@@ -176,7 +176,7 @@ impl GitHub {
             eprintln!("Cache near miss {}@{} vs {}", key.0, ver, key.1);
         }
 
-        let (status, res) = match cb(&self.client).await {
+        let (status, res) = match Box::pin(cb(&self.client)).await {
             Ok(res) => {
                 let status = res.status();
                 let headers = res.headers();
@@ -206,7 +206,7 @@ impl GitHub {
             _ => status.is_success(),
         };
         let body = match res {
-            Some(res) if !non_parsable_body => Some(res.obj().await?),
+            Some(res) if !non_parsable_body => Some(Box::pin(res.obj()).await?),
             _ => None,
         };
         match body.ok_or(Error::NoBody).and_then(|stats| {

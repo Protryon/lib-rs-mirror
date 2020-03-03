@@ -1,24 +1,25 @@
-use crate::writer::*;
 use actix_web::body::Body;
 use actix_web::dev::Url;
 use actix_web::http::header::HeaderValue;
 use actix_web::http::StatusCode;
-use actix_web::middleware;
 use actix_web::HttpResponse;
+use actix_web::middleware;
 use actix_web::{web, App, HttpRequest, HttpServer};
 use arc_swap::ArcSwap;
 use cap::Cap;
-use categories::Category;
 use categories::CATEGORIES;
+use categories::Category;
 use chrono::prelude::*;
+use crate::writer::*;
 use env_logger;
 use failure::ResultExt;
 use front_end;
 use futures::future::Future;
-use kitchen_sink;
+use futures::future::FutureExt;
 use kitchen_sink::filter::ImageOptimAPIFilter;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::Origin;
+use kitchen_sink;
 use locale::Numeric;
 use render_readme::{Highlighter, Markup, Renderer};
 use repo_url::SimpleRepo;
@@ -26,8 +27,8 @@ use search_index::CrateSearchIndex;
 use std::convert::TryInto;
 use std::env;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{Duration, Instant, SystemTime};
 use tokio::runtime::Runtime;
 use urlencoding::decode;
@@ -699,8 +700,8 @@ async fn handle_feed(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     .body(page))
 }
 
-async fn run_timeout<R, T: 'static + Send>(secs: u64, fut: R) -> Result<T, failure::Error> where R: Future<Output=Result<T, failure::Error>> {
-    tokio::time::timeout(Duration::from_secs(secs), fut).await?
+fn run_timeout<R, T: 'static + Send>(secs: u64, fut: R) -> impl Future<Output=Result<T, failure::Error>> where R: Future<Output=Result<T, failure::Error>> {
+    Box::pin(tokio::time::timeout(Duration::from_secs(secs), fut).map(|res| res?))
 }
 
 async fn rt_run_timeout<R, T: 'static + Send>(rt: &Runtime, secs: u64, fut: R) -> Result<T, failure::Error> where R: 'static + Send + Future<Output=Result<T, failure::Error>> {

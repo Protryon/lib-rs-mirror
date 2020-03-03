@@ -154,7 +154,7 @@ impl Index {
         Ok(converted)
     }
 
-    pub async fn get_deps_stats(&self) -> DepsStats {
+    pub fn get_deps_stats(&self) -> DepsStats {
         let crates = self.crates_io_crates();
         let crates: Vec<(Box<str>, FxHashMap<_,_>)> = crates
         .par_iter()

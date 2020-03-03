@@ -176,7 +176,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
         }
 
         let _s = self.sem.acquire().await;
-        let data = SimpleCache::fetch(url.as_ref()).await?;
+        let data = Box::pin(SimpleCache::fetch(url.as_ref())).await?;
         match serde_json::from_slice(&data) {
             Ok(res) => {
                 let res = on_miss(res);

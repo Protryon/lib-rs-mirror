@@ -131,7 +131,7 @@ async fn main() {
         }
         drop(tx);
         if stopped() {return;}
-        let _ = waiting.collect::<()>().await;
+        waiting.collect::<()>().await;
         if stopped() {return;}
         tokio::task::block_in_place(|| {
             index_thread.join().unwrap().unwrap();

@@ -210,6 +210,7 @@ impl CrateDb {
         }).await
     }
 
+    #[inline]
     pub async fn latest_crate_update_timestamp(&self) -> FResult<Option<u32>> {
         self.with_read("latest_crate_update_timestamp", |conn| {
             let nope: [u8; 0] = [];
@@ -658,7 +659,7 @@ impl CrateDb {
     /// Fetch or guess categories for a crate
     ///
     /// Returns category slugs
-    fn crate_categories_tx<'a>(&self, conn: &Connection, origin: &Origin, kebab_keywords: &HashSet<String>, threshold: f64) -> FResult<Vec<(f64, String)>> {
+    fn crate_categories_tx(&self, conn: &Connection, origin: &Origin, kebab_keywords: &HashSet<String>, threshold: f64) -> FResult<Vec<(f64, String)>> {
         let assigned = self.assigned_crate_categories_tx(conn, origin)?;
         if !assigned.is_empty() {
             Ok(assigned)
@@ -807,6 +808,7 @@ impl CrateDb {
     }
 
     /// Find keywords that may be most relevant to the crate
+    #[inline]
     pub async fn keywords(&self, origin: &Origin) -> FResult<Vec<String>> {
         self.with_read("keywords", |conn| {
             self.keywords_tx(conn, origin)
@@ -986,6 +988,7 @@ impl CrateDb {
         }).await
     }
 
+    #[inline]
     pub async fn crate_rank(&self, origin: &Origin) -> FResult<f64> {
         self.with_read("crate_rank", |conn| {
             let mut query = conn.prepare_cached("SELECT ranking FROM crates WHERE origin = ?1)")?;

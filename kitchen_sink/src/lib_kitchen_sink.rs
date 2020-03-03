@@ -785,10 +785,10 @@ impl KitchenSink {
                 warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()));
             }
 
-            meta.readme.as_mut().map(|readme| {
+            if let Some(readme) = meta.readme.as_mut() {
                 readme.base_url = Some(repo.readme_base_url(&path_in_repo));
                 readme.base_image_url = Some(repo.readme_base_image_url(&path_in_repo));
-            });
+            }
             Ok::<_, CError>(self.rich_crate_version_data_common(origin.clone(), meta, 0, false, warnings))
         })?.await
     }
@@ -1025,11 +1025,13 @@ impl KitchenSink {
                 }
             }
             if cat == "science" || cat == "algorithms" {
-                if package.keywords.iter().any(|k| k == "neural-network" || eq(k,"machine-learning") || eq(k,"neuralnetworks") || eq(k,"neuralnetwork") || eq(k,"tensorflow") || eq(k,"deep-learning")) {
-                    *cat = "science::ml".into();
-                } else if package.keywords.iter().any(|k| {
+                let is_nn = |k: &String| k == "neural-network" || eq(k,"machine-learning") || eq(k,"neuralnetworks") || eq(k,"neuralnetwork") || eq(k,"tensorflow") || eq(k,"deep-learning");
+                let is_math = |k: &String| {
                     k == "math" || eq(k,"calculus") || eq(k,"algebra") || eq(k,"linear-algebra") || eq(k,"mathematics") || eq(k,"maths") || eq(k,"number-theory")
-                }) {
+                };
+                if package.keywords.iter().any(is_nn) {
+                    *cat = "science::ml".into();
+                } else if package.keywords.iter().any(is_math) {
                     *cat = "science::math".into();
                 }
             }
@@ -1211,6 +1213,7 @@ impl KitchenSink {
         }
     }
 
+    #[inline]
     pub async fn prewarm(&self) {
         let _ = self.index.deps_stats().await;
     }
@@ -1549,6 +1552,7 @@ impl KitchenSink {
         Ok(())
     }
 
+    #[inline]
     pub fn user_by_email(&self, email: &str) -> CResult<Option<User>> {
         Ok(self.user_db.user_by_email(email).context("user_by_email")?)
     }
@@ -1569,6 +1573,7 @@ impl KitchenSink {
 
     /// List of all notable crates
     /// Returns origin, rank, last updated unix timestamp
+    #[inline]
     pub async fn sitemap_crates(&self) -> CResult<Vec<(Origin, f64, i64)>> {
         Ok(self.crate_db.sitemap_crates().await?)
     }
@@ -1840,6 +1845,7 @@ impl KitchenSink {
         Ok((authors, owners, owners_partial, if hit_max_contributor_count { 100 } else { contributors }))
     }
 
+    #[inline]
     async fn owners_github(&self, owner: &CrateOwner) -> CResult<User> {
         // This is a bit weak, since logins are not permanent
         if let Some(user) = self.gh.user_by_login(owner.github_login().ok_or(KitchenSinkErr::OwnerWithoutLogin)?).await? {

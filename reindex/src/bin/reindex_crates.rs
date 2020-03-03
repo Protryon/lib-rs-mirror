@@ -259,7 +259,9 @@ async fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrat
         temp_inp.number_of_indirect_reverse_deps = deps.runtime.def.max(deps.build.def).into();
         temp_inp.number_of_indirect_reverse_optional_deps = indirect_reverse_optional_deps;
         let tmp = futures::future::join_all(deps.rev_dep_names.iter()
-            .map(|name| async move { crates.downloads_per_month(&Origin::from_crates_io_name(name)).await })).await;
+            .map(|name| async move {
+                crates.downloads_per_month(&Origin::from_crates_io_name(name)).await
+            })).await;
         let biggest = tmp.into_iter().filter_map(|x| x.ok().and_then(|x| x)).max().unwrap_or(0);
         temp_inp.downloads_per_month_minus_most_downloaded_user = downloads_per_month.saturating_sub(biggest as u32);
     }

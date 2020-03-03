@@ -70,7 +70,7 @@ pub fn auto_keywords(manifest: &Manifest, github_description: Option<&str>, read
     let d = extract_text_phrases(manifest, github_description, readme_text);
     let mut sw = rake::StopWords::new();
     sw.reserve(STOPWORDS.len());
-    sw.extend(STOPWORDS.iter().map(|s| s.to_string())); // TODO: use real stopwords, THEN filter via STOPWORDS again, because multiple Rust-y words are fine
+    sw.extend(STOPWORDS.iter().map(|s| (*s).to_string())); // TODO: use real stopwords, THEN filter via STOPWORDS again, because multiple Rust-y words are fine
     // normalize space and _ to -
     let r = rake::Rake::new(sw);
     let rake_keywords = r.run_sentences(d.iter().map(|(_, s)| s.as_str()));

@@ -149,6 +149,7 @@ impl Index {
         converted.extend(collected.into_iter().map(|(k, v)| {
             let name = inter.resolve(k).expect("resolve");
             debug_assert_eq!(name, name.to_ascii_lowercase());
+            debug_assert!(!name.is_empty());
             (name.into(), v)
         }));
         Ok(converted)
@@ -177,6 +178,7 @@ impl Index {
                 let t = n.versions.entry(semver).or_insert(0);
                 *t = t.checked_add(1).expect("overflow");
                 if depinf.direct {
+                    debug_assert!(!parent_name.is_empty());
                     n.rev_dep_names.push(&parent_name);
                 }
                 match depinf.ty {

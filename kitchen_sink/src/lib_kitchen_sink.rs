@@ -1868,6 +1868,7 @@ impl KitchenSink {
         Err(KitchenSinkErr::OwnerWithoutLogin)?
     }
 
+    #[inline]
     pub async fn crates_of_author(&self, aut: &RichAuthor) -> CResult<Vec<CrateOwnerRow>> {
         self.crate_db.crates_of_author(aut.github.id).await
     }
@@ -2081,6 +2082,7 @@ impl KitchenSink {
         self.crates_io.cleanup();
     }
 
+    #[inline]
     pub async fn author_by_login(&self, login: &str) -> CResult<RichAuthor> {
         let github = self.gh.user_by_login(login).await?.ok_or_else(|| KitchenSinkErr::AuthorNotFound(login.to_owned()))?;
         Ok(RichAuthor {

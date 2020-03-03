@@ -174,7 +174,7 @@ pub struct CompatRange {
 }
 
 pub async fn render_trending_crates(out: &mut impl Write, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
-    let (top, upd) = futures::join!(kitchen_sink.trending_crates(50), kitchen_sink.notable_recently_updated_crates(70));
+    let (top, upd) = futures::join!(kitchen_sink.trending_crates(55), Box::pin(kitchen_sink.notable_recently_updated_crates(70)));
     let upd = upd?;
 
     let mut seen = HashSet::new();
@@ -186,7 +186,7 @@ pub async fn render_trending_crates(out: &mut impl Write, kitchen_sink: &Kitchen
             tmp1.push(async move { futures::try_join!(f1, f2) });
         }
     }
-    tmp1.truncate(50);
+    tmp1.truncate(40);
 
     let mut tmp2 = Vec::with_capacity(top.len());
     for (k, _) in top.iter() {
@@ -196,7 +196,7 @@ pub async fn render_trending_crates(out: &mut impl Write, kitchen_sink: &Kitchen
             tmp2.push(async move { futures::try_join!(f1, f2) });
         }
     }
-    tmp2.truncate(50);
+    tmp2.truncate(40);
 
     let (mut updated, trending) = futures::try_join!(try_join_all(tmp1), try_join_all(tmp2))?;
 

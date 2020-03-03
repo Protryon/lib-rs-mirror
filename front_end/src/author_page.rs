@@ -1,10 +1,15 @@
-use crate::templates;
 use crate::Page;
+use crate::templates;
+use futures::stream::StreamExt;
+use kitchen_sink::CrateOwnerRow;
 use kitchen_sink::CResult;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::RichAuthor;
+use kitchen_sink::RichCrateVersion;
+use kitchen_sink::UserOrg;
 use kitchen_sink::UserType;
 use render_readme::Renderer;
+use std::sync::Arc;
 
 // pub struct User {
 //     pub id: u32,
@@ -23,17 +28,32 @@ pub struct AuthorPage<'a> {
     pub aut: &'a RichAuthor,
     pub kitchen_sink: &'a KitchenSink,
     pub markup: &'a Renderer,
+    pub crates: Vec<(Arc<RichCrateVersion>, CrateOwnerRow)>,
+    pub orgs: Vec<UserOrg>,
 }
 
 impl<'a> AuthorPage<'a> {
     pub async fn new(aut: &'a RichAuthor, kitchen_sink: &'a KitchenSink, markup: &'a Renderer) -> CResult<AuthorPage<'a>> {
         dbg!(&aut);
-        let crates = kitchen_sink.crates_of_author(aut).await?;
+        let orgs = kitchen_sink.user_github_orgs(&aut.github.login).await?.unwrap_or_default();
+        let mut rows = kitchen_sink.crates_of_author(aut).await?;
+        rows.sort_by(|a,b| b.latest_release.cmp(&a.latest_release));
+        rows.truncate(200);
+        dbg!(&rows);
+
+        let crates = futures::stream::iter(rows.into_iter())
+            .filter_map(|row| async move {
+                let c = kitchen_sink.rich_crate_version_async(&row.origin).await.map_err(|e| eprintln!("{}", e)).ok()?;
+                Some((c, row))
+            })
+            .collect().await;
 
         Ok(Self {
+            crates,
             aut,
             kitchen_sink,
             markup,
+            orgs,
         })
     }
 

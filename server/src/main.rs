@@ -445,18 +445,23 @@ async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let login = req.match_info().query("author");
     println!("author page for {:?}", login);
     let state: &AServerState = req.app_data().expect("appdata");
-    if !is_alnum(login) {
-        return render_404_page(state, login);
+    let crates = state.crates.load();
+    let aut = match crates.author_by_login(&login).await {
+        Ok(aut) => aut,
+        Err(_) => {
+            return render_404_page(state, login, "user");
+        }
+    };
+    if aut.github.login != login {
+        return Ok(HttpResponse::PermanentRedirect().header("Location", format!("/~{}", encode(&aut.github.login))).body(""));
     }
     let cache_file = state.page_cache_dir.join(format!("@{}.html", login));
     Ok(serve_cached(
         with_file_cache(state, cache_file, 3600, {
-        let login = login.to_owned();
         let state = state.clone();
         run_timeout(60, async move {
             let crates = state.crates.load();
             let mut page: Vec<u8> = Vec::with_capacity(32000);
-            let aut = crates.author_by_login(&login).await?;
             front_end::render_author_page(&mut page, &aut, &crates, &state.markup).await?;
             Ok::<_, failure::Error>((page, None))
         })

@@ -2,13 +2,13 @@
 @use crate::Urler;
 @use crate::AuthorPage;
 
-@(url: &Urler, c: &AuthorPage)
+@(url: &Urler, p: &AuthorPage)
 
-@:base(&c.page(), {
+@:base(&p.page(), {
   <header id="author">
     <div class="inner-col">
     <div class="breadcrumbs">
-      <h1><a href="/">Lib.rs</a></h1> › @if c.is_org() {
+      <h1><a href="/">Lib.rs</a></h1> › @if p.is_org() {
         Orgs
       } else {
         Users
@@ -16,17 +16,42 @@
     </div>
 
     <h2>
-      @"@"@c.login()
+      @"@"@p.login()
     </h2>
 
     <nav><ul>
-      <li><a href="@c.github_url()">GitHub</a></li>
+      <li><a href="@p.github_url()">GitHub</a></li>
     </ul></nav>
     </div>
   </header>
   <main>
     <div class="inner-col">
-      Hi
+      @if !p.orgs.is_empty() {
+        <section>Member of GitHub orgs</section>
+        <ul>
+          @for org in &p.orgs {
+            <li><a href="@org.url">@login</a></li>
+          }
+        </ul>
+      }
+      <section>
+        <h3>Crates by @p.aut.name()</h3>
+        <ul class=crates-list>
+          @for (k, r) in &p.crates {
+            <li>
+              <a href="@url.krate(&k)">
+                <div class=h>
+                  <h4>
+                    @k.short_name()
+                  </h4>
+                </div>
+                <div class=meta>
+                </div>
+              </a>
+            </li>
+          }
+        </ul>
+      </section>
     </div>
   </main>
   </div>

@@ -2096,6 +2096,15 @@ pub struct RichAuthor {
     pub github: User,
 }
 
+impl RichAuthor {
+    pub fn name(&self) -> &str {
+        match &self.github.name {
+            Some(n) if !n.is_empty() => &n,
+            _ => &self.github.login,
+        }
+    }
+}
+
 /// This is used to uniquely identify authors based on as little information as is available
 #[derive(Debug, Hash, Eq, PartialEq)]
 enum AuthorId {

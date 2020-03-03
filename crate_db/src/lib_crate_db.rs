@@ -645,21 +645,24 @@ impl CrateDb {
 
     pub async fn crates_of_author(&self, github_id: u32) -> FResult<Vec<CrateOwnerRow>> {
         self.with_read("crates_of_author", |conn| {
-            let mut query = conn.prepare_cached(r#"SELECT ac.crate_id, ac.invited_by_github_id, ac.invited_at, max(cv.created)
-                FROM author_crates ac JOIN crate_versions cv USING(crate_id)
+            let mut query = conn.prepare_cached(r#"SELECT c.origin, ac.invited_by_github_id, ac.invited_at, max(cv.created)
+                FROM author_crates ac
+                JOIN crate_versions cv USING(crate_id)
+                JOIN crates c ON c.id = ac.crate_id
                 WHERE ac.github_id = ?1
                 GROUP BY ac.crate_id
+                LIMIT 2000
             "#)?;
             let q = query.query_map(&[&github_id], |row| {
-                let crate_id: u32 = row.get_unwrap(0);
+                let origin = Origin::from_str(row.get_raw(0).as_str().unwrap());
                 let invited_by_github_id: Option<u32> = row.get_unwrap(1);
                 let invited_at = row.get_raw(2).as_str().ok().and_then(|d| DateTime::parse_from_rfc3339(d).ok());
                 let latest_timestamp: u32 = row.get_unwrap(3);
                 Ok(CrateOwnerRow {
-                    crate_id,
+                    origin,
                     invited_by_github_id,
                     invited_at,
-                    latest_version: DateTime::from_utc(NaiveDateTime::from_timestamp(latest_timestamp as _, 0), FixedOffset::east(0)),
+                    latest_release: DateTime::from_utc(NaiveDateTime::from_timestamp(latest_timestamp as _, 0), FixedOffset::east(0)),
                 })
             })?;
             Ok(q.filter_map(|x| x.ok()).collect())
@@ -1142,11 +1145,12 @@ impl KeywordInsert {
     }
 }
 
+#[derive(Debug)]
 pub struct CrateOwnerRow {
-    crate_id: u32,
-    invited_by_github_id: Option<u32>,
-    invited_at: Option<DateTime<FixedOffset>>,
-    latest_version: DateTime<FixedOffset>,
+    pub origin: Origin,
+    pub invited_by_github_id: Option<u32>,
+    pub invited_at: Option<DateTime<FixedOffset>>,
+    pub latest_release: DateTime<FixedOffset>,
 }
 
 #[inline]

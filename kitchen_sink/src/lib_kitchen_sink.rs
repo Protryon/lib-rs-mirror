@@ -252,7 +252,7 @@ impl KitchenSink {
             if crate_name.is_empty() {
                 continue;
             }
-            let categories: Vec<_> = parts.next().unwrap().split(',')
+            let categories: Vec<_> = parts.next().expect("overrides broken").split(',')
                 .map(|s| s.trim().to_string().into()).collect();
             if categories.is_empty() {
                 continue;
@@ -1952,9 +1952,6 @@ impl KitchenSink {
             // +7 here allows some duplication, and penalizes harder only after a few crates
             // adding original score means it'll never get lower than 1/3rd
             let new_score = score * 0.5 + (score + 7.) / (7. + dupe_points);
-            if dupe_points > 0. {
-                eprintln!("Knocking {}p {} to {} (by {})", dupe_points, origin.short_crate_name(), new_score, new_score / score);
-            }
             crates.push((origin, new_score));
         }
         crates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));

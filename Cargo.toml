@@ -12,7 +12,6 @@ members = [
 "front_end",
 "github_info",
 "kitchen_sink",
-"lazyonce",
 "reindex",
 "render_readme",
 "repo_url",

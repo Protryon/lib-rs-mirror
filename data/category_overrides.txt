@@ -40,6 +40,7 @@ bb8: asynchronous
 bcc-sys : development-tools
 bcc: development-tools
 bcfs : cryptography::cryptocurrencies, wasm
+beacon: cryptography::cryptocurrencies
 begonia: command-line-interface
 bfc: emulators
 bigbro: os, filesystem
@@ -52,6 +53,7 @@ bitcoin_hashes : cryptography::cryptocurrencies
 bitcoincore-rpc : cryptography::cryptocurrencies
 bitvector: data-structures
 blip_buf: multimedia::audio
+blockchain-network-simple: cryptography::cryptocurrencies
 bloke: game-engines
 bloomfilter: data-structures
 bnf: parsers

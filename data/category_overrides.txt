@@ -198,6 +198,7 @@ favy: multimedia::images
 fddf: command-line-utilities, filesystem
 fdfast: filesystem
 fec : encoding
+fedora-prime: os::unix-apis, command-line-utilities
 ff: algorithms
 fin_data: value-formatting
 finality-grandpa :cryptography::cryptocurrencies
@@ -267,6 +268,7 @@ grin_store: cryptography::cryptocurrencies
 grin_wallet_impls: cryptography::cryptocurrencies
 gtfs-structures : parser-implementations
 gtrans: command-line-utilities, internationalization
+gwasm-dispatcher : wasm
 hash-db : rust-patterns, databases, no-std
 hash256-std-hasher : rust-patterns, no-std
 hdf5: data-structures
@@ -294,6 +296,8 @@ i3ipc : hardware-support
 iban_validate: parser-implementations
 ical: parser-implementations
 igdb-rs: games
+ihex: embedded, development-tools
+ilibipt: hardware-support
 image-capture-core : os::macos-apis
 image-interlacer : multimedia::images, command-line-utilities
 imdb-index: web-programming
@@ -313,6 +317,8 @@ iota-model : cryptography::cryptocurrencies
 iota-pow: cryptography::cryptocurrencies
 iota-spammer : cryptography::cryptocurrencies
 iota-utils : cryptography::cryptocurrencies
+ipp-headers-sys: hardware-support
+ipp-sys: hardware-support, development-tools::profiling
 ipwhois: databases, network-programming
 is-macro : development-tools::procedural-macro-helpers
 isbfc: emulators
@@ -368,6 +374,8 @@ libsbc-sys: hardware-support
 lightning :cryptography::cryptocurrencies
 line: text-editors
 line_drawing: game-engines, algorithms
+link-ippcore  : hardware-support
+link-ippi : hardware-support
 llvm-passgen : development-tools
 loc: text-processing
 loc: text-processing, command-line-utilities
@@ -467,6 +475,7 @@ openni2: science::machine-learning
 openpol: games
 orgize: parser-implementations
 osmesa-sys : multimedia, os::unix-apis
+osmgpsmap: science, gui
 ostrich-core : asynchronous
 overdose : concurrency, data-structures
 ovgu-canteen : parser-implementations
@@ -496,6 +505,7 @@ plugger-core : development-tools::ffi
 pngcrush: compression
 polygraph: database-implementations
 pomodoro: command-line-utilities
+portaudio: os, multimedia::audio
 ppg : command-line-utilities, authentication
 pq-sys: database
 preftool-env : config
@@ -521,6 +531,7 @@ randrust: web-programming::http-server
 raptorq: network-programming
 rascam: hardware-support, multimedia::video
 ratio: science::math
+rdispatcher: concurrency
 rdkafka: asynchronous, network-programming
 readmouse: os::macos-apis
 recoreco: command-line-utilities, science::machine-learning

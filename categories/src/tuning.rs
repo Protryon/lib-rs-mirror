@@ -455,7 +455,8 @@ lazy_static! {
         (Cond::All(&["accurate", "cpu"]), &[("emulators", 1.1, 0.)]),
         (Cond::All(&["super", "nintendo"]), &[("emulators", 1.3, 0.1), ("wasm", 0.8, 0.)]),
         (Cond::Any(&["esolang", "tick-accurate", "brainfuck"]), &[("emulators", 1.1, 0.), ("parsing", 0.5, 0.), ("parser-implementations", 0.9, 0.)]),
-        (Cond::Any(&["vte", "virtual-terminal", "terminal-emulator"]), &[("emulators", 0.5, 0.)]),
+        (Cond::Any(&["vte", "virtual-terminal", "terminal-emulator"]), &[("emulators", 0.5, 0.), ("command-line-interface", 1.1, 0.)]),
+        (Cond::All(&["terminal", "emulator"]), &[("emulators", 0.8, 0.), ("command-line-interface", 1.2, 0.1)]),
 
         (Cond::Any(&["radix", "genetic"]), &[("science", 1.4, 0.), ("command-line-utilities", 0.75, 0.)]),
 
@@ -816,7 +817,7 @@ lazy_static! {
         (Cond::Any(&["repl", "pack"]), &[("parsing", 0.9, 0.)]),
 
         (Cond::Any(&["cli"]), &[("command-line-utilities", 1.1, 0.), ("command-line-interface", 1.1, 0.), ("rust-patterns", 0.6, 0.)]),
-        (Cond::Any(&["tui"]), &[("command-line-interface", 1.1, 0.05)]),
+        (Cond::Any(&["tui"]), &[("command-line-interface", 1.1, 0.1)]),
         (Cond::Any(&["dep:clap", "dep:docopt", "dep:structopt", "dep:ncurses"]), &[("command-line-utilities", 1.1, 0.1), ("command-line-interface", 0.9, 0.)]),
         (Cond::All(&["curses", "interface"]), &[("command-line-interface", 1.1, 0.05)]),
         (Cond::All(&["terminal", "ui"]), &[("command-line-interface", 1.1, 0.), ("multimedia::encoding", 0.8, 0.)]),
@@ -830,7 +831,7 @@ lazy_static! {
             ("science::math", 0.8, 0.), ("hardware-support", 0.7, 0.), ("command-line-utilities", 0.75, 0.), ("internationalization", 0.9, 0.),
             ("development-tools::procedural-macro-helpers", 0.7, 0.), ("memory-management", 0.5, 0.), ("rendering::engine", 0.8, 0.), ("emulators", 0.6, 0.)]),
         (Cond::Any(&["has:bin"]), &[("command-line-utilities", 1.1, 0.1), ("development-tools::cargo-plugins", 0.9, 0.), ("no-std", 0.7, 0.), ("game-engines", 0.9, 0.),
-            ("development-tools::procedural-macro-helpers", 0.7, 0.), ("memory-management", 0.4, 0.), ("algorithms", 0.5, 0.)]),
+            ("development-tools::procedural-macro-helpers", 0.7, 0.), ("memory-management", 0.4, 0.), ("os", 0.9, 0.), ("os::windows-apis", 0.8, 0.), ("algorithms", 0.5, 0.)]),
         (Cond::NotAny(&["has:bin"]), &[("games", 0.7, 0.), ("development-tools::cargo-plugins", 0.9, 0.), ("command-line-utilities", 0.4, 0.)]),
 
         (Cond::Any(&["hardware", "verilog", "bluetooth", "drone", "rs232","enclave", "adafruit", "laser", "altimeter", "sensor"]),

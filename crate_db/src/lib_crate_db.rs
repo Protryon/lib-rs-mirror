@@ -1034,7 +1034,7 @@ impl CrateDb {
             let timestamp = Utc::now().timestamp() as u32;
             let q = q.query_map(&[&timestamp], |r| {
                 let s = r.get_raw(0).as_str().unwrap();
-                Ok(Origin::from_crates_io_name(s))
+                Ok(Origin::from_str(s))
             })?.filter_map(|r| r.ok());
             Ok(q.collect())
         }).await

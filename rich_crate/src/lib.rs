@@ -34,7 +34,7 @@ impl fmt::Debug for Origin {
 
 impl Origin {
     pub fn from_crates_io_name(name: &str) -> Self {
-        assert!(!name.is_empty() && is_alnum(name));
+        assert!(!name.is_empty() && is_alnum(name), "bad crate name: {}", name);
         Origin::CratesIo(name.to_ascii_lowercase().into())
     }
 

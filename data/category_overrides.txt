@@ -160,6 +160,7 @@ durs-network-documents : cryptography::cryptocurrencies
 durs-wot : cryptography::cryptocurrencies
 dwarf-term : command-line-interface, game-engines
 dwm-status : os, gui
+dynamic: rust-patterns
 dynamic_reload: os, development-tools
 easyunits: rust-patterns
 eclectica: development-tools
@@ -705,10 +706,12 @@ try-guard : rust-patterns
 try_from: rust-patterns
 tss-tspi : hardware-support
 tt-call : rust-patterns
+ttmap: data-structures
 ttyaskpass: command-line-interface, authentication
 tw_pack_lib: games
 tw_unpack: games
 twapi: web-programming
+typeable: rust-patterns
 typedb: database-implementations
 typename: rust-patterns
 ucd-trie: data-structures, text-processing

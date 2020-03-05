@@ -228,6 +228,16 @@ impl CrateDb {
         }).await
     }
 
+    pub async fn before_index_latest(&self, origin: &Origin) -> FResult<()> {
+        self.with_write("before_index_latest", |tx| {
+            let next_timestamp = (Utc::now().timestamp() + 3600 * 24 * 3) as u32;
+            let mut mark_updated = tx.prepare_cached("UPDATE crates SET next_update = ?2 WHERE origin = ?1")?;
+            let args: &[&dyn ToSql] = &[&origin.to_str(), &next_timestamp];
+            mark_updated.execute(args).context("premark updated crate")?;
+            Ok(())
+        }).await
+    }
+
     /// Add data of the latest version of a crate to the index
     /// Score is a ranking of a crate (0 = bad, 1 = great)
     pub async fn index_latest(&self, c: CrateVersionData<'_>) -> FResult<()> {

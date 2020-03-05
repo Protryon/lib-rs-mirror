@@ -1349,6 +1349,7 @@ impl KitchenSink {
 
     pub async fn index_crate_highest_version(&self, origin: &Origin) -> CResult<()> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
+        self.crate_db.before_index_latest(origin).await?;
 
         let (src, manifest, _warn) = match origin {
             Origin::CratesIo(ref name) => {

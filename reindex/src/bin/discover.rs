@@ -6,26 +6,30 @@ use std::io::BufRead;
 use std::io::Write;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let crates = KitchenSink::new_default().await?;
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let handle = tokio::runtime::Handle::current();
+    handle.spawn(async {
+        let crates = KitchenSink::new_default().await?;
 
-    for line in io::stdin().lock().lines() {
-        let mut line = line?;
-        if line.trim().is_empty() {
-            continue;
-        }
-        if !line.starts_with("https://") {
-            line = format!("https://github.com/{}", line.trim_start_matches('/'));
-        }
-        if let Err(e) = check_repo(&line, &crates) {
-            eprintln!("{}: {}", line, e);
-            let mut src = e.source();
-            while let Some(e) = src {
-                eprintln!(" {}", e);
-                src = e.source();
+        for line in io::stdin().lock().lines() {
+            let mut line = line?;
+            if line.trim().is_empty() {
+                continue;
+            }
+            if !line.starts_with("https://") {
+                line = format!("https://github.com/{}", line.trim_start_matches('/'));
+            }
+            if let Err(e) = check_repo(&line, &crates) {
+                eprintln!("{}: {}", line, e);
+                let mut src = e.source();
+                while let Some(e) = src {
+                    eprintln!(" {}", e);
+                    src = e.source();
+                }
             }
         }
-    }
+        Ok::<_, Box<dyn std::error::Error + Send + Sync>>(())
+    }).await??;
     Ok(())
 }
 

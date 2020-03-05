@@ -1524,6 +1524,10 @@ impl KitchenSink {
                                     if dep1 == dep2 {
                                         continue;
                                     }
+                                    if !is_alnum(dep1) {
+                                        eprintln!("Bad crate name {} in {}", dep1, url);
+                                        continue;
+                                    }
                                     // Not really a replacement, but a recommendation if A then B
                                     changes.push(RepoChange::Replaced { crate_name: dep1.to_string(), replacement: dep2.to_string(), weight })
                                 }
@@ -1532,6 +1536,11 @@ impl KitchenSink {
                     }
                 } else {
                     for crate_name in removed {
+                        if !is_alnum(&crate_name) {
+                            eprintln!("Bad crate name {} in {}", crate_name, url);
+                            continue;
+                        }
+
                         if !added.is_empty() {
                             // Assuming relevance falls a bit when big changes are made.
                             // Removals don't decay with age (if we see great comebacks, maybe it should be split by semver-major).
@@ -2142,4 +2151,9 @@ async fn index_test() {
     assert!(stats.total > 13800);
     let lode = stats.counts.get("lodepng").unwrap();
     assert_eq!(12, lode.runtime.def);
+}
+
+
+fn is_alnum(q: &str) -> bool {
+    q.as_bytes().iter().copied().all(|c| c.is_ascii_alphanumeric() || c == b'_' || c == b'-')
 }

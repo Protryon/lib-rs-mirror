@@ -29,6 +29,7 @@ ascon: cryptography
 ass-rs: web-programming
 ast_node: parser-implementations
 async-codec : asynchronous
+atomicring: concurrency, data-structures
 atomsh: command-line-utilities
 augr-core : command-line-utilities
 background-jobs-core : asynchronous
@@ -85,6 +86,7 @@ ch8asm: emulators, development-tools
 chariot_slp : games, parser-implementations
 checkm: science, parser-implementations
 chillup: web-programming
+cht: concurrency, data-structures
 cita_trie: data-structures
 click: development-tools
 clocksource: date-and-time, os
@@ -97,6 +99,7 @@ collisions: algorithms
 colloquy: command-line-interface
 commoncrypto-sys : os::macos-apis
 commoncrypto: os::macos-apis, cryptography
+concurrent-hashmap : concurrency, data-structures
 conllx: parser-implementations
 contralog: development-tools::debugging
 core-foundation-sys: os::macos-apis
@@ -118,6 +121,7 @@ crunchy : development-tools
 cryptoballot: cryptography, authentication, gui
 cryptonote-wallet: cryptography::cryptocurrencies
 csound: multimedia::audio
+cuckoocache: concurrency, caching, data-structures
 cute-dnd-dice: game-engines
 darling_core : development-tools::procedural-macro-helpers
 ddh: filesystem, command-line-utilities
@@ -143,6 +147,7 @@ diceware-rs : command-line-utilities, authentication
 diesel: databases
 differential-geometry : science::math
 direction: rust-patterns
+ditto: concurrency, data-structures
 dmg: os::macos-apis, filesystem
 docx: parser-implementations, text-processing
 doublepivot-quicksort : algorithms
@@ -536,6 +541,7 @@ ratio: science::math
 rdispatcher: concurrency
 rdkafka: asynchronous, network-programming
 readmouse: os::macos-apis
+recloser: concurrency
 recoreco: command-line-utilities, science::machine-learning
 redis-cluster : databases
 redisearch_api : databases
@@ -680,6 +686,7 @@ teloxide: web-programming
 tempus_fugit: development-tools::profiling
 termcodes: command-line-interface, no-std
 text_io: text-processing
+thingvellir: concurrency
 thrift_codec : encoding, web-programming
 time-parse : date-and-time, parser-implementations
 tls_read_hancock_bin : parser-implementations, science

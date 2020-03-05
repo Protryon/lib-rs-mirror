@@ -34,7 +34,7 @@ impl fmt::Debug for Origin {
 
 impl Origin {
     pub fn from_crates_io_name(name: &str) -> Self {
-        debug_assert!(!name.is_empty());
+        assert!(!name.is_empty() && is_alnum(name));
         Origin::CratesIo(name.to_ascii_lowercase().into())
     }
 
@@ -134,4 +134,8 @@ fn roundtrip_gh() {
     assert_eq!(o1, o2);
     assert_ne!(o1, o3);
     assert_eq!("baz", o2.short_crate_name());
+}
+
+fn is_alnum(q: &str) -> bool {
+    q.as_bytes().iter().copied().all(|c| c.is_ascii_alphanumeric() || c == b'_' || c == b'-')
 }

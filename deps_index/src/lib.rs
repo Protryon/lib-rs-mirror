@@ -25,6 +25,8 @@ pub enum DepsErr {
     Stopped,
     #[fail(display = "Deps stats timeout")]
     DepsNotAvailable,
+    #[fail(display = "Index is empty or parsing failed")]
+    IndexBroken,
     #[fail(display = "Crate timeout")]
     GitIndexFile(PathBuf, String),
     #[fail(display = "Git crate '{:?}' can't be indexed, because it's not on the list", _0)]

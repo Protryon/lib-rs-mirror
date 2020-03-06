@@ -139,12 +139,15 @@ pub struct Index {
 impl Index {
     pub fn new(data_dir: &Path) -> Result<Self, DepsErr> {
         let crates_io_index = crates_index::Index::new(data_dir.join("index"));
-        let indexed_crates = crates_io_index.crate_index_paths().par_bridge()
+        let indexed_crates: FxHashMap<_,_> = crates_io_index.crate_index_paths().par_bridge()
                 .filter_map(|path| {
                     let c = crates_index::Crate::new_checked(path).ok()?;
                     Some((c.name().to_ascii_lowercase().into(), c))
                 })
                 .collect();
+        if indexed_crates.len() < 35000 {
+            return Err(DepsErr::IndexBroken);
+        }
         Ok(Self {
             git_index: GitIndex::new(data_dir)?,
             cache: RwLock::new(FxHashMap::with_capacity_and_hasher(5000, Default::default())),

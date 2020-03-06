@@ -381,7 +381,8 @@ impl KitchenSink {
                     }
 
                     let ratio1 = (800. + this_week_avg) / (900. + prev_week_avg) * prev_week_avg.sqrt().min(10.);
-                    let ratio4 = (800. + this_4w_avg) / (900. + prev_4w_avg) * prev_4w_avg.sqrt().min(11.);
+                    // 0.9, because it's less interesting
+                    let ratio4 = 0.9 * (700. + this_4w_avg) / (600. + prev_4w_avg) * prev_4w_avg.sqrt().min(9.);
 
                     // combine short term and long term trends
                     Some((origin, ratio1, ratio4))

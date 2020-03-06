@@ -217,6 +217,7 @@ finite: science::math
 finn-assembler: development-tools
 fitrs: parser-implementations
 fixed_width: parser-implementations
+fixedstep: game-engines
 fixedvec: no-std, data-structures
 flats: data-structures
 flightmath: command-line-utilities, science
@@ -456,6 +457,7 @@ near-bindgen-core : cryptography::cryptocurrencies
 neli: network-programming, os::unix-apis
 neocom: emulators
 neon-sys: web-programming
+nes: rust-patterns
 nessus: development-tools, network-programming
 nestools: game-engines, emulators
 netdevice: os, network-programming
@@ -721,6 +723,7 @@ urldecode: web-programming
 urlocator: parser-implementations
 usereport-rs : development-tools::profiling, command-line-utilities
 users: os::unix-apis
+utf-8: text-processing, algorithms
 utime: filesystem
 vad: multimedia::audio
 validjson: encoding, command-line-utilities

@@ -1165,7 +1165,7 @@ impl KitchenSink {
         warnings
     }
 
-    pub async fn check_url_is_valid(&self, url: &str) -> bool {
+    async fn check_url_is_valid(&self, url: &str) -> bool {
         if let Ok(Some(res)) = self.url_check_cache.get(url) {
             return res;
         }
@@ -1600,7 +1600,7 @@ impl KitchenSink {
         self.crate_db.parent_crate(repo, child.short_name()).await.ok()?
     }
 
-    pub async fn cachebust_string_for_repo(&self, crate_repo: &Repo) -> CResult<String> {
+    async fn cachebust_string_for_repo(&self, crate_repo: &Repo) -> CResult<String> {
         Ok(self.crate_db.crates_in_repo(crate_repo).await
             .context("db crates_in_repo")?
             .into_iter()

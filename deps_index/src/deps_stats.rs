@@ -69,13 +69,13 @@ pub struct DepVisitor {
 }
 
 impl DepVisitor {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             node_visited: FxHashSet::with_capacity_and_hasher(120, Default::default()),
         }
     }
 
-    pub fn visit(&mut self, depset: &ArcDepSet, depinf: DepInf, mut cb: impl FnMut(&mut Self, &DepName, &Dep)) {
+    pub(crate) fn visit(&mut self, depset: &ArcDepSet, depinf: DepInf, mut cb: impl FnMut(&mut Self, &DepName, &Dep)) {
         let target_addr: &Mutex<FxHashMap<DepName, Dep>> = &*depset;
         if self.node_visited.insert((depinf, target_addr as *const _)) {
             if let Some(depset) = depset.try_lock() {
@@ -87,12 +87,12 @@ impl DepVisitor {
     }
 
     #[inline]
-    pub fn start(&mut self, dep: &Dep, depinf: DepInf, cb: impl FnMut(&mut DepVisitor, &ArcDepSet, DepInf)) {
+    pub(crate) fn start(&mut self, dep: &Dep, depinf: DepInf, cb: impl FnMut(&mut DepVisitor, &ArcDepSet, DepInf)) {
         self.recurse_inner(dep, DepInf { direct: true, ..depinf }, cb)
     }
 
     #[inline]
-    pub fn recurse(&mut self, dep: &Dep, depinf: DepInf, cb: impl FnMut(&mut DepVisitor, &ArcDepSet, DepInf)) {
+    pub(crate) fn recurse(&mut self, dep: &Dep, depinf: DepInf, cb: impl FnMut(&mut DepVisitor, &ArcDepSet, DepInf)) {
         self.recurse_inner(dep, DepInf { direct: false, ..depinf }, cb)
     }
 
@@ -155,7 +155,7 @@ impl Index {
         Ok(converted)
     }
 
-    pub fn get_deps_stats(&self) -> DepsStats {
+    pub(crate) fn get_deps_stats(&self) -> DepsStats {
         let crates = self.crates_io_crates();
         let crates: Vec<(Box<str>, FxHashMap<_,_>)> = crates
         .par_iter()

@@ -215,7 +215,7 @@ impl Index {
             .unwrap_or_else(|| krate.latest_version()) // latest_version = most recently published version
     }
 
-    pub fn deps_of_crate(&self, krate: &impl ICrate, query: DepQuery) -> Result<Dep, DepsErr> {
+    pub(crate) fn deps_of_crate(&self, krate: &impl ICrate, query: DepQuery) -> Result<Dep, DepsErr> {
         let (latest, features) = krate.latest_version_with_features(query.all_optional);
         self.deps_of_crate_int(latest, features, query)
     }
@@ -240,7 +240,7 @@ impl Index {
         })
     }
 
-    pub fn deps_of_ver<'a>(&self, ver: &'a impl IVersion, wants: Features) -> Result<ArcDepSet, DepsErr> {
+    pub(crate) fn deps_of_ver<'a>(&self, ver: &'a impl IVersion, wants: Features) -> Result<ArcDepSet, DepsErr> {
         let key = (format!("{}-{}", ver.name(), ver.version()).into(), wants);
         if let Some(cached) = self.cache.read().get(&key) {
             return Ok(cached.clone());

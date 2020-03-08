@@ -16,7 +16,7 @@ use semver::Version as SemVer;
 use semver::VersionReq;
 use serde_derive::*;
 use std::iter;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 use string_interner::StringInterner;
@@ -128,7 +128,7 @@ impl ICrate for RichCrateVersion {
 
 pub struct Index {
     indexed_crates: FxHashMap<Box<str>, Crate>,
-    pub crates_io_index: crates_index::Index,
+    pub crates_index_path: PathBuf,
     git_index: GitIndex,
 
     pub inter: RwLock<StringInterner<Sym>>,
@@ -138,7 +138,8 @@ pub struct Index {
 
 impl Index {
     pub fn new(data_dir: &Path) -> Result<Self, DepsErr> {
-        let crates_io_index = crates_index::Index::new(data_dir.join("index"));
+        let crates_index_path = data_dir.join("index");
+        let crates_io_index = crates_index::Index::new(&crates_index_path);
         let indexed_crates: FxHashMap<_,_> = crates_io_index.crate_index_paths().par_bridge()
                 .filter_map(|path| {
                     let c = crates_index::Crate::new_checked(path).ok()?;
@@ -154,12 +155,12 @@ impl Index {
             inter: RwLock::new(StringInterner::new()),
             deps_stats: DoubleCheckedCell::new(),
             indexed_crates,
-            crates_io_index,
+            crates_index_path,
         })
     }
 
     pub fn update(&self) {
-        let _ = self.crates_io_index.update().map_err(|e| eprintln!("{}", e));
+        let _ = crates_index::Index::new(&self.crates_index_path).update().map_err(|e| eprintln!("{}", e));
     }
 
     /// Crates available in the crates.io index

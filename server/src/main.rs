@@ -263,22 +263,32 @@ async fn default_handler(req: HttpRequest) -> Result<HttpResponse, ServerError> 
     let name = path.trim_matches('/').to_owned();
     let crates = state.crates.load();
     let (found_crate, found_keyword) = rt_run_timeout(&state.rt, 10, async move {
-        match crates.rich_crate_async(&Origin::from_crates_io_name(&name)).await {
-            Ok(c) => Ok((Some(c), None)),
-            Err(_) => {
+        let crate_maybe = if is_alnum(&name) {
+            crates.rich_crate_async(&Origin::from_crates_io_name(&name)).await.ok()
+        } else {
+            None
+        };
+        match crate_maybe {
+            Some(c) => Ok((Some(c), None)),
+            None => {
                 let inverted_hyphens: String = name.chars().map(|c| if c == '-' {'_'} else if c == '_' {'-'} else {c.to_ascii_lowercase()}).collect();
-                match crates.rich_crate_async(&Origin::from_crates_io_name(&inverted_hyphens)).await {
-                    Ok(c) => Ok((Some(c), None)),
-                    Err(_) => {
+                let crate_maybe = if is_alnum(&name) {
+                    crates.rich_crate_async(&Origin::from_crates_io_name(&inverted_hyphens)).await.ok()
+                } else {
+                    None
+                };
+                match crate_maybe {
+                    Some(c) => Ok((Some(c), None)),
+                    None => {
                         if crates.is_it_a_keyword(&inverted_hyphens).await {
                             Ok((None, Some(inverted_hyphens)))
                         } else {
                             Ok((None, None))
                         }
                     },
-                    }
-            },
                 }
+            },
+        }
     }).await?;
 
     if let Some(k) = found_crate {

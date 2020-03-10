@@ -27,7 +27,7 @@
           @if r.invited_by_github_id.is_none() {
             Founded
             @if let Some(d) = r.invited_at {
-              in @AuthorPage::format_month(&d) (@HumanTime::from(d).to_text_en(Accuracy::Rough, Tense::Past))
+              in @AuthorPage::format_month(&d). Last updated @HumanTime::from(r.latest_release).to_text_en(Accuracy::Rough, Tense::Past).
             }
           } else {
             Member

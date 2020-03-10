@@ -42,7 +42,6 @@ pub struct AuthorPage<'a> {
 
 impl<'a> AuthorPage<'a> {
     pub async fn new(aut: &'a RichAuthor, kitchen_sink: &'a KitchenSink, markup: &'a Renderer) -> CResult<AuthorPage<'a>> {
-        dbg!(&aut);
         let orgs = kitchen_sink.user_github_orgs(&aut.github.login).await?.unwrap_or_default();
         let orgs = futures::stream::iter(orgs).filter_map(|org| async move {
             kitchen_sink.github_org(&org.login).await

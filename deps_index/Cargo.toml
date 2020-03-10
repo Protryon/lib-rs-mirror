@@ -7,7 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-crates-index = { git = "https://github.com/frewsxcv/rust-crates-index", version = "0.14.1", branch = "smol" }
+crates-index = "0.14.2"
 rich_crate = { path = "../rich_crate", version = "0.5" }
 repo_url = { path = "../repo_url", version = "0.3.0" }
 serde = "1.0.104"

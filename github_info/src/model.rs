@@ -65,6 +65,7 @@ pub struct User {
     pub blog: Option<String>,        // "https://example.com
     #[serde(rename = "type")]
     pub user_type: UserType,
+    pub created_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -175,10 +176,19 @@ pub struct Topics {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserOrg {
     pub login: String, // "github",
-    //id: String, // 1,
-    // node_id: String, // "MDEyOk9yZ2FuaXphdGlvbjE=",
-    pub url: String, // "https://api.github.com/orgs/github",
+}
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Org {
+    id: u32,
+    pub login: String, // "github",
+    pub name: Option<String>,
+    pub blog: Option<String>,
+    pub html_url: String,
+    pub avatar_url: String,
     // public_members_url: String, // "https://api.github.com/orgs/github/public_members{/member}",
     // avatar_url: String, // "https://github.com/images/error/octocat_happy.gif",
     pub description: Option<String>, // "A great organization"
+    pub created_at: String,
 }

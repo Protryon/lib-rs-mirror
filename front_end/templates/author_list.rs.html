@@ -1,0 +1,43 @@
+@use chrono_humanize::*;
+@use chrono_humanize::HumanTime;
+@use crate::AuthorPage;
+@use crate::author_page::OtherOwner;
+@use crate::format_downloads;
+@use crate::Urler;
+@use kitchen_sink::CrateOwnerRow;
+@use kitchen_sink::RichCrateVersion;
+@use std::sync::Arc;
+
+@(crates: &[(Arc<RichCrateVersion>, u32, CrateOwnerRow, Vec<OtherOwner>)], url: &Urler)
+
+<ul class=crates-list>
+  @for (k, dl, r, _) in crates {
+    <li>
+      <a href="@url.krate(&k)">
+        <div class=h>
+          <h4>
+            @k.short_name()
+          </h4>
+        </div>
+        <div class=meta>
+          @if *dl > 1000 {
+            <span class=downloads title="@dl recent downloads">@if let Some((num,unit)) = Some(format_downloads(*dl)) {@num<b>@unit</b>}</span>
+          }
+
+          @if r.invited_by_github_id.is_none() {
+            Founded
+            @if let Some(d) = r.invited_at {
+              in @AuthorPage::format_month(&d) (@HumanTime::from(d).to_text_en(Accuracy::Rough, Tense::Past))
+            }
+          } else {
+            Member
+            @if let Some(d) = r.invited_at {
+              since @AuthorPage::format_month(&d) (@HumanTime::from(d).to_text_en(Accuracy::Rough, Tense::Present))
+            }
+          }
+        </div>
+      </a>
+    </li>
+  }
+</ul>
+

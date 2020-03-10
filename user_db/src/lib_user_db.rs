@@ -52,6 +52,7 @@ impl UserDb {
                 gravatar_id: row.get_unwrap(4),
                 html_url: row.get_unwrap(5),
                 blog: None,
+                created_at: None,
                 user_type: match row.get_raw(6).as_str().unwrap() {
                     "org" => UserType::Org,
                     "bot" => UserType::Bot,
@@ -88,6 +89,7 @@ impl UserDb {
                 gravatar_id: row.get_unwrap(4),
                 html_url: row.get_unwrap(5),
                 blog: None,
+                created_at: None,
                 user_type: match row.get_raw(6).as_str().unwrap() {
                     "org" => UserType::Org,
                     "bot" => UserType::Bot,

@@ -140,9 +140,10 @@ impl Urler {
     /// This will probably change to a listing page rather than arbitrary personal URL
     pub fn author(&self, author: &CrateAuthor<'_>) -> Option<String> {
         if let Some(ref gh) = author.github {
-            Some(match gh.user_type {
-                UserType::User => format!("https://crates.io/users/{}", encode(&gh.login)),
-                UserType::Org | UserType::Bot => format!("https://github.com/{}", encode(&gh.login)),
+            Some(match (gh.user_type, author.owner) {
+                (UserType::User, true) => self.crates_io_user_by_github_login(&gh.login),
+                (UserType::User, _) => format!("https://crates.io/users/{}", encode(&gh.login)),
+                (UserType::Org, _) | (UserType::Bot, _) => format!("https://github.com/{}", encode(&gh.login)),
             })
         } else if let Some(ref info) = author.info {
             if let Some(ref em) = info.email {
@@ -160,6 +161,10 @@ impl Urler {
         } else {
             None
         }
+    }
+
+    pub fn crates_io_user_by_github_login(&self, login: &str) -> String {
+        format!("/~{}", encode(login))
     }
 
     pub fn search_crates_io(&self, query: &str) -> String {

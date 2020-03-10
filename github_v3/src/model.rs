@@ -67,6 +67,7 @@ pub struct User {
     pub blog: Option<String>,        // "https://example.com
     #[serde(rename = "type")]
     pub user_type: UserType,
+    pub created_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

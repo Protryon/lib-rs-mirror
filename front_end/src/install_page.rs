@@ -39,6 +39,8 @@ impl<'a> InstallPage<'a> {
             item_description: self.ver.description().map(|d| d.to_string()),
             noindex: true,
             search_meta: false,
+            critical_css_data: Some(include_str!("../../style/public/install.css")),
+            critical_css_dev_url: Some("/install.css"),
             ..Default::default()
         }
     }

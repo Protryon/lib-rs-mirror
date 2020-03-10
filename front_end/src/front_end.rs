@@ -40,6 +40,7 @@ use semver::Version as SemVer;
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::io::Write;
+use url::Url;
 
 include!(concat!(env!("OUT_DIR"), "/templates.rs"));
 
@@ -337,4 +338,34 @@ pub(crate) fn date_now() -> String {
 /// Used to render descriptions
 pub(crate) fn render_markdown_str(s: &str, markup: &Renderer) -> templates::Html<String> {
     templates::Html(markup.markdown_str(s, false, None))
+}
+
+
+/// Nicely rounded number of downloads
+///
+/// To show that these numbers are just approximate.
+pub(crate) fn format_downloads(num: u32) -> (String, &'static str) {
+    match num {
+        a @ 0..=99 => (format!("{}", a), ""),
+        a @ 0..=500 => (format!("{}", a / 10 * 10), ""),
+        a @ 0..=999 => (format!("{}", a / 50 * 50), ""),
+        a @ 0..=9999 => (format!("{}.{}", a / 1000, a % 1000 / 100), "K"),
+        a @ 0..=999_999 => (format!("{}", a / 1000), "K"),
+        a => (format!("{}.{}", a / 1_000_000, a % 1_000_000 / 100_000), "M"),
+    }
+}
+
+
+pub(crate) fn url_domain(url: &str) -> Option<Cow<'static, str>> {
+    Url::parse(url).ok().and_then(|url| {
+        url.host_str().and_then(|host| {
+            if host.ends_with(".github.io") {
+                Some("github.io".into())
+            } else if host.ends_with(".githubusercontent.com") {
+                None
+            } else {
+                Some(host.trim_start_matches("www.").to_string().into())
+            }
+        })
+    })
 }

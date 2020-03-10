@@ -1,6 +1,9 @@
+@use chrono_humanize::*;
+@use crate::AuthorPage;
+@use crate::iter::*;
+@use crate::templates::author_list;
 @use crate::templates::base;
 @use crate::Urler;
-@use crate::AuthorPage;
 
 @(url: &Urler, p: &AuthorPage)
 
@@ -8,57 +11,91 @@
   <header id="author">
     <div class="inner-col">
     <div class="breadcrumbs">
-      <h1><a href="/">Lib.rs</a></h1> › @if p.is_org() {
+      <h1><a href="/">Lib.rs</a></h1> › <span class="has-keywords">@if p.is_org() {
         Orgs
       } else {
         Users
-      }
+      }</span>
+
+      <span class="keywords">
+        <span>
+          @for key in p.keywords.iter().take(3) {
+            <a href="@url.keyword(key)" class=keyword><span>#</span>@key</a>
+          }
+        </span>
+        @for key in p.keywords.iter().skip(3).take(3) {
+          <a href="@url.keyword(key)" class=keyword><span>#</span>@key</a>
+        }
+      </span>
+
     </div>
 
     <h2>
-      @"@"@p.login()
+      @if p.orgs.iter().any(|o| o.login == "rust-lang") {<span class=labels><span title="Member of the rust-lang org">Rust team</span></span>}
+      @p.login()
     </h2>
+    @if !p.aut.name().is_empty() && p.aut.name() != p.login() {
+      <p class=desc>@p.aut.name()</p>
+    }
+    <p>
+      Joined crates-io @HumanTime::from(p.joined).to_text_en(Accuracy::Rough, Tense::Past)@if let Some(d) = p.joined_github() {.
+        Joined GitHub @HumanTime::from(d).to_text_en(Accuracy::Rough, Tense::Past).
+      }
+    </p>
+
 
     <nav><ul>
-      <li><a href="@p.github_url()">GitHub</a></li>
+      <li><a rel="ugc nofollow" href="@p.github_url()">GitHub</a></li>
+      <li><a rel="ugc nofollow" href="https://crates.io/users/@p.aut.github.login">crates.io</a></li>
+      @if let Some((url, label)) = p.homepage_link() {
+        <li><a href="@url" rel="ugc nofollow" >@label</a></li>
+      }
     </ul></nav>
     </div>
   </header>
   <main>
     <div class="inner-col">
       @if !p.orgs.is_empty() {
-        <section>Member of GitHub orgs</section>
-        <ul>
-          @for org in &p.orgs {
-            <li><a href="@org.url">@login</a></li>
+        <section>
+          <h3>Member of GitHub orgs</h3>
+          @for (last, org) in p.orgs.iter().identify_last() {
+            <a rel="ugc nofollow" href="@org.html_url">@AuthorPage::org_name(org)</a>@if !last {,}
           }
-        </ul>
+        </section>
       }
-      <section>
-        <h3>Crates by @p.aut.name()</h3>
-        <ul class=crates-list>
-          @for (k, r) in &p.crates {
-            <li>
-              <a href="@url.krate(&k)">
-                <div class=h>
-                  <h4>
-                    @k.short_name()
-                  </h4>
-                </div>
-                <div class=meta>
-                </div>
-              </a>
-            </li>
+      @if !p.collab.is_empty() {
+        <section>
+          <h3>Collaborated with</h3>
+          @for (last, user) in p.collab.iter().identify_last() {
+            <a href="@url.crates_io_user_by_github_login(&user.login)">@user.login</a>@if !last {,}
           }
-        </ul>
-      </section>
+        </section>
+      }
+    </div>
+    <div class="author-cols">
+      <div class="inner-col">
+        @if p.founder_total > 0 {
+          <section>
+            <h3>@p.aut.name() created @p.founder_total crate@if p.founder_total != 1 {s}</h3>
+            @:author_list(&p.founder_crates, url)
+          </section>
+        }
+        @if p.member_total > 0 {
+          <section>
+            <h3>Co-owns @p.member_total crate@if p.member_total != 1 {s}</h3>
+            @:author_list(&p.member_crates, url)
+          </section>
+        }
+      </div>
     </div>
   </main>
   </div>
 
   <footer>
     <div class="inner-col">
-      Bye
+      <p>Based on data from crates-io and GitHub.</p>
+      <aside role="contentinfo"><p><a href="/"><b>Lib.rs</b></a> is an unofficial list of Rust/Cargo crates. It's <a href="https://gitlab.com/crates.rs?sort=stars_desc">open-source</a>, created by <a href="/~kornelski">kornelski</a>.</p></aside>
+
     </div>
   </footer>
 })

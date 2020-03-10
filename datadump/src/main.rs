@@ -123,6 +123,7 @@ async fn index_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, us
             let owners: Vec<_> = owners
                 .into_iter()
                 .filter_map(|o| {
+                    let invited_at = o.created_at.splitn(2, '.').next().unwrap().to_string(); // trim millis part
                     let invited_by_github_id =
                         o.created_by_id.and_then(|id| users.get(&id).map(|u| u.github_id as u32).or_else(|| teams.get(&id).map(|t| t.github_id)));
                     Some(match o.owner_kind {
@@ -134,7 +135,7 @@ async fn index_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, us
                             CrateOwner {
                                 id: o.owner_id as _,
                                 login: u.login.to_owned(),
-                                invited_at: Some(o.created_at),
+                                invited_at: Some(invited_at),
                                 invited_by_github_id,
                                 github_id: u.github_id.try_into().ok(),
                                 name: Some(u.name.to_owned()),
@@ -148,7 +149,7 @@ async fn index_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, us
                             CrateOwner {
                                 id: o.owner_id as _,
                                 login: u.login.to_owned(),
-                                invited_at: Some(o.created_at),
+                                invited_at: Some(invited_at),
                                 github_id: Some(u.github_id),
                                 invited_by_github_id,
                                 name: Some(u.name.to_owned()),

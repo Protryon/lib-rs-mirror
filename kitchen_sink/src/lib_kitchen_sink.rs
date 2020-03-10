@@ -21,6 +21,7 @@ pub use crates_io_client::CrateDependency;
 use crates_io_client::CrateMetaFile;
 pub use crates_io_client::CrateMetaVersion;
 pub use crates_io_client::OwnerKind;
+pub use github_info::Org;
 pub use github_info::User;
 pub use github_info::UserOrg;
 pub use github_info::UserType;
@@ -1623,6 +1624,11 @@ impl KitchenSink {
         Ok(self.gh.user_orgs(github_login).await?)
     }
 
+    #[inline]
+    pub async fn github_org(&self, github_login: &str) -> CResult<Option<Org>> {
+        Ok(self.gh.org(github_login).await?)
+    }
+
     /// Returns (contrib, github user)
     async fn contributors_from_repo(&self, crate_repo: &Repo, owners: &[CrateOwner], found_crate_in_repo: bool) -> CResult<(bool, HashMap<String, (f64, User)>)> {
         let mut hit_max_contributor_count = false;
@@ -1873,7 +1879,7 @@ impl KitchenSink {
         self.crate_db.crates_of_author(aut.github.id).await
     }
 
-    async fn crate_owners(&self, origin: &Origin) -> CResult<Vec<CrateOwner>> {
+    pub async fn crate_owners(&self, origin: &Origin) -> CResult<Vec<CrateOwner>> {
         match origin {
             Origin::CratesIo(name) => {
                 if let Some(o) = self.crates_io_owners_cache.get(name)? {

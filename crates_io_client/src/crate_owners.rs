@@ -1,3 +1,6 @@
+use chrono::DateTime;
+use chrono::offset::TimeZone;
+use chrono::Utc;
 use serde_derive::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -53,6 +56,10 @@ impl CrateOwner {
                 }
             },
         }
+    }
+
+    pub fn invited_at(&self) -> Option<DateTime<Utc>> {
+        self.invited_at.as_ref().and_then(|d| Utc.datetime_from_str(d, "%Y-%m-%d %H:%M:%S").ok())
     }
 
     /// Be careful about case-insensitivity

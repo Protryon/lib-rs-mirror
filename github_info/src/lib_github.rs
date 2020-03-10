@@ -55,7 +55,8 @@ impl Error {
 
 pub struct GitHub {
     client: github_v3::Client,
-    orgs: TempCache<(String, Option<Vec<UserOrg>>)>,
+    user_orgs: TempCache<(String, Option<Vec<UserOrg>>)>,
+    orgs: TempCache<(String, Option<Org>)>,
     users: TempCache<(String, Option<User>)>,
     commits: TempCache<(String, Option<Vec<CommitMeta>>)>,
     releases: TempCache<(String, Option<Vec<GitHubRelease>>)>,
@@ -68,8 +69,9 @@ impl GitHub {
     pub fn new(cache_path: impl AsRef<Path>, token: &str) -> CResult<Self> {
         Ok(Self {
             client: github_v3::Client::new(Some(token)),
-            orgs: TempCache::new(&cache_path.as_ref().with_file_name("github_orgs.bin"))?,
-            users: TempCache::new(&cache_path.as_ref().with_file_name("github_users.bin"))?,
+            user_orgs: TempCache::new(&cache_path.as_ref().with_file_name("github_user_orgs.bin"))?,
+            orgs: TempCache::new(&cache_path.as_ref().with_file_name("github_orgs2.bin"))?,
+            users: TempCache::new(&cache_path.as_ref().with_file_name("github_users2.bin"))?,
             commits: TempCache::new(&cache_path.as_ref().with_file_name("github_commits.bin"))?,
             releases: TempCache::new(&cache_path.as_ref().with_file_name("github_releases.bin"))?,
             contribs: TempCache::new(&cache_path.as_ref().with_file_name("github_contribs.bin"))?,
@@ -104,8 +106,15 @@ impl GitHub {
 
     pub async fn user_orgs(&self, login: &str) -> CResult<Option<Vec<UserOrg>>> {
         let key = login.to_ascii_lowercase();
-        self.get_cached(&self.orgs, (&key, ""), |client| client.get()
+        self.get_cached(&self.user_orgs, (&key, ""), |client| client.get()
                        .path("users").arg(login).path("orgs")
+                       .send(), id).await.map_err(|e| e.context("user_orgs"))
+    }
+
+    pub async fn org(&self, login: &str) -> CResult<Option<Org>> {
+        let key = login.to_ascii_lowercase();
+        self.get_cached(&self.orgs, (&key, ""), |client| client.get()
+                       .path("orgs").arg(login)
                        .send(), id).await.map_err(|e| e.context("user_orgs"))
     }
 

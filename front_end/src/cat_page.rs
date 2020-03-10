@@ -99,20 +99,6 @@ impl<'a> CatPage<'a> {
         self.related.iter().map(|slug| CATEGORIES.from_slug(slug).0.into_iter().filter(|c| seen.insert(&c.slug)).collect()).filter(|v: &Vec<_>| !v.is_empty()).collect()
     }
 
-    /// Nicely rounded number of downloads
-    ///
-    /// To show that these numbers are just approximate.
-    pub fn downloads(&self, num: u32) -> (String, &'static str) {
-        match num {
-            a @ 0..=99 => (format!("{}", a), ""),
-            a @ 0..=500 => (format!("{}", a / 10 * 10), ""),
-            a @ 0..=999 => (format!("{}", a / 50 * 50), ""),
-            a @ 0..=9999 => (format!("{}.{}", a / 1000, a % 1000 / 100), "K"),
-            a @ 0..=999_999 => (format!("{}", a / 1000), "K"),
-            a => (format!("{}.{}", a / 1_000_000, a % 1_000_000 / 100_000), "M"),
-        }
-    }
-
     /// Metadata about the category
     pub fn page(&self) -> Page {
         Page {

@@ -645,7 +645,7 @@ impl CrateDb {
 
     pub async fn crates_of_author(&self, github_id: u32) -> FResult<Vec<CrateOwnerRow>> {
         self.with_read("crates_of_author", |conn| {
-            let mut query = conn.prepare_cached(r#"SELECT c.origin, ac.invited_by_github_id, ac.invited_at, max(cv.created)
+            let mut query = conn.prepare_cached(r#"SELECT c.origin, ac.invited_by_github_id, ac.invited_at, max(cv.created), c.ranking
                 FROM author_crates ac
                 JOIN crate_versions cv USING(crate_id)
                 JOIN crates c ON c.id = ac.crate_id
@@ -656,13 +656,18 @@ impl CrateDb {
             let q = query.query_map(&[&github_id], |row| {
                 let origin = Origin::from_str(row.get_raw(0).as_str().unwrap());
                 let invited_by_github_id: Option<u32> = row.get_unwrap(1);
-                let invited_at = row.get_raw(2).as_str().ok().and_then(|d| DateTime::parse_from_rfc3339(d).ok());
+                let invited_at = row.get_raw(2).as_str().ok().map(|d| match Utc.datetime_from_str(d, "%Y-%m-%d %H:%M:%S") {
+                    Ok(d) => d,
+                    Err(e) => panic!("Can't parse {}, because {}", d, e),
+                });
                 let latest_timestamp: u32 = row.get_unwrap(3);
+                let crate_ranking: f64 = row.get_unwrap(4);
                 Ok(CrateOwnerRow {
                     origin,
+                    crate_ranking: crate_ranking as f32,
                     invited_by_github_id,
                     invited_at,
-                    latest_release: DateTime::from_utc(NaiveDateTime::from_timestamp(latest_timestamp as _, 0), FixedOffset::east(0)),
+                    latest_release: DateTime::from_utc(NaiveDateTime::from_timestamp(latest_timestamp as _, 0), Utc),
                 })
             })?;
             Ok(q.filter_map(|x| x.ok()).collect())
@@ -1148,9 +1153,10 @@ impl KeywordInsert {
 #[derive(Debug)]
 pub struct CrateOwnerRow {
     pub origin: Origin,
+    pub crate_ranking: f32,
     pub invited_by_github_id: Option<u32>,
-    pub invited_at: Option<DateTime<FixedOffset>>,
-    pub latest_release: DateTime<FixedOffset>,
+    pub invited_at: Option<DateTime<Utc>>,
+    pub latest_release: DateTime<Utc>,
 }
 
 #[inline]

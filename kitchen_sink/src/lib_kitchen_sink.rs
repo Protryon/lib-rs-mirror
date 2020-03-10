@@ -1907,7 +1907,20 @@ impl KitchenSink {
         }
     }
 
-    pub async fn index_crates_io_crate_owners(&self, origin: &Origin, owners: Vec<CrateOwner>) -> CResult<()> {
+    pub async fn index_crates_io_crate_owners(&self, origin: &Origin, mut owners: Vec<CrateOwner>) -> CResult<()> {
+        for o in &mut owners {
+            if o.github_id == o.invited_by_github_id {
+                o.invited_by_github_id = None;
+            }
+        }
+        owners.sort_by(|a,b| a.invited_at.cmp(&b.invited_at));
+        // crates.io has some data missing?
+        if owners.len() >= 2 {
+            if owners[1].invited_by_github_id.is_none() {
+                owners[1].invited_by_github_id = owners[0].invited_by_github_id.or(owners[0].github_id);
+            }
+        }
+
         self.crate_db.index_crate_owners(origin, &owners).await?;
         if let Origin::CratesIo(name) = origin {
             self.crates_io_owners_cache.set(&**name, owners)?;

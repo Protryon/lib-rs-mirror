@@ -181,6 +181,7 @@ envoption: config
 eosio : cryptography::cryptocurrencies
 eosio_macros_internal: cryptography::cryptocurrencies
 eosio_numstr : cryptography::cryptocurrencies
+eraserhead: rust-patterns
 esplugin: parser-implementations
 etclient-core : cryptography::cryptocurrencies
 euclid: science::math

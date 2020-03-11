@@ -133,7 +133,6 @@ async fn index_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, us
                                 return None;
                             }
                             CrateOwner {
-                                id: o.owner_id as _,
                                 login: u.login.to_owned(),
                                 invited_at: Some(invited_at),
                                 invited_by_github_id,
@@ -147,7 +146,6 @@ async fn index_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, us
                         1 => {
                             let u = teams.get(&o.owner_id).expect("owner consistency");
                             CrateOwner {
-                                id: o.owner_id as _,
                                 login: u.login.to_owned(),
                                 invited_at: Some(invited_at),
                                 github_id: Some(u.github_id),

@@ -22,7 +22,6 @@ pub enum OwnerKind {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateOwner {
-    pub id: usize,              // 362,
     pub login: String,          // "github:rust-bus:maintainers",
     pub kind: OwnerKind,        // "team" || "user"
     pub url: Option<String>,    // "https://github.com/rust-bus",

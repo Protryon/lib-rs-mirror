@@ -3,6 +3,7 @@
 #[macro_use]
 extern crate serde_derive;
 
+use github_info::MinimalUser;
 use futures::stream::StreamExt;
 mod yearly;
 pub use crate::yearly::*;
@@ -553,13 +554,12 @@ impl KitchenSink {
         let versions = self.get_repo_versions(origin, &host, &cachebust).await?;
         Ok(RichCrate::new(origin.clone(), gh.owner.into_iter().map(|o| {
             CrateOwner {
-                id: 0,
                 avatar: o.avatar_url,
                 url: Some(o.html_url),
                 login: o.login,
                 kind: OwnerKind::User, // FIXME: crates-io uses teams, and we'd need to find the right team? is "owners" a guaranteed thing?
                 name: o.name,
-                github_id: Some(o.id),
+                github_id: o.id,
 
                 invited_at: None,
                 invited_by_github_id: None,
@@ -1288,6 +1288,17 @@ impl KitchenSink {
     }
 
     /// Maintenance: add user to local db index
+    pub(crate) async fn index_user_m(&self, user: &MinimalUser, commit: &GitCommitAuthor) -> CResult<()> {
+        if stopped() {Err(KitchenSinkErr::Stopped)?;}
+        let user = self.gh.user_by_login(&user.login).await?.ok_or_else(|| KitchenSinkErr::AuthorNotFound(user.login.clone()))?;
+        if !self.user_db.email_has_github(&commit.email)? {
+            println!("{} => {}", commit.email, user.login);
+            self.user_db.index_user(&user, Some(&commit.email), commit.name.as_ref().map(|s| s.as_str()))?;
+        }
+        Ok(())
+    }
+
+    /// Maintenance: add user to local db index
     pub fn index_user(&self, user: &User, commit: &GitCommitAuthor) -> CResult<()> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
         if !self.user_db.email_has_github(&commit.email)? {
@@ -1501,20 +1512,20 @@ impl KitchenSink {
         self.crate_db.index_repo_crates(repo, manif).await.context("index rev repo")?;
         let mut changes = Vec::new();
 
-            if let Repo { host: RepoHost::GitHub(ref repo), .. } = repo {
-                if let Some(commits) = self.repo_commits(repo, as_of_version).await? {
-                    for c in commits {
-                        if let Some(a) = c.author {
-                            self.index_user(&a, &c.commit.author)?;
-                        }
-                        if let Some(a) = c.committer {
-                            self.index_user(&a, &c.commit.committer)?;
-                        }
+        if let Repo { host: RepoHost::GitHub(ref repo), .. } = repo {
+            if let Some(commits) = self.repo_commits(repo, as_of_version).await? {
+                for c in commits {
+                    if let Some(a) = c.author {
+                        self.index_user_m(&a, &c.commit.author).await?;
+                    }
+                    if let Some(a) = c.committer {
+                        self.index_user_m(&a, &c.commit.committer).await?;
                     }
                 }
             }
+        }
 
-            if stopped() {Err(KitchenSinkErr::Stopped)?;}
+        if stopped() {Err(KitchenSinkErr::Stopped)?;}
 
         tokio::task::block_in_place(|| {
             crate_git_checkout::find_dependency_changes(&checkout, |added, removed, age| {
@@ -1646,7 +1657,7 @@ impl KitchenSink {
                 if contributors.len() >= 100 {
                     hit_max_contributor_count = true;
                 }
-                let mut by_login = HashMap::new();
+                let mut by_login: HashMap<String, (f64, User)> = HashMap::new();
                 for contr in contributors {
                     if let Some(author) = contr.author {
                         if author.user_type == UserType::Bot {
@@ -1657,8 +1668,17 @@ impl KitchenSink {
                                 w.commits as f64 +
                                 ((w.added + w.deleted*2) as f64).sqrt()
                             }).sum::<f64>();
-                        by_login.entry(author.login.to_lowercase())
-                            .or_insert((0., author)).0 += count;
+                        use std::collections::hash_map::Entry;
+                        match by_login.entry(author.login.to_ascii_lowercase()) {
+                            Entry::Vacant(e) => {
+                                if let Ok(Some(user)) = self.gh.user_by_login(&author.login).await {
+                                    e.insert((count, user));
+                                }
+                            },
+                            Entry::Occupied(mut e) => {
+                                e.get_mut().0 += count;
+                            },
+                        }
                     }
                 }
                 Ok((hit_max_contributor_count, by_login))
@@ -1890,7 +1910,6 @@ impl KitchenSink {
             Origin::GitLab {..} => Ok(vec![]),
             Origin::GitHub {repo, ..} => Ok(vec![
                 CrateOwner {
-                    id: 0,
                     avatar: None,
                     // FIXME: read from GH
                     url: Some(format!("https://github.com/{}", repo.owner)),
@@ -1962,10 +1981,6 @@ impl KitchenSink {
 
     /// To make categories more varied, lower score of crates by same authors, with same keywords
     async fn knock_duplicates(&self, crates: &mut Vec<(Origin, f64)>) {
-        let mut seen_owners = HashMap::new();
-        let mut seen_keywords = HashMap::new();
-        let mut seen_owner_keywords = HashMap::new();
-
         let with_owners = futures::stream::iter(crates.drain(..))
         .filter_map(|(o, score)| async move {
             let c = match self.rich_crate_version_async(&o).await {
@@ -1991,22 +2006,24 @@ impl KitchenSink {
         let mut top_keywords: Vec<_> = top_keywords.into_iter().collect();
         top_keywords.sort_by(|a, b| b.1.cmp(&a.1));
         let top_keywords: HashSet<_> = top_keywords.iter().copied().take((top_keywords.len() / 10).min(10).max(2)).map(|(k, _)| k.to_string()).collect();
-        eprintln!("top cat keywords {:?}", top_keywords);
 
         crates.clear();
-        for (origin, score, owners, keywords) in with_owners {
+        let mut seen_owners = HashMap::new();
+        let mut seen_keywords = HashMap::new();
+        let mut seen_owner_keywords = HashMap::new();
+        for (origin, score, owners, keywords) in &with_owners {
             let mut weight_sum = 0;
             let mut score_sum = 0.0;
             for owner in owners.iter().take(5) {
-                let n = seen_owners.entry(owner.id).or_insert(0u32);
+                let n = seen_owners.entry(&owner.login).or_insert(0u32);
                 score_sum += (*n).saturating_sub(3) as f64; // authors can have a few crates with no penalty
                 weight_sum += 2;
                 *n += 2;
             }
-            let primary_owner_id = owners.get(0).map(|o| o.id).unwrap_or(0);
+            let primary_owner_id = owners.get(0).map(|o| o.login.as_str()).unwrap_or("");
             for keyword in keywords.into_iter().take(5) {
                 // obvious keywords are too repetitive and affect innocent crates
-                if !top_keywords.contains(&keyword) {
+                if !top_keywords.contains(keyword.as_str()) {
                     let n = seen_keywords.entry(keyword.clone()).or_insert(0u32);
                     score_sum += (*n).saturating_sub(4) as f64; // keywords are expected to repeat a bit
                     weight_sum += 1;
@@ -2025,7 +2042,7 @@ impl KitchenSink {
             // +7 here allows some duplication, and penalizes harder only after a few crates
             // adding original score means it'll never get lower than 1/3rd
             let new_score = score * 0.5 + (score + 7.) / (7. + dupe_points);
-            crates.push((origin, new_score));
+            crates.push((origin.to_owned(), new_score));
         }
         crates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
     }

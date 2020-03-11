@@ -9,8 +9,6 @@ use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
-pub mod model;
-
 pub struct Response {
     res: reqwest::Response,
     client: Arc<ClientInner>,

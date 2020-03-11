@@ -69,6 +69,19 @@ pub struct User {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MinimalUser {
+    pub id: Option<u32>,
+    pub login: String,
+    pub name: Option<String>,
+    pub avatar_url: Option<String>,  // "https://avatars0.githubusercontent.com/u/1111?v=4",
+    pub gravatar_id: Option<String>, // "",
+    pub html_url: String,            // "https://github.com/zzzz",
+    #[serde(rename = "type")]
+    pub user_type: UserType,
+    pub created_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContribWeek {
     #[serde(rename = "w")]
     pub week_timestamp: u32,
@@ -89,7 +102,7 @@ pub struct SearchResults<T> {
 pub struct UserContrib {
     pub total: u32,
     pub weeks: Vec<ContribWeek>,
-    pub author: Option<User>,
+    pub author: Option<MinimalUser>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -111,8 +124,8 @@ pub struct GitCommit {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommitMeta {
     pub sha: String, // TODO: deserialize to bin
-    pub author: Option<User>,
-    pub committer: Option<User>,
+    pub author: Option<MinimalUser>,
+    pub committer: Option<MinimalUser>,
     pub commit: GitCommit,
     // parents: [{sha}]
 }
@@ -137,7 +150,7 @@ pub struct GitHubRepo {
     pub has_pages: bool,
     pub archived: bool,
     pub default_branch: Option<String>,
-    pub owner: Option<User>,
+    pub owner: Option<MinimalUser>,
     #[serde(default)]
     pub topics: Vec<String>,
 

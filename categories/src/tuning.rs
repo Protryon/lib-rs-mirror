@@ -266,7 +266,7 @@ lazy_static! {
             &[("cryptography", 1.4, 0.3), ("algorithms", 0.9, 0.), ("no-std", 0.95, 0.), ("command-line-utilities", 0.75, 0.), ("development-tools", 0.8, 0.), ("development-tools::testing", 0.8, 0.)]),
 
         (Cond::NotAny(&["ethereum", "ethcore", "mimblewimble", "crypto", "dep:ethereum-types", "parity", "bitcoin", "solana", "monero", "coinbase",
-            "litecoin", "bitfinex", "ledger", "hyperledger", "self-sovereign", "dep:libp2p", "dep:bitcoin", "dep:blockchain", "nanocurrency", "currency", "stellar", "coin", "wallet", "bitstamp"]),
+            "litecoin", "bitfinex", "ledger", "hyperledger", "contract", "self-sovereign", "dep:libp2p", "dep:bitcoin", "dep:blockchain", "nanocurrency", "currency", "stellar", "coin", "wallet", "bitstamp"]),
             &[("cryptography::cryptocurrencies", 0.7, 0.)]),
         (Cond::Any(&["ethereum", "ethcore", "bitcoin", "mimblewimble", "dep:ethereumvm", "dep:solana-sdk", "dep:ethabi", "monero", "hyperledger"]),
             &[("cryptography::cryptocurrencies", 1.7, 0.8), ("science::math", 0.8, 0.), ("data-structures", 0.7, 0.), ("cryptography", 0.7, 0.), ("database-implementations", 0.7, 0.),
@@ -283,6 +283,7 @@ lazy_static! {
         (Cond::Any(&["parity", "stellar", "coin", "wallet", "wallets", "bitstamp", "dep:parity-codec", "dep:libp2p"]),
             &[("cryptography::cryptocurrencies", 1.3, 0.1), ("rust-patterns", 0.7, 0.), ("multimedia::encoding", 0.6, 0.), ("science::math", 0.8, 0.)]),
         (Cond::All(&["bitcoin", "cash"]), &[("cryptography::cryptocurrencies", 1.5, 0.2)]),
+        (Cond::All(&["smart", "contract"]), &[("cryptography::cryptocurrencies", 1.3, 0.1)]),
         (Cond::All(&["crypto", "asset"]), &[("cryptography::cryptocurrencies", 1.2, 0.05)]),
         (Cond::Any(&["polkadot"]), &[("cryptography::cryptocurrencies", 1.2, 0.05)]),
         (Cond::Any(&["uint"]), &[("rust-patterns", 1.2, 0.), ("cryptography::cryptocurrencies", 0.8, 0.)]),

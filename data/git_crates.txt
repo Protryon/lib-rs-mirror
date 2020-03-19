@@ -111,7 +111,6 @@ github:intecture/api/intecture_bindings
 github:intel/cloud-hypervisor/cloud-hypervisor
 github:ioncodes/snesutilities/snesutils
 github:ixy-languages/ixy.rs/ixy
-github:jakbyte/krafter/krafter
 github:jedisct1/flowgger/flowgger
 github:jharrilim/pong-amethyst/pong-amethyst
 github:johalun/echo/module

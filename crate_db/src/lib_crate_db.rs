@@ -44,7 +44,7 @@ pub struct CrateDb {
 
 pub struct CrateVersionData<'a> {
     pub origin: &'a Origin,
-    pub derived: &'a CrateVersionSourceData,
+    pub source_data: &'a CrateVersionSourceData,
     pub manifest: &'a Manifest,
     pub deps_stats: &'a [(&'a str, f32)],
     pub is_build: bool,
@@ -247,7 +247,7 @@ impl CrateDb {
         let package = manifest.package.as_ref().expect("package");
         let mut insert_keyword = KeywordInsert::new()?;
         let all_explicit_keywords = package.keywords.iter()
-            .chain(c.derived.github_keywords.iter().flatten());
+            .chain(c.source_data.github_keywords.iter().flatten());
         for (i, k) in all_explicit_keywords.enumerate() {
             let mut w: f64 = 100. / (6 + i * 2) as f64;
             if STOPWORDS.get(k.as_str()).is_some() {
@@ -279,7 +279,7 @@ impl CrateDb {
                 insert_keyword.add(&format!("feature:{}", feat), 0.55, false);
             }
         }
-        if manifest.is_sys(c.derived.has_buildrs || package.build.is_some()) {
+        if manifest.is_sys(c.source_data.has_buildrs || package.build.is_some()) {
             insert_keyword.add("has:is_sys", 0.01, false);
         }
         if manifest.is_proc_macro() {
@@ -324,8 +324,7 @@ impl CrateDb {
             let args: &[&dyn ToSql] = &[&origin, &0, &0];
             insert_crate.execute(args).context("insert crate")?;
             let (crate_id, downloads): (u32, u32) = get_crate_id.query_row(&[&origin], |row| Ok((row.get_unwrap(0), row.get_unwrap(1)))).context("crate_id")?;
-
-            let (readme, readme_format, readme_base_url, readme_base_image_url) = match &c.derived.readme {
+            let (readme, readme_format, readme_base_url, readme_base_image_url) = match &c.source_data.readme {
                 Some(Readme {base_url, base_image_url, markup}) => {
                     let (markup, format) = match markup {
                         Markup::Html(s) => (s, "html"),
@@ -336,23 +335,24 @@ impl CrateDb {
                 },
                 None => (None, None, None, None),
             };
+                    eprintln!("Indexing base_url {:?}", readme_base_url);
 
             let manifest = rmp_serde::encode::to_vec_named(c.manifest).context("manifest rmp")?;
-            let language_stats = rmp_serde::encode::to_vec_named(&c.derived.language_stats).context("lang rmp")?;
+            let language_stats = rmp_serde::encode::to_vec_named(&c.source_data.language_stats).context("lang rmp")?;
             let named_args: &[(&str, &dyn ToSql)] = &[
                 (":crate_id", &crate_id),
                 (":readme", &readme),
                 (":readme_format", &readme_format),
                 (":readme_base_url", &readme_base_url),
                 (":readme_base_image_url", &readme_base_image_url),
-                (":crate_compressed_size", &c.derived.crate_compressed_size),
-                (":crate_decompressed_size", &c.derived.crate_decompressed_size),
-                (":capitalized_name", &c.derived.capitalized_name),
-                (":lib_file", &c.derived.lib_file),
-                (":has_buildrs", &c.derived.has_buildrs),
-                (":is_nightly", &c.derived.is_nightly),
-                (":is_yanked", &c.derived.is_yanked),
-                (":has_code_of_conduct", &c.derived.has_code_of_conduct),
+                (":crate_compressed_size", &c.source_data.crate_compressed_size),
+                (":crate_decompressed_size", &c.source_data.crate_decompressed_size),
+                (":capitalized_name", &c.source_data.capitalized_name),
+                (":lib_file", &c.source_data.lib_file),
+                (":has_buildrs", &c.source_data.has_buildrs),
+                (":is_nightly", &c.source_data.is_nightly),
+                (":is_yanked", &c.source_data.is_yanked),
+                (":has_code_of_conduct", &c.source_data.has_code_of_conduct),
                 (":manifest", &manifest),
                 (":language_stats", &language_stats),
             ];
@@ -408,7 +408,7 @@ impl CrateDb {
             }
             // yanked crates may contain garbage, or needlessly come up in similar crates
             // so knock all keywords' importance if it's yanked
-            insert_keyword.commit(&tx, crate_id, if c.derived.is_yanked {0.1} else {1.})?;
+            insert_keyword.commit(&tx, crate_id, if c.source_data.is_yanked {0.1} else {1.})?;
 
             mark_updated.execute(&[&crate_id, &next_timestamp]).context("mark updated crate")?;
             println!("{}", out);
@@ -1176,7 +1176,7 @@ fn try_indexing() {
 
     let db = CrateDb::new_with_synonyms(t.as_ref(), Path::new("../data/tag-synonyms.csv")).unwrap();
     let origin = Origin::from_crates_io_name("cratedbtest");
-    let derived = CrateVersionSourceData {
+    let source_data = CrateVersionSourceData {
         capitalized_name: "captname".into(),
         ..Default::default()
     };
@@ -1187,7 +1187,7 @@ keywords = ["test-CRATE"]
 categories = ["1", "two", "GAMES", "science", "::science::math::"]
 "#).unwrap();
     db.index_latest(CrateVersionData {
-        derived: &derived,
+        source_data: &source_data,
         manifest: &manifest,
         origin: &origin,
         deps_stats: &[],
@@ -1204,16 +1204,16 @@ categories = ["1", "two", "GAMES", "science", "::science::math::"]
     assert_eq!(manifest.package().keywords, new_manifest.package().keywords);
     assert_eq!(manifest.package().categories, new_manifest.package().categories);
 
-    assert_eq!(new_derived.language_stats, derived.language_stats);
-    assert_eq!(new_derived.crate_compressed_size, derived.crate_compressed_size);
-    assert_eq!(new_derived.crate_decompressed_size, derived.crate_decompressed_size);
-    assert_eq!(new_derived.is_nightly, derived.is_nightly);
-    assert_eq!(new_derived.capitalized_name, derived.capitalized_name);
-    assert_eq!(new_derived.readme, derived.readme);
-    assert_eq!(new_derived.lib_file, derived.lib_file);
-    assert_eq!(new_derived.has_buildrs, derived.has_buildrs);
-    assert_eq!(new_derived.has_code_of_conduct, derived.has_code_of_conduct);
-    assert_eq!(new_derived.is_yanked, derived.is_yanked);
+    assert_eq!(new_derived.language_stats, source_data.language_stats);
+    assert_eq!(new_derived.crate_compressed_size, source_data.crate_compressed_size);
+    assert_eq!(new_derived.crate_decompressed_size, source_data.crate_decompressed_size);
+    assert_eq!(new_derived.is_nightly, source_data.is_nightly);
+    assert_eq!(new_derived.capitalized_name, source_data.capitalized_name);
+    assert_eq!(new_derived.readme, source_data.readme);
+    assert_eq!(new_derived.lib_file, source_data.lib_file);
+    assert_eq!(new_derived.has_buildrs, source_data.has_buildrs);
+    assert_eq!(new_derived.has_code_of_conduct, source_data.has_code_of_conduct);
+    assert_eq!(new_derived.is_yanked, source_data.is_yanked);
     });
     rt.block_on(f).unwrap();
 }

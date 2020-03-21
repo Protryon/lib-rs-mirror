@@ -1367,7 +1367,7 @@ impl KitchenSink {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
         self.crate_db.before_index_latest(origin).await?;
 
-        let (src, manifest, _warn) = match origin {
+        let (source_data, manifest, _warn) = match origin {
             Origin::CratesIo(ref name) => {
                 let ver = self.index.crate_highest_version(name, false).context("rich_crate_version2")?;
                 self.rich_crate_version_data_from_crates_io(ver).await.context("rich_crate_version_data_from_crates_io")?
@@ -1400,7 +1400,7 @@ impl KitchenSink {
         }
         let (is_build, is_dev) = self.is_build_or_dev(origin).await?;
         let package = manifest.package();
-        let readme_text = src.readme.as_ref().map(|r| render_readme::Renderer::new(None).visible_text(&r.markup));
+        let readme_text = source_data.readme.as_ref().map(|r| render_readme::Renderer::new(None).visible_text(&r.markup));
         let repository = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
         let authors = package.authors.iter().map(|a| Author::new(a)).collect::<Vec<_>>();
 
@@ -1412,7 +1412,7 @@ impl KitchenSink {
             &tmp
         };
 
-        let extracted_auto_keywords = feat_extractor::auto_keywords(&manifest, src.github_description.as_deref(), readme_text.as_deref());
+        let extracted_auto_keywords = feat_extractor::auto_keywords(&manifest, source_data.github_description.as_deref(), readme_text.as_deref());
 
         self.crate_db.index_latest(CrateVersionData {
             category_slugs,
@@ -1422,7 +1422,7 @@ impl KitchenSink {
             deps_stats: &weighed_deps,
             is_build, is_dev,
             manifest: &manifest,
-            derived: &src,
+            source_data: &source_data,
             extracted_auto_keywords,
         }).await?;
         Ok(())

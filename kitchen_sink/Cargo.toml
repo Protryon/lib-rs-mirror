@@ -15,7 +15,7 @@ deps_index = { path = "../deps_index" }
 feat_extractor = { path = "../feat_extractor" }
 docs_rs_client = { path = "../docs_rs_client", version = "0.4.0" }
 github_info = { path = "../github_info", version = "0.9" }
-crate_git_checkout = { path = "../crate_git_checkout", version = "0.4.3" }
+crate_git_checkout = { path = "../crate_git_checkout", version = "0.4.5" }
 user_db = { path = "../user_db", version = "0.3" }
 crate_db = { path = "../crate_db", version = "0.4.0" }
 categories = { path = "../categories" }

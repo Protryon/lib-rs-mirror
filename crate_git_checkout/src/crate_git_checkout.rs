@@ -9,7 +9,7 @@ pub use git2::Repository;
 use git2::{Blob, ObjectType, Reference, Tree};
 use lazy_static::lazy_static;
 use render_readme;
-use render_readme::{Markup, Readme};
+use render_readme::Markup;
 use repo_url::Repo;
 use std::collections::hash_map::Entry::Vacant;
 use std::collections::{HashMap, HashSet};
@@ -310,7 +310,7 @@ pub fn find_dependency_changes(repo: &Repository, mut cb: impl FnMut(HashSet<Str
 }
 
 // FIXME: buggy, barely works
-pub fn find_readme(repo: &Repository, package: &Package) -> Result<Option<Readme>, failure::Error> {
+pub fn find_readme(repo: &Repository, package: &Package) -> Result<Option<(String, Markup)>, failure::Error> {
     let head = repo.head()?;
     let tree = head.peel_to_tree()?;
     let mut readme = None;
@@ -344,20 +344,12 @@ pub fn find_readme(repo: &Repository, package: &Package) -> Result<Option<Readme
             } else {
                 Markup::Markdown(text)
             };
-            readme = Some(readme_from_repo(markup, &package.repository, base));
+            readme = Some((base.to_owned(), markup));
             found_best = is_correct_dir;
         }
         Ok(())
     })?;
     Ok(readme)
-}
-
-fn readme_from_repo(markup: Markup, repo_url: &Option<String>, base_dir_in_repo: &str) -> Readme {
-    let repo = repo_url.as_ref().and_then(|url| Repo::new(url).ok());
-    let base_url = repo.as_ref().map(|r| r.readme_base_url(base_dir_in_repo));
-    let base_image_url = repo.map(|r| r.readme_base_image_url(base_dir_in_repo));
-
-    Readme::new(markup, base_url, base_image_url)
 }
 
 /// Check if given filename is a README. If `package` is missing, guess.

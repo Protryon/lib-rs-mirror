@@ -2,8 +2,6 @@ use cargo_toml::Manifest;
 use cargo_toml::Package;
 use libflate::gzip::Decoder;
 use render_readme::Markup;
-use render_readme::Readme;
-use repo_url::Repo;
 use std::collections::HashSet;
 use std::io;
 use std::io::Read;
@@ -180,7 +178,7 @@ impl Collector {
 
         Ok(CrateFile {
             decompressed_size: self.decompressed_size,
-            readme: self.markup.map(|(path, m)| readme_from_repo(m, manifest.package.as_ref().and_then(|r| r.repository.as_ref()), &path)),
+            readme: self.markup,
             manifest,
             files: self.files,
             lib_file: self.lib_file,
@@ -232,7 +230,8 @@ pub struct CrateFile {
     pub manifest: Manifest,
     pub lib_file: Option<String>,
     pub files: Vec<PathBuf>,
-    pub readme: Option<Readme>,
+    // relative path and markdown
+    pub readme: Option<(String, Markup)>,
     pub language_stats: udedokei::Stats,
     pub decompressed_size: usize,
     pub is_nightly: bool,
@@ -245,14 +244,6 @@ impl CrateFile {
         let path = path.as_ref();
         self.files.iter().any(|p| p == path)
     }
-}
-
-fn readme_from_repo(markup: Markup, repo_url: Option<&String>, base_path: &str) -> Readme {
-    let repo = repo_url.and_then(|url| Repo::new(url).ok());
-    let base_url = repo.as_ref().map(|r| r.readme_base_url(base_path));
-    let base_image_url = repo.map(|r| r.readme_base_image_url(base_path));
-
-    Readme::new(markup, base_url, base_image_url)
 }
 
 /// Check if given filename is a README. If `package` is missing, guess.
@@ -275,7 +266,7 @@ fn unpack_crate() {
     assert_eq!(d.manifest.package.as_ref().unwrap().version, "0.5.1");
     assert!(d.lib_file.unwrap().contains("fn nothing"));
     assert_eq!(d.files.len(), 5);
-    assert!(match d.readme.unwrap().markup {
+    assert!(match d.readme.unwrap().1 {
         Markup::Rst(a) => a == "o hi\n",
         _ => false,
     });
@@ -288,6 +279,7 @@ fn unpack_crate() {
 
 #[test]
 fn unpack_repo() {
+    use repo_url::Repo;
     let test_repo_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("test.repo");
     let repo = Repo::new("http://example.invalid/foo.git").unwrap();
     let checkout = crate_git_checkout::checkout(&repo, &test_repo_path).unwrap();
@@ -300,7 +292,7 @@ fn unpack_repo() {
     assert_eq!(d.manifest.package.as_ref().unwrap().version, "0.5.1");
     assert!(d.lib_file.unwrap().contains("fn nothing"));
     assert_eq!(d.files.len(), 5);
-    assert!(match d.readme.unwrap().markup {
+    assert!(match d.readme.unwrap().1 {
         Markup::Rst(a) => a == "o hi\n",
         _ => false,
     });

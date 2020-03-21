@@ -790,11 +790,7 @@ impl KitchenSink {
                 warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()));
             }
 
-            if let Some(readme) = meta.readme.as_mut() {
-                readme.base_url = Some(repo.readme_base_url(&path_in_repo));
-                readme.base_image_url = Some(repo.readme_base_image_url(&path_in_repo));
-            }
-            Ok::<_, CError>(self.rich_crate_version_data_common(origin.clone(), meta, 0, false, warnings))
+            Ok::<_, CError>(self.rich_crate_version_data_common(origin.clone(), meta, 0, false, path_in_repo, warnings))
         })?.await
     }
 
@@ -841,6 +837,8 @@ impl KitchenSink {
             }
         }
 
+        eprintln!("R1 {:?}", meta.readme);
+
         let maybe_repo = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
         let has_readme_file = meta.readme.is_some();
         if !has_readme_file {
@@ -872,11 +870,16 @@ impl KitchenSink {
             }
         }
 
-        self.rich_crate_version_data_common(origin, meta, crate_compressed_size as u32, latest.is_yanked(), warnings).await
+        let path_in_repo = match maybe_repo.as_ref() {
+            Some(r) => self.crate_db.path_in_repo(r, name).await?,
+            None => None,
+        }.unwrap_or_default();
+
+        self.rich_crate_version_data_common(origin, meta, crate_compressed_size as u32, latest.is_yanked(), path_in_repo, warnings).await
     }
 
     ///// Fixing and faking the data
-    async fn rich_crate_version_data_common(&self, origin: Origin, mut meta: CrateFile, crate_compressed_size: u32, is_yanked: bool, mut warnings: Warnings) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
+    async fn rich_crate_version_data_common(&self, origin: Origin, mut meta: CrateFile, crate_compressed_size: u32, is_yanked: bool, path_in_repo: String, mut warnings: Warnings) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
         Self::override_bad_categories(&mut meta.manifest);
 
         let mut github_keywords = None;
@@ -946,7 +949,7 @@ impl KitchenSink {
         }
 
         // lib file takes majority of space in cache, so remove it if it won't be used
-        if !self.is_readme_short(meta.readme.as_ref()) {
+        if !self.is_readme_short(meta.readme.as_ref().map(|r| &r.1)) {
             meta.lib_file = None;
         }
 
@@ -954,7 +957,7 @@ impl KitchenSink {
         let mut words = vec![package.name.as_str()];
         let readme_txt;
         if let Some(ref r) = meta.readme {
-            readme_txt = render_readme::Renderer::new(None).visible_text(&r.markup);
+            readme_txt = render_readme::Renderer::new(None).visible_text(&r.1);
             words.push(&readme_txt);
         }
         if let Some(ref s) = package.description {words.push(s);}
@@ -968,6 +971,26 @@ impl KitchenSink {
 
         let has_buildrs = meta.has("build.rs");
         let has_code_of_conduct = meta.has("CODE_OF_CONDUCT.md") || meta.has("docs/CODE_OF_CONDUCT.md") || meta.has(".github/CODE_OF_CONDUCT.md");
+
+        let readme = meta.readme.map(|(readme_path, markup)| {
+            let (base_url, base_image_url) = match maybe_repo {
+                Some(repo) => {
+                    // Not parsing github URL, because "aboslute" path should not be allowed to escape the repo path,
+                    // but it needs to normalize ../readme paths
+                    let url = url::Url::parse(&format!("http://localhost/{}", path_in_repo)).and_then(|u| u.join(&readme_path));
+                    let in_repo_url_path = url.as_ref().map_or("", |u| u.path().trim_start_matches('/'));
+                    eprintln!("{} + {} = {:?} = {}", path_in_repo, readme_path, url, in_repo_url_path);
+                    (Some(repo.readme_base_url(in_repo_url_path)), Some(repo.readme_base_image_url(in_repo_url_path)))
+                },
+                None => (None, None),
+            };
+            Readme {
+                markup,
+                base_url,
+                base_image_url,
+            }
+        });
+
         let src = CrateVersionSourceData {
             capitalized_name,
             language_stats: meta.language_stats,
@@ -977,7 +1000,7 @@ impl KitchenSink {
             is_nightly: meta.is_nightly,
             has_buildrs,
             has_code_of_conduct,
-            readme: meta.readme,
+            readme,
             lib_file: meta.lib_file,
             github_description,
             github_keywords,
@@ -1053,9 +1076,9 @@ impl KitchenSink {
         })
     }
 
-    pub fn is_readme_short(&self, readme: Option<&Readme>) -> bool {
+    pub fn is_readme_short(&self, readme: Option<&Markup>) -> bool {
         if let Some(r) = readme {
-            match r.markup {
+            match r {
                 Markup::Markdown(ref s) | Markup::Rst(ref s) | Markup::Html(ref s) => s.len() < 1000,
             }
         } else {
@@ -1111,11 +1134,7 @@ impl KitchenSink {
     async fn add_readme_from_crates_io(&self, meta: &mut CrateFile, name: &str, ver: &str) {
         if let Ok(Some(html)) = self.crates_io.readme(name, ver).await {
             eprintln!("Found readme on crates.io {}@{}", name, ver);
-            meta.readme = Some(Readme {
-                markup: Markup::Html(String::from_utf8_lossy(&html).to_string()),
-                base_url: None,
-                base_image_url: None,
-            });
+            meta.readme = Some((String::new(), Markup::Html(String::from_utf8_lossy(&html).to_string())));
         } else {
             eprintln!("No readme on crates.io for {}@{}", name, ver);
         }

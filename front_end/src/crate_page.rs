@@ -250,7 +250,7 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn is_readme_short(&self) -> bool {
-        self.kitchen_sink.is_readme_short(self.ver.readme())
+        self.kitchen_sink.is_readme_short(self.ver.readme().as_ref().map(|r| &r.markup))
     }
 
     pub fn has_no_readme_or_lib(&self) -> bool {

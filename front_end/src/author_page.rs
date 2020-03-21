@@ -70,8 +70,9 @@ impl<'a> AuthorPage<'a> {
         // Most collaborated with
         let mut collab = HashMap::new();
         for (c, _, row, all_owners) in founder_crates.iter().chain(member_crates.iter()) {
-            for k in c.keywords() {
-                *keywords.entry(k).or_insert(0.) += row.crate_ranking + 0.5;
+            for (i, k) in c.keywords().iter().enumerate() {
+                // take first(-ish) keyword from each crate to avoid one crate taking most
+                *keywords.entry(k).or_insert(0.) += (row.crate_ranking + 0.5) / (i+2) as f32;
             }
 
             if let Some(own) = all_owners.iter().find(|o| o.github_id == aut.github.id) {

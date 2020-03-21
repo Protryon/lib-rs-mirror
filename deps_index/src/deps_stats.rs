@@ -1,4 +1,5 @@
 use crate::index::*;
+use crate::Origin;
 use crate::DepsErr;
 use parking_lot::Mutex;
 use rayon::prelude::*;
@@ -178,7 +179,7 @@ impl Index {
                 let t = n.versions.entry(semver).or_insert(0);
                 *t = t.checked_add(1).expect("overflow");
                 if depinf.direct {
-                    debug_assert!(!parent_name.is_empty());
+                    assert!(Origin::is_valid_crate_name(&parent_name));
                     n.rev_dep_names.push(&parent_name);
                 }
                 match depinf.ty {

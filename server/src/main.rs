@@ -264,19 +264,17 @@ async fn default_handler(req: HttpRequest) -> Result<HttpResponse, ServerError> 
     let name = path.trim_matches('/').to_owned();
     let crates = state.crates.load();
     let (found_crate, found_keyword) = rt_run_timeout(&state.rt, 10, async move {
-        let crate_maybe = if is_alnum(&name) {
-            crates.rich_crate_async(&Origin::from_crates_io_name(&name)).await.ok()
-        } else {
-            None
+        let crate_maybe = match Origin::try_from_crates_io_name(&name) {
+            Some(o) => crates.rich_crate_async(&o).await.ok(),
+            _ => None,
         };
         match crate_maybe {
             Some(c) => Ok((Some(c), None)),
             None => {
                 let inverted_hyphens: String = name.chars().map(|c| if c == '-' {'_'} else if c == '_' {'-'} else {c.to_ascii_lowercase()}).collect();
-                let crate_maybe = if is_alnum(&name) {
-                    crates.rich_crate_async(&Origin::from_crates_io_name(&inverted_hyphens)).await.ok()
-                } else {
-                    None
+                let crate_maybe = match Origin::try_from_crates_io_name(&inverted_hyphens) {
+                    Some(o) => crates.rich_crate_async(&o).await.ok(),
+                    _ => None,
                 };
                 match crate_maybe {
                     Some(c) => Ok((Some(c), None)),
@@ -392,7 +390,7 @@ fn get_origin_from_subpath(q: &actix_web::dev::Path<Url>) -> Option<Origin> {
     let mut parts = parts.splitn(4, '/');
     let first = parts.next()?;
     match parts.next() {
-        None => Some(Origin::from_crates_io_name(&first)),
+        None => Origin::try_from_crates_io_name(&first),
         Some(owner) => {
             let repo = parts.next()?;
             let package = parts.next()?;
@@ -475,10 +473,10 @@ async fn handle_crate(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     println!("crate page for {:?}", crate_name);
     let state: &AServerState = req.app_data().expect("appdata");
     let crates = state.crates.load();
-    let origin = Origin::from_crates_io_name(&crate_name);
-    if !is_alnum(&crate_name) || !crates.crate_exists(&origin) {
-        return render_404_page(state, &crate_name, "crate");
-    }
+    let origin = match Origin::try_from_crates_io_name(&crate_name).filter(|o| crates.crate_exists(o)) {
+        Some(o) => o,
+        None => return render_404_page(state, &crate_name, "crate"),
+    };
     let cache_file = state.page_cache_dir.join(format!("{}.html", crate_name));
     Ok(serve_cached(with_file_cache(state, cache_file, 800, {
         render_crate_page(state.clone(), origin)
@@ -490,10 +488,10 @@ async fn handle_crate_reverse_dependencies(req: HttpRequest) -> Result<HttpRespo
     println!("rev deps for {:?}", crate_name);
     let state: &AServerState = req.app_data().expect("appdata");
     let crates = state.crates.load();
-    let origin = Origin::from_crates_io_name(&crate_name);
-    if !is_alnum(&crate_name) || !crates.crate_exists(&origin) {
-        return render_404_page(&state, &crate_name, "crate");
-    }
+    let origin = match Origin::try_from_crates_io_name(&crate_name).filter(|o| crates.crate_exists(o)) {
+        Some(o) => o,
+        None => return render_404_page(state, &crate_name, "crate"),
+    };
     Ok(serve_cached(render_crate_reverse_dependencies(state.clone(), origin).await?))
 }
 

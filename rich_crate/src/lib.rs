@@ -33,19 +33,39 @@ impl fmt::Debug for Origin {
 }
 
 impl Origin {
+    #[inline]
     pub fn from_crates_io_name(name: &str) -> Self {
-        assert!(!name.is_empty() && is_alnum(name), "bad crate name: '{}'", name);
-        Origin::CratesIo(name.to_ascii_lowercase().into())
+        match Self::try_from_crates_io_name(name) {
+            Some(n) => n,
+            None => panic!("bad crate name: '{}'", name),
+        }
     }
 
+    #[inline]
+    pub fn try_from_crates_io_name(name: &str) -> Option<Self> {
+        if Self::is_valid_crate_name(name) {
+            Some(Origin::CratesIo(name.to_ascii_lowercase().into()))
+        } else {
+            None
+        }
+    }
+
+    #[inline(always)]
+    pub fn is_valid_crate_name(name: &str) -> bool {
+        !name.is_empty() && is_alnum(name)
+    }
+
+    #[inline]
     pub fn from_github(repo: SimpleRepo, package: impl Into<Box<str>>) -> Self {
         Origin::GitHub { repo, package: package.into() }
     }
 
+    #[inline]
     pub fn from_gitlab(repo: SimpleRepo, package: impl Into<Box<str>>) -> Self {
         Origin::GitLab { repo, package: package.into() }
     }
 
+    #[inline]
     pub fn from_repo(r: &Repo, package: &str) -> Option<Self> {
         match r.host() {
             RepoHost::GitHub(r) => Some(Self::from_github(r.clone(), package)),
@@ -83,6 +103,7 @@ impl Origin {
         }
     }
 
+    #[inline]
     pub fn short_crate_name(&self) -> &str {
         match *self {
             Origin::CratesIo(ref s) => s,

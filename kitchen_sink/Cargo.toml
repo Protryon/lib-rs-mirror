@@ -20,7 +20,7 @@ user_db = { path = "../user_db", version = "0.3" }
 crate_db = { path = "../crate_db", version = "0.4.0" }
 categories = { path = "../categories" }
 render_readme = { path = "../render_readme" }
-rich_crate = { path = "../rich_crate", version = "0.5" }
+rich_crate = { path = "../rich_crate", version = "0.5.1" }
 simple_cache = { path = "../simple_cache", version = "0.7.0" }
 repo_url = { path = "../repo_url", version = "0.3.0" }
 cargo_toml = "0.8.0"

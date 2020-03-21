@@ -266,7 +266,7 @@ github:rsaarelm/magog/vitral
 github:ruffle-rs/ruffle/ruffle_core
 github:ruffle-rs/ruffle/ruffle_desktop
 github:ruffle-rs/ruffle/ruffle_web
-github:rust-analyzer/rust-analyzer/ra_cli
+github:rust-analyzer/rust-analyzer/rust-analyzer
 github:rust-lang/rustlings/rustlings
 github:sandstorm-io/collections-app/sandstorm-collections-app
 github:schulke-214/connect-four/connect-four

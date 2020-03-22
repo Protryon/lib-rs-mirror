@@ -66,12 +66,13 @@ impl<'a> HomePage<'a> {
             let mut n = 0u16;
             for c in self.crates.recently_updated_crates_in_category(&cat.cat.slug).await.expect("recently_updated_crates_in_category") {
                 if let Ok(c) = self.crates.rich_crate_version_async(&c).await {
-                    seen.insert(c.origin().to_owned());
-                    cat.top.push(c);
-                    if n >= 2 {
-                        break;
+                    if seen.insert(c.origin().to_owned()) {
+                        cat.top.push(c);
+                        if n >= 2 {
+                            break;
+                        }
+                        n += 1;
                     }
-                    n += 1;
                 }
             }
         }})
@@ -130,8 +131,9 @@ impl<'a> HomePage<'a> {
 
                 for c in top {
                     if let Ok(c) = self.crates.rich_crate_version_async(&c).await {
-                        seen.insert(c.origin().to_owned());
-                        cat.top.push(c);
+                        if seen.insert(c.origin().to_owned()) {
+                            cat.top.push(c);
+                        }
                     }
                 }
                 cat.dl = dl.max(cat.dl);

@@ -13,3 +13,6 @@
 [submodule "data/index"]
 	path = data/index
 	url = https://github.com/rust-lang/crates.io-index.git
+[submodule "data/rustaceans"]
+	path = data/rustaceans
+	url = https://github.com/nrc/rustaceans.org

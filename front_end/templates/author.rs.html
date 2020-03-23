@@ -34,8 +34,8 @@
       @if p.orgs.iter().any(|o| o.login == "rust-lang") {<span class=labels><span title="Member of the rust-lang org">Rust team</span></span>}
       @p.login()
     </h2>
-    @if !p.aut.name().is_empty() && p.aut.name() != p.login() {
-      <p class=desc>@p.aut.name()</p>
+    @if let Some(n) = p.name() {
+      <p class=desc>@n</p>
     }
     <p>
       Joined crates-io @HumanTime::from(p.joined).to_text_en(Accuracy::Rough, Tense::Past)@if let Some(d) = p.joined_github() {.
@@ -49,6 +49,12 @@
       <li><a rel="ugc nofollow" href="https://crates.io/users/@p.aut.github.login">crates.io</a></li>
       @if let Some((url, label)) = p.homepage_link() {
         <li><a href="@url" rel="ugc nofollow" >@label</a></li>
+      }
+      @if let Some((url, label)) = p.twitter_link() {
+        <li><a href="@url" rel="ugc nofollow" >Twitter (@label)</a></li>
+      }
+      @if let Some((url, label)) = p.forum_link() {
+        <li><a href="@url" rel="ugc nofollow" >Forum (@label)</a></li>
       }
     </ul></nav>
     </div>
@@ -93,9 +99,8 @@
 
   <footer>
     <div class="inner-col">
-      <p>Based on data from crates-io and GitHub.</p>
+      <p>Based on data from crates-io, GitHub and <a href="https://rustaceans.org">rustaceans.org</a>.</p>
       <aside role="contentinfo"><p><a href="/"><b>Lib.rs</b></a> is an unofficial list of Rust/Cargo crates. It's <a href="https://gitlab.com/crates.rs?sort=stars_desc">open-source</a>, created by <a href="/~kornelski">kornelski</a>.</p></aside>
-
     </div>
   </footer>
 })

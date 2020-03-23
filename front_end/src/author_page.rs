@@ -10,6 +10,7 @@ use kitchen_sink::Org;
 use kitchen_sink::OwnerKind;
 use kitchen_sink::RichAuthor;
 use kitchen_sink::RichCrateVersion;
+use kitchen_sink::Rustacean;
 use kitchen_sink::User;
 use kitchen_sink::UserType;
 use render_readme::Renderer;
@@ -38,10 +39,14 @@ pub struct AuthorPage<'a> {
     pub(crate) member_total: usize,
     pub(crate) keywords: Vec<String>,
     pub(crate) collab: Vec<User>,
+    pub(crate) rustacean: Option<Rustacean>,
 }
 
 impl<'a> AuthorPage<'a> {
     pub async fn new(aut: &'a RichAuthor, kitchen_sink: &'a KitchenSink, markup: &'a Renderer) -> CResult<AuthorPage<'a>> {
+
+        let rustacean = kitchen_sink.rustacean_for_github_login(&aut.github.login);
+
         let orgs = kitchen_sink.user_github_orgs(&aut.github.login).await?.unwrap_or_default();
         let orgs = futures::stream::iter(orgs).filter_map(|org| async move {
             kitchen_sink.github_org(&org.login).await
@@ -111,6 +116,7 @@ impl<'a> AuthorPage<'a> {
             joined,
             keywords,
             collab,
+            rustacean,
         })
     }
 
@@ -133,9 +139,39 @@ impl<'a> AuthorPage<'a> {
             .collect().await
     }
 
+    pub fn name(&self) -> Option<&str> {
+        let gh_name = self.aut.name();
+        if !gh_name.is_empty() && gh_name != self.login() {
+            return Some(gh_name);
+        }
+        self.rustacean.as_ref().and_then(|r| r.name.as_deref())
+    }
+
+    pub fn twitter_link(&self) -> Option<(String, &str)> {
+        eprintln!("{:?}", self.rustacean);
+        self.rustacean.as_ref().and_then(|r| r.twitter.as_deref())
+        .map(|t| t.trim_start_matches('@'))
+        .filter(|t| !t.is_empty())
+        .map(|t| {
+            (format!("https://twitter.com/{}", t), t)
+        })
+    }
+
+    pub fn forum_link(&self) -> Option<(String, &str)> {
+        self.rustacean.as_ref().and_then(|r| r.discourse.as_deref())
+        .map(|t| t.trim_start_matches('@'))
+        .filter(|t| !t.is_empty())
+        .map(|t| {
+            (format!("https://users.rust-lang.org/u/{}", t), t)
+        })
+    }
+
     /// `(url, label)`
     pub fn homepage_link(&self) -> Option<(&str, Cow<'_, str>)> {
-        if let Some(url) = self.aut.github.blog.as_deref() {
+        let url = self.aut.github.blog.as_deref()
+            .or_else(|| self.rustacean.as_ref().and_then(|r| r.website.as_deref()))
+            .or_else(|| self.rustacean.as_ref().and_then(|r| r.blog.as_deref()));
+        if let Some(url) = url {
             if url.starts_with("https://") || url.starts_with("http://") {
                 let label = url_domain(url)
                     .map(|host| {

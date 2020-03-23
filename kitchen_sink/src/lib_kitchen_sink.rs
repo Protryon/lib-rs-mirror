@@ -170,6 +170,7 @@ pub struct KitchenSink {
     category_overrides: HashMap<String, Vec<Cow<'static, str>>>,
     crates_io_owners_cache: TempCache<Vec<CrateOwner>>,
     throttle: tokio::sync::Semaphore,
+    data_path: PathBuf,
 }
 
 impl KitchenSink {
@@ -212,6 +213,7 @@ impl KitchenSink {
             category_overrides: Self::load_category_overrides(&data_path.join("category_overrides.txt"))?,
             crates_io_owners_cache: TempCache::new(&data_path.join("cio-owners.tmp"))?,
             throttle: tokio::sync::Semaphore::new(40),
+            data_path: data_path.into(),
         })
         })
     }
@@ -2095,6 +2097,17 @@ impl KitchenSink {
         Ok(self.crate_db.recently_updated_crates_in_category(slug).await?)
     }
 
+    /// Case sensitive!
+    pub fn rustacean_for_github_login(&self, login: &str) -> Option<Rustacean> {
+        if !is_alnum(login) {
+            return None;
+        }
+
+        let path = self.data_path.join(format!("rustaceans/data/{}.json", login));
+        let json = std::fs::read(path).ok()?;
+        serde_json::from_slice(&json).ok()
+    }
+
     #[inline]
     pub async fn notable_recently_updated_crates(&self, limit: u32) -> CResult<Vec<(Origin, f64)>> {
         let mut crates = self.crate_db.recently_updated_crates(limit).await?;
@@ -2158,6 +2171,25 @@ impl RichAuthor {
             _ => &self.github.login,
         }
     }
+}
+
+#[derive(Deserialize, Debug)]
+pub struct Rustacean {
+    pub name: Option<String>,
+    /// email address. Will appear in a mailto link.
+    pub email: Option<String>,
+    /// homepage URL.
+    pub website: Option<String>,
+    /// URL for your blog.
+    pub blog: Option<String>,
+    /// username on Discourse.
+    pub discourse: Option<String>,
+    /// username on Reddit
+    pub reddit: Option<String>,
+    /// username on Twitter, including the @.
+    pub twitter: Option<String>,
+    /// any notes you lik
+    pub notes: Option<String>,
 }
 
 /// This is used to uniquely identify authors based on as little information as is available

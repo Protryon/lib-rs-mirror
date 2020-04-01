@@ -20,79 +20,79 @@ type BoxErr = Box<dyn std::error::Error + Sync + Send>;
 #[tokio::main]
 async fn main() -> Result<(), BoxErr> {
     tokio::runtime::Handle::current().spawn(async move {
-            let handle = tokio::runtime::Handle::current();
-            let mut a = Archive::new(Decoder::new(BufReader::new(File::open("db-dump.tar.gz")?))?);
-            let ksink = KitchenSink::new_default().await?;
+        let handle = tokio::runtime::Handle::current();
+        let mut a = Archive::new(Decoder::new(BufReader::new(File::open("db-dump.tar.gz")?))?);
+        let ksink = KitchenSink::new_default().await?;
 
-            tokio::task::block_in_place(move || {
-                let mut crate_owners = None;
-                let mut crates = None;
-                let mut metadata = None;
-                let mut teams = None;
-                let mut users = None;
-                let mut downloads = None;
-                let mut versions = None;
+        tokio::task::block_in_place(move || {
+            let mut crate_owners = None;
+            let mut crates = None;
+            let mut metadata = None;
+            let mut teams = None;
+            let mut users = None;
+            let mut downloads = None;
+            let mut versions = None;
 
-                for file in a.entries()? {
-                    let file = file?;
-                    if !file.header().entry_type().is_file() {
-                        continue;
-                    }
-                    if let Some(path) = file.path()?.file_name().and_then(|f| f.to_str()) {
-                        eprint!("{} ({}KB): ", path, file.header().size()? / 1000);
-                        match path {
-                            "crate_owners.csv" => {
-                                eprintln!("parse_crate_owners…");
-                                crate_owners = Some(parse_crate_owners(file)?);
-                            },
-                            "crates.csv" => {
-                                eprintln!("parse_crates…");
-                                crates = Some(parse_crates(file)?);
-                            },
-                            "metadata.csv" => {
-                                eprintln!("parse_metadata…");
-                                metadata = Some(parse_metadata(file)?);
-                            },
-                            "teams.csv" => {
-                                eprintln!("parse_teams…");
-                                teams = Some(parse_teams(file)?);
-                            },
-                            "users.csv" => {
-                                eprintln!("parse_users…");
-                                users = Some(parse_users(file)?);
-                            },
-                            "version_downloads.csv" => {
-                                eprintln!("parse_version_downloads…");
-                                downloads = Some(parse_version_downloads(file)?);
-                            },
-                            "versions.csv" => {
-                                eprintln!("parse_versions…");
-                                versions = Some(parse_versions(file)?);
-                            },
-                            p => eprintln!("Ignored file {}", p),
-                        };
-                        if let (Some(crates), Some(versions)) = (&crates, &versions) {
-                            if let Some(downloads) = downloads.take() {
-                                eprintln!("Indexing {} crates, {} versions, {} downloads", crates.len(), versions.len(), downloads.len());
-                                index_downloads(crates, versions, &downloads, &ksink)?;
-                            }
+            for file in a.entries()? {
+                let file = file?;
+                if !file.header().entry_type().is_file() {
+                    continue;
+                }
+                if let Some(path) = file.path()?.file_name().and_then(|f| f.to_str()) {
+                    eprint!("{} ({}KB): ", path, file.header().size()? / 1000);
+                    match path {
+                        "crate_owners.csv" => {
+                            eprintln!("parse_crate_owners…");
+                            crate_owners = Some(parse_crate_owners(file)?);
+                        },
+                        "crates.csv" => {
+                            eprintln!("parse_crates…");
+                            crates = Some(parse_crates(file)?);
+                        },
+                        "metadata.csv" => {
+                            eprintln!("parse_metadata…");
+                            metadata = Some(parse_metadata(file)?);
+                        },
+                        "teams.csv" => {
+                            eprintln!("parse_teams…");
+                            teams = Some(parse_teams(file)?);
+                        },
+                        "users.csv" => {
+                            eprintln!("parse_users…");
+                            users = Some(parse_users(file)?);
+                        },
+                        "version_downloads.csv" => {
+                            eprintln!("parse_version_downloads…");
+                            downloads = Some(parse_version_downloads(file)?);
+                        },
+                        "versions.csv" => {
+                            eprintln!("parse_versions…");
+                            versions = Some(parse_versions(file)?);
+                        },
+                        p => eprintln!("Ignored file {}", p),
+                    };
+                    if let (Some(crates), Some(versions)) = (&crates, &versions) {
+                        if let Some(downloads) = downloads.take() {
+                            eprintln!("Indexing {} crates, {} versions, {} downloads", crates.len(), versions.len(), downloads.len());
+                            index_downloads(crates, versions, &downloads, &ksink)?;
                         }
                     }
                 }
+            }
 
-                if let (Some(crates), Some(teams), Some(users)) = (crates, teams, users) {
-                            if let Some(crate_owners) = crate_owners.take() {
-                                eprintln!("Indexing owners of {} crates", crate_owners.len());
-                        handle.spawn(async move {
-                            index_owners(&crates, crate_owners, &teams, &users, &ksink).await.unwrap();
-                        });
-                    }
+            if let (Some(crates), Some(teams), Some(users)) = (crates, teams, users) {
+                        if let Some(crate_owners) = crate_owners.take() {
+                            eprintln!("Indexing owners of {} crates", crate_owners.len());
+                    handle.spawn(async move {
+                        index_owners(&crates, crate_owners, &teams, &users, &ksink).await.unwrap();
+                    });
                 }
-                Ok(())
-            })
+            }
+            Ok(())
         })
-        .await
-        .unwrap()
+    })
+    .await
+    .unwrap()
 }
 
 #[inline(never)]

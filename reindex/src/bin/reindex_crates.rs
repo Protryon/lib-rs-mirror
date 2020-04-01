@@ -368,7 +368,7 @@ fn is_squatspam(k: &RichCrateVersion) -> bool {
 }
 
 fn is_deprecated(k: &RichCrateVersion) -> bool {
-    if k.version().contains("deprecated") || kitchen_sink::is_deprecated(k.short_name()) || k.version() == "0.0.0" || k.version() == "0.0.1" {
+    if k.version().contains("deprecated") || k.version() == "0.0.0" || k.version() == "0.0.1" {
         return true;
     }
     if k.maintenance() == MaintenanceStatus::Deprecated {
@@ -399,6 +399,11 @@ fn is_deprecated(k: &RichCrateVersion) -> bool {
             desc.contains("no longer maintained") ||
             desc.contains("this tool is abandoned") ||
             desc.ends_with("deprecated") || desc.contains("deprecated in favor") || desc.contains("project is deprecated");
+    }
+    if let Ok(req) = k.version().parse() {
+        if kitchen_sink::is_deprecated(k.short_name(), &req) {
+            return true;
+        }
     }
     false
 }

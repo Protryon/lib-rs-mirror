@@ -390,7 +390,7 @@ impl Index {
     /// 0 = not used *or deprecated*
     /// 1 = everyone uses it
     pub async fn version_popularity(&self, crate_name: &str, requirement: &VersionReq) -> Result<Option<(bool, f32)>, DepsErr> {
-        if is_deprecated(crate_name) {
+        if is_deprecated(crate_name, requirement) {
             return Ok(Some((false, 0.)));
         }
 
@@ -448,11 +448,13 @@ impl fmt::Debug for Dep {
     }
 }
 
-/// TODO: check if the repo is rust-lang-deprecated.
-/// Note: the repo URL in the crate is outdated, and it may be a redirect to the deprecated
-pub fn is_deprecated(name: &str) -> bool {
+pub fn is_deprecated(name: &str, requirement: &VersionReq) -> bool {
+    let v02 = "0.2.99".parse().unwrap();
+    let v01 = "0.1.99".parse().unwrap();
     match name {
-        "rustc-serialize" | "gcc" | "rustc-benchmarks" | "time" | "rust-crypto" |
+        "time" if requirement.matches(&v01) => true,
+        "winapi" if requirement.matches(&v01) || requirement.matches(&v02) => true,
+        "rustc-serialize" | "gcc" | "rustc-benchmarks" | "rust-crypto" |
         "flate2-crc" | "complex" | "simple_stats" | "concurrent" | "feed" |
         "isatty" | "thread-scoped" | "target_build_utils" | "chan" | "chan-signal" |
         "glsl-to-spirv" => true,

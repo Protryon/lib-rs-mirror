@@ -97,9 +97,10 @@ impl<'a> AuthorPage<'a> {
                 }
             }
         }
+        let num_keywords = (1 + founder_total/2 + member_total/3).max(2).min(7);
         let mut keywords: Vec<_> = keywords.into_iter().collect();
         keywords.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
-        let keywords: Vec<_> = keywords.into_iter().take(7).map(|(k, _)| k.to_owned()).collect();
+        let keywords: Vec<_> = keywords.into_iter().take(num_keywords).map(|(k, _)| k.to_owned()).collect();
 
         let mut collab: Vec<_> = collab.into_iter().map(|(_, v)| v).collect();
         collab.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(Ordering::Equal));

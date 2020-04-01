@@ -466,7 +466,9 @@ lazy_static! {
         (Cond::Any(&["idl", "asmjs", "webasm"]), &[("gui", 0.5, 0.), ("command-line-utilities", 0.75, 0.)]),
         (Cond::Any(&["javascript"]), &[("gui", 0.9, 0.), ("caching", 0.9, 0.), ("command-line-utilities", 0.8, 0.), ("multimedia::encoding", 0.7, 0.), ("visualization", 0.8, 0.), ("cryptography::cryptocurrencies", 0.6, 0.)]),
 
-        (Cond::Any(&["concurrency", "spinlock", "semaphore", "parallel", "multithreaded", "barrier", "thread-local", "parallelism", "parallelizm", "coroutines", "threads", "threadpool", "fork-join", "parallelization", "actor"]),
+        (Cond::Any(&["concurrency", "spinlock", "semaphore", "parallel", "multithreaded", "barrier", "thread-local", "parallelism"]),
+            &[("concurrency", 1.35, 0.1), ("command-line-utilities", 0.8, 0.), ("games", 0.5, 0.), ("memory-management", 0.8, 0.), ("caching", 0.8, 0.), ("os", 0.8, 0.), ("parsing", 0.9, 0.), ("simulation", 0.8, 0.)]),
+        (Cond::Any(&["parallelizm", "coroutines", "threads", "threadpool", "fork-join", "parallelization", "actor", "openmp"]),
             &[("concurrency", 1.35, 0.1), ("command-line-utilities", 0.8, 0.), ("games", 0.5, 0.), ("memory-management", 0.8, 0.), ("caching", 0.8, 0.), ("os", 0.8, 0.), ("parsing", 0.9, 0.), ("simulation", 0.8, 0.)]),
         (Cond::Any(&["atomic"]), &[("concurrency", 1.1, 0.1), ("command-line-utilities", 0.75, 0.)]),
         (Cond::Any(&["queue", "zookeeper"]), &[("concurrency", 1.2, 0.)]),

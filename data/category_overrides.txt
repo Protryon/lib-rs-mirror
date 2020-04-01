@@ -697,6 +697,7 @@ teloxide: web-programming
 tempus_fugit: development-tools::profiling
 termcodes: command-line-interface, no-std
 text_io: text-processing
+tgaimage: multimedia::images
 thingvellir: concurrency
 thrift_codec: encoding, web-programming
 time-parse: date-and-time, parser-implementations

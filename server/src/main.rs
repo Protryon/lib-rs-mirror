@@ -175,6 +175,7 @@ async fn run_server() -> Result<(), failure::Error> {
             .route("/", web::get().to(handle_home))
             .route("/search", web::get().to(handle_search))
             .route("/index", web::get().to(handle_search)) // old crates.rs/index url
+            .route("/categories/{rest:.*}", web::get().to(handle_redirect))
             .route("/new", web::get().to(handle_new_trending))
             .route("/keywords/{keyword}", web::get().to(handle_keyword))
             .route("/crates/{crate}", web::get().to(handle_crate))
@@ -356,6 +357,12 @@ async fn handle_github_crate(req: HttpRequest) -> Result<HttpResponse, ServerErr
 }
 async fn handle_gitlab_crate(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     handle_git_crate(req, "lab").await
+}
+
+async fn handle_redirect(req: HttpRequest) -> HttpResponse {
+    let inf = req.match_info();
+    let rest = inf.query("rest");
+    HttpResponse::PermanentRedirect().header("Location", format!("/{}", rest)).body("")
 }
 
 async fn handle_git_crate(req: HttpRequest, slug: &'static str) -> Result<HttpResponse, ServerError> {

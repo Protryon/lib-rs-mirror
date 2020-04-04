@@ -121,6 +121,8 @@ crunchy: development-tools
 cryptoballot: cryptography, authentication, gui
 cryptonote-wallet: cryptography::cryptocurrencies
 csound: multimedia::audio
+css-color: parser-implementations, web-programming
+cssparser: parser-implementations, web-programming
 cuckoocache: concurrency, caching, data-structures
 cute-dnd-dice: game-engines
 darling_core: development-tools::procedural-macro-helpers

@@ -164,7 +164,7 @@ lazy_static! {
 
         (Cond::Any(&["parser", "syntex"]),
             &[("parser-implementations", 1.1, 0.), ("parsing", 1.08, 0.), ("no-std", 0.85, 0.), ("embedded", 0.9, 0.), ("science", 0.9, 0.), ("development-tools", 0.8, 0.),
-            ("development-tools::debugging", 0.8, 0.), ("rendering::graphics-api", 0.3, 0.), ("rendering", 0.6, 0.), ("web-programming::http-client", 0.75, 0.),
+            ("development-tools::debugging", 0.8, 0.), ("rendering::graphics-api", 0.3, 0.), ("rendering", 0.6, 0.), ("gui", 0.8, 0.), ("web-programming::http-client", 0.75, 0.),
             ("command-line-utilities", 0.75, 0.), ("command-line-interface", 0.5, 0.), ("games", 0.7, 0.), ("visualization", 0.7, 0.)]),
         (Cond::All(&["elf", "parser"]), &[("parser-implementations", 1.2, 0.2), ("os::unix-apis", 1.1, 0.)]),
         (Cond::All(&["format", "parser"]), &[("parser-implementations", 1.3, 0.2), ("parsing", 0.95, 0.), ("games", 0.8, 0.), ("development-tools::ffi", 0.8, 0.)]),
@@ -179,7 +179,7 @@ lazy_static! {
 
         (Cond::Any(&["tokenizer", "tokenize", "parser-combinators", "peg", "lalr", "yacc", "ll1", "lexer", "lex", "context-free", "grammars", "grammar"]),
             &[("parsing", 1.2, 0.1), ("parser-implementations", 0.8, 0.), ("os", 0.7, 0.), ("emulators", 0.7, 0.), ("internationalization", 0.8, 0.), ("games", 0.8, 0.)]),
-        (Cond::All(&["parser", "generator"]), &[("parsing", 1.4, 0.3), ("parser-implementations", 0.9, 0.)]),
+        (Cond::All(&["parser", "generator"]), &[("parsing", 1.4, 0.3), ("parser-implementations", 0.9, 0.), ("gui", 0.5, 0.)]),
         (Cond::Any(&["backus–naur", "bnf"]), &[("parsing", 1.2, 0.), ("parser-implementations", 1.2, 0.)]),
         (Cond::All(&["parser", "combinators"]), &[("parsing", 1.3, 0.2), ("parser-implementations", 0.95, 0.), ("multimedia::encoding", 0.5, 0.)]),
         (Cond::Any(&["dep:nom"]), &[("parser-implementations", 1.2, 0.1)]),
@@ -202,7 +202,7 @@ lazy_static! {
             &[("parser-implementations", 1.2, 0.1), ("parsing", 1.1, 0.), ("authentication", 0.8, 0.), ("network-programming", 0.8, 0.), ("value-formatting", 1.1, 0.), ("encoding", 1.2, 0.1)]),
 
         (Cond::All(&["machine", "learning"]), &[("science::ml", 1.5, 0.3), ("network-programming", 0.8, 0.), ("science::math", 0.8, 0.), ("science", 0.8, 0.),
-            ("emulators", 0.15, 0.), ("command-line-utilities", 0.5, 0.), ("games", 0.5, 0.)]),
+            ("emulators", 0.15, 0.), ("command-line-utilities", 0.5, 0.), ("games", 0.5, 0.), ("gui", 0.8, 0.)]),
         (Cond::All(&["decision", "tree"]), &[("science::ml", 1.2, 0.1), ("algorithms", 1.1, 0.)]),
         (Cond::All(&["neural", "classifier"]), &[("science::ml", 1.5, 0.3), ("science::math", 0.8, 0.), ("network-programming", 0.5, 0.)]),
         (Cond::All(&["neural", "network"]), &[("science::ml", 1.5, 0.3), ("science::math", 0.8, 0.), ("network-programming", 0.5, 0.),
@@ -484,11 +484,12 @@ lazy_static! {
         (Cond::All(&["tile"]), &[("game-engines", 1.1, 0.), ("network-programming", 0.8, 0.), ("asynchronous", 0.8, 0.), ("internationalization", 0.8, 0.)]),
         (Cond::All(&["map", "grid"]), &[("game-engines", 1.1, 0.)]),
         (Cond::All(&["game", "map"]), &[("game-engines", 1.1, 0.1), ("games", 1.1, 0.1), ("data-structures", 0.8, 0.)]),
-        (Cond::Any(&["consensus", "erlang", "gossip"]), &[("concurrency", 1.2, 0.1), ("network-programming", 1.2, 0.1), ("asynchronous", 1.2, 0.1)]),
+        (Cond::Any(&["consensus", "erlang", "gossip"]), &[("concurrency", 1.2, 0.1), ("network-programming", 1.2, 0.1), ("asynchronous", 1.2, 0.1), ("gui", 0.8, 0.)]),
 
         (Cond::Any(&["gui"]), &[("gui", 1.35, 0.1), ("command-line-interface", 0.15, 0.), ("algorithms", 0.8, 0.), ("multimedia::video", 0.5, 0.)]),
         (Cond::Any(&["qt", "x11", "wayland", "gtk", "window-events"]), &[("gui", 1.35, 0.1), ("rendering::graphics-api", 1.1, 0.), ("algorithms", 0.8, 0.), ("no-std", 0.7, 0.), ("os::unix-apis", 1.2, 0.1), ("cryptography::cryptocurrencies", 0.9, 0.), ("os::macos-apis", 0.25, 0.), ("caching", 0.5, 0.), ("command-line-interface", 0.15, 0.)]),
         (Cond::All(&["window", "manager"]), &[("gui", 1.4, 0.2)]),
+        (Cond::All(&["gui", "toolkit"]), &[("gui", 1.4, 0.2)]),
         (Cond::All(&["status", "bar"]), &[("gui", 1.2, 0.1)]),
         (Cond::All(&["copy", "pasting"]), &[("gui", 1.1, 0.), ("parser-implementations", 0.9, 0.)]),
         (Cond::All(&["ui", "framework"]), &[("gui", 1.2, 0.), ("rendering::graphics-api", 1.2, 0.)]),
@@ -497,6 +498,7 @@ lazy_static! {
         (Cond::Any(&["displaying", "desktop", "compositor"]),
             &[("gui", 1.2, 0.1), ("command-line-utilities", 0.9, 0.), ("hardware-support", 0.9, 0.), ("asynchronous", 0.8, 0.), ("internationalization", 0.9, 0.)]),
         (Cond::Any(&["dashboard", "displaying", "inspector", "instrumentation"]), &[("visualization", 1.2, 0.1), ("games", 0.5, 0.)]),
+        (Cond::Any(&["toolkit", "imgui"]), &[("gui", 1.1, 0.)]),
 
         (Cond::Any(&["japanese", "arabic", "korean", "hangul", "pinyin", "hanzi", "locale", "chinese", "chinese-numbers", "scotland", "scottish", "japan", "thai", "american", "uk", "country", "language-code"]),
             &[("internationalization", 1.2, 0.2), ("command-line-utilities", 0.75, 0.), ("rendering::engine", 0.1, 0.), ("rendering::data-formats", 0.2, 0.), ("filesystem", 0.2, 0.)]),
@@ -880,7 +882,7 @@ lazy_static! {
         (Cond::All(&["games", "framework"]), &[("game-engines", 1.3, 0.2), ("games", 0.6, 0.), ("gui", 0.8, 0.)]),
         (Cond::All(&["game", "library"]), &[("game-engines", 1.3, 0.2), ("games", 0.6, 0.), ("gui", 0.8, 0.)]),
         (Cond::All(&["game", "ecs"]), &[("game-engines", 1.2, 0.), ("games", 0.4, 0.)]),
-        (Cond::All(&["game", "parser"]), &[("game-engines", 1.1, 0.), ("rendering::engine", 0.1, 0.), ("games", 0.2, 0.)]),
+        (Cond::All(&["game", "parser"]), &[("game-engines", 1.1, 0.), ("rendering::engine", 0.1, 0.), ("games", 0.2, 0.), ("gui", 0.5, 0.)]),
         (Cond::All(&["chess", "engine"]), &[("game-engines", 1.5, 0.3), ("rendering::engine", 0.4, 0.), ("games", 0.4, 0.)]),
         (Cond::All(&["game", "scripting"]), &[("game-engines", 1.5, 0.3), ("rendering::engine", 0.4, 0.), ("games", 0.5, 0.), ("rendering::data-formats", 0.2, 0.)]),
         (Cond::All(&["game", "editor"]), &[("game-engines", 1.3, 0.1), ("rendering::engine", 0.4, 0.), ("games", 0.8, 0.), ("rendering::engine", 0.2, 0.)]),
@@ -1050,7 +1052,7 @@ lazy_static! {
         (Cond::Any(&["http-client", "twitter", "vkontakte"]), &[("web-programming::http-client", 1.2, 0.1), ("web-programming::http-server", 0.8, 0.), ("no-std", 0.7, 0.), ("command-line-utilities", 0.75, 0.), ("development-tools::procedural-macro-helpers", 0.4, 0.), ("development-tools", 0.75, 0.)]),
         (Cond::All(&["cli", "cloud"]), &[("web-programming::http-client", 1.2, 0.1), ("command-line-utilities", 1.2, 0.2)]),
         (Cond::Any(&["javascript", "stdweb", "sass", "lodash", "css", "webvr", "frontend", "emscripten", "asmjs", "slack", "url", "uri"]),
-            &[("web-programming", 1.2, 0.2), ("command-line-utilities", 0.75, 0.), ("development-tools::testing", 0.6, 0.)]),
+            &[("web-programming", 1.2, 0.2), ("gui", 0.9, 0.), ("command-line-utilities", 0.75, 0.), ("development-tools::testing", 0.6, 0.)]),
         (Cond::Any(&["json"]), &[("web-programming", 1.1, 0.1), ("algorithms", 0.8, 0.), ("command-line-utilities", 0.75, 0.), ("text-processing", 0.8, 0.)]),
         (Cond::Any(&["protocol", "network", "socket", "wifi", "wi-fi"]), &[
             ("network-programming", 1.2, 0.2), ("parsing", 0.8, 0.), ("os::windows-apis", 0.9, 0.), ("rendering::data-formats", 0.4, 0.),

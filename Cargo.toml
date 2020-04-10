@@ -30,21 +30,26 @@ members = [
 
 [profile.dev]
 opt-level = 1
+debug = true
 
 [profile.release]
 debug = true
 
 [profile.dev.package.miniz_oxide]
 opt-level = 3
+debug = false
 
 [profile.dev.package.flate2]
 opt-level = 3
+debug = false
 
 [profile.dev.package.serde]
 opt-level = 3
+debug = false
 
 [profile.dev.package.rmp-serde]
 opt-level = 3
+debug = false
 
 
 [patch.crates-io]

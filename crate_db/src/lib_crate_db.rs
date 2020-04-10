@@ -508,7 +508,7 @@ impl CrateDb {
             ")?;
             let q = q.query_map(&[&repo.canonical_git_url()], |r| {
                 let s = r.get_raw(0).as_str()?;
-                Ok(Origin::from_crates_io_name(s))
+                crates_io_name(s)
             })?.filter_map(|r| r.ok());
             Ok(q.collect())
         }).await
@@ -535,7 +535,7 @@ impl CrateDb {
             loop {
                 child_path = child_path.rsplitn(2, '/').nth(1).unwrap_or("");
                 if let Some(child) = paths.get(child_path) {
-                    return Ok(Some(Origin::from_crates_io_name(child)));
+                    return Ok(Origin::try_from_crates_io_name(child));
                 }
                 if child_path.is_empty() {
                     // in these paths "" is the root
@@ -557,9 +557,9 @@ impl CrateDb {
             }
 
             Ok(if let Some(child) = repo.repo_name().and_then(|n| paths.get(n).or_else(|| paths.get(unprefix(n)))) {
-                Some(Origin::from_crates_io_name(child))
+                Origin::try_from_crates_io_name(child)
             } else if let Some(child) = repo.owner_name().and_then(|n| paths.get(n).or_else(|| paths.get(unprefix(n)))) {
-                Some(Origin::from_crates_io_name(child))
+                Origin::try_from_crates_io_name(child)
             } else {
                 None
             })
@@ -802,7 +802,7 @@ impl CrateDb {
             "#)?;
             let res = query.query_map(&[&crate_name], |row| {
                 let s = row.get_raw(1).as_str()?;
-                Ok(Origin::from_crates_io_name(s))
+                crates_io_name(s)
             }).context("replacement_crates")?;
             Ok(res.collect::<std::result::Result<_,_>>()?)
         }).await
@@ -913,8 +913,7 @@ impl CrateDb {
             let q = query.query_map(NO_PARAMS, |row| {
                 let s = row.get_raw(0).as_str()?;
                 let weight = row.get(1)?;
-                Ok((Origin::try_from_crates_io_name(s)
-                    .ok_or_else(|| rusqlite::Error::ToSqlConversionFailure(format!("bad name in removals{}", s).into()))?, weight))
+                Ok((crates_io_name(s)?, weight))
             })?;
             let q = q.filter_map(|r| r.ok());
             Ok(q.collect())
@@ -1157,6 +1156,11 @@ impl KeywordInsert {
         }
         Ok(())
     }
+}
+
+fn crates_io_name(name: &str) -> std::result::Result<Origin, rusqlite::Error> {
+    Ok(Origin::try_from_crates_io_name(name)
+                    .ok_or_else(|| rusqlite::Error::ToSqlConversionFailure(format!("bad name {}", name).into()))?)
 }
 
 #[derive(Debug)]

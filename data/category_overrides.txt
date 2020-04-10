@@ -111,6 +111,7 @@ commoncrypto: os::macos-apis, cryptography
 concurrent-hashmap: concurrency, data-structures
 conllx: parser-implementations
 contralog: development-tools::debugging
+conv: rust-patterns
 core-foundation-sys: os::macos-apis
 core-graphics: os::macos-apis, rendering::graphics-api
 core-text: os::macos-apis
@@ -124,6 +125,7 @@ coz: development-tools::profiling
 cqc: simulation
 cqrs-core: asynchronous
 crate-race: development-tools::profiling
+crates-index-diff: development-tools
 crates_io_api: web-programming
 cron-parser: parser-implementations
 crossterm_style: command-line-interface
@@ -782,6 +784,7 @@ udp_netmsg: network-programming
 ul: rendering::graphics-api
 ullage: development-tools
 ultrastar-txt: parser-implementations
+uploads-im-client: web-programming
 urdf-rs: parser-implementations
 uriparse: parser-implementations, web-programming
 urldecode: web-programming

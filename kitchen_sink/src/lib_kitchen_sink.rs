@@ -856,8 +856,6 @@ impl KitchenSink {
             }
         }
 
-        eprintln!("R1 {:?}", meta.readme);
-
         let maybe_repo = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
         let has_readme_file = meta.readme.is_some();
         if !has_readme_file {

@@ -905,7 +905,7 @@ lazy_static! {
         (Cond::All(&["game", "engine"]), &[("game-engines", 1.5, 0.3), ("games", 0.3, 0.), ("rendering::data-formats", 0.2, 0.), ("filesystem", 0.7, 0.), ("no-std", 0.8, 0.), ("filesystem", 0.8, 0.), ("command-line-interface", 0.8, 0.)]),
         (Cond::All(&["game", "development"]), &[("game-engines", 1.3, 0.2), ("games", 0.3, 0.)]),
         (Cond::All(&["game", "dev"]), &[("game-engines", 1.2, 0.), ("games", 0.9, 0.)]),
-        (Cond::Any(&["games"]), &[("gui", 0.8, 0.)]),
+        (Cond::Any(&["games", "game"]), &[("gui", 0.7, 0.), ("development-tools", 0.7, 0.)]),
         (Cond::All(&["rpg", "game"]), &[("games", 1.2, 0.2), ("game-engines", 1.1, 0.)]),
         (Cond::All(&["voxel", "game"]), &[("games", 1.2, 0.2), ("game-engines", 1.1, 0.)]),
         (Cond::Any(&["unreal-engine"]), &[("games", 1.2, 0.), ("game-engines", 1.1, 0.)]),

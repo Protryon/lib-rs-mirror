@@ -1,4 +1,5 @@
 abortable_parser: parsing
+ace: command-line-interface, parser-implementations
 ackorelic: development-tools::debugging, network-programming
 acm: science::math
 advancedresearch-higher_order_core: rust-patterns

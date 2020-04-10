@@ -142,7 +142,7 @@ impl Urler {
         if let Some(ref gh) = author.github {
             Some(match (gh.user_type, author.owner) {
                 (UserType::User, true) => self.crates_io_user_by_github_login(&gh.login),
-                (UserType::User, _) => format!("https://crates.io/users/{}", encode(&gh.login)),
+                (UserType::User, _) |
                 (UserType::Org, _) | (UserType::Bot, _) => format!("https://github.com/{}", encode(&gh.login)),
             })
         } else if let Some(ref info) = author.info {

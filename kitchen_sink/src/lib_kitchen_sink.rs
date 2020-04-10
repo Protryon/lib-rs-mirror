@@ -120,6 +120,8 @@ pub enum KitchenSinkErr {
     DataNotFound(String),
     #[fail(display = "crate has no versions")]
     NoVersions,
+    #[fail(display = "cached data has different version than the index")]
+    CacheExpired,
     #[fail(display = "Environment variable CRATES_DATA_DIR is not set.\nChoose a dir where it's OK to store lots of data, and export it like CRATES_DATA_DIR=/var/lib/crates.rs")]
     CratesDataDirEnvVarMissing,
     #[fail(display = "{} does not exist\nPlease get data files from https://lib.rs/data and put them in that directory, or set CRATES_DATA_DIR to their location.", _0)]
@@ -715,9 +717,24 @@ impl KitchenSink {
         if let Some(krate) = self.loaded_rich_crate_version_cache.read().get(origin) {
             return Ok(krate.clone());
         }
-
-        let data = tokio::time::timeout(Duration::from_secs(30), self.crate_db.rich_crate_version_data(origin))
+        let mut data = tokio::time::timeout(Duration::from_secs(30), self.crate_db.rich_crate_version_data(origin))
             .await.map_err(|_| KitchenSinkErr::DataTimedOut)?;
+
+        if let Ok(cached) = &data {
+            match origin {
+                Origin::CratesIo(name) => {
+                    let expected_ver = self.index.crate_highest_version(name, false).context("rich_crate_version2")?;
+                    let has = &cached.0.package().version;
+                    let wants = expected_ver.version();
+                    if has != wants {
+                        eprintln!("Ignoring derived cache of {}, because it's {}, and crates-io is {}", name, has, wants);
+                        data = Err(KitchenSinkErr::CacheExpired.into());
+                    }
+                },
+                _ => {}, // TODO: figure out when to invalidate cache of git-repo crates
+            }
+        }
+
         let (manifest, derived) = match data {
             Ok(v) => v,
             Err(e) => {

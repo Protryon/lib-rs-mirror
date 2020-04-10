@@ -21,7 +21,10 @@ type BoxErr = Box<dyn std::error::Error + Sync + Send>;
 async fn main() -> Result<(), BoxErr> {
     tokio::runtime::Handle::current().spawn(async move {
         let handle = tokio::runtime::Handle::current();
-        let mut a = Archive::new(Decoder::new(BufReader::new(File::open("db-dump.tar.gz")?))?);
+        /// I can't be bothered to make async stream adapter to make async body impl Read
+        let res = reqwest::blocking::get("https://static.crates.io/db-dump.tar.gz")?;
+        let res = BufReader::with_capacity(256_000_000, res);
+        let mut a = Archive::new(Decoder::new(res)?);
         let ksink = KitchenSink::new_default().await?;
 
         tokio::task::block_in_place(move || {

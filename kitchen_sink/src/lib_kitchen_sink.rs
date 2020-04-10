@@ -1294,7 +1294,6 @@ impl KitchenSink {
         )?;
 
         Ok(replacements.into_iter()
-            .map(|name| Origin::from_crates_io_name(&name))
             .chain(related)
             .unique()
             .take(10)

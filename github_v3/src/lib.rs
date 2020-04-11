@@ -64,9 +64,12 @@ impl Builder {
         self
     }
 
+    /// Add a user-supplied argument to the request path, e.g. `.path("users").arg(username)`
+    ///
+    /// The arg is URL-escaped, so it's safe to use any user-supplied data.
     pub fn arg(mut self, arg: &str) -> Self {
         self.url.push('/');
-        self.url.push_str(arg);
+        self.url.push_str(&urlencoding::encode(arg));
         self
     }
 

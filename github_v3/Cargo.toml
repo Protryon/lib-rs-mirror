@@ -3,9 +3,13 @@ name = "github_v3"
 description = "Async GitHub API v3 client"
 version = "0.3.1"
 authors = ["Kornel <kornel@geekhood.net>"]
-keywords = ["github", "rest-api", "async"]
+keywords = ["github", "restful", "api", "async"]
 categories = ["web-programming", "web-programming::http-client"]
 edition = "2018"
+readme = "README.md"
+repository = "https://gitlab.com/crates.rs/crates.rs/-/tree/master/github_v3"
+homepage = "https://lib.rs/github_v3"
+license = "CC0-1.0"
 
 [dependencies]
 reqwest = { version = "0.10.1", features = ["json"] }
@@ -16,6 +20,7 @@ serde_derive = "1.0.104"
 futures = "0.3.4"
 async-stream = "0.2.1"
 tokio = { version = "0.2.11", features = ["time"] }
+urlencoding = "1.0.0"
 
 [dev-dependencies]
 tokio = { version = "0.2.11", features = ["rt-threaded", "macros", "time"] }

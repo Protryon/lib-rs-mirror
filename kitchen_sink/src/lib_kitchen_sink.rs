@@ -996,7 +996,6 @@ impl KitchenSink {
                     // but it needs to normalize ../readme paths
                     let url = url::Url::parse(&format!("http://localhost/{}", path_in_repo)).and_then(|u| u.join(&readme_path));
                     let in_repo_url_path = url.as_ref().map_or("", |u| u.path().trim_start_matches('/'));
-                    eprintln!("{} + {} = {:?} = {}", path_in_repo, readme_path, url, in_repo_url_path);
                     (Some(repo.readme_base_url(in_repo_url_path)), Some(repo.readme_base_image_url(in_repo_url_path)))
                 },
                 None => (None, None),

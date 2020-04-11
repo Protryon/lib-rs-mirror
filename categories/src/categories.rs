@@ -50,7 +50,7 @@ quick_error! {
 }
 
 lazy_static! {
-    pub static ref CATEGORIES: Categories = { Categories::new().expect("built-in categories") };
+    pub static ref CATEGORIES: Categories = Categories::new().expect("built-in categories");
 }
 
 impl Categories {

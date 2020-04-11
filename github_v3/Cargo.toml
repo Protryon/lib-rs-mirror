@@ -1,7 +1,7 @@
 [package]
 name = "github_v3"
 description = "Async GitHub API v3 client"
-version = "0.3.1"
+version = "0.3.2"
 authors = ["Kornel <kornel@geekhood.net>"]
 keywords = ["github", "restful", "api", "async"]
 categories = ["web-programming", "web-programming::http-client"]

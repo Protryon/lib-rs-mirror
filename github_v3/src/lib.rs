@@ -61,26 +61,50 @@ impl Response {
 pub struct Builder {
     client: Arc<ClientInner>,
     url: String,
+    query_string_started: bool,
 }
 
 impl Builder {
     /// Add a constant path to the request, e.g. `.path("users")`
     ///
+    /// Inner slashes are OK, but the string must not start or end with a slash.
+    ///
+    /// Panics if query string has been added.
+    ///
     /// It's appended raw, so must be URL-safe.
     pub fn path(mut self, url_part: &'static str) -> Self {
         debug_assert_eq!(url_part, url_part.trim_matches('/'));
+        assert!(!self.query_string_started);
 
         self.url.push('/');
         self.url.push_str(url_part);
         self
     }
 
-    /// Add a user-supplied argument to the request path, e.g. `.path("users").arg(username)`
+    /// Add a user-supplied argument to the request path, e.g. `.path("users").arg(username)`,
+    /// or after a call to query(), starts adding fragments to the query string with no delimiters.
     ///
     /// The arg is URL-escaped, so it's safe to use any user-supplied data.
     pub fn arg(mut self, arg: &str) -> Self {
-        self.url.push('/');
+        if !self.query_string_started {
+            self.url.push('/');
+        }
         self.url.push_str(&urlencoding::encode(arg));
+        self
+    }
+
+    /// Add a raw unescaped query string. The string must *not* start with `?`
+    ///
+    /// ```rust
+    /// # Client::new(None)
+    /// .get().path("search/users").query("q=").arg(somestring)
+    /// ```
+    pub fn query(mut self, query_string: &str) -> Self {
+        debug_assert!(!query_string.starts_with('?'));
+        debug_assert!(!query_string.starts_with('&'));
+        self.url.push(if self.query_string_started {'&'} else {'?'});
+        self.url.push_str(query_string);
+        self.query_string_started = true;
         self
     }
 
@@ -135,11 +159,12 @@ impl Client {
 
     /// Make a new request to the API.
     pub fn get(&self) -> Builder {
-        let mut url = String::with_capacity(60);
+        let mut url = String::with_capacity(100);
         url.push_str("https://api.github.com");
         Builder {
             client: self.inner.clone(),
             url,
+            query_string_started: false,
         }
     }
 }

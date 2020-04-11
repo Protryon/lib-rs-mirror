@@ -5,7 +5,6 @@ use std::path::Path;
 
 use github_v3::StatusCode;
 use serde::{Deserialize, Serialize};
-use urlencoding::encode;
 
 mod model;
 pub use crate::model::*;
@@ -88,9 +87,9 @@ impl GitHub {
                 return Ok(Some(vec![user]));
             }
         }
-        let enc_email = encode(email);
         self.get_cached(&self.emails, (email, ""), |client| client.get()
-                       .path(&format!("search/users?q=in:email%20{}", enc_email))
+                       .path("search/users")
+                       .query("q=in:email%20").arg(email)
                        .send(), |res: SearchResults<User>| {
                         println!("Found {} = {:#?}", email, res.items);
                         res.items
@@ -128,9 +127,8 @@ impl GitHub {
 
     pub async fn releases(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Option<Vec<GitHubRelease>>> {
         let key = format!("release/{}/{}", repo.owner, repo.repo);
-        let path = format!("repos/{}/{}/releases", repo.owner, repo.repo);
         self.get_cached(&self.releases, (&key, as_of_version), |client| client.get()
-                           .path(&path)
+                           .path("repos").arg(&repo.owner).arg(&repo.repo).path("releases")
                            .send(), id).await.map_err(|e| e.context("releases"))
     }
 
@@ -164,10 +162,9 @@ impl GitHub {
     pub async fn contributors(&self, repo: &SimpleRepo, as_of_version: &str) -> CResult<Option<Vec<UserContrib>>> {
         let path = format!("repos/{}/{}/stats/contributors", repo.owner, repo.repo);
         let key = (path.as_str(), as_of_version);
-        let callback = |client: &github_v3::Client| {
-            client.get().path(&path).send()
-        };
-        self.get_cached(&self.contribs, key, callback, id).await
+        self.get_cached(&self.contribs, key, |client: &github_v3::Client| {
+            client.get().path("repos").arg(&repo.owner).arg(&repo.repo).path("stats/contributors").send()
+        }, id).await
     }
 
     async fn get_cached<F, P, B, R, A>(&self, cache: &TempCache<(String, Option<R>)>, key: (&str, &str), cb: F, postproc: P) -> CResult<Option<R>>

@@ -9,16 +9,19 @@ use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
+/// Response from the API
 pub struct Response {
     res: reqwest::Response,
     client: Arc<ClientInner>,
 }
 
 impl Response {
+    /// Fetch a single JSON object from the API
     pub async fn obj<T: DeserializeOwned>(self) -> Result<T, GHError> {
         Ok(self.res.json().await?)
     }
 
+    /// Stream an array of objects from the API
     pub fn array<T: DeserializeOwned + std::marker::Unpin + 'static>(self) -> impl Stream<Item = Result<T, GHError>> {
         let mut res = self.res;
         let client = self.client;
@@ -41,22 +44,30 @@ impl Response {
         })
     }
 
+    /// Response headers
     pub fn headers(&self) -> &HeaderMap {
         self.res.headers()
     }
 
+    /// Response status
     pub fn status(&self) -> StatusCode {
         self.res.status()
     }
 }
 
+/// See `Client::get()`
+///
+/// Make a new request by constructing the request URL bit by bit
 pub struct Builder {
     client: Arc<ClientInner>,
     url: String,
 }
 
 impl Builder {
-    pub fn path(mut self, url_part: &str) -> Self {
+    /// Add a constant path to the request, e.g. `.path("users")`
+    ///
+    /// It's appended raw, so must be URL-safe.
+    pub fn path(mut self, url_part: &'static str) -> Self {
         debug_assert_eq!(url_part, url_part.trim_matches('/'));
 
         self.url.push('/');
@@ -73,6 +84,7 @@ impl Builder {
         self
     }
 
+    /// Make the request
     pub async fn send(self) -> Result<Response, GHError> {
         let res = self.client.raw_get(&self.url).await?;
         Ok(Response {
@@ -88,15 +100,18 @@ struct ClientInner {
     wait_sec: AtomicU32,
 }
 
+/// API Client. Start here.
 pub struct Client {
     inner: Arc<ClientInner>,
 }
 
 impl Client {
+    /// Reads `GITHUB_TOKEN` env var.
     pub fn new_from_env() -> Self {
         Self::new(std::env::var("GITHUB_TOKEN").ok().as_deref())
     }
 
+    /// Takes API token for authenticated requests (make the token in GitHub settings)
     pub fn new(token: Option<&str>) -> Self {
         let mut default_headers = HeaderMap::with_capacity(2);
         default_headers.insert("Accept", HeaderValue::from_static("application/vnd.github.v3+json"));
@@ -118,6 +133,7 @@ impl Client {
         }
     }
 
+    /// Make a new request to the API.
     pub fn get(&self) -> Builder {
         let mut url = String::with_capacity(60);
         url.push_str("https://api.github.com");
@@ -174,12 +190,14 @@ impl ClientInner {
         }
     }
 
+    /// GitHub's `x-ratelimit-remaining` header
     pub fn rate_limit_remaining(headers: &HeaderMap) -> Option<u32> {
         headers.get("x-ratelimit-remaining")
             .and_then(|s| s.to_str().ok())
             .and_then(|s| s.parse().ok())
     }
 
+    /// GitHub's `x-ratelimit-reset` header
     pub fn rate_limit_reset(headers: &HeaderMap) -> Option<SystemTime> {
         headers.get("x-ratelimit-reset")
             .and_then(|s| s.to_str().ok())

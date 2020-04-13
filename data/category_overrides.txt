@@ -84,6 +84,11 @@ capstone-sys: development-tools::debugging
 capstone3: development-tools::debugging
 captcha: web-programming
 cargo-xbuild: development-tools::build-tools, development-tools::cargo-plugins
+casperlabs-contract-ffi: cryptography::cryptocurrencies
+casperlabs-contract: cryptography::cryptocurrencies
+casperlabs-engine-grpc-server: cryptography::cryptocurrencies
+casperlabs-engine-test-support: cryptography::cryptocurrencies
+casperlabs-types: cryptography::cryptocurrencies
 cb2: command-line-utilities
 celery-rs-core: asynchronous
 celery: asynchronous
@@ -412,7 +417,7 @@ librdkafka-sys: asynchronous
 librsyncr: network-programming
 libsbc-sys: hardware-support
 libtimew: parser-implementations
-lightning:cryptography::cryptocurrencies
+lightning: cryptography::cryptocurrencies
 line: text-editors
 line_drawing: game-engines, algorithms
 link-ippcore : hardware-support
@@ -490,10 +495,16 @@ ndless-static-vars: rust-patterns
 near-bindgen-core :cryptography::cryptocurrencies
 near-bindgen-core: cryptography::cryptocurrencies
 near-bindgen-macros :cryptography::cryptocurrencies
+near-bindgen-promise: cryptography::cryptocurrencies
+near-bindgen: cryptography::cryptocurrencies
 near-bindgen:cryptography::cryptocurrencies
 near-rpc-error-macro:cryptography::cryptocurrencies
+near-runtime-fees: cryptography::cryptocurrencies
 near-runtime-fees:cryptography::cryptocurrencies
+near-sdk: cryptography::cryptocurrencies
+near-vm-errors: cryptography::cryptocurrencies
 near-vm-errors:cryptography::cryptocurrencies
+near-vm-logic: cryptography::cryptocurrencies
 near-vm-runner-standalone:cryptography::cryptocurrencies
 neli: network-programming, os::unix-apis
 neocom: emulators
@@ -524,6 +535,7 @@ nzsc_core: game-engines
 objc-encode: os::macos-apis, development-tools::ffi
 olekit: parser-implementations
 onig_sys: text-processing
+ontio-bump-alloc: cryptography::cryptocurrencies
 openhmd-rs-sys: multimedia, rendering::graphics-api
 openldap: network-programming
 openni2: science::machine-learning
@@ -536,6 +548,7 @@ overdose: concurrency, data-structures
 ovgu-canteen: parser-implementations
 oxygengine-core: game-engines, wasm
 packapp: os::macos-apis, command-line-utilities
+pallet-contracts: cryptography::cryptocurrencies
 papyrus: development-tools, command-line-utilities
 parity-scale-codec-derive: cryptography::cryptocurrencies
 parse-display-derive: rust-patterns, development-tools::procedural-macro-helpers
@@ -579,6 +592,7 @@ pwasm-abi: cryptography::cryptocurrencies
 pwasm-ethereum: cryptography::cryptocurrencies
 pwasm-libc: cryptography::cryptocurrencies
 pwasm-std: cryptography::cryptocurrencies
+pwasm-utils: cryptography::cryptocurrencies
 qeda: command-line-utilities
 qni-core-rs: web-programming::websocket
 quaternion_averager: science::math
@@ -703,11 +717,15 @@ solana-gossip:cryptography::cryptocurrencies
 solana-keygen:cryptography::cryptocurrencies
 solana-logger:cryptography::cryptocurrencies
 solana-vote-program: cryptography::cryptocurrencies
+solid: cryptography::cryptocurrencies
+solsa: cryptography::cryptocurrencies
 sorted-json: encoding
+sp-std: cryptography::cryptocurrencies
 spade: data-structures
 specs_sprite: game-engines
 speculo: development-tools
 spinning_top: concurrency
+splinter: cryptography::cryptocurrencies
 sqlparser: parser-implementations
 ssb_parser: parser-implementations
 sse-codec: web-programming

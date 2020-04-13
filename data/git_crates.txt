@@ -61,7 +61,8 @@ github:eirproject/eir/libeir_tests
 github:electric-capital/crypto-ecosystems/crypto-ecosystems
 github:emu-rs/rustual-boy/rustual-boy-cli
 github:emu-rs/rustual-boy/rustual-boy-core
-github:facebook/hhvm/hack_oxidized
+github:facebook/hhvm/hh_codegen
+github:facebook/hhvm/oxidized
 github:facebookexperimental/mononoke/hgcli
 github:facebookexperimental/mononoke/mercurial
 github:facebookexperimental/mononoke/server
@@ -137,9 +138,8 @@ github:kuy/elevato-rs/elevators
 github:kvakvs/erlangrt/erlangrt
 github:kylewlacy/sorbet-cocoa/sorbet-cocoa
 github:kzen-networks/multi-party-eddsa/multi-party-ed25519
-github:libra/libra/client
-github:libra/libra/consensus
-github:libra/libra/executor
+github:libra/libra/libra-node
+github:libra/libra/libra-swarm
 github:libra/libra/libra-wallet
 github:librespot-org/librespot/librespot
 github:librespot-org/librespot/librespot-audio

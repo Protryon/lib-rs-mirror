@@ -48,7 +48,7 @@ lazy_static! {
         (Cond::Any(&["dlopen"]), &[("os", 1.2, 0.2), ("no-std", 0.3, 0.), ("config", 0.8, 0.)]),
         (Cond::Any(&["library"]), &[("games", 0.8, 0.), ("development-tools::cargo-plugins", 0.8, 0.)]),
         (Cond::Any(&["ios", "objective-c", "core-foundation"]), &[("os::macos-apis", 1.2, 0.1), ("no-std", 0.1, 0.)]),
-        (Cond::NotAny(&["ios", "objective-c", "objc", "obj-c", "objrs", "hfs", "osx", "os-x", "dylib", "mach", "xcode", "uikit", "appkit", "metal", "foundation", "macos", "mac", "apple", "cocoa", "core"]), &[("os::macos-apis", 0.8, 0.)]),
+        (Cond::NotAny(&["ios", "objective-c", "objc", "obj-c", "objrs", "hfs", "osx", "os-x", "dylib", "mach", "xcode", "uikit", "appkit", "metal", "foundation", "macos", "mac", "apple", "cocoa"]), &[("os::macos-apis", 0.8, 0.)]),
         (Cond::Any(&["linux", "freebsd", "openbsd", "netbsd", "dragonflybsd", "arch-linux", "pacman", "deb", "rpm"]),
             &[("os", 1.1, 0.), ("os::unix-apis", 1.4, 0.1), ("os::macos-apis", 0.2, 0.), ("os::windows-apis", 0.1, 0.)]),
         (Cond::Any(&["glib", "gobject", "gdk"]), &[("os", 1.1, 0.), ("os::unix-apis", 1.4, 0.1)]),

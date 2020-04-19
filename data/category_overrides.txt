@@ -88,6 +88,7 @@ cansi: parser-implementations
 capstone-sys: development-tools::debugging
 capstone3: development-tools::debugging
 captcha: web-programming
+carapax  : web-programming
 cargo-xbuild: development-tools::build-tools, development-tools::cargo-plugins
 casperlabs-contract-ffi: cryptography::cryptocurrencies
 casperlabs-contract: cryptography::cryptocurrencies
@@ -155,6 +156,7 @@ cvssrust: parser-implementations
 cxmr-util-servers : web-programming::http-server
 darling_core: development-tools::procedural-macro-helpers
 ddh: filesystem, command-line-utilities
+deadpool-redis : databases
 debug_finder: parser-implementations, command-line-utilities
 deckofcards: game-engines
 default-env: rust-patterns
@@ -248,6 +250,7 @@ fdfast: filesystem
 fec: encoding
 fedora-prime: os::unix-apis, command-line-utilities
 ff: algorithms
+filetime: filesystem
 fin_data: value-formatting
 finality-grandpa:cryptography::cryptocurrencies
 finchers-core: web-programming::http-server
@@ -306,6 +309,7 @@ getch: os
 giphy: web-programming
 girage: cryptography, gui
 github-rs: web-programming
+gitlab-ci-validate : development-tools
 global_counter: concurrency, development-tools::debugging
 glsl: rendering, parser-implementations
 glutin_cocoa: os::macos-apis
@@ -415,6 +419,7 @@ keychain-services: os::macos-apis, authentication
 kf-protocol-transport: asynchronous, network-programming
 kf-protocol: asynchronous, network-programming
 kf-socket: network-programming
+kickstart : development-tools, command-line-utilities
 kodict: internationalization
 kraken: authentication
 krates: visualization
@@ -483,6 +488,7 @@ makeflow: development-tools
 makepad-widget: web-programming
 makepad: text-editors
 mamba: parser-implementations
+marge : development-tools
 marionette: development-tools::testing
 markdust: text-processing
 matrix_bot_api: network-programming
@@ -533,6 +539,9 @@ near-bindgen:cryptography::cryptocurrencies
 near-rpc-error-macro:cryptography::cryptocurrencies
 near-runtime-fees: cryptography::cryptocurrencies
 near-runtime-fees:cryptography::cryptocurrencies
+near-sdk : cryptography::cryptocurrencies
+near-sdk-core : cryptography::cryptocurrencies
+near-sdk-macros : cryptography::cryptocurrencies
 near-sdk: cryptography::cryptocurrencies
 near-vm-errors: cryptography::cryptocurrencies
 near-vm-errors:cryptography::cryptocurrencies
@@ -614,9 +623,11 @@ polygraph: database-implementations
 pomodoro: command-line-utilities
 portaudio: os, multimedia::audio
 postscript: parser-implementations
+powerline-rs : development-tools, command-line-utilities
 ppg: command-line-utilities, authentication
 pq-sys: database
 preftool-env: config
+pretty: text-processing, command-line-interface
 proc-concat-bytes: data-structures, rust-patterns
 prodash: asynchronous, visualization
 project-cleanup: command-line-utilities, development-tools
@@ -653,6 +664,7 @@ redis-cluster: databases
 redisearch_api: databases
 releasetag: development-tools::debugging
 rendy-memory: memory-management
+repo-backup : development-tools, command-line-utilities
 repoutil: development-tools
 reproto-backend-csharp: encoding, development-tools::ffi
 reproto-backend-doc: encoding, development-tools::ffi
@@ -726,6 +738,7 @@ rxrust: asynchronous
 salad: command-line-utilities, authentication
 saml2aws-auto: authentication
 sample_planning: science::machine-learning, algorithms
+sass-sys: web-programming
 scan4df: command-line-utilities, filesystem
 scannit-core-ffi: development-tools::ffi
 scannit-core-ffi: hardware-support
@@ -806,7 +819,12 @@ tarkov: games
 tcalc: command-line-utilities
 tdo-core:command-line-interface
 tealdeer: command-line-utilities
+telegram-bot : web-programming
+telegram-bot-async  : web-programming
+telegram-bot-fork : web-programming
 telegram-client: web-programming
+telegram-typings  : web-programming
+telegrambot  : web-programming
 telnetify: network-programming
 teloxide: web-programming
 tempus_fugit: development-tools::profiling
@@ -822,6 +840,12 @@ tmux-thumbs: text-editors
 toks: parser-implementations, web-programming
 trackable: development-tools::debugging
 traitcast_core: rust-patterns
+trans-gen-core : development-tools
+trans-gen-go : development-tools
+trans-gen-java : development-tools
+trans-gen-ruby : development-tools
+trans-gen-scala : development-tools
+trans-schema : development-tools
 transit_model: filesystem
 trashmap: data-structures
 trie-db: rust-patterns

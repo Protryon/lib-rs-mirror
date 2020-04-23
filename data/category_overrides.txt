@@ -188,6 +188,7 @@ docx: parser-implementations, text-processing
 doryen-fov: game-engines
 doublepivot-quicksort: algorithms
 doubter: development-tools::testing
+duct: development-tools, command-line-utilities
 dull: command-line-utilities, command-line-interface
 dungen: game-engines
 duniter-keys: cryptography::cryptocurrencies
@@ -488,6 +489,7 @@ makeflow: development-tools
 makepad-widget: web-programming
 makepad: text-editors
 mamba: parser-implementations
+man: development-tools, text-processing
 marge : development-tools
 marionette: development-tools::testing
 markdust: text-processing
@@ -701,6 +703,7 @@ roadmap: data-structures
 roads-from-nd: multimedia::images
 robinhood: web-programming
 rocket-etag-if-none-match: web-programming::http-server
+roff: text-processing
 rojo: development-tools
 romodoro: command-line-utilities
 romy-core: game-engines

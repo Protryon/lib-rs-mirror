@@ -485,7 +485,7 @@ async fn handle_crate(req: HttpRequest) -> Result<HttpResponse, ServerError> {
         None => return render_404_page(state, &crate_name, "crate"),
     };
     let cache_file = state.page_cache_dir.join(format!("{}.html", crate_name));
-    Ok(serve_cached(with_file_cache(state, cache_file, 800, {
+    Ok(serve_cached(with_file_cache(state, cache_file, 600, {
         render_crate_page(state.clone(), origin)
     }).await?))
 }
@@ -504,7 +504,7 @@ async fn handle_crate_reverse_dependencies(req: HttpRequest) -> Result<HttpRespo
 
 async fn handle_new_trending(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let state: &AServerState = req.app_data().expect("appdata");
-    Ok(serve_cached(with_file_cache(state, state.page_cache_dir.join("_new_.html"), 900, {
+    Ok(serve_cached(with_file_cache(state, state.page_cache_dir.join("_new_.html"), 600, {
         let state = state.clone();
         run_timeout(60, async move {
             let crates = state.crates.load();

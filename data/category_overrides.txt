@@ -22,6 +22,7 @@ alphaid: encoding
 alphavantage: web-programming
 amath: parser-implementations
 anes: parser-implementations, command-line-interface
+anitomy-sys: parser-implementations
 anitomy: parser-implementations
 anybar_rs: os::macos-apis
 aocl: command-line-utilities
@@ -119,6 +120,7 @@ collider: science::math, game-engines
 collisions: algorithms
 colloquy: command-line-interface
 colorsys: multimedia::images
+comma: parser-implementations
 commoncrypto-sys: os::macos-apis
 commoncrypto: os::macos-apis, cryptography
 concurrent-hashmap: concurrency, data-structures
@@ -250,7 +252,9 @@ fddf: command-line-utilities, filesystem
 fdfast: filesystem
 fec: encoding
 fedora-prime: os::unix-apis, command-line-utilities
+festive: development-tools::testing
 ff: algorithms
+file_scanner: parser-implementations
 filetime: filesystem
 fin_data: value-formatting
 finality-grandpa:cryptography::cryptocurrencies
@@ -294,6 +298,7 @@ ga: science::machine-learning, algorithms
 galah: science
 gallop: parsing
 game-loop: game-engines
+ganit: development-tools, science::math
 gary-core: development-tools
 gaviota-sys: game-engines
 gcnctrlusb: hardware-support, emulators
@@ -316,12 +321,14 @@ glsl: rendering, parser-implementations
 glutin_cocoa: os::macos-apis
 glutin_core_foundation: rendering::graphics-api
 glx: rendering::graphics-api, os::unix-apis
+goblin: parser-implementations
 google_geocoding: science, web-programming
 gosh-core: science
 graftpress_core: web-programming
 grammarly: web-programming
 graphcore: data-structures
 graviton_core: development-tools
+grep_json_deserialize: parser-implementations
 grin-miner: cryptography::cryptocurrencies
 grin: cryptography::cryptocurrencies
 grin_api: cryptography::cryptocurrencies
@@ -351,6 +358,7 @@ holochain_locksmith:cryptography::cryptocurrencies
 holochain_logging:cryptography::cryptocurrencies
 holochain_metrics:cryptography::cryptocurrencies
 holochain_persistence_api:cryptography::cryptocurrencies
+holochain_serialized_bytes_derive: cryptography::cryptocurrencies
 httpdate: date-and-time, parser-implementations
 httpserv: development-tools, web-programming::http-server
 hubcaps: web-programming
@@ -395,11 +403,13 @@ iso639-1: internationalization
 iso639_2: internationalization
 iso8601-duration: date-and-time, parser-implementations
 iso_currency: internationalization
+java-desc: parser-implementations
 jeepers: science::machine-learning
 jokeyrhyme-dotfiles: development-tools
 json-tools: parser-implementations
 json2cbor: encoding, command-line-utilities
 jsonapi: web-programming
+jsonpath: parser-implementations
 jsonpath_lib: parser-implementations
 jsonrpc-client-core: parser-implementations
 jsonrpc-codec: web-programming
@@ -424,11 +434,13 @@ kickstart : development-tools, command-line-utilities
 kodict: internationalization
 kraken: authentication
 krates: visualization
+krita: parser-implementations
 krust_core: game-engines
 ktmpl: configuration
 kube: development-tools
 kurbo: science::math, rendering::graphics-api
 kx: development-tools
+languagetool: parser-implementations, text-processing
 lapp: parser-implementations
 lava_torrent: parser-implementations
 lcov: parser-implementations
@@ -466,6 +478,7 @@ loggify: development-tools::debugging
 loop-rs: command-line-utilities
 lsp-codec: asynchronous
 lttb: algorithms
+lua-patterns: parser-implementations
 lualexer: parser-implementations
 lumberjack-utils: data-structures, command-line-utilities
 lumberjack: data-structures
@@ -504,6 +517,7 @@ metar: parser-implementations
 mindjuice: emulators
 mine_sweeper: games
 minidump-processor:development-tools::debugging
+minidump: parser-implementations
 minimad: text-processing, parser-implementations
 miniquad: gui
 mlc: command-line-utilities, text-processing
@@ -518,6 +532,7 @@ moonlander-gp: science::machine-learning
 mothra: command-line-utilities
 mp3-duration-sum: command-line-utilities, multimedia::audio
 mqtt-codec: network-programming
+mqtt-packet: parser-implementations, network-programming
 mrt-rs: parser-implementations, network-programming
 msql-srv: database
 multiboot2: os
@@ -564,6 +579,8 @@ newrelic_plugin: web-programming
 newt: command-line-interface
 nite2-sys: science::machine-learning
 nokiahealth: databases
+nom-bibtex: parser-implementations
+nom_pem: parser-implementations, cryptography
 nordselect: network-programming, command-line-utilities
 notcurses: command-line-interface
 notes: command-line-utilities
@@ -662,6 +679,7 @@ reader_for_microxml: parser-implementations
 readmouse: os::macos-apis
 recloser: concurrency
 recoreco: command-line-utilities, science::machine-learning
+recursive_disassembler: parser-implementations, development-tools
 redis-cluster: databases
 redisearch_api: databases
 releasetag: development-tools::debugging
@@ -720,6 +738,7 @@ rpi-video-rs: hardware-support, multimedia::video
 rpm-rs: os, parser-implementations
 rqr: multimedia::images
 rsdb: database-implementations
+rsef-rs: parser-implementations
 rtm: concurrency, hardware-support, no-std
 rubrail: os::macos-apis
 rumq-core: network-programming
@@ -754,6 +773,7 @@ seahorse: command-line-interface
 sekai: science
 semantic-rs: development-tools
 semver-parser: parser-implementations
+serde-humanize-rs: parser-implementations, encoding
 serenium: development-tools::testing
 sfl_parser: parser-implementations
 sgf-parser: parser-implementations
@@ -894,6 +914,7 @@ varlociraptor: science
 vec3D: science::math
 veloren-launcher: games
 verba: text-processing, internationalization
+verilated: parser-implementations, hardware-support
 versionisator: development-tools::build-tools
 vfio-bindings: os::unix-apis
 vhdl_lang: development-tools
@@ -920,6 +941,7 @@ x86test: development-tools::testing
 xi-core-lib: text-editors
 xio_job_to_blockdiag: command-line-utilities
 xml-rs: parser-implementations, encoding
+xml_sax: parser-implementations, web-programming
 xmltree: parser-implementations
 xpc-connection: os::macos-apis
 yellowsun: cryptography::cryptocurrencies

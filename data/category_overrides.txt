@@ -312,6 +312,7 @@ geoplaces: science
 geoplaces: science, web-programming
 geos: science::math
 getch: os
+gifriend: multimedia::images
 giphy: web-programming
 girage: cryptography, gui
 github-rs: web-programming
@@ -403,6 +404,7 @@ iso639-1: internationalization
 iso639_2: internationalization
 iso8601-duration: date-and-time, parser-implementations
 iso_currency: internationalization
+ivyrust: networking
 java-desc: parser-implementations
 jeepers: science::machine-learning
 jokeyrhyme-dotfiles: development-tools
@@ -424,6 +426,7 @@ k2hash-sys: databases
 k8-client: rust-patterns
 k8s-openapi-codegen-common: rust-patterns
 k8s-openapi: development-tools
+kanji-number-parser: parser-implementations, internationalization
 kekbit-codecs: encoding
 ketos: development-tools
 keychain-services: os::macos-apis, authentication
@@ -498,6 +501,7 @@ mach: os::macos-apis
 magenta-sys: os
 magenta: os
 magic-wormhole: command-line-utilities, network-programming
+mailmap: email, parser-implementations
 makeflow: development-tools
 makepad-widget: web-programming
 makepad: text-editors
@@ -512,6 +516,7 @@ mediawiki: web-programming
 memorydb: database-implementations
 mermer-rs: text-processing, science
 meson: development-tools::build-tools
+message-meta: parser-implementations, text-processing
 metac: parser-implementations, development-tools
 metar: parser-implementations
 mindjuice: emulators
@@ -623,6 +628,7 @@ passclip: command-line-utilities
 pathfinder_geometry: science::math
 paw-attributes: development-tools::procedural-macro-helpers
 paw: parser-implementations
+pcap-rs : parser-implementations, network-programming
 pcd-rs: parser-implementations
 pdcurses-sys: command-line-interface
 perkv: database-implementations
@@ -662,6 +668,7 @@ pwasm-utils: cryptography::cryptocurrencies
 qeda: command-line-utilities
 qni-core-rs: web-programming::websocket
 quaternion_averager: science::math
+quick-protobuf: parser-implementations
 quicksort: algorithms
 quoted_printable: parser-implementations
 qupla: cryptography::cryptocurrencies
@@ -740,12 +747,14 @@ rqr: multimedia::images
 rsdb: database-implementations
 rsef-rs: parser-implementations
 rtm: concurrency, hardware-support, no-std
+rtps-idl-grammar: parser-implementations
 rubrail: os::macos-apis
 rumq-core: network-programming
 rusoto_credential: authentication
 rusp: network-programming
 rust-easy-router: web-programming::http-server
 rust_fixed_width: data-structures
+rusta: games, parser-implementations
 rustasm6502: emulators
 rustils: rust-patterns
 rustler_sys: development-tools::ffi
@@ -930,6 +939,7 @@ webidl: parser-implementations
 weighted-select: asynchronous
 wham: simulation
 wikipedia: web-programming
+witty: web-programming, science::machine-learning
 wlambda: parser-implementations
 wnck-sys: gui
 wooting-sdk: hardware-support

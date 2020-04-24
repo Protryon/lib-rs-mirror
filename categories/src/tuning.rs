@@ -177,7 +177,9 @@ lazy_static! {
         (Cond::Any(&["sanitizer", "nom"]), &[("parser-implementations", 1.3, 0.2), ("algorithms", 0.8, 0.), ("encoding", 0.8, 0.)]),
         (Cond::Any(&["tokenizer", "lexer", "parser", "jwt", "macro", "rpc"]), &[("encoding", 0.8, 0.), ("emulators", 0.6, 0.), ("rendering::graphics-api", 0.9, 0.)]),
 
-        (Cond::Any(&["tokenizer", "tokenize", "parser-combinators", "peg", "lalr", "yacc", "ll1", "lexer", "lex", "context-free", "grammars", "grammar"]),
+        (Cond::Any(&["tokenizer", "tokenize", "parser-combinators", "peg", "lalr", "yacc"]),
+            &[("parsing", 1.2, 0.1), ("parser-implementations", 0.8, 0.), ("os", 0.7, 0.), ("emulators", 0.7, 0.), ("internationalization", 0.8, 0.), ("games", 0.8, 0.)]),
+        (Cond::Any(&["combinator", "ll1", "lexer", "lex", "context-free", "grammars", "grammar"]),
             &[("parsing", 1.2, 0.1), ("parser-implementations", 0.8, 0.), ("os", 0.7, 0.), ("emulators", 0.7, 0.), ("internationalization", 0.8, 0.), ("games", 0.8, 0.)]),
         (Cond::All(&["parser", "generator"]), &[("parsing", 1.4, 0.3), ("parser-implementations", 0.9, 0.), ("gui", 0.5, 0.)]),
         (Cond::Any(&["backus–naur", "bnf"]), &[("parsing", 1.2, 0.), ("parser-implementations", 1.2, 0.)]),
@@ -610,7 +612,7 @@ lazy_static! {
             &[("network-programming", 1.1, 0.1), ("web-programming", 1.1, 0.1), ("parsing", 0.8, 0.), ("data-structures", 0.8, 0.),
             ("development-tools::procedural-macro-helpers", 0.7, 0.), ("rendering::graphics-api", 0.9, 0.)]),
         (Cond::Any(&["ip", "ipv6", "ipv4", "network", "internet"]), &[("network-programming", 1.2, 0.1), ("web-programming", 1.1, 0.), ("parsing", 0.8, 0.)]),
-        (Cond::Any(&["proxy", "networking", "cidr"]), &[("network-programming", 1.2, 0.1), ("web-programming", 1.1, 0.), ("parsing", 0.8, 0.)]),
+        (Cond::Any(&["proxy", "networking", "cidr"]), &[("network-programming", 1.2, 0.1), ("web-programming", 1.1, 0.), ("parsing", 0.5, 0.)]),
         (Cond::Any(&["http2", "http/2", "http", "https", "httpd", "tcp", "irc", "tcp-client", "multicast", "anycast", "bgp", "amazon", "aws", "amazon-s3", "cloud", "service"]),
             &[("network-programming", 1.1, 0.1), ("filesystem", 0.7, 0.), ("memory-management", 0.5, 0.), ("asynchronous", 0.8, 0.), ("algorithms", 0.8, 0.), ("text-processing", 0.8, 0.),
             ("command-line-interface", 0.5, 0.), ("development-tools::procedural-macro-helpers", 0.8, 0.), ("development-tools::build-utils", 0.6, 0.)]),
@@ -757,7 +759,7 @@ lazy_static! {
         (Cond::Any(&["perf", "performance", "optimizer"]), &[("development-tools::profiling", 1.2, 0.1), ("development-tools", 1.1, 0.)]),
         (Cond::Any(&["version"]), &[("development-tools::profiling", 0.8, 0.)]),
         (Cond::Any(&["bump", "changelog"]), &[("development-tools", 1.2, 0.), ("development-tools::profiling", 0.6, 0.)]),
-        (Cond::Any(&["git", "vcs"]), &[("development-tools", 1.1, 0.)]),
+        (Cond::Any(&["git", "vcs"]), &[("development-tools", 1.1, 0.), ("parsing", 0.6, 0.)]),
         (Cond::Any(&["sourcecode", "commit", "generates"]), &[("development-tools", 1.1, 0.)]),
         (Cond::Any(&["installer", "packages"]), &[("development-tools", 1.1, 0.), ("os", 1.1, 0.)]),
 
@@ -1059,7 +1061,7 @@ lazy_static! {
         (Cond::Any(&["protocol", "network", "socket", "wifi", "wi-fi"]), &[
             ("network-programming", 1.2, 0.2), ("parsing", 0.6, 0.), ("os::windows-apis", 0.9, 0.), ("rendering::data-formats", 0.4, 0.),
             ("command-line-utilities", 0.75, 0.), ("cryptography::cryptocurrencies", 0.8, 0.)]),
-        (Cond::Any(&["protobuf", "protocol-buffers", "proto"]), &[("network-programming", 1.2, 0.2), ("encoding", 1.2, 0.2), ("command-line-utilities", 0.75, 0.)]),
+        (Cond::Any(&["protobuf", "protocol-buffers", "proto"]), &[("network-programming", 1.2, 0.2), ("encoding", 1.2, 0.2), ("parsing", 0.4, 0.), ("command-line-utilities", 0.75, 0.)]),
         (Cond::All(&["protocol", "buffers"]), &[("network-programming", 1.2, 0.1), ("encoding", 1.2, 0.1)]),
         (Cond::Any(&["p2p", "digitalocean"]), &[("network-programming", 1.4, 0.2), ("command-line-utilities", 0.75, 0.), ("development-tools", 0.75, 0.), ("multimedia", 0.5, 0.)]),
 

@@ -246,7 +246,17 @@ pub fn find_versions(repo: &Repository) -> Result<PackageVersionTimestamps, fail
     Ok(package_versions)
 }
 
+
+fn is_alnum(q: &str) -> bool {
+    q.as_bytes().iter().copied().all(|c| c.is_ascii_alphanumeric() || c == b'_' || c == b'-')
+}
+
 fn add_package(package_versions: &mut PackageVersionTimestamps, pkg: Package, commit: &Commit) {
+    if pkg.name.is_empty() || !is_alnum(&pkg.name) {
+        eprintln!("bad crate name {}", pkg.name);
+        return;
+    }
+
     // Find oldest occurence of each version, assuming it's a release date
     let time_epoch = commit.time().seconds();
     let ver_time = package_versions.entry(pkg.name).or_insert_with(HashMap::new)

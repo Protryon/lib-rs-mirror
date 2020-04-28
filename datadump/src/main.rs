@@ -17,18 +17,29 @@ use std::io::BufReader;
 use std::io::Read;
 use tar::Archive;
 
-const NUM_CRATES: usize = 40000;
+const NUM_CRATES: usize = 42000;
 type BoxErr = Box<dyn std::error::Error + Sync + Send>;
 
 #[tokio::main]
 async fn main() -> Result<(), BoxErr> {
+    let path = std::env::args_os().nth(1);
+
     tokio::runtime::Handle::current().spawn(async move {
         let handle = tokio::runtime::Handle::current();
-        /// I can't be bothered to make async stream adapter to make async body impl Read
-        let res = reqwest::blocking::get("https://static.crates.io/db-dump.tar.gz")?;
-        let res = BufReader::with_capacity(256_000_000, res);
-        let mut a = Archive::new(Decoder::new(res)?);
         let ksink = KitchenSink::new_default().await?;
+        let mut tmp1;
+        let mut tmp2;
+        let src: &mut dyn Read = if let Some(path) = path {
+            eprintln!("Loading local");
+            tmp1 = std::fs::File::open(path)?;
+            &mut tmp1
+        } else {
+            // I can't be bothered to make async stream adapter to make async body impl Read
+            tmp2 = reqwest::blocking::get("https://static.crates.io/db-dump.tar.gz")?;
+            &mut tmp2
+        };
+        let res = BufReader::with_capacity(8_000_000, src);
+        let mut a = Archive::new(Decoder::new(res)?);
 
         tokio::task::block_in_place(move || {
             let mut crate_owners = None;
@@ -76,7 +87,21 @@ async fn main() -> Result<(), BoxErr> {
                             eprintln!("parse_versions…");
                             versions = Some(parse_versions(file)?);
                         },
-                        p => eprintln!("Ignored file {}", p),
+                        "dependencies.csv" => {
+                            eprintln!("parse_dependencies");
+                            dependencies = Some(parse_dependencies(file)?);
+                        },
+                        // expected ignored
+                        "reserved_crate_names.csv" | // not publishing any
+                        "version_authors.csv" | // is in index
+                        "badges.csv" | // got from cargo.tomls
+                        "crates_categories.csv" | // got better data than this
+                        "crates_keywords.csv" | "keywords.csv" | // got better data than this
+                        "categories.csv" | // got my own categories
+                        "metadata.json" | "README.md" | // not relevant
+                        "import.sql" | "export.sql" | "schema.sql" // NoSQL
+                        => eprintln!("skip"),
+                        p => eprintln!("Ignored unexpected file {}", p),
                     };
 
                     if let (Some(crates), Some(versions)) = (&crates, &versions) {
@@ -316,7 +341,7 @@ fn parse_users(file: impl Read) -> Result<Users, BoxErr> {
     Ok(out)
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct CrateVersionRow {
     crate_id: u32,
     crate_size: Option<u64>,

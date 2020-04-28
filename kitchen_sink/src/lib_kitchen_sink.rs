@@ -1972,6 +1972,9 @@ impl KitchenSink {
     /// Direct reverse dependencies, but with release dates (when first seen or last used)
     pub fn depender_changes(&self, origin: &Origin) -> CResult<Vec<DependerChangesMonthly>> {
         let daily_changes = self.depender_changes.get(origin.to_str().as_str())?.unwrap_or_default();
+        if daily_changes.is_empty() {
+            return Ok(Vec::new());
+        }
 
         // We're going to use weirdo 30-day months, with excess going into december
         // which makes data more even and pads the December's holiday drop a bit

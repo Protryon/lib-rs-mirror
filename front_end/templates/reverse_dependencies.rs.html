@@ -18,6 +18,35 @@
   </header>
   <main>
     <div class="inner-col">
+      @if let Some((g, years)) = p.changes_graph() {
+        <div class="active-users @if g.len() >= 48 {big}"><table>
+          <caption><strong>Active</strong> direct dependers over time: total, gained/lost</caption>
+          <tr class=total>
+            @for ch in &g {
+              <td>@if !ch.label_inside {<span>@ch.running_total</span>}
+                @if ch.running_total > 0 {<div class="@if ch.added > ch.removed {gaining} @if ch.added < ch.removed {losing}"
+                    style="width: @(ch.width)px; height: @(ch.running_totals_height)px">@if ch.label_inside {<span>@ch.running_total</span>}</div>}
+              </td>
+            }
+          </tr>
+          <tr>
+            @for (year, colspan) in years {
+              <th colspan=@colspan @if colspan < 8 {class="partial"}>@if colspan > 2 {@year}</th>
+            }
+          </tr>
+          <tr class=added>
+            @for ch in &g {
+              <td>@if ch.added_height > 0 {<div style="width: @(ch.width)px; height: @(ch.added_height-1)px"></div>}</td>
+            }
+          </tr>
+          <tr class=removed>
+            @for ch in &g {
+              <td>@if ch.removed_height > 0 {<div style="width: @(ch.width)px; height: @(ch.removed_height-1)px"></div>}</td>
+            }
+          </tr>
+        </table></div>
+      }
+
       @if let Some(stats) = p.stats {
         <p>
           @if stats.runtime.all() > 0 {

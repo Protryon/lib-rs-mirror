@@ -1970,8 +1970,47 @@ impl KitchenSink {
     }
 
     /// Direct reverse dependencies, but with release dates (when first seen or last used)
-    pub fn depender_changes(&self, origin: &Origin) -> CResult<Vec<DependerChanges>> {
-        Ok(self.depender_changes.get(origin.to_str().as_str())?.unwrap_or_default())
+    pub fn depender_changes(&self, origin: &Origin) -> CResult<Vec<DependerChangesMonthly>> {
+        let daily_changes = self.depender_changes.get(origin.to_str().as_str())?.unwrap_or_default();
+
+        // We're going to use weirdo 30-day months, with excess going into december
+        // which makes data more even and pads the December's holiday drop a bit
+        let mut by_week = HashMap::with_capacity(daily_changes.len());
+        for d in &daily_changes {
+            let w = by_week.entry((d.at.y, (d.at.o/30).min(11))).or_insert(DependerChangesMonthly {
+                year: d.at.y,
+                month0: (d.at.o/30).min(11),
+                added: 0,
+                removed: 0,
+                running_total: 0,
+            });
+            w.added += d.added as u32;
+            w.removed += d.removed as u32;
+        }
+
+        let first = &daily_changes[0];
+        let last = daily_changes.last().unwrap();
+        let mut curr = (first.at.y, (first.at.o/30).min(11));
+        let end = (last.at.y, (last.at.o/30).min(11));
+        let mut weekly = Vec::with_capacity(by_week.len());
+        let mut running_total = 0;
+        while curr <= end {
+            let mut e = by_week.get(&curr).copied().unwrap_or(DependerChangesMonthly {
+                year: curr.0, month0: curr.1,
+                added: 0, removed: 0,
+                running_total,
+            });
+            running_total += e.added;
+            running_total -= e.removed;
+            e.running_total = running_total;
+            weekly.push(e);
+            curr.1 += 1;
+            if curr.1 > 11 {
+                curr.0 += 1;
+                curr.1 = 0;
+            }
+        }
+        Ok(weekly)
     }
 
     pub async fn index_crates_io_crate_owners(&self, origin: &Origin, mut owners: Vec<CrateOwner>) -> CResult<()> {
@@ -2298,6 +2337,15 @@ pub struct DependerChanges {
     pub at: MiniDate,
     pub added: u16,
     pub removed: u16,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct DependerChangesMonthly {
+    pub year: u16,
+    pub month0: u16,
+    pub added: u32,
+    pub removed: u32,
+    pub running_total: u32,
 }
 
 #[test]

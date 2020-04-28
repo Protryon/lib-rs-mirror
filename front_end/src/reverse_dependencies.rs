@@ -4,6 +4,7 @@ use kitchen_sink::KitchenSink;
 use kitchen_sink::Origin;
 use kitchen_sink::RevDependencies;
 use kitchen_sink::SemVer;
+use kitchen_sink::DependerChangesMonthly;
 use locale::Numeric;
 use render_readme::Renderer;
 
@@ -18,6 +19,7 @@ pub struct CratePageRevDeps<'a> {
     pub stats: Option<&'a RevDependencies>,
     pub has_download_columns: bool,
     downloads_by_ver: Vec<(SemVer, u32)>,
+    changes: Vec<DependerChangesMonthly>,
 }
 
 pub struct RevDepInf<'a> {
@@ -41,6 +43,20 @@ pub struct DlRow {
     pub dl_str: (String, &'static str),
     pub dl_perc: f32,
     pub dl_num_width: f32,
+}
+
+pub struct ChangesEntry {
+    pub running_total: u32,
+    pub added: u32,
+    pub removed: u32,
+
+    pub width: u16,
+    pub running_totals_height: u16,
+    pub added_height: u16,
+    pub removed_height: u16,
+    pub year: u16,
+
+    pub label_inside: bool,
 }
 
 impl<'a> CratePageRevDeps<'a> {
@@ -93,12 +109,14 @@ impl<'a> CratePageRevDeps<'a> {
         }
         let has_download_columns = deps.iter().any(|d| d.rev_dep_count > 0 || d.downloads > 100);
 
+        let changes = kitchen_sink.depender_changes(ver.origin())?;
         Ok(Self {
             ver,
             deps,
             stats,
             downloads_by_ver,
             has_download_columns,
+            changes,
         })
     }
 
@@ -205,6 +223,52 @@ impl<'a> CratePageRevDeps<'a> {
             i.dl_num_width = 4. + 7. * (i.dl_str.0.len() + i.dl_str.1.len()) as f32; // approx visual width of the number
         }
         ver
+    }
+
+    /// entries + year and colspan
+    pub fn changes_graph(&self) -> Option<(Vec<ChangesEntry>, Vec<(u16, u16)>)> {
+        let total_max = self.changes.iter().map(|c| c.running_total).max().unwrap_or(0).max(1);
+
+        let good_data = (self.changes.len() >= 12 && total_max >= 15) || (self.changes.len() >= 6 && total_max >= 100);
+        if !good_data {
+            return None;
+        }
+
+        let added_removed_max = self.changes.iter().map(|c| c.added.max(c.removed)).max().unwrap_or(0).max(18);
+
+        let adds_chart_height = 20;
+        let totals_chart_height = 80;
+        let width = (800 / self.changes.len()).max(1).min(30) as _;
+
+        let entries: Vec<_> = self.changes.iter().map(|ch| {
+            let running_totals_height = (ch.running_total * totals_chart_height) as f64 / total_max.max(50) as f64;
+            ChangesEntry {
+                running_total: ch.running_total,
+                added: ch.added,
+                removed: ch.removed,
+                width,
+                running_totals_height: running_totals_height.round() as _,
+                added_height: (ch.added * adds_chart_height / added_removed_max) as _,
+                removed_height: (ch.removed * adds_chart_height / added_removed_max) as _,
+                year: ch.year,
+
+                label_inside: ((ch.running_total as f64).log10().ceil() * 5.8 + 7.) < running_totals_height,
+            }
+        }).collect();
+
+        let mut years = Vec::with_capacity(entries.len()/12+1);
+        let mut curr_year = entries[0].year;
+        let mut curr_year_months = 0;
+        for e in &entries {
+            if curr_year != e.year {
+                years.push((curr_year, curr_year_months));
+                curr_year = e.year;
+                curr_year_months = 0;
+            }
+            curr_year_months += 1;
+        }
+        years.push((curr_year, curr_year_months));
+        Some((entries, years))
     }
 
     pub fn page(&self) -> Page {

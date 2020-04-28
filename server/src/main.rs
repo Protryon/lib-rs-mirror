@@ -90,6 +90,7 @@ async fn run_server() -> Result<(), failure::Error> {
     let rt = tokio::runtime::Builder::new()
         .threaded_scheduler()
         .enable_all()
+        .core_threads(2)
         .max_threads(8)
         .thread_name("server-bg")
         .build()

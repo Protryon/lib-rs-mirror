@@ -1964,7 +1964,6 @@ impl KitchenSink {
 
     /// Direct reverse dependencies, but with release dates (when first seen or last used)
     pub fn index_dependers_liveness_ranges(&self, origin: &Origin, ranges: Vec<DependerChanges>) -> CResult<()> {
-        eprintln!("indexing {}: {:?}", origin.to_str(), ranges.iter().fold(0, |s, e| s + e.added - e.removed));
         self.depender_changes.set(origin.to_str(), ranges)?;
         Ok(())
     }

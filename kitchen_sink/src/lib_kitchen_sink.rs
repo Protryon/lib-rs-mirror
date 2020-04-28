@@ -171,6 +171,7 @@ pub struct KitchenSink {
     yearly: AllDownloads,
     category_overrides: HashMap<String, Vec<Cow<'static, str>>>,
     crates_io_owners_cache: TempCache<Vec<CrateOwner>>,
+    depender_changes: TempCache<Vec<DependerChanges>>,
     throttle: tokio::sync::Semaphore,
     data_path: PathBuf,
 }
@@ -214,6 +215,7 @@ impl KitchenSink {
             main_cache_dir,
             category_overrides: Self::load_category_overrides(&data_path.join("category_overrides.txt"))?,
             crates_io_owners_cache: TempCache::new(&data_path.join("cio-owners.tmp"))?,
+            depender_changes: TempCache::new(&data_path.join("deps-changes.tmp"))?,
             throttle: tokio::sync::Semaphore::new(40),
             data_path: data_path.into(),
         })
@@ -1960,6 +1962,18 @@ impl KitchenSink {
         }
     }
 
+    /// Direct reverse dependencies, but with release dates (when first seen or last used)
+    pub fn index_dependers_liveness_ranges(&self, origin: &Origin, ranges: Vec<DependerChanges>) -> CResult<()> {
+        eprintln!("indexing {}: {:?}", origin.to_str(), ranges.iter().fold(0, |s, e| s + e.added - e.removed));
+        self.depender_changes.set(origin.to_str(), ranges)?;
+        Ok(())
+    }
+
+    /// Direct reverse dependencies, but with release dates (when first seen or last used)
+    pub fn depender_changes(&self, origin: &Origin) -> CResult<Vec<DependerChanges>> {
+        Ok(self.depender_changes.get(origin.to_str().as_str())?.unwrap_or_default())
+    }
+
     pub async fn index_crates_io_crate_owners(&self, origin: &Origin, mut owners: Vec<CrateOwner>) -> CResult<()> {
         for o in &mut owners {
             if o.github_id == o.invited_by_github_id {
@@ -2255,6 +2269,35 @@ impl<'a> CrateAuthor<'a> {
             "?anon?"
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Hash, Deserialize, Ord, Eq, PartialEq, PartialOrd)]
+pub struct MiniDate {
+    /// year
+    y: u16,
+    /// ordinal (day of year)
+    o: u16,
+}
+
+impl MiniDate {
+    pub fn new(from: Date<Utc>) -> Self {
+        Self {
+            y: from.year() as u16,
+            o: from.ordinal0() as u16,
+        }
+    }
+
+    pub fn next_year(mut self) -> Self {
+        self.y += 1;
+        self
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct DependerChanges {
+    pub at: MiniDate,
+    pub added: u16,
+    pub removed: u16,
 }
 
 #[test]

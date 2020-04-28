@@ -1,9 +1,12 @@
 #![allow(unused)]
 #![allow(dead_code)]
+use std::collections::HashSet;
 use chrono::prelude::*;
 use kitchen_sink::CrateOwner;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::Origin;
+use kitchen_sink::MiniDate;
+use kitchen_sink::DependerChanges;
 use kitchen_sink::OwnerKind;
 use libflate::gzip::Decoder;
 use serde_derive::Deserialize;
@@ -35,6 +38,7 @@ async fn main() -> Result<(), BoxErr> {
             let mut users = None;
             let mut downloads = None;
             let mut versions = None;
+            let mut dependencies = None;
 
             for file in a.entries()? {
                 let file = file?;
@@ -74,6 +78,15 @@ async fn main() -> Result<(), BoxErr> {
                         },
                         p => eprintln!("Ignored file {}", p),
                     };
+
+                    if let (Some(crates), Some(versions)) = (&crates, &versions) {
+                        if let Some(dependencies) = dependencies.take() {
+                            eprintln!("Indexing dependencies for {} crates", dependencies.len());
+                            index_dependencies(crates, versions, &dependencies, &ksink)?;
+                        }
+                    }
+
+
                     if let (Some(crates), Some(versions)) = (&crates, &versions) {
                         if let Some(downloads) = downloads.take() {
                             eprintln!("Indexing {} crates, {} versions, {} downloads", crates.len(), versions.len(), downloads.len());
@@ -84,8 +97,8 @@ async fn main() -> Result<(), BoxErr> {
             }
 
             if let (Some(crates), Some(teams), Some(users)) = (crates, teams, users) {
-                        if let Some(crate_owners) = crate_owners.take() {
-                            eprintln!("Indexing owners of {} crates", crate_owners.len());
+                if let Some(crate_owners) = crate_owners.take() {
+                    eprintln!("Indexing owners of {} crates", crate_owners.len());
                     handle.spawn(async move {
                         index_owners(&crates, crate_owners, &teams, &users, &ksink).await.unwrap();
                     });
@@ -115,6 +128,70 @@ fn index_downloads(crates: &CratesMap, versions: &VersionsMap, downloads: &Versi
         } else {
             eprintln!("Bad crate? {} {}", crate_id, name);
         }
+    }
+    Ok(())
+}
+
+/// Direct reverse dependencies, but with release dates (when first seen or last used)
+#[inline(never)]
+fn index_dependencies(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDepsMap, ksink: &KitchenSink) -> Result<(), BoxErr> {
+    let mut deps_changes = HashMap::with_capacity(crates.len());
+
+    for (crate_id, name) in crates {
+
+        if let Some(vers) = versions.get(crate_id) {
+            let mut from_oldest: Vec<_> = vers.iter().filter_map(|v| {
+                date_from_str(&v.created_at).ok().map(|date| (v.id, MiniDate::new(date)))
+            }).collect();
+            from_oldest.sort_by_key(|a| a.0);
+
+            let mut over_time = HashMap::new();
+            let last_idx = from_oldest.len()-1;
+            for (idx, (ver_id, release_date)) in from_oldest.into_iter().enumerate() {
+                // out of order versions (1.1.1 released after 2.0.0) are not an issue
+                // because we only mark deps as still-used, not explicit removals based on diffs
+                //
+                // ..except the last one :(
+                let end_date = if idx == last_idx {
+                    release_date.next_year()
+                } else {
+                    release_date
+                };
+
+                for &dep_id in deps.get(&ver_id).map(Vec::as_slice).unwrap_or_default() {
+                    if dep_id == *crate_id {
+                        // libcpocalypse semver trick - not relevant
+                        continue;
+                    }
+
+                    // (first seen, last seen)
+                    over_time.entry(dep_id).or_insert((release_date, end_date)).1 = end_date;
+                }
+            }
+
+            for (dep_id, first_last) in over_time {
+                deps_changes.entry(dep_id).or_insert_with(Vec::new).push(first_last);
+            }
+        } else {
+            eprintln!("Bad crate? {} {}", crate_id, name);
+        }
+    }
+
+    for (crate_id, uses) in deps_changes {
+        let name = crates.get(&crate_id).expect("bork crate");
+        let today = MiniDate::new(Utc::today());
+        let mut by_day = HashMap::with_capacity(uses.len()*2);
+        for (first, last) in uses {
+            by_day.entry(first).or_insert(DependerChanges {at: first, added:0, removed:0}).added += 1;
+            if last <= today {
+                by_day.entry(last).or_insert(DependerChanges {at: last, added:0, removed:0}).removed += 1;
+            }
+        }
+        let mut by_day: Vec<_> = by_day.values().copied().collect();
+        by_day.sort_by_key(|a| a.at);
+
+        let origin = Origin::from_crates_io_name(name);
+        ksink.index_dependers_liveness_ranges(&origin, by_day);
     }
     Ok(())
 }
@@ -270,6 +347,13 @@ fn parse_versions(mut file: impl Read) -> Result<VersionsMap, BoxErr> {
 
 type VersionDownloads = HashMap<u32, Vec<(Date<Utc>, u32)>>;
 
+fn date_from_str(date: &str) -> Result<Date<Utc>, std::num::ParseIntError> {
+    let y = date[0..4].parse()?;
+    let m = date[5..7].parse()?;
+    let d = date[8..10].parse()?;
+    Ok(Utc.ymd(y, m, d))
+}
+
 #[inline(never)]
 fn parse_version_downloads(mut file: impl Read) -> Result<VersionDownloads, BoxErr> {
     let mut csv = csv::ReaderBuilder::new().has_headers(true).flexible(false).from_reader(file);
@@ -277,14 +361,10 @@ fn parse_version_downloads(mut file: impl Read) -> Result<VersionDownloads, BoxE
     for r in csv.records() {
         let r = r?;
         let mut r = r.iter();
-        let date = r.next().ok_or("no date")?;
-        let y = date[0..4].parse()?;
-        let m = date[5..7].parse()?;
-        let d = date[8..10].parse()?;
-        let date = Utc.ymd(y, m, d);
+        let date = date_from_str(r.next().ok_or("no date")?)?;
         let downloads = r.next().and_then(|s| s.parse().ok()).ok_or("bad dl")?;
         let version_id = r.next().and_then(|s| s.parse().ok()).ok_or("bad dl")?;
-        out.entry(version_id).or_insert_with(Vec::new).push((date, downloads));
+        out.entry(version_id).or_insert_with(|| Vec::with_capacity(365*4)).push((date, downloads));
     }
     Ok(out)
 }
@@ -307,6 +387,23 @@ fn parse_crates(file: impl Read) -> Result<CratesMap, BoxErr> {
         let id: u32 = r.get(5).and_then(|s| s.parse().ok()).ok_or("bad record")?;
         let name = r.get(7).ok_or("bad record")?;
         out.insert(id, name.to_owned());
+    }
+    Ok(out)
+}
+
+/// version ID depends on crate ID
+type CrateDepsMap = HashMap<u32, Vec<u32>>;
+
+#[inline(never)]
+fn parse_dependencies(file: impl Read) -> Result<CrateDepsMap, BoxErr> {
+    // crate_id,default_features,features,id,kind,optional,req,target,version_id
+    let mut csv = csv::ReaderBuilder::new().has_headers(true).flexible(false).from_reader(file);
+    let mut out = HashMap::with_capacity(NUM_CRATES);
+    for r in csv.records() {
+        let r = r?;
+        let crate_id: u32 = r.get(0).and_then(|s| s.parse().ok()).ok_or("bad record")?;
+        let version_id: u32 = r.get(8).and_then(|s| s.parse().ok()).ok_or("bad record")?;
+        out.entry(version_id).or_insert_with(Vec::new).push(crate_id);
     }
     Ok(out)
 }

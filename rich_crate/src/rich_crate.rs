@@ -45,3 +45,14 @@ impl RichCrate {
         &self.versions
     }
 }
+
+/// Rev dependencies added/removed given month
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct DependerChangesMonthly {
+    pub year: u16,
+    pub month0: u16,
+    pub added: u32,
+    pub removed: u32,
+    /// total of +adds-removes until now
+    pub running_total: u32,
+}

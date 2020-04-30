@@ -34,6 +34,7 @@ pub use rich_crate::Origin;
 pub use rich_crate::RichCrate;
 pub use rich_crate::RichCrateVersion;
 pub use rich_crate::RichDep;
+pub use rich_crate::DependerChangesMonthly;
 pub use rich_crate::{Cfg, Target};
 pub use semver::Version as SemVer;
 
@@ -2339,15 +2340,6 @@ pub struct DependerChanges {
     pub at: MiniDate,
     pub added: u16,
     pub removed: u16,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct DependerChangesMonthly {
-    pub year: u16,
-    pub month0: u16,
-    pub added: u32,
-    pub removed: u32,
-    pub running_total: u32,
 }
 
 #[test]

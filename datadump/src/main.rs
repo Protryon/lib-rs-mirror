@@ -165,22 +165,38 @@ fn index_dependencies(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDe
     for (crate_id, name) in crates {
 
         if let Some(vers) = versions.get(crate_id) {
-            let mut from_oldest: Vec<_> = vers.iter().filter_map(|v| {
-                date_from_str(&v.created_at).ok().map(|date| (v.id, MiniDate::new(date)))
+            let mut releases_from_oldest: Vec<_> = vers.iter().filter_map(|v| {
+                date_from_str(&v.created_at).ok().map(|date| (v.id, MiniDate::new(date), &v.num))
             }).collect();
-            from_oldest.sort_by_key(|a| a.0);
+            releases_from_oldest.sort_by_key(|a| a.0);
 
             let mut over_time = HashMap::new();
-            let last_idx = from_oldest.len()-1;
-            for (idx, (ver_id, release_date)) in from_oldest.into_iter().enumerate() {
-                // out of order versions (1.1.1 released after 2.0.0) are not an issue
-                // because we only mark deps as still-used, not explicit removals based on diffs
-                //
-                // ..except the last one :(
-                let end_date = if idx == last_idx {
-                    release_date.next_year()
+            let mut releases = releases_from_oldest.iter().peekable();
+            while let Some(&(ver_id, release_date, version_str)) = releases.next() {
+                let end_date = if let Some(&&(_, next_release_date, _)) = releases.peek() {
+                    // if the next releases is going to drop it, then attribute drop date
+                    // to some time between the releases
+                    release_date.half_way(next_release_date)
                 } else {
-                    release_date
+                    // it's the final release, so relevance is now until the death of the crate.
+                    //
+                    // approximate how junky or stable the crate is
+                    // assuming that experimental versions get abandoned quickly
+                    // and 1.x are relevant for longer
+                    //
+                    // FIXME: this logic should be unified with ranking
+                    let junk = version_str.as_str() == "0.1.0";
+                    let unstable = version_str.starts_with("0.");
+                    let days_fresh = if junk {
+                        30*2
+                    } else if unstable && releases_from_oldest.len() < 3 {
+                        30*6
+                    } else if unstable {
+                        365
+                    } else {
+                        365*2
+                    };
+                    release_date.days_later(days_fresh)
                 };
 
                 for &dep_id in deps.get(&ver_id).map(Vec::as_slice).unwrap_or_default() {

@@ -2328,10 +2328,33 @@ impl MiniDate {
         }
     }
 
-    pub fn next_year(mut self) -> Self {
-        self.y += 1;
-        self
+    /// Screw leap years
+    pub fn days_later(self, days: i32) -> Self {
+        let n = self.y as i32 * 365 + self.o as i32 + days;
+        let y = (n/365) as u16;
+        let o = (n%365) as u16;
+        Self {
+            y, o
+        }
     }
+
+    pub fn half_way(self, other: Self) -> Self {
+        let diff = (other.y as i32 - self.y as i32) * 365 + (other.o as i32 - self.o as i32);
+        self.days_later(diff/2)
+    }
+}
+
+#[test]
+fn minidate() {
+    let a = MiniDate::new(Utc.ymd(2020,2,2));
+    let b = MiniDate::new(Utc.ymd(2024,4,4));
+    let c = MiniDate::new(Utc.ymd(2022,3,5));
+    assert_eq!(c, a.half_way(b));
+
+    let d = MiniDate::new(Utc.ymd(1999,12,31));
+    let e = MiniDate::new(Utc.ymd(2000,1,1));
+    assert_eq!(e, d.days_later(1));
+    assert_eq!(d, e.days_later(-1));
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]

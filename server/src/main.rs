@@ -431,12 +431,14 @@ async fn handle_debug(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     if !cfg!(debug_assertions) {
         Err(failure::err_msg("off"))?
     }
-
-    let state: &AServerState = req.app_data().expect("appdata");
     let origin = get_origin_from_subpath(req.match_info()).ok_or(failure::format_err!("boo"))?;
-    let mut page: Vec<u8> = Vec::with_capacity(32000);
+    let state: &AServerState = req.app_data().expect("appdata");
     let crates = state.crates.load();
-    let ver = crates.rich_crate_version_async(&origin).await?;
+    let crates2 = Arc::clone(&crates);
+    let ver = rt_run_timeout(&state.rt, 10, async move {
+        crates2.rich_crate_version_async(&origin).await
+    }).await?;
+    let mut page: Vec<u8> = Vec::with_capacity(32000);
     front_end::render_debug_page(&mut page, &ver, &crates)?;
     Ok(HttpResponse::Ok()
         .content_type("text/html;charset=UTF-8")

@@ -128,25 +128,36 @@ async fn run_server() -> Result<(), failure::Error> {
         let start_time = start_time.clone();
         let timestamp = timestamp.clone();
         async move {
+            let mut last_reload = Instant::now();
             state.crates.load().prewarm().await;
             loop {
                 tokio::time::delay_for(Duration::from_secs(1)).await;
                 let elapsed = start_time.elapsed().as_secs() as u32;
                 timestamp.store(elapsed, Ordering::SeqCst);
-                if 1 == HUP_SIGNAL.swap(0, Ordering::SeqCst) {
+                let should_reload = if 1 == HUP_SIGNAL.swap(0, Ordering::SeqCst) {
                     println!("HUP!");
+                    true
+                } else if last_reload.elapsed() > Duration::from_secs(30*60) {
+                    println!("Reloading state on a timer");
+                    true
+                } else {
+                    false
+                };
+                if should_reload {
+                    last_reload = Instant::now();
                     match KitchenSink::new(&data_dir, &github_token).await {
                         Ok(k) => {
                             state.crates.load().cleanup();
                             let k = Arc::new(k);
-                            tokio::task::spawn({
+                            let _ = tokio::task::spawn({
                                 let k = k.clone();
                                 async move {
                                     k.update().await
                                 }
-                            });
+                            }).await;
                             state.crates.store(k);
-                            state.crates.load().prewarm().await
+                            println!("Reloaded state");
+                            state.crates.load().prewarm().await;
                         },
                         Err(e) => {
                             eprintln!("Refresh failed: {}", e);

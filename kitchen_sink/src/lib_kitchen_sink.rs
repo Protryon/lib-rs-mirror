@@ -1262,7 +1262,7 @@ impl KitchenSink {
     }
 
     pub async fn update(&self) {
-        let _ = futures::join!(self.index.update(), self.index.deps_stats());
+        self.index.update().await;
     }
 
     #[inline]

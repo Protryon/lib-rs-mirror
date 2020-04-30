@@ -175,6 +175,12 @@ github:mdreem/dreetris/dreetris
 github:mesalock-linux/mesalink/mesalink
 github:mgattozzi/haskellrs/haskellrs
 github:mgattozzi/rushs/rushs
+github:microsoft/electionguard-verifier/electionguard_verify
+github:microsoft/inno-updater/inno_updater
+github:microsoft/winrt-rs/winmd
+github:microsoft/winrt-rs/winmd_macros
+github:microsoft/winrt-rs/winrt
+github:microsoft/winrt-rs/winrt_macros
 github:millardjn/rusty_sr/rusty_sr
 github:mmstick/concurr/concurr
 github:mohanson/gameboy/gameboy
@@ -261,6 +267,10 @@ github:remacs/remacs/remacs-bindings
 github:remacs/remacs/remacs-lib
 github:robey/c3r3s/fling
 github:robey/pack4x5/pack4x5
+github:robmikh/goldsrc-asset-viewer/goldsrc-asset-viewer
+github:robmikh/goldsrc-asset-viewer/mdlparser
+github:robmikh/goldsrc-asset-viewer/wad3parser
+github:robmikh/minesweeper-rs/minesweeper-rs
 github:rsaarelm/magog/magog
 github:rsaarelm/magog/vitral
 github:ruffle-rs/ruffle/ruffle_core

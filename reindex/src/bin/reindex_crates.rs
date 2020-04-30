@@ -267,22 +267,10 @@ async fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrat
         temp_inp.downloads_per_month_minus_most_downloaded_user = downloads_per_month.saturating_sub(biggest as u32);
     }
 
-    let removals_divisor = if let Some(removals_weighed) = crates.crate_removals(k.origin()).await {
-        // count some indirect/optional deps in case removals have been due to moving the crate behind another facade
-        // +20 is a fudge factor to smooth out nosiy data for rarely used crates.
-        // We don't care about small amount of removals, only mass exodus from big dead crates.
-        let effective_rev_deps = 20. + (direct_rev_deps as f64).max(indirect_reverse_optional_deps as f64 / 5.);
-        let removals_ratio = removals_weighed / (effective_rev_deps * 3.);
-        // if it's used more than removed, ratio < 1 is fine.
-        removals_ratio.max(1.).min(3.)
-    } else {
-        1.
-    };
-
     let temp_score = ranking::crate_score_temporal(&temp_inp);
     let temp_score = temp_score.total();
 
-    let mut score = (base_score + temp_score) * 0.5 / removals_divisor;
+    let mut score = (base_score + temp_score) * 0.5;
 
     // there's usually a non-macro/non-sys sibling
     if k.is_proc_macro() || k.is_sys() {

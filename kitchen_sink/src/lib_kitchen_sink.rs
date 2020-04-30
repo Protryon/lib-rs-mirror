@@ -165,7 +165,6 @@ pub struct KitchenSink {
     gh: github_info::GitHub,
     loaded_rich_crate_version_cache: RwLock<FxHashMap<Origin, Arc<RichCrateVersion>>>,
     category_crate_counts: DoubleCheckedCell<Option<HashMap<String, u32>>>,
-    removals: DoubleCheckedCell<HashMap<Origin, f64>>,
     top_crates_cached: tokio::sync::RwLock<FxHashMap<String, Arc<Vec<Origin>>>>,
     git_checkout_path: PathBuf,
     main_cache_dir: PathBuf,
@@ -210,7 +209,6 @@ impl KitchenSink {
             loaded_rich_crate_version_cache: RwLock::new(FxHashMap::default()),
             git_checkout_path: data_path.join("git"),
             category_crate_counts: DoubleCheckedCell::new(),
-            removals: DoubleCheckedCell::new(),
             top_crates_cached: tokio::sync::RwLock::new(FxHashMap::default()),
             yearly: AllDownloads::new(&main_cache_dir),
             main_cache_dir,
@@ -642,16 +640,6 @@ impl KitchenSink {
             }
             Err(KitchenSinkErr::CrateNotFound(origin.clone())).context("missing releases, even tags")?
         })
-    }
-
-    /// Fudge-factor score proprtional to how many times a crate has been removed from some project
-    pub async fn crate_removals(&self, origin: &Origin) -> Option<f64> {
-        self.removals
-            .get_or_init(async {
-                Box::pin(self.crate_db.removals()).await.expect("fetch crate removals")
-            })
-            .await
-            .get(origin).cloned()
     }
 
     #[inline]

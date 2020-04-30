@@ -1261,9 +1261,8 @@ impl KitchenSink {
         let _ = self.index.deps_stats().await;
     }
 
-    pub fn update(&self) {
-        self.index.update();
-        let _ = self.index.deps_stats();
+    pub async fn update(&self) {
+        let _ = futures::join!(self.index.update(), self.index.deps_stats());
     }
 
     #[inline]

@@ -159,8 +159,11 @@ impl Index {
         })
     }
 
-    pub fn update(&self) {
-        let _ = crates_index::Index::new(&self.crates_index_path).update().map_err(|e| eprintln!("{}", e));
+    pub async fn update(&self) {
+        let path = self.crates_index_path.to_owned();
+        let _ = tokio::task::spawn_blocking(move || {
+            let _ = crates_index::Index::new(path).update().map_err(|e| eprintln!("{}", e));
+        }).await;
     }
 
     /// Crates available in the crates.io index

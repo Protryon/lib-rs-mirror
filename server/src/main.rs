@@ -130,7 +130,7 @@ async fn run_server() -> Result<(), failure::Error> {
         async move {
             state.crates.load().prewarm().await;
             loop {
-                tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
+                tokio::time::delay_for(Duration::from_secs(1)).await;
                 let elapsed = start_time.elapsed().as_secs() as u32;
                 timestamp.store(elapsed, Ordering::SeqCst);
                 if 1 == HUP_SIGNAL.swap(0, Ordering::SeqCst) {
@@ -139,7 +139,12 @@ async fn run_server() -> Result<(), failure::Error> {
                         Ok(k) => {
                             state.crates.load().cleanup();
                             let k = Arc::new(k);
-                            k.update();
+                            tokio::task::spawn({
+                                let k = k.clone();
+                                async move {
+                                    k.update().await
+                                }
+                            });
                             state.crates.store(k);
                             state.crates.load().prewarm().await
                         },
@@ -147,9 +152,9 @@ async fn run_server() -> Result<(), failure::Error> {
                             eprintln!("Refresh failed: {}", e);
                             std::process::exit(1);
                         },
-                        }
                     }
                 }
+            }
         }});
 
     // watchdog

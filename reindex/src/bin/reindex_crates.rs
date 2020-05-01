@@ -279,7 +279,7 @@ async fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrat
         let peak_active = depender_changes.iter().map(|m| m.running_total).max().unwrap_or(0);
         // laplace smooth unpopular crates
         let min_relevant_dependers = 15;
-        let former_glory = (current_active.running_total + min_relevant_dependers) as f64 / (peak_active + min_relevant_dependers) as f64;
+        let former_glory = 1f64.min((current_active.running_total + min_relevant_dependers + 1) as f64 / (peak_active + min_relevant_dependers) as f64);
 
         // If a crate is used mostly indirectly, it matters less whether it's losing direct users
         let indirect_to_direct_ratio = 1f64.min((direct_rev_deps * 3) as f64 / indirect_reverse_optional_deps.max(1) as f64);

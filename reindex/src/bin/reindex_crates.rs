@@ -272,6 +272,29 @@ async fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrat
 
     let mut score = (base_score + temp_score) * 0.5;
 
+    let depender_changes = crates.depender_changes(all.origin()).expect("depender_changes");
+    if let Some(current_active) = depender_changes.last() {
+        let peak_active = depender_changes.iter().map(|m| m.running_total).max().unwrap_or(0);
+        // laplace smooth unpopular crates
+        let min_relevant_dependers = 15;
+        let former_glory = (current_active.running_total + min_relevant_dependers) as f64 / (peak_active + min_relevant_dependers) as f64;
+
+        // If a crate is used mostly indirectly, it matters less whether it's losing direct users
+        let indirect_to_direct_ratio = 1f64.min((direct_rev_deps * 3) as f64 / indirect_reverse_optional_deps.max(1) as f64);
+        let indirect_to_direct_ratio = (1. + indirect_to_direct_ratio) * 0.5;
+        let mut former_glory = former_glory * indirect_to_direct_ratio + (1. - indirect_to_direct_ratio);
+
+        // if it's clearly declining, accelerate its demise
+        if let Some(last_quarter) = depender_changes.get(depender_changes.len().saturating_sub(3)) {
+            if last_quarter.running_total > current_active.running_total {
+                former_glory = former_glory.powf(1.5);
+            }
+        }
+        eprintln!("former glory: {:.3}/{:.3} {:.3}/{:.3} = {:.3} # {}", peak_active, current_active.running_total,
+            direct_rev_deps, indirect_reverse_optional_deps, former_glory, all.origin().to_str());
+        score *= former_glory;
+    }
+
     // there's usually a non-macro/non-sys sibling
     if k.is_proc_macro() || k.is_sys() {
         score *= 0.9;

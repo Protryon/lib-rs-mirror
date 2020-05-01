@@ -34,7 +34,7 @@ pub struct AuthorPage<'a> {
     pub(crate) founder_crates: Vec<(Arc<RichCrateVersion>, u32, CrateOwnerRow, Vec<OtherOwner>)>,
     pub(crate) member_crates: Vec<(Arc<RichCrateVersion>, u32, CrateOwnerRow, Vec<OtherOwner>)>,
     pub(crate) orgs: Vec<Org>,
-    pub(crate) joined: DateTime<Utc>,
+    pub(crate) joined: Option<DateTime<Utc>>,
     pub(crate) founder_total: usize,
     pub(crate) member_total: usize,
     pub(crate) keywords: Vec<String>,
@@ -55,7 +55,7 @@ impl<'a> AuthorPage<'a> {
         })
         .collect().await;
         let rows = kitchen_sink.crates_of_author(aut).await?;
-        let joined = rows.iter().filter_map(|row| row.invited_at).min().expect("no crates?");
+        let joined = rows.iter().filter_map(|row| row.invited_at).min();
 
         let (mut founder, mut member): (Vec<_>, Vec<_>) = rows.into_iter().partition(|c| c.invited_by_github_id.is_none());
         let founder_total = founder.len();
@@ -223,6 +223,7 @@ impl<'a> AuthorPage<'a> {
             title: format!("@{}'s Rust crates", self.login()),
             critical_css_data: Some(include_str!("../../style/public/author.css")),
             critical_css_dev_url: Some("/author.css"),
+            noindex: self.joined.is_none(),
             ..Default::default()
         }
     }

@@ -37,12 +37,13 @@
     @if let Some(n) = p.name() {
       <p class=desc>@n</p>
     }
-    <p>
-      Joined crates-io @HumanTime::from(p.joined).to_text_en(Accuracy::Rough, Tense::Past)@if let Some(d) = p.joined_github() {.
+    <p>@if let Some(d) = p.joined {
+        Joined crates-io @HumanTime::from(d).to_text_en(Accuracy::Rough, Tense::Past).
+      }
+      @if let Some(d) = p.joined_github() {
         Joined GitHub @HumanTime::from(d).to_text_en(Accuracy::Rough, Tense::Past).
       }
     </p>
-
 
     <nav><ul>
       <li><a rel="ugc nofollow" href="@p.github_url()">GitHub</a></li>
@@ -91,6 +92,9 @@
             <h3>Co-owns @p.member_total crate@if p.member_total != 1 {s}</h3>
             @:author_list(&p.member_crates, url)
           </section>
+        }
+        @if p.founder_total == 0 && p.member_total == 0 {
+          <p class=empty>This person doesn't own any crates on crates-io.</p>
         }
       </div>
     </div>

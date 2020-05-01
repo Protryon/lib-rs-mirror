@@ -283,17 +283,23 @@ async fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrat
 
         // If a crate is used mostly indirectly, it matters less whether it's losing direct users
         let indirect_to_direct_ratio = 1f64.min((direct_rev_deps * 3) as f64 / indirect_reverse_optional_deps.max(1) as f64);
-        let indirect_to_direct_ratio = (1. + indirect_to_direct_ratio) * 0.5;
-        let mut former_glory = former_glory * indirect_to_direct_ratio + (1. - indirect_to_direct_ratio);
+        let indirect_to_direct_ratio = (0.9 + indirect_to_direct_ratio) * 0.5;
+        let former_glory = former_glory * indirect_to_direct_ratio + (1. - indirect_to_direct_ratio);
+
+        // if it's being mostly removed, accelerate its demise. laplace smoothed for small crates
+        let removals_fraction = 1. - (current_active.expired_total + 10) as f64 / (current_active.removed_total + current_active.expired_total + 10) as f64;
+        let mut powf = 1.0 + removals_fraction * 0.7;
 
         // if it's clearly declining, accelerate its demise
         if let Some(last_quarter) = depender_changes.get(depender_changes.len().saturating_sub(3)) {
             if last_quarter.running_total() > current_active.running_total() {
-                former_glory = former_glory.powf(1.5);
+                powf += 0.5;
             }
         }
-        eprintln!("former glory: a{:.3}/t{:.3} r{:03}/e{:03} d{:.3}/i{:.3} = {:.3} # {}", peak_active, current_active.running_total(),
+        let former_glory = former_glory.powf(powf);
+        eprintln!("former glory: a{:.3}/t{:.3} r{:03}/e{:03} ^{:.3} d{:.3}/i{:.3} = {:.3} # {}", peak_active, current_active.running_total(),
             current_active.removed_total, current_active.expired_total,
+            powf,
             direct_rev_deps, indirect_reverse_optional_deps, former_glory, all.origin().to_str());
         score *= former_glory;
     }

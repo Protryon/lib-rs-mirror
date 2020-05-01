@@ -576,7 +576,7 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
                                 }
                             },
                             Err(e) => {
-                                eprintln!("Refresh err: {} {}", e, cache_file.display());
+                                eprintln!("Refresh err: {} {}", e.iter_chain().map(|e| e.to_string()).collect::<Vec<_>>().join("; "), cache_file.display());
                             },
                         }
                     } else {

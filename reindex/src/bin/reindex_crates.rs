@@ -37,7 +37,9 @@ async fn main() {
 
     let everything = std::env::args().nth(1).map_or(false, |a| a == "--all");
     let specific: Vec<_> = if !everything {
-        std::env::args().skip(1).map(Origin::from_str).collect()
+        std::env::args().skip(1).map(|name| {
+            Origin::try_from_crates_io_name(&name).unwrap_or_else(|| Origin::from_str(name))
+        }).collect()
     } else {
         Vec::new()
     };
@@ -333,7 +335,7 @@ async fn is_sub_component(crates: &KitchenSink, k: &RichCrateVersion) -> bool {
             Some("core") | Some("shared") | Some("utils") | Some("common") |
             Some("fork") | Some("unofficial") => {
                 if let Some(parent_name) = name.get(..pos-1) {
-                    if crates.crate_exists(&Origin::from_crates_io_name(parent_name)) {
+                    if Origin::try_from_crates_io_name(parent_name).map_or(false, |name| crates.crate_exists(&name)) {
                         // TODO: check if owners overlap?
                         return true;
                     }

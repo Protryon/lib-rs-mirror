@@ -234,22 +234,23 @@ impl<'a> CratePageRevDeps<'a> {
             return None;
         }
 
-        let added_removed_max = self.changes.iter().map(|c| c.added.max(c.removed)).max().unwrap_or(0).max(18);
+        let added_removed_max = self.changes.iter().map(|c| c.added.max(c.removed + c.expired)).max().unwrap_or(0).max(18);
 
         let adds_chart_height = 20;
         let totals_chart_height = 80;
         let width = (800 / self.changes.len()).max(1).min(30) as _;
 
         let entries: Vec<_> = self.changes.iter().map(|ch| {
+            let removed = ch.removed + ch.expired;
             let running_totals_height = (ch.running_total() * totals_chart_height) as f64 / total_max.max(50) as f64;
             ChangesEntry {
                 running_total: ch.running_total(),
                 added: ch.added,
-                removed: ch.removed,
+                removed,
                 width,
                 running_totals_height: running_totals_height.round() as _,
                 added_height: (ch.added * adds_chart_height / added_removed_max) as _,
-                removed_height: (ch.removed * adds_chart_height / added_removed_max) as _,
+                removed_height: (removed * adds_chart_height / added_removed_max) as _,
                 year: ch.year,
 
                 label_inside: ((ch.running_total() as f64).log10().ceil() * 5.8 + 7.) < running_totals_height,

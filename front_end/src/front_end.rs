@@ -88,7 +88,7 @@ impl Page {
 /// See `cat_page.rs.html`
 pub async fn render_category(out: &mut impl Write, cat: &Category, crates: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
     let urler = Urler::new(None);
-    let page = cat_page::CatPage::new(cat, crates, renderer).await.context("can't prepare rendering of category page")?;
+    let page = cat_page::CatPage::new(cat, crates, renderer).await?;
     templates::cat_page(out, &page, &urler)?;
     Ok(())
 }

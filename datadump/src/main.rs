@@ -207,9 +207,9 @@ fn index_dependencies(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDe
                         // libcpocalypse semver trick - not relevant
                         continue;
                     }
-
-                    // (first seen, last seen)
-                    over_time.entry(dep_id).or_insert((release_date, end_date, expired)).1 = end_date;
+                    let e = over_time.entry(dep_id).or_insert((release_date, end_date, expired));
+                    e.1 = end_date;
+                    e.2 = expired;
                 }
             }
 

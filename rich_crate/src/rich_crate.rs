@@ -52,7 +52,18 @@ pub struct DependerChangesMonthly {
     pub year: u16,
     pub month0: u16,
     pub added: u32,
+    /// Actively removed
     pub removed: u32,
-    /// total of +adds-removes until now
-    pub running_total: u32,
+    /// Just stopped counting as active crate
+    pub expired: u32,
+
+    pub added_total: u32,
+    pub removed_total: u32,
+    pub expired_total: u32,
+}
+
+impl DependerChangesMonthly {
+    pub fn running_total(&self) -> u32 {
+        self.added_total - self.removed_total - self.expired_total
+    }
 }

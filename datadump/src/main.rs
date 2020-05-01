@@ -173,11 +173,14 @@ fn index_dependencies(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDe
             let mut over_time = HashMap::new();
             let mut releases = releases_from_oldest.iter().peekable();
             while let Some(&(ver_id, release_date, version_str)) = releases.next() {
+                let expired;
                 let end_date = if let Some(&&(_, next_release_date, _)) = releases.peek() {
+                    expired = false;
                     // if the next releases is going to drop it, then attribute drop date
                     // to some time between the releases
                     release_date.half_way(next_release_date)
                 } else {
+                    expired = true;
                     // it's the final release, so relevance is now until the death of the crate.
                     //
                     // approximate how junky or stable the crate is
@@ -206,7 +209,7 @@ fn index_dependencies(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDe
                     }
 
                     // (first seen, last seen)
-                    over_time.entry(dep_id).or_insert((release_date, end_date)).1 = end_date;
+                    over_time.entry(dep_id).or_insert((release_date, end_date, expired)).1 = end_date;
                 }
             }
 
@@ -222,10 +225,15 @@ fn index_dependencies(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDe
         let name = crates.get(&crate_id).expect("bork crate");
         let today = MiniDate::new(Utc::today());
         let mut by_day = HashMap::with_capacity(uses.len()*2);
-        for (first, last) in uses {
-            by_day.entry(first).or_insert(DependerChanges {at: first, added:0, removed:0}).added += 1;
-            if last <= today {
-                by_day.entry(last).or_insert(DependerChanges {at: last, added:0, removed:0}).removed += 1;
+        for (start_date, end_date, expired) in uses {
+            by_day.entry(start_date).or_insert(DependerChanges {at: start_date, added:0, removed:0, expired: 0}).added += 1;
+            if end_date <= today {
+                let e = by_day.entry(end_date).or_insert(DependerChanges {at: end_date, added:0, removed:0, expired: 0});
+                if expired {
+                    e.expired += 1;
+                } else {
+                    e.removed += 1;
+                }
             }
         }
         let mut by_day: Vec<_> = by_day.values().copied().collect();

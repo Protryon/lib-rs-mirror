@@ -227,7 +227,7 @@ impl<'a> CratePageRevDeps<'a> {
 
     /// entries + year and colspan
     pub fn changes_graph(&self) -> Option<(Vec<ChangesEntry>, Vec<(u16, u16)>)> {
-        let total_max = self.changes.iter().map(|c| c.running_total).max().unwrap_or(0).max(1);
+        let total_max = self.changes.iter().map(|c| c.running_total()).max().unwrap_or(0).max(1);
 
         let good_data = (self.changes.len() >= 12 && total_max >= 15) || (self.changes.len() >= 6 && total_max >= 100);
         if !good_data {
@@ -241,9 +241,9 @@ impl<'a> CratePageRevDeps<'a> {
         let width = (800 / self.changes.len()).max(1).min(30) as _;
 
         let entries: Vec<_> = self.changes.iter().map(|ch| {
-            let running_totals_height = (ch.running_total * totals_chart_height) as f64 / total_max.max(50) as f64;
+            let running_totals_height = (ch.running_total() * totals_chart_height) as f64 / total_max.max(50) as f64;
             ChangesEntry {
-                running_total: ch.running_total,
+                running_total: ch.running_total(),
                 added: ch.added,
                 removed: ch.removed,
                 width,
@@ -252,7 +252,7 @@ impl<'a> CratePageRevDeps<'a> {
                 removed_height: (ch.removed * adds_chart_height / added_removed_max) as _,
                 year: ch.year,
 
-                label_inside: ((ch.running_total as f64).log10().ceil() * 5.8 + 7.) < running_totals_height,
+                label_inside: ((ch.running_total() as f64).log10().ceil() * 5.8 + 7.) < running_totals_height,
             }
         }).collect();
 

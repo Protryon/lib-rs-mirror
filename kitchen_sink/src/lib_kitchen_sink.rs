@@ -214,7 +214,7 @@ impl KitchenSink {
             main_cache_dir,
             category_overrides: Self::load_category_overrides(&data_path.join("category_overrides.txt"))?,
             crates_io_owners_cache: TempCache::new(&data_path.join("cio-owners.tmp"))?,
-            depender_changes: TempCache::new(&data_path.join("deps-changes.tmp"))?,
+            depender_changes: TempCache::new(&data_path.join("deps-changes2.tmp"))?,
             throttle: tokio::sync::Semaphore::new(40),
             data_path: data_path.into(),
         })
@@ -1965,42 +1965,48 @@ impl KitchenSink {
 
         // We're going to use weirdo 30-day months, with excess going into december
         // which makes data more even and pads the December's holiday drop a bit
-        let mut by_week = HashMap::with_capacity(daily_changes.len());
+        let mut by_month = HashMap::with_capacity(daily_changes.len());
         for d in &daily_changes {
-            let w = by_week.entry((d.at.y, (d.at.o/30).min(11))).or_insert(DependerChangesMonthly {
+            let w = by_month.entry((d.at.y, (d.at.o/30).min(11))).or_insert(DependerChangesMonthly {
                 year: d.at.y,
                 month0: (d.at.o/30).min(11),
-                added: 0,
-                removed: 0,
-                running_total: 0,
+                added: 0, added_total: 0,
+                removed: 0, removed_total: 0,
+                expired: 0, expired_total: 0,
             });
             w.added += d.added as u32;
             w.removed += d.removed as u32;
+            w.expired += d.expired as u32;
         }
 
         let first = &daily_changes[0];
         let last = daily_changes.last().unwrap();
         let mut curr = (first.at.y, (first.at.o/30).min(11));
         let end = (last.at.y, (last.at.o/30).min(11));
-        let mut weekly = Vec::with_capacity(by_week.len());
-        let mut running_total = 0;
+        let mut monthly = Vec::with_capacity(by_month.len());
+        let mut added_total = 0;
+        let mut removed_total = 0;
+        let mut expired_total = 0;
         while curr <= end {
-            let mut e = by_week.get(&curr).copied().unwrap_or(DependerChangesMonthly {
+            let mut e = by_month.get(&curr).copied().unwrap_or(DependerChangesMonthly {
                 year: curr.0, month0: curr.1,
-                added: 0, removed: 0,
-                running_total,
+                added: 0, removed: 0, expired: 0,
+                added_total: 0, removed_total: 0, expired_total: 0,
             });
-            running_total += e.added;
-            running_total -= e.removed;
-            e.running_total = running_total;
-            weekly.push(e);
+            added_total += e.added;
+            expired_total += e.expired;
+            removed_total += e.removed;
+            e.added_total = added_total;
+            e.expired_total = expired_total;
+            e.removed_total = removed_total;
+            monthly.push(e);
             curr.1 += 1;
             if curr.1 > 11 {
                 curr.0 += 1;
                 curr.1 = 0;
             }
         }
-        Ok(weekly)
+        Ok(monthly)
     }
 
     pub async fn index_crates_io_crate_owners(&self, origin: &Origin, mut owners: Vec<CrateOwner>) -> CResult<()> {
@@ -2349,7 +2355,10 @@ fn minidate() {
 pub struct DependerChanges {
     pub at: MiniDate,
     pub added: u16,
+    /// Crate has released a new version without this dependency
     pub removed: u16,
+    /// Crate has this dependnecy, but is not active any more
+    pub expired: u16,
 }
 
 #[test]

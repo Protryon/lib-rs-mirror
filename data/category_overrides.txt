@@ -180,6 +180,7 @@ diceware-rs: command-line-utilities, authentication
 diceware: command-line-utilities, authentication
 dicom-core: multimedia::images
 diesel: databases
+diesel: databases
 differential-geometry: science::math
 direction: rust-patterns
 ditto: concurrency, data-structures
@@ -398,6 +399,7 @@ ipc: asynchronous
 ipp-headers-sys: hardware-support
 ipp-sys: hardware-support, development-tools::profiling
 ipwhois: databases, network-programming
+iron-hmac : web-programming, cryptography
 is-macro: development-tools::procedural-macro-helpers
 isbfc: emulators
 iso639-1: internationalization
@@ -612,6 +614,7 @@ orgize: parser-implementations
 osmesa-sys: multimedia, os::unix-apis
 osmgpsmap: science, gui
 ostrich-core: asynchronous
+oven: web-programming
 overdose: concurrency, data-structures
 ovgu-canteen: parser-implementations
 oxygengine-core: game-engines, wasm
@@ -637,6 +640,7 @@ peruse: parsing
 pf: filesystem, network-programming
 pickpocket: web-programming
 pico-sys: web-programming
+pin-utils : rust-patterns, asynchronous
 pinentry: command-line-interface, authentication
 pkgman: os
 plagiarismbasic_lib: text-processing
@@ -799,6 +803,7 @@ sitemap: parser-implementations
 slot: memory-management
 smalltree: data-structures
 smileypyramid: command-line-utilities
+smol-potat : asynchronous
 snoopy: parser-implementations, network-programming
 solana-clap-utils:cryptography::cryptocurrencies
 solana-client:cryptography::cryptocurrencies
@@ -888,6 +893,7 @@ truetype: parser-implementations, rendering::data-formats
 truth: parser-implementations
 try-guard: rust-patterns
 try_from: rust-patterns
+trybuild: development-tools::testing, command-line-interface
 tss-tspi: hardware-support
 tsukurou_core: development-tools
 tt-call: rust-patterns

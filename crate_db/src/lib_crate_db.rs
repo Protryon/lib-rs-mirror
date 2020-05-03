@@ -155,10 +155,10 @@ impl CrateDb {
                         },
                     };
 
-                    let manifest = row.get_raw("manifest").as_blob().expect("manifest col");
-                    let manifest = rmp_serde::from_slice(manifest).expect("manifest parse");
-                    let language_stats = row.get_raw("language_stats").as_blob().expect("language_stats col");
-                    let language_stats = rmp_serde::from_slice(language_stats).expect("language_stats parse");
+                    let manifest = row.get_raw("manifest").as_blob()?;
+                    let manifest = rmp_serde::from_slice(manifest).map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
+                    let language_stats = row.get_raw("language_stats").as_blob()?;
+                    let language_stats = rmp_serde::from_slice(language_stats).map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
                     Ok((manifest, readme, Row {
                         lib_file: row.get("lib_file")?,
                         capitalized_name: row.get("capitalized_name")?,

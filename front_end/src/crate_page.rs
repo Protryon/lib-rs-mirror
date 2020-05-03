@@ -71,6 +71,7 @@ pub struct CratePage<'a> {
     related_crates: Option<Vec<Origin>>,
     keywords_populated: Vec<(String, bool)>,
     parent_crate: Option<Arc<RichCrateVersion>>,
+    downloads_per_month_or_equivalent: Option<usize>,
 }
 
 /// Helper used to find most "interesting" versions
@@ -112,12 +113,16 @@ pub(crate) struct Contributors<'a> {
 
 impl<'a> CratePage<'a> {
     pub async fn new(all: &'a RichCrate, ver: &'a RichCrateVersion, kitchen_sink: &'a KitchenSink, markup: &'a Renderer) -> CResult<CratePage<'a>> {
-        let (top_category, parent_crate, changelog_url, related_crates, keywords_populated) = futures::join!(
+        let (top_category, parent_crate, changelog_url, keywords_populated, (related_crates, downloads_per_month_or_equivalent)) = futures::join!(
             kitchen_sink.top_category(ver),
             kitchen_sink.parent_crate(ver),
             kitchen_sink.changelog_url(ver),
-            Self::make_related_crates(kitchen_sink, ver),
             kitchen_sink.keywords_populated(ver),
+            async {
+                let downloads_per_month_or_equivalent = kitchen_sink.downloads_per_month_or_equivalent(ver.origin()).await.ok().and_then(|x| x);
+                let related_crates = Self::make_related_crates(kitchen_sink, ver, downloads_per_month_or_equivalent).await;
+                (related_crates, downloads_per_month_or_equivalent)
+            },
         );
         let top_category = top_category
             .and_then(|(top, slug)| CATEGORIES.from_slug(slug).0.last().map(|&c| (top, c)));
@@ -165,6 +170,7 @@ impl<'a> CratePage<'a> {
             related_crates,
             keywords_populated,
             parent_crate,
+            downloads_per_month_or_equivalent,
         };
         let (sizes, lang_stats, viral_license) = page.crate_size_and_viral_license(deps?).await?;
         page.sizes = Some(sizes);
@@ -300,7 +306,7 @@ impl<'a> CratePage<'a> {
 
     pub fn nofollow(&self) -> Links {
         // TODO: take multiple factors into account, like # of contributors, author reputation, dependents
-        if self.block(self.kitchen_sink.downloads_per_month_or_equivalent(self.all.origin())).ok().and_then(|x| x).unwrap_or(0) < 100 {
+        if self.downloads_per_month_or_equivalent.unwrap_or(0) < 100 {
             Links::Ugc
         } else {
             Links::FollowUgc
@@ -712,12 +718,12 @@ impl<'a> CratePage<'a> {
         self.related_crates.as_deref()
     }
 
-    async fn make_related_crates(kitchen_sink: &KitchenSink, ver: &RichCrateVersion) -> Option<Vec<Origin>> {
+    async fn make_related_crates(kitchen_sink: &KitchenSink, ver: &RichCrateVersion, downloads_per_month_or_equivalent: Option<usize>) -> Option<Vec<Origin>> {
         // require some level of downloads to avoid recommending spam
         // but limit should be relative to the current crate, so that minor crates
         // get related suggestions too
 
-        let dl = kitchen_sink.downloads_per_month_or_equivalent(ver.origin()).await.ok().and_then(|x| x).unwrap_or(100);
+        let dl = downloads_per_month_or_equivalent.unwrap_or(100);
         let min_recent_downloads = (dl as u32 / 2).min(200);
         kitchen_sink.related_crates(ver, min_recent_downloads).await.map_err(|e| eprintln!("related crates fail: {}", e)).ok()
     }

@@ -67,31 +67,31 @@ impl<'a> CratePageRevDeps<'a> {
         let latest_unstable_semver = &kitchen_sink.index.crate_highest_version(&own_name, false)?.version().parse()?;
         let stats = all_deps_stats.counts.get(own_name.as_str());
 
-        let mut downloads_by_ver: Vec<_> = kitchen_sink.recent_downloads_by_version(ver)?.into_iter().map(|(v, d)| (v.to_semver(), d)).collect();
+        let mut downloads_by_ver: Vec<_> = kitchen_sink.recent_downloads_by_version(ver).await?.into_iter().map(|(v, d)| (v.to_semver(), d)).collect();
         downloads_by_ver.sort_by(|a, b| b.0.cmp(&a.0));
 
         let mut deps: Vec<_> = match stats {
             Some(s) => futures::future::join_all(s.rev_dep_names.iter().map(|rev_dep| async move {
-            let origin = Origin::from_crates_io_name(rev_dep);
-            let downloads = kitchen_sink.downloads_per_month(&origin).await.ok().and_then(|x| x).unwrap_or(0);
-            let depender = kitchen_sink.index.crate_highest_version(&rev_dep.to_lowercase(), true).expect("rev dep integrity");
-            let (is_optional, req, kind) = depender.dependencies().iter().find(|d| {
-                own_name.eq_ignore_ascii_case(d.crate_name())
-            })
-            .map(|d| {
-                (d.is_optional(), d.requirement(), d.kind().unwrap_or_default())
-            })
-            .unwrap_or_default();
+                let origin = Origin::from_crates_io_name(rev_dep);
+                let downloads = kitchen_sink.downloads_per_month(&origin).await.ok().and_then(|x| x).unwrap_or(0);
+                let depender = kitchen_sink.index.crate_highest_version(&rev_dep.to_lowercase(), true).expect("rev dep integrity");
+                let (is_optional, req, kind) = depender.dependencies().iter().find(|d| {
+                    own_name.eq_ignore_ascii_case(d.crate_name())
+                })
+                .map(|d| {
+                    (d.is_optional(), d.requirement(), d.kind().unwrap_or_default())
+                })
+                .unwrap_or_default();
 
-            let req = req.parse().unwrap_or_else(|_| VersionReq::any());
-            let matches_latest = req.matches(&latest_stable_semver) || req.matches(&latest_unstable_semver);
+                let req = req.parse().unwrap_or_else(|_| VersionReq::any());
+                let matches_latest = req.matches(&latest_stable_semver) || req.matches(&latest_unstable_semver);
 
-            RevDepInf {
-                origin,
-                depender, downloads, is_optional, req, kind,
-                matches_latest,
-                rev_dep_count: 0,
-            }
+                RevDepInf {
+                    origin,
+                    depender, downloads, is_optional, req, kind,
+                    matches_latest,
+                    rev_dep_count: 0,
+                }
             })).await,
             None => Vec::new(),
         };

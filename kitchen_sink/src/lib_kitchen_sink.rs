@@ -411,7 +411,8 @@ impl KitchenSink {
     }
 
     // Monthly downloads, sampled from last few days or weeks
-    pub fn recent_downloads_by_version(&self, k: &RichCrateVersion) -> CResult<HashMap<MiniVer, u32>> {
+    pub async fn recent_downloads_by_version(&self, k: &RichCrateVersion) -> CResult<HashMap<MiniVer, u32>> {
+
         let now = Utc::today();
         let curr_year = now.year() as u16;
         let curr_year_data = self.yearly.get_crate_year(k.name(), curr_year)?.unwrap_or_default();
@@ -644,7 +645,7 @@ impl KitchenSink {
 
     #[inline]
     pub async fn downloads_per_month(&self, origin: &Origin) -> CResult<Option<usize>> {
-        self.downloads_recent(origin).await.map(|dl| dl.map(|n| n / 3))
+        self.downloads_recent_90_days(origin).await.map(|dl| dl.map(|n| n / 3))
     }
 
     pub async fn downloads_per_month_or_equivalent(&self, origin: &Origin) -> CResult<Option<usize>> {
@@ -668,7 +669,7 @@ impl KitchenSink {
     }
 
     #[inline]
-    async fn downloads_recent(&self, origin: &Origin) -> CResult<Option<usize>> {
+    async fn downloads_recent_90_days(&self, origin: &Origin) -> CResult<Option<usize>> {
         Ok(match origin {
             Origin::CratesIo(name) => {
                 let meta = self.crates_io_meta(name).await?;
@@ -1362,7 +1363,7 @@ impl KitchenSink {
     /// Maintenance: add crate to local db index
     pub async fn index_crate(&self, k: &RichCrate, score: f64) -> CResult<()> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
-        self.crate_db.index_versions(k, score, self.downloads_recent(k.origin()).await?).await?;
+        self.crate_db.index_versions(k, score, self.downloads_per_month(k.origin()).await?).await?;
         Ok(())
     }
 

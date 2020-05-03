@@ -1265,8 +1265,17 @@ impl KitchenSink {
     /// 0 = not used
     /// 1 = everyone uses it
     #[inline]
-    pub async fn version_popularity(&self, crate_name: &str, requirement: &VersionReq) -> Result<Option<(bool, f32)>, KitchenSinkErr> {
-        self.index.version_popularity(crate_name, requirement).await.map_err(KitchenSinkErr::Deps)
+    pub async fn version_popularity(&self, crate_name: &str, requirement: &VersionReq) -> CResult<Option<(bool, f32)>> {
+        let mut res = self.index.version_popularity(crate_name, requirement).await.map_err(KitchenSinkErr::Deps)?;
+        if let Some((ref mut matches_latest, ref mut pop)) = &mut res {
+            if let Some((former_glory, _)) = self.former_glory(&Origin::from_crates_io_name(crate_name)).await? {
+                if former_glory < 0.5 {
+                    *matches_latest = false;
+                }
+                *pop *= former_glory as f32;
+            }
+        }
+        Ok(res)
     }
 
     /// "See also"

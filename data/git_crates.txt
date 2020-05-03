@@ -1,3 +1,4 @@
+
 github:1password/typeshare/typeshare
 github:advancedresearch/path_semantics/basic_theorem_prover
 github:advancedresearch/path_semantics/boolalg
@@ -41,7 +42,10 @@ github:cch123/asm-cli-rust/asm-cli-rust
 github:chainx-org/chainx/chainx
 github:changlan/kytan/kytan
 github:citybound/citybound/citybound
+github:cjbassi/ytop/package-publisher
+github:cjbassi/ytop/ytop
 github:cristicbz/rust-doom/rs_doom
+github:dalamar42/rayt/rayt
 github:dani-garcia/bitwarden_rs/bitwarden_rs
 github:darrint/device-blocker/device-blocker
 github:dcampbell24/iup-rust/iup
@@ -80,6 +84,12 @@ github:florob/rustyxml/RustyXML
 github:foxboxpdx/macrotis/macrotis
 github:fraunhofer-aisec/rabe/rabe
 github:freaky/compactor/compactor
+github:gamozolabs/chocolate_milk/aht
+github:gamozolabs/chocolate_milk/bootloader
+github:gamozolabs/chocolate_milk/kernel
+github:gamozolabs/chocolate_milk/pe_parser
+github:gamozolabs/chocolate_milk/rangeset
+github:gamozolabs/chocolate_milk/server
 github:garkimasera/rusted-ruins/rusted-ruins
 github:gekkio/mooneye-gb/mooneye-gb
 github:getzola/zola/zola
@@ -172,6 +182,11 @@ github:maps4print/azul/azul-css
 github:maringa-gamedev/rust-igmc-2018/rust-igmc-2018
 github:mathall/rim/rim
 github:mdreem/dreetris/dreetris
+github:meilisearch/meilisearch/meilisearch-core
+github:meilisearch/meilisearch/meilisearch-http
+github:meilisearch/meilisearch/meilisearch-schema
+github:meilisearch/meilisearch/meilisearch-tokenizer
+github:meilisearch/meilisearch/meilisearch-types
 github:mesalock-linux/mesalink/mesalink
 github:mgattozzi/haskellrs/haskellrs
 github:mgattozzi/rushs/rushs
@@ -212,6 +227,8 @@ github:nokia/not-perf/nperf
 github:nokia/not-perf/nwind
 github:non-binary/http-cache-semantics/http-cache-semantics
 github:oakes/solidoak/solidoak
+github:oam-dev/rudr/healthscope
+github:oam-dev/rudr/rudr
 github:oreboot/oreboot/cpu
 github:oreboot/oreboot/payloads
 github:oreboot/oreboot/uart
@@ -282,8 +299,7 @@ github:sandstorm-io/collections-app/sandstorm-collections-app
 github:schulke-214/connect-four/connect-four
 github:schulke-214/rsnake/rsnake
 github:scipr-lab/zexe/dpc
-github:scipr-lab/zexe/snark
-github:scipr-lab/zexe/snark-gadgets
+github:scipr-lab/zexe/groth16
 github:scs/substrate-api-client/substrate-api-client
 github:seppo0010/rsedis/rsedis
 github:servo/devices/device

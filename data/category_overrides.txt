@@ -355,11 +355,13 @@ holochain_conductor_lib:cryptography::cryptocurrencies
 holochain_conductor_lib_api:cryptography::cryptocurrencies
 holochain_core:cryptography::cryptocurrencies
 holochain_dpki:cryptography::cryptocurrencies
+holochain_json_api: cryptography::cryptocurrencies
 holochain_json_derive:cryptography::cryptocurrencies
 holochain_locksmith:cryptography::cryptocurrencies
 holochain_logging:cryptography::cryptocurrencies
 holochain_metrics:cryptography::cryptocurrencies
 holochain_persistence_api:cryptography::cryptocurrencies
+holochain_serialized_bytes: cryptography::cryptocurrencies
 holochain_serialized_bytes_derive: cryptography::cryptocurrencies
 httpdate: date-and-time, parser-implementations
 httpserv: development-tools, web-programming::http-server

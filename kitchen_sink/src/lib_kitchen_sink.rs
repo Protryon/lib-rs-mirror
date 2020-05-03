@@ -437,8 +437,11 @@ impl KitchenSink {
             }
             end_day = start_day;
         }
+
+        // normalize data sample to be proportional to montly downloads
+        let actual_downloads_per_month = self.downloads_per_month(k.origin()).await?.unwrap_or(total as usize * 30 / days as usize);
         Ok(out.into_iter().map(|(k,v)|
-            (k.clone(), (v as usize * 30 / days) as u32)
+            (k.clone(), (v as usize * actual_downloads_per_month / total as usize) as u32)
         ).collect())
     }
 

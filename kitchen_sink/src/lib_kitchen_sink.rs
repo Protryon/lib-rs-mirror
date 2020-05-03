@@ -1303,7 +1303,7 @@ impl KitchenSink {
     pub async fn top_category(&self, krate: &RichCrateVersion) -> Option<(u32, String)> {
         let crate_origin = krate.origin();
         let cats = join_all(krate.category_slugs().map(|slug| slug.into_owned()).map(|slug| async move {
-            let c = self.top_crates_in_category(&slug).await?;
+            let c = tokio::time::timeout(Duration::from_secs(5), self.top_crates_in_category(&slug)).await??;
             Ok::<_, CError>((c, slug))
         })).await;
         cats.into_iter().filter_map(|cats| cats.ok()).filter_map(|(cat, slug)| {

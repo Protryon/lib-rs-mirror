@@ -53,8 +53,8 @@
               <a property="applicationCategory" @if *link {href="@url.keyword(key)"} class=keyword><span>#</span>@key</a>
           }
         </span>
-        @for (key, link) in keywords.into_iter().skip(3) {
-          <a property="applicationCategory" @if link {href="@url.keyword(&key)"} class=keyword><span>#</span>@key</a>
+        @for (key, link) in keywords.iter().skip(3) {
+          <a property="applicationCategory" @if *link {href="@url.keyword(key)"} class=keyword><span>#</span>@key</a>
         }
       </span>
     }

@@ -67,6 +67,9 @@ pub struct CratePage<'a> {
     api_reference_url: Option<String>,
     former_glory: Option<(f64, u32)>,
     dependents_stats: Option<&'a RevDependencies>,
+    changelog_url: Option<String>,
+    related_crates: Option<Vec<Origin>>,
+    keywords_populated: Vec<(String, bool)>,
 }
 
 /// Helper used to find most "interesting" versions
@@ -119,6 +122,12 @@ impl<'a> CratePage<'a> {
             kitchen_sink.former_glory(all.origin()),
             kitchen_sink.top_keyword(all),
             kitchen_sink.all_contributors(ver))?;
+
+        let (changelog_url, related_crates, keywords_populated) = futures::join!(
+            kitchen_sink.changelog_url(ver),
+            Self::make_related_crates(kitchen_sink, ver),
+            kitchen_sink.keywords_populated(ver),
+        );
         let deps = kitchen_sink.all_dependencies_flattened(ver);
         let api_reference_url = if kitchen_sink.has_docs_rs(ver.origin(), ver.short_name(), ver.version()).await {
             Some(format!("https://docs.rs/{}", ver.short_name()))
@@ -141,6 +150,9 @@ impl<'a> CratePage<'a> {
             api_reference_url,
             former_glory,
             dependents_stats,
+            changelog_url,
+            related_crates,
+            keywords_populated,
         };
         let (sizes, lang_stats, viral_license) = page.crate_size_and_viral_license(deps?).await?;
         page.sizes = Some(sizes);
@@ -202,8 +214,8 @@ impl<'a> CratePage<'a> {
         }
     }
 
-    pub fn changelog_url(&self) -> Option<String> {
-        self.handle.enter(|| futures::executor::block_on(self.kitchen_sink.changelog_url(self.ver)))
+    pub fn changelog_url(&self) -> Option<&str> {
+        self.changelog_url.as_deref()
     }
 
     pub fn is_build_or_dev(&self) -> (bool, bool) {
@@ -225,15 +237,12 @@ impl<'a> CratePage<'a> {
     }
 
     /// If true, there are many other crates with this keyword. Populated first.
-    pub fn keywords_populated(&self) -> Option<Vec<(String, bool)>> {
-        self.handle.enter(|| futures::executor::block_on(async {
-            let k = self.kitchen_sink.keywords_populated(self.ver).await;
-            if k.is_empty() {
-                None
-            } else {
-                Some(k)
-            }
-        }))
+    pub fn keywords_populated(&self) -> Option<&[(String, bool)]> {
+        if !self.keywords_populated.is_empty() {
+            Some(&self.keywords_populated)
+        } else {
+            None
+        }
     }
 
     pub fn parent_crate(&self) -> Option<Arc<RichCrateVersion>> {
@@ -691,15 +700,18 @@ impl<'a> CratePage<'a> {
         self.block(self.kitchen_sink.github_stargazers_and_watchers(self.all.origin())).ok().and_then(|x| x)
     }
 
-    pub fn related_crates(&self) -> Option<Vec<Origin>> {
+    pub fn related_crates(&self) -> Option<&[Origin]> {
+        self.related_crates.as_deref()
+    }
+
+    async fn make_related_crates(kitchen_sink: &KitchenSink, ver: &RichCrateVersion) -> Option<Vec<Origin>> {
         // require some level of downloads to avoid recommending spam
         // but limit should be relative to the current crate, so that minor crates
         // get related suggestions too
-        self.block(async {
-            let dl = self.kitchen_sink.downloads_per_month_or_equivalent(self.all.origin()).await.ok().and_then(|x| x).unwrap_or(100);
-            let min_recent_downloads = (dl as u32 / 2).min(200);
-            self.kitchen_sink.related_crates(&self.ver, min_recent_downloads).await.map_err(|e| eprintln!("related crates fail: {}", e)).ok()
-        })
+
+        let dl = kitchen_sink.downloads_per_month_or_equivalent(ver.origin()).await.ok().and_then(|x| x).unwrap_or(100);
+        let min_recent_downloads = (dl as u32 / 2).min(200);
+        kitchen_sink.related_crates(ver, min_recent_downloads).await.map_err(|e| eprintln!("related crates fail: {}", e)).ok()
     }
 
     /// data for piechart

@@ -64,6 +64,7 @@ pub struct CratePage<'a> {
     is_build_or_dev: (bool, bool),
     handle: Handle,
     api_reference_url: Option<String>,
+    former_glory: Option<(f64, u32)>,
 }
 
 /// Helper used to find most "interesting" versions
@@ -109,7 +110,8 @@ impl<'a> CratePage<'a> {
             .and_then(|(top, slug)| CATEGORIES.from_slug(slug).0.last().map(|&c| (top, c)));
         let is_build_or_dev = kitchen_sink.is_build_or_dev(ver.origin()).await?;
 
-        let (top_keyword, all_contributors) = futures::try_join!(
+        let (former_glory, top_keyword, all_contributors) = futures::try_join!(
+            kitchen_sink.former_glory(all.origin()),
             kitchen_sink.top_keyword(all),
             kitchen_sink.all_contributors(ver))?;
         let deps = kitchen_sink.all_dependencies_flattened(ver);
@@ -132,6 +134,7 @@ impl<'a> CratePage<'a> {
             is_build_or_dev,
             handle: Handle::current(),
             api_reference_url,
+            former_glory,
         };
         let (sizes, lang_stats, viral_license) = page.crate_size_and_viral_license(deps?).await?;
         page.sizes = Some(sizes);
@@ -186,8 +189,8 @@ impl<'a> CratePage<'a> {
         };
         let name_capital = self.ver.capitalized_name();
 
-        if self.ver.is_yanked() {
-            format!("{} {} [deprecated] — {}", name_capital, self.ver.version(), kind)
+        if self.ver.is_yanked() || self.former_glory.map_or(false, |(f, _)| f < 0.3) {
+            format!("{} {} [deprecated]", name_capital, self.ver.version())
         } else {
             format!("{} — {}", name_capital, kind)
         }

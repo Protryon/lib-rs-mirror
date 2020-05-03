@@ -83,6 +83,8 @@ btc_spv_bin:cryptography::cryptocurrencies
 buffered-reader: rust-patterns
 buffett-core: web-programming
 c2rust-ast-exporter: value-formatting, encoding
+c2rust-ast-printer : value-formatting
+c2rust-refactor : development-tools
 cage: development-tools, command-line-utilities
 calx: os::macos-apis, multimedia::audio
 cansi: parser-implementations
@@ -90,6 +92,7 @@ capstone-sys: development-tools::debugging
 capstone3: development-tools::debugging
 captcha: web-programming
 carapax  : web-programming
+cargo-watch : development-tools::cargo-plugins
 cargo-xbuild: development-tools::build-tools, development-tools::cargo-plugins
 casperlabs-contract-ffi: cryptography::cryptocurrencies
 casperlabs-contract: cryptography::cryptocurrencies
@@ -179,7 +182,6 @@ dia-args: command-line-interface
 diceware-rs: command-line-utilities, authentication
 diceware: command-line-utilities, authentication
 dicom-core: multimedia::images
-diesel: databases
 diesel: databases
 differential-geometry: science::math
 direction: rust-patterns
@@ -327,6 +329,7 @@ glx: rendering::graphics-api, os::unix-apis
 goblin: parser-implementations
 google_geocoding: science, web-programming
 gosh-core: science
+gptman: command-line-utilities, filesystem
 graftpress_core: web-programming
 grammarly: web-programming
 graphcore: data-structures
@@ -622,6 +625,7 @@ overdose: concurrency, data-structures
 ovgu-canteen: parser-implementations
 oxygengine-core: game-engines, wasm
 packapp: os::macos-apis, command-line-utilities
+pad: text-processing
 pallet-contracts: cryptography::cryptocurrencies
 papyrus: development-tools, command-line-utilities
 parity-scale-codec-derive: cryptography::cryptocurrencies
@@ -795,6 +799,7 @@ sfl_parser: parser-implementations
 sgf-parser: parser-implementations
 shellfn-core: command-line-interface
 shippai:rust-patterns
+shlex : value-formatting, command-line-interface
 shuteye: os, date-and-time
 sic_core: multimedia::images
 sigv4: command-line-utilities, web-programming
@@ -963,6 +968,7 @@ xml-rs: parser-implementations, encoding
 xml_sax: parser-implementations, web-programming
 xmltree: parser-implementations
 xpc-connection: os::macos-apis
+xsv: command-line-utilities, text-processing
 yellowsun: cryptography::cryptocurrencies
 ymlctx: config
 yoga: gui

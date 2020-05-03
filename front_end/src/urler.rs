@@ -42,16 +42,16 @@ impl Urler {
     }
 
     /// Summary of all dependencies
-    pub fn deps(&self, krate: &RichCrateVersion) -> String {
+    pub fn deps(&self, krate: &RichCrateVersion) -> Option<String> {
         match krate.origin() {
             Origin::CratesIo(_) => {
-                format!("https://deps.rs/crate/{}/{}", encode(&krate.short_name()), encode(krate.version()))
+                None
             },
             Origin::GitHub {repo, ..} => {
-                format!("https://deps.rs/repo/github/{}/{}", encode(&repo.owner), encode(&repo.repo))
+                Some(format!("https://deps.rs/repo/github/{}/{}", encode(&repo.owner), encode(&repo.repo)))
             },
             Origin::GitLab {repo, ..} => {
-                format!("https://deps.rs/repo/gitlab/{}/{}", encode(&repo.owner), encode(&repo.repo))
+                Some(format!("https://deps.rs/repo/gitlab/{}/{}", encode(&repo.owner), encode(&repo.repo)))
             },
         }
     }

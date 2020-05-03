@@ -335,7 +335,11 @@
         <section id="deps">
           @if let Some((normal, dev, build)) = c.direct_dependencies() {
             @if c.has_runtime_deps() || c.ver.links().is_some() {
-              <h4><a href="@url.deps(&c.ver)">Dependencies</a></h4>
+              @if let Some(depsurl) = url.deps(&c.ver) {
+                <h4><a href="@depsurl">Dependencies</a></h4>
+              } else {
+                <h4>Dependencies</h4>
+              }
             } else {
               <h4>No runtime deps</h4>
             }

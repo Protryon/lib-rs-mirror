@@ -70,6 +70,7 @@ pub struct CratePage<'a> {
     changelog_url: Option<String>,
     related_crates: Option<Vec<Origin>>,
     keywords_populated: Vec<(String, bool)>,
+    parent_crate: Option<Arc<RichCrateVersion>>,
 }
 
 /// Helper used to find most "interesting" versions
@@ -111,23 +112,33 @@ pub(crate) struct Contributors<'a> {
 
 impl<'a> CratePage<'a> {
     pub async fn new(all: &'a RichCrate, ver: &'a RichCrateVersion, kitchen_sink: &'a KitchenSink, markup: &'a Renderer) -> CResult<CratePage<'a>> {
-        let top_category = kitchen_sink.top_category(ver).await
+        let (top_category, parent_crate, changelog_url, related_crates, keywords_populated) = futures::join!(
+            kitchen_sink.top_category(ver),
+            kitchen_sink.parent_crate(ver),
+            kitchen_sink.changelog_url(ver),
+            Self::make_related_crates(kitchen_sink, ver),
+            kitchen_sink.keywords_populated(ver),
+        );
+        let top_category = top_category
             .and_then(|(top, slug)| CATEGORIES.from_slug(slug).0.last().map(|&c| (top, c)));
-        let is_build_or_dev = kitchen_sink.is_build_or_dev(ver.origin()).await?;
 
-        let (dependents_stats, former_glory, top_keyword, all_contributors) = futures::try_join!(
+        let (is_build_or_dev, parent_crate, dependents_stats, former_glory, top_keyword, all_contributors) = futures::try_join!(
+            async { Ok(kitchen_sink.is_build_or_dev(ver.origin()).await?) },
+            async {
+                Ok(if let Some(origin) = parent_crate {
+                    Some(kitchen_sink.rich_crate_version_async(&origin).await?)
+                } else {
+                    None
+                })
+            },
             async {
                 Ok(kitchen_sink.crates_io_dependents_stats_of(all.origin()).await?)
             },
             kitchen_sink.former_glory(all.origin()),
             kitchen_sink.top_keyword(all),
-            kitchen_sink.all_contributors(ver))?;
+            kitchen_sink.all_contributors(ver),
+        )?;
 
-        let (changelog_url, related_crates, keywords_populated) = futures::join!(
-            kitchen_sink.changelog_url(ver),
-            Self::make_related_crates(kitchen_sink, ver),
-            kitchen_sink.keywords_populated(ver),
-        );
         let deps = kitchen_sink.all_dependencies_flattened(ver);
         let api_reference_url = if kitchen_sink.has_docs_rs(ver.origin(), ver.short_name(), ver.version()).await {
             Some(format!("https://docs.rs/{}", ver.short_name()))
@@ -153,6 +164,7 @@ impl<'a> CratePage<'a> {
             changelog_url,
             related_crates,
             keywords_populated,
+            parent_crate,
         };
         let (sizes, lang_stats, viral_license) = page.crate_size_and_viral_license(deps?).await?;
         page.sizes = Some(sizes);
@@ -245,12 +257,8 @@ impl<'a> CratePage<'a> {
         }
     }
 
-    pub fn parent_crate(&self) -> Option<Arc<RichCrateVersion>> {
-        self.handle.enter(|| futures::executor::block_on(async {
-            let origin = self.kitchen_sink.parent_crate(self.ver).await?;
-            self.kitchen_sink.rich_crate_version_async(&origin).await
-                .map_err(|e| eprintln!("parent crate: {} {:?}", e, origin)).ok()
-        }))
+    pub fn parent_crate(&self) -> Option<&RichCrateVersion> {
+        self.parent_crate.as_deref()
     }
 
     pub fn render_markdown_str(&self, s: &str) -> templates::Html<String> {

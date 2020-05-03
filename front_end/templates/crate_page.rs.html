@@ -213,20 +213,29 @@
                       }
                     } else {
                       @if d.direct > 0 {
-                      @if d.deps != d.direct {
-                        Used in <b>@c.format_number(d.deps)</b> crate@if d.deps != 1 {s}
+                      @if d.deps != d.direct && d.former_glory > 0.72 {
                           @if d.direct == 1 {
+                            Used in <b>@c.format_number(d.deps)</b> crate@if d.deps != 1 {s}
                             @if let Some(name) = d.name {
                               (via <a href="@url.crate_by_origin(&Origin::from_crates_io_name(name))">@name</a>)
                             }
                           } else {
                             @if let Some(link) = url.reverse_deps(c.ver.origin()) {
-                              (<a href="@link">@c.format_number(d.direct)&nbsp;directly</a>)
+                              Used in <a href="@link"><b>@c.format_number(d.deps)</b> crate@if d.deps != 1 {s}
+                              (@c.format_number(d.direct)&nbsp;directly)</a>
                             }
                           }
                       } else {
                         @if let Some(link) = url.reverse_deps(c.ver.origin()) {
-                          Used in <a href="@link"><b>@c.format_number(d.deps)</b>&nbsp;crate@if d.deps != 1 {s}</a>
+                          @if d.former_glory < 0.3 {
+                            <a href="@link">This crate has lost popularity</a>
+                          } else {
+                            @if d.former_glory < 0.6 {
+                              Used in <a href="@link">@if d.direct > 5 {less than} <b>@c.format_number(d.direct)</b>&nbsp;crate@if d.direct != 1 {s}</a>
+                            } else {
+                              Used in <a href="@link">@if d.former_glory < 0.7 && d.deps > 5 {less than} <b>@c.format_number(d.deps)</b>&nbsp;crate@if d.deps != 1 {s}</a>
+                            }
+                          }
                         }
                       }
                     }}

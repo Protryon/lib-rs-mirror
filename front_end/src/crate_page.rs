@@ -240,7 +240,7 @@ impl<'a> CratePage<'a> {
             deps: d.runtime.def as u32 + d.runtime.opt as u32 + d.build.def as u32 + d.build.opt as u32 + d.dev as u32,
             direct: d.direct.all() as u32,
             name: d.rev_dep_names.iter().next(),
-            former_glory: self.former_glory,
+            former_glory: self.former_glory.map(|(f, _)| f).unwrap_or(1.),
         };
         if d.deps == 0 {
             return None;
@@ -907,7 +907,7 @@ pub struct DepsStatsResult<'a> {
     pub deps: u32,
     pub direct: u32,
     pub name: Option<&'a str>,
-    pub former_glory: Option<(f64, u32)>,
+    pub former_glory: f64,
 }
 
 #[derive(Debug, Copy, Clone, Default)]

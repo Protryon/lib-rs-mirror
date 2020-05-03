@@ -1,3 +1,4 @@
+use kitchen_sink::RevDependencies;
 use crate::download_graph::DownloadsGraph;
 use crate::templates;
 use crate::urler::Urler;
@@ -65,6 +66,7 @@ pub struct CratePage<'a> {
     handle: Handle,
     api_reference_url: Option<String>,
     former_glory: Option<(f64, u32)>,
+    dependents_stats: Option<&'a RevDependencies>,
 }
 
 /// Helper used to find most "interesting" versions
@@ -110,7 +112,10 @@ impl<'a> CratePage<'a> {
             .and_then(|(top, slug)| CATEGORIES.from_slug(slug).0.last().map(|&c| (top, c)));
         let is_build_or_dev = kitchen_sink.is_build_or_dev(ver.origin()).await?;
 
-        let (former_glory, top_keyword, all_contributors) = futures::try_join!(
+        let (dependents_stats, former_glory, top_keyword, all_contributors) = futures::try_join!(
+            async {
+                Ok(kitchen_sink.crates_io_dependents_stats_of(all.origin()).await?)
+            },
             kitchen_sink.former_glory(all.origin()),
             kitchen_sink.top_keyword(all),
             kitchen_sink.all_contributors(ver))?;
@@ -135,6 +140,7 @@ impl<'a> CratePage<'a> {
             handle: Handle::current(),
             api_reference_url,
             former_glory,
+            dependents_stats,
         };
         let (sizes, lang_stats, viral_license) = page.crate_size_and_viral_license(deps?).await?;
         page.sizes = Some(sizes);
@@ -204,16 +210,18 @@ impl<'a> CratePage<'a> {
         self.is_build_or_dev
     }
 
-    pub fn dependents_stats(&self) -> Option<(u32, u32, Option<&str>)> {
-        self.handle.enter(|| futures::executor::block_on(self.kitchen_sink.crates_io_dependents_stats_of(self.ver.origin())))
-        .map_err(|e| eprintln!("{}", e))
-        .ok().and_then(|x| x)
-        .map(|d| (
-            d.runtime.def as u32 + d.runtime.opt as u32 + d.build.def as u32 + d.build.opt as u32 + d.dev as u32,
-            d.direct.all() as u32,
-            d.rev_dep_names.iter().next()
-        ))
-        .filter(|d| d.0 > 0)
+    pub fn dependents_stats(&self) -> Option<DepsStatsResult> {
+        let d = self.dependents_stats?;
+        let d = DepsStatsResult {
+            deps: d.runtime.def as u32 + d.runtime.opt as u32 + d.build.def as u32 + d.build.opt as u32 + d.dev as u32,
+            direct: d.direct.all() as u32,
+            name: d.rev_dep_names.iter().next(),
+            former_glory: self.former_glory,
+        };
+        if d.deps == 0 {
+            return None;
+        }
+        Some(d)
     }
 
     /// If true, there are many other crates with this keyword. Populated first.
@@ -873,6 +881,13 @@ impl<'a> CratePage<'a> {
             _ => false,
         }
     }
+}
+
+pub struct DepsStatsResult<'a> {
+    pub deps: u32,
+    pub direct: u32,
+    pub name: Option<&'a str>,
+    pub former_glory: Option<(f64, u32)>,
 }
 
 #[derive(Debug, Copy, Clone, Default)]

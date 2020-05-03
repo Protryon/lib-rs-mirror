@@ -205,30 +205,28 @@
                     <b>@c.format_number(dl)</b> downloads per month
                   }
                 }
-                @if let Some((deps, direct, name)) = c.dependents_stats() {
+                @if let Some(d) = c.dependents_stats() {
                   <br>
-                    @if deps == 1 && direct == 1 {
-                      @if let Some(name) = name {
+                    @if d.deps == 1 && d.direct == 1 {
+                      @if let Some(name) = d.name {
                         Used in <a href="@url.crate_by_origin(&Origin::from_crates_io_name(name))">@name</a>
                       }
                     } else {
-                      @if direct > 0 {
-                      @if deps != direct {
-                        Used in <b>@c.format_number(deps)</b> crate@if deps != 1 {s}
-                          @if direct == 1 {
-                            @if let Some(name) = name {
-                              @if let Some(link) = url.reverse_deps(&Origin::from_crates_io_name(name)) {
-                                (via <a href="@link">@name</a>)
-                              }
+                      @if d.direct > 0 {
+                      @if d.deps != d.direct {
+                        Used in <b>@c.format_number(d.deps)</b> crate@if d.deps != 1 {s}
+                          @if d.direct == 1 {
+                            @if let Some(name) = d.name {
+                              (via <a href="@url.crate_by_origin(&Origin::from_crates_io_name(name))">@name</a>)
                             }
                           } else {
                             @if let Some(link) = url.reverse_deps(c.ver.origin()) {
-                              (<a href="@link">@c.format_number(direct)&nbsp;directly</a>)
+                              (<a href="@link">@c.format_number(d.direct)&nbsp;directly</a>)
                             }
                           }
                       } else {
                         @if let Some(link) = url.reverse_deps(c.ver.origin()) {
-                          Used in <a href="@link"><b>@c.format_number(deps)</b>&nbsp;crate@if deps != 1 {s}</a>
+                          Used in <a href="@link"><b>@c.format_number(d.deps)</b>&nbsp;crate@if d.deps != 1 {s}</a>
                         }
                       }
                     }}

@@ -2009,6 +2009,49 @@ impl KitchenSink {
         Ok(monthly)
     }
 
+    /// 1.0 - still at its peak
+    /// < 1 - heading into obsolescence
+    /// < 0.3 - dying
+    ///
+    /// And returns number of active direct deps
+    pub async fn former_glory(&self, origin: &Origin) -> CResult<Option<(f64, u32)>> {
+        let mut direct_rev_deps = 0;
+        let mut indirect_reverse_optional_deps = 0;
+        if let Some(deps) = self.crates_io_dependents_stats_of(origin).await? {
+            direct_rev_deps = deps.direct.all();
+            indirect_reverse_optional_deps = (deps.runtime.def as u32 + deps.runtime.opt as u32)
+                .max(deps.dev as u32)
+                .max(deps.build.def as u32 + deps.build.opt as u32);
+        }
+
+        let depender_changes = self.depender_changes(origin)?;
+        if let Some(current_active) = depender_changes.last() {
+            let peak_active = depender_changes.iter().map(|m| m.running_total()).max().unwrap_or(0);
+            // laplace smooth unpopular crates
+            let min_relevant_dependers = 15;
+            let former_glory = 1f64.min((current_active.running_total() + min_relevant_dependers + 1) as f64 / (peak_active + min_relevant_dependers) as f64);
+
+            // If a crate is used mostly indirectly, it matters less whether it's losing direct users
+            let indirect_to_direct_ratio = 1f64.min((direct_rev_deps * 3) as f64 / indirect_reverse_optional_deps.max(1) as f64);
+            let indirect_to_direct_ratio = (0.9 + indirect_to_direct_ratio) * 0.5;
+            let former_glory = former_glory * indirect_to_direct_ratio + (1. - indirect_to_direct_ratio);
+
+            // if it's being mostly removed, accelerate its demise. laplace smoothed for small crates
+            let removals_fraction = 1. - (current_active.expired_total + 10) as f64 / (current_active.removed_total + current_active.expired_total + 10) as f64;
+            let mut powf = 1.0 + removals_fraction * 0.7;
+
+            // if it's clearly declining, accelerate its demise
+            if let Some(last_quarter) = depender_changes.get(depender_changes.len().saturating_sub(3)) {
+                if last_quarter.running_total() > current_active.running_total() {
+                    powf += 0.5;
+                }
+            }
+            Ok(Some((former_glory.powf(powf), current_active.running_total())))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub async fn index_crates_io_crate_owners(&self, origin: &Origin, mut owners: Vec<CrateOwner>) -> CResult<()> {
         for o in &mut owners {
             if o.github_id == o.invited_by_github_id {

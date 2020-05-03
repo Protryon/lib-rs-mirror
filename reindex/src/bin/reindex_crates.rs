@@ -249,11 +249,9 @@ async fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrat
         dependency_freshness,
     };
 
-    let mut direct_rev_deps = 0;
-    let mut indirect_reverse_optional_deps = 0;
     if let Some(deps) = crates.crates_io_dependents_stats_of(k.origin()).await.expect("depsstats") {
-        direct_rev_deps = deps.direct.all();
-        indirect_reverse_optional_deps = (deps.runtime.def as u32 + deps.runtime.opt as u32)
+        let direct_rev_deps = deps.direct.all();
+        let indirect_reverse_optional_deps = (deps.runtime.def as u32 + deps.runtime.opt as u32)
             .max(deps.dev as u32)
             .max(deps.build.def as u32 + deps.build.opt as u32);
 
@@ -273,34 +271,7 @@ async fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrat
     let temp_score = temp_score.total();
 
     let mut score = (base_score + temp_score) * 0.5;
-
-    let depender_changes = crates.depender_changes(all.origin()).expect("depender_changes");
-    if let Some(current_active) = depender_changes.last() {
-        let peak_active = depender_changes.iter().map(|m| m.running_total()).max().unwrap_or(0);
-        // laplace smooth unpopular crates
-        let min_relevant_dependers = 15;
-        let former_glory = 1f64.min((current_active.running_total() + min_relevant_dependers + 1) as f64 / (peak_active + min_relevant_dependers) as f64);
-
-        // If a crate is used mostly indirectly, it matters less whether it's losing direct users
-        let indirect_to_direct_ratio = 1f64.min((direct_rev_deps * 3) as f64 / indirect_reverse_optional_deps.max(1) as f64);
-        let indirect_to_direct_ratio = (0.9 + indirect_to_direct_ratio) * 0.5;
-        let former_glory = former_glory * indirect_to_direct_ratio + (1. - indirect_to_direct_ratio);
-
-        // if it's being mostly removed, accelerate its demise. laplace smoothed for small crates
-        let removals_fraction = 1. - (current_active.expired_total + 10) as f64 / (current_active.removed_total + current_active.expired_total + 10) as f64;
-        let mut powf = 1.0 + removals_fraction * 0.7;
-
-        // if it's clearly declining, accelerate its demise
-        if let Some(last_quarter) = depender_changes.get(depender_changes.len().saturating_sub(3)) {
-            if last_quarter.running_total() > current_active.running_total() {
-                powf += 0.5;
-            }
-        }
-        let former_glory = former_glory.powf(powf);
-        eprintln!("former glory: a{:.3}/t{:.3} r{:03}/e{:03} ^{:.3} d{:.3}/i{:.3} = {:.3} # {}", peak_active, current_active.running_total(),
-            current_active.removed_total, current_active.expired_total,
-            powf,
-            direct_rev_deps, indirect_reverse_optional_deps, former_glory, all.origin().to_str());
+    if let Some((former_glory, _)) = crates.former_glory(all.origin()).await.expect("former_glory") {
         score *= former_glory;
     }
 

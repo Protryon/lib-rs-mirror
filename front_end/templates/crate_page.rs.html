@@ -206,14 +206,14 @@
                   }
                 }
                 @if let Some(d) = c.dependents_stats() {
+                  @if d.direct > 0 {
                   <br>
-                    @if d.deps == 1 && d.direct == 1 {
+                    @if d.direct == 1 && (d.deps == 1 || d.former_glory < 0.8) {
                       @if let Some(name) = d.name {
                         Used in <a href="@url.crate_by_origin(&Origin::from_crates_io_name(name))">@name</a>
                       }
                     } else {
-                      @if d.direct > 0 {
-                      @if d.deps != d.direct && d.former_glory > 0.72 {
+                      @if d.deps != d.direct && d.former_glory > 0.7 {
                           @if d.direct == 1 {
                             Used in <b>@c.format_number(d.deps)</b> crate@if d.deps != 1 {s}
                             @if let Some(name) = d.name {
@@ -230,16 +230,12 @@
                           @if d.former_glory < 0.3 {
                             <a href="@link">This crate has lost popularity</a>
                           } else {
-                            @if d.former_glory < 0.6 {
-                              Used in <a href="@link">@if d.direct > 5 {less than} <b>@c.format_number(d.direct)</b>&nbsp;crate@if d.direct != 1 {s}</a>
-                            } else {
-                              Used in <a href="@link">@if d.former_glory < 0.7 && d.deps > 5 {less than} <b>@c.format_number(d.deps)</b>&nbsp;crate@if d.deps != 1 {s}</a>
-                            }
+                            Used in <a href="@link">@if d.direct > 5 {less than} <b>@c.format_number(d.direct)</b>&nbsp;crate@if d.direct != 1 {s}</a>
                           }
                         }
                       }
-                    }}
-                }
+                    }
+                }}
               </p>
             </section>
             <section id="sloc">

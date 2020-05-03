@@ -184,6 +184,7 @@ diesel: databases
 differential-geometry: science::math
 direction: rust-patterns
 ditto: concurrency, data-structures
+dlopen: os
 dmg: os::macos-apis, filesystem
 dockerfile-parser: parser-implementations
 docstrings: parser-implementations

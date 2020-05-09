@@ -1,6 +1,6 @@
 [package]
 name = "crates-server"
-version = "0.14.5"
+version = "0.14.6"
 authors = ["Kornel <kornel@geekhood.net>"]
 edition = "2018"
 description = "Crates.rs web server"
@@ -16,28 +16,28 @@ assets = [
 ]
 
 [dependencies]
-actix-web = "2"
-env_logger = "0.7"
-log = "0.4.6"
-render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git", version = "0.7" }
+actix-web = "2.0.0"
+env_logger = "0.7.1"
+log = "0.4.8"
+render_readme = { path = "../render_readme", version = "0.7" }
 search_index = { path = "../search_index" }
 repo_url = { path = "../repo_url" }
 kitchen_sink = { path = "../kitchen_sink", version = "0.9" }
 front_end = { path = "../front_end", version = "0.4" }
 urlencoding = "1.0.0"
-failure = "0.1.5"
-tokio = { version = "0.2.11", features = ["rt-threaded", "macros", "time"] }
+failure = "0.1.8"
+tokio = { version = "0.2.20", features = ["rt-threaded", "macros", "time"] }
 categories = { path = "../categories" }
-arc-swap = "0.4.4"
-signal-hook = "0.1.12"
+arc-swap = "0.4.6"
+signal-hook = "0.1.14"
 locale = "0.2.2"
-cap = "0.1"
-actix-rt = "1.0.0"
-futures = "0.3.1"
+cap = "0.1.0"
+actix-rt = "1.1.1"
+futures = "0.3.5"
 actix-files = "0.2.1"
 actix-threadpool = "0.3.1"
 either = "1.5.3"
 qstring = "0.7.2"
-chrono = "0.4.10"
-blake3 = { version = "0.2.2", default-features = false }
-base64 = "0.12"
+chrono = "0.4.11"
+blake3 = { version = "0.3.3", default-features = false }
+base64 = "0.12.1"

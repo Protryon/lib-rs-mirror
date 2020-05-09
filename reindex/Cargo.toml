@@ -1,5 +1,5 @@
 [package]
-version = "0.3.3"
+version = "0.3.4"
 edition = "2018"
 name = "reindex"
 authors = ["Kornel <kornel@geekhood.net>"]
@@ -13,7 +13,7 @@ user_db = { path = "../user_db", version = "0.3" }
 failure = "0.1.6"
 rand = "0.7.2"
 search_index = { path = "../search_index" }
-render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git" }
+render_readme = { path = "../render_readme" }
 ranking = { path = "../ranking" }
 either = "1.5.3"
 parking_lot = "0.10.0"

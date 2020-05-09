@@ -1,7 +1,7 @@
 [package]
 edition = "2018"
 name = "front_end"
-version = "0.4.2"
+version = "0.4.3"
 authors = ["Kornel <kornel@geekhood.net>"]
 autobins = true
 
@@ -15,7 +15,7 @@ ructe = "0.9"
 [dependencies]
 kitchen_sink = { path = "../kitchen_sink", version = "0.9" }
 rich_crate = { path = "../rich_crate" }
-render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git", version = "0.7.0" }
+render_readme = { path = "../render_readme", version = "0.7.0" }
 categories = { path = "../categories" }
 udedokei = { path = "../udedokei" }
 search_index = { path = "../search_index" }

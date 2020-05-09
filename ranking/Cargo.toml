@@ -1,6 +1,6 @@
 [package]
 name = "ranking"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Kornel <kornel@geekhood.net>"]
 edition = "2018"
 
@@ -12,5 +12,5 @@ path = "src/lib_ranking.rs"
 rich_crate = { path = "../rich_crate" }
 chrono = "0.4.10"
 cargo_toml = "0.8.0"
-render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git", version = "0.7" }
+render_readme = { path = "../render_readme", version = "0.7" }
 semver = "0.9.0"

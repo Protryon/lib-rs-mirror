@@ -2,7 +2,7 @@
 edition = "2018"
 description = "Analyze git repository containing Cargo crates"
 name = "crate_git_checkout"
-version = "0.4.5"
+version = "0.4.6"
 authors = ["Kornel <kornel@geekhood.net>"]
 
 [lib]
@@ -12,7 +12,7 @@ path = "src/crate_git_checkout.rs"
 [dependencies]
 git2 = "0.13"
 cargo_toml = "0.8.0"
-render_readme = { git = "https://gitlab.com/crates.rs/render_readme.git" }
+render_readme = { path = "../render_readme" }
 repo_url = { path = "../repo_url" }
 failure = "0.1.6"
 urlencoding = "1.0.0"

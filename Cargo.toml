@@ -57,6 +57,3 @@ cargo_toml = { path = "cargo_toml" }
 cargo_author = { path = "cargo_author" }
 onig = { git = "https://github.com/kornelski/rust-onig" }
 onig_sys = { git = "https://github.com/kornelski/rust-onig" }
-
-[patch.'https://gitlab.com/crates.rs/render_readme.git']
-render_readme = { path = "render_readme" }

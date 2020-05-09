@@ -33,10 +33,12 @@ aquaenv: os::macos-apis, command-line-utilities, gui
 arcon: science
 argh: command-line-interface
 arthas: database-implementations
+artichoke-core : development-tools
 ascon: cryptography
 askii: command-line-utilities, command-line-interface
 asn1rs: parser-implementations, encoding
 ass-rs: web-programming
+assembly-core: development-tools
 ast_node: parser-implementations
 async-codec: asynchronous
 atomicring: concurrency, data-structures
@@ -108,6 +110,7 @@ casperlabs-engine-grpc-server: cryptography::cryptocurrencies
 casperlabs-engine-test-support: cryptography::cryptocurrencies
 casperlabs-types: cryptography::cryptocurrencies
 cb2: command-line-utilities
+cb2_core: development-tools
 cddl: parser-implementations
 celery-rs-core: asynchronous
 celery: asynchronous
@@ -115,6 +118,7 @@ cgl: rendering::graphics-api, os::macos-apis
 ch8asm: emulators, development-tools
 chariot_slp: games, parser-implementations
 checkm: science, parser-implementations
+chi:development-tools
 chillup: web-programming
 chrobry-core: template-engines
 chromatica: multimedia::images
@@ -159,6 +163,7 @@ cqrs-core: asynchronous
 crate-race: development-tools::profiling
 crates-index-diff: development-tools
 crates_io_api: web-programming
+crc32_digest : algorithms
 cron-parser: parser-implementations
 crossterm_style: command-line-interface
 crossterm_utils : command-line-interface
@@ -201,6 +206,7 @@ dicom-core: multimedia::images
 diesel: databases
 differential-geometry: science::math
 direction: rust-patterns
+dirs-sys : filesystem, os
 dither: multimedia::images
 ditto: concurrency, data-structures
 dlopen: os
@@ -281,6 +287,8 @@ fec: encoding
 fedora-prime: os::unix-apis, command-line-utilities
 festive: development-tools::testing
 ff: algorithms
+file-metadata  : filesystem, os::macos-apis
+file-metadata-mditem-macros : filesystem, os::macos-apis
 file_scanner: parser-implementations
 filetime: filesystem
 fin_data: value-formatting
@@ -361,6 +369,7 @@ graftpress_core: web-programming
 grammarly: web-programming
 graphcore: data-structures
 graviton_core: development-tools
+greenie-proc : development-tools, rust-patterns
 grep_json_deserialize: parser-implementations
 grin-miner: cryptography::cryptocurrencies
 grin: cryptography::cryptocurrencies
@@ -399,6 +408,7 @@ httpdate: date-and-time, parser-implementations
 httpserv: development-tools, web-programming::http-server
 hubcaps: web-programming
 humanize-rs: parser-implementations, value-formatting
+hwinfo: hardware-support
 hybrid-clocks: algorithms
 hyper-router: web-programming::http-server
 i3_ipc: network-programming
@@ -467,6 +477,7 @@ k8s-openapi: development-tools
 kanji-number-parser: parser-implementations, internationalization
 kekbit-codecs: encoding
 ketos: development-tools
+keychain-services : authentication, os::macos-apis, hardware-support, cryptography
 keychain-services: os::macos-apis, authentication
 kf-protocol-transport: asynchronous, network-programming
 kf-protocol: asynchronous, network-programming
@@ -496,6 +507,7 @@ libblas-sys: science::math
 libc-interface : os
 libdoh: network-programming, asynchronous
 libinput-sys: os
+libipld-core : network-programming
 liblapack-sys: science::math
 libloadorder-ffi: game-engines
 libnghttp2-sys: web-programming::http-server
@@ -504,6 +516,7 @@ librdkafka-sys: asynchronous
 librespot-core: multimedia::audio
 librsyncr: network-programming
 libsbc-sys: hardware-support
+libswe-sys : science
 libtimew: parser-implementations
 license-exprs : parser-implementations
 ligen-core: development-tools
@@ -521,6 +534,7 @@ log_domain: science::math
 log_kv: database-implementations
 loggify: development-tools::debugging
 lone-ranger : multimedia, web-programming
+lonsdaleite:rendering::graphics-api, os::macos-apis
 loop-rs: command-line-utilities
 lsp-codec: asynchronous
 lttb: algorithms
@@ -539,6 +553,7 @@ lv2rs: multimedia::audio
 lw-webdriver: development-tools::testing
 lyon_core: multimedia::images, rendering::graphics-api
 mac: rust-patterns
+mac_utun : os::macos-apis, network-programming
 macchanger: os, network-programming
 mach: os::macos-apis
 magenta-sys: os
@@ -576,6 +591,7 @@ mockery: development-tools::testing
 modbot: web-programming
 modbus-core: network-programming
 moltenvk_deps: os::macos-apis, rendering::graphics-api
+monger-core : databases
 monger: databases
 monotron-api : embedded
 moonlander-gp: science::machine-learning
@@ -681,6 +697,7 @@ pathfinder_geometry: science::math
 paw-attributes: development-tools::procedural-macro-helpers
 paw: parser-implementations
 pcap-rs : parser-implementations, network-programming
+pcb-core : development-tools
 pcd-rs: parser-implementations
 pdcurses-sys: command-line-interface
 perkv: database-implementations
@@ -711,6 +728,7 @@ prodash: asynchronous, visualization
 project-cleanup: command-line-utilities, development-tools
 prometheus-parser: parser-implementations
 prometheus_wireguard_exporter: network-programming
+psyche-core : game-engines
 psyche-core: science::machine-learning
 pulsar: network-programming
 pwasm-abi-derive: cryptography::cryptocurrencies
@@ -783,6 +801,7 @@ rmatrix: command-line-utilities
 rnix: parser-implementations
 roadmap: data-structures
 roads-from-nd: multimedia::images
+robin_core : development-tools
 robinhood: web-programming
 rocket-etag-if-none-match: web-programming::http-server
 roff: text-processing
@@ -810,6 +829,7 @@ rubrail: os::macos-apis
 rumq-core: network-programming
 rusoto_credential: authentication
 rusp: network-programming
+rust-apple-photos : databases, os::macos-apis
 rust-easy-router: web-programming::http-server
 rust_fixed_width: data-structures
 rusta: games, parser-implementations
@@ -880,6 +900,7 @@ speculo: development-tools
 spinning_top: concurrency
 splinter: cryptography::cryptocurrencies
 sqlparser: parser-implementations
+sqlx-core :databases
 ssb_parser: parser-implementations
 sse-codec: web-programming
 stamm: science::machine-learning
@@ -931,6 +952,7 @@ termplay: multimedia::images, multimedia::video
 text_io: text-processing
 tgaimage: multimedia::images
 thingvellir: concurrency
+thorin: development-tools::debugging
 thrift_codec: encoding, web-programming
 time-parse: date-and-time, parser-implementations
 timeago: date-and-time
@@ -979,6 +1001,7 @@ udp_netmsg: network-programming
 ul: rendering::graphics-api
 ullage: development-tools
 ultrastar-txt: parser-implementations
+unison-fsmonitor : os::macos-apis, command-line-utilities
 uploads-im-client: web-programming
 urdf-rs: parser-implementations
 uriparse: parser-implementations, web-programming
@@ -1006,6 +1029,7 @@ w_result: rust-patterns
 wagyu: cryptography::cryptocurrencies
 wake-on-lan: os, network-programming
 waybackrust: web-programming
+wayk_core : network-programming
 wcxhead: development-tools
 webhook_listener: web-programming::http-server
 webidl: parser-implementations
@@ -1028,11 +1052,13 @@ xio_job_to_blockdiag: command-line-utilities
 xml-rs: parser-implementations, encoding
 xml_sax: parser-implementations, web-programming
 xmltree: parser-implementations
+xpc-connection-sys : os::macos-apis
 xpc-connection: os::macos-apis
 xsv: command-line-utilities, text-processing
 yellowsun: cryptography::cryptocurrencies
 ymlctx: config
 yoga: gui
+yoin-core : internationalization
 yubirs: authentication
 zapper_derive: development-tools::procedural-macro-helpers
 zemeroth: games

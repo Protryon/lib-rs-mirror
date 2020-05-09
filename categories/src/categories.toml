@@ -846,3 +846,5 @@ preference = 1.2
 # """
 # short-description = """
 # Everything else goes here."""
+# preference = 0.01
+# obvious-keywords = []

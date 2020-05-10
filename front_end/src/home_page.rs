@@ -121,9 +121,7 @@ impl<'a> HomePage<'a> {
                     .cloned()
                     .collect();
 
-                // skip topmost popular, because some categories have literally just 1 super-popular crate,
-                // which elevates the whole category
-                for c in top.iter().skip(1) {
+                for c in top.iter() {
                     if let Ok(Some(d)) = self.crates.downloads_per_month_or_equivalent(c).await {
                         dl += d;
                     }

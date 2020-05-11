@@ -16,6 +16,7 @@ mod not_found_page;
 mod reverse_dependencies;
 mod search_page;
 mod urler;
+mod crev;
 pub use crate::not_found_page::*;
 pub use crate::search_page::*;
 use futures::future::try_join_all;
@@ -28,6 +29,7 @@ use chrono::prelude::*;
 use failure;
 use failure::ResultExt;
 use kitchen_sink::Compat;
+use kitchen_sink::Review;
 use kitchen_sink::RichAuthor;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::{stopped, KitchenSinkErr};
@@ -181,6 +183,17 @@ pub async fn render_install_page(out: &mut impl Write, ver: &RichCrateVersion, k
     let urler = Urler::new(None); // Don't set self-crate, because we want to link back to crate page
     let c = crate::install_page::InstallPage::new(ver, kitchen_sink, renderer).await;
     templates::install(out, &urler, &c).context("install page io")?;
+    Ok(())
+}
+
+/// See `crev.rs.html`
+pub async fn render_crate_reviews(out: &mut impl Write, reviews: &[Review], ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
+    if stopped() {
+        Err(KitchenSinkErr::Stopped)?;
+    }
+    let urler = Urler::new(None); // Don't set self-crate, because we want to link back to crate page
+    let c = crate::crev::ReviewsPage::new(reviews, ver, kitchen_sink, renderer).await;
+    templates::crev(out, &urler, &c).context("crev page io")?;
     Ok(())
 }
 

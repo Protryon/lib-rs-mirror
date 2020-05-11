@@ -1,0 +1,70 @@
+@use crate::templates::base;
+@use crate::crev::ReviewsPage;
+@use crate::Urler;
+
+@(url: &Urler, c: &ReviewsPage)
+
+@:base(&c.page(), {
+  <header id="creviews" @if c.ver.is_yanked() {class="yanked"} else {@if c.ver.is_nightly() {class="nightly"}}>
+    <div class="inner-col">
+    <div class="breadcrumbs">
+    <h1>
+      <a href="/"><span>Lib</span>.rs</a>
+    </h1>
+     › <a href="@url.krate(&c.ver)" rel="up">@c.ver.capitalized_name()</a>
+     › Reviews
+    </div>
+    <nav><ul>
+        <li class=active>Reviews</li>
+        <li><a href="@url.crate_by_origin(&c.cargo_crev_origin)">cargo-crev</a></li>
+    </ul></nav>
+    </div>
+  </header>
+  <main>
+    <div class="inner-col">
+        @if c.reviews.is_empty() {
+            <p class="error">This crate has no reviews yet. To add a review, <a href="@url.install(&c.cargo_crev_origin)">set up your <code>cargo-crev</code></a>.</p>
+        } else {
+            <p>@if c.reviews.len() > 1 {These reviews are} else {This review is} from <a href="@url.crate_by_origin(&c.cargo_crev_origin)">Crev, a distributed system for code reviews</a>. To add your review, <a href="@url.install(&c.cargo_crev_origin)">set up <code>cargo-crev</code></a>.</p>
+        }
+        <div class="reviews">
+        @for (fold, latest_warn, r) in &c.reviews {
+            @if *latest_warn {
+                <p>The current version of @c.ver.capitalized_name() is @c.ver.version().</p>
+            }
+            <article class="@c.version_compare(&r.version).0 @if r.comment_markdown.trim_start().is_empty() {no-text}">
+                <div class="h">
+                    <p class=for><span class=version>@r.version <span>@c.version_compare(&r.version).1</span></span>
+                        <span class=rating>Rating: <span class="@c.rating_class(r.rating)">@c.rating_label(r.rating)
+                            @if r.unmaintained { + Unmaintained }
+                        </span></span>
+                        <span class=thoroughness>Thoroughness: <span class="@c.level_class(r.thoroughness)">@c.level_label(r.thoroughness)</span></span>
+                        <span class=understanding>Understanding: <span class="@c.level_class(r.understanding)">@c.level_label(r.understanding)</span></span>
+                    </p>
+                    <p class=by>by @if let Some(author_url) = r.author_url.as_ref() {
+                            <a rel="nofollow ugc noopener" href="@author_url#@r.author_id">@c.author_name(r)</a>
+                        } else {
+                            @c.author_name(r)
+                        }
+                        on <span class="date">@r.date.format("%Y-%m-%d")</span>
+                    </p>
+                </div>
+                @if !r.comment_markdown.trim_start().is_empty() {
+                    @if *fold {<details><summary>Show review…</summary>}
+                    <div class="comment">
+                        @c.render_comment(&r.comment_markdown)
+                    </div>
+                    @if *fold {</details>}
+                }
+            </article>
+        }
+        </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="inner-col">
+        <p>Back to <a href="@url.krate(&c.ver)" rel="up">@c.ver.capitalized_name()</a>.</p>
+    </div>
+  </footer>
+})

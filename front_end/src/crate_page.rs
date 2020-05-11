@@ -72,6 +72,7 @@ pub struct CratePage<'a> {
     keywords_populated: Vec<(String, bool)>,
     parent_crate: Option<Arc<RichCrateVersion>>,
     downloads_per_month_or_equivalent: Option<usize>,
+    pub has_reviews: bool,
 }
 
 /// Helper used to find most "interesting" versions
@@ -150,6 +151,7 @@ impl<'a> CratePage<'a> {
         } else {
             None
         };
+        let has_reviews = !kitchen_sink.reviews_for_crate(ver.origin()).is_empty();
         let mut page = Self {
             top_keyword,
             all_contributors,
@@ -171,6 +173,7 @@ impl<'a> CratePage<'a> {
             keywords_populated,
             parent_crate,
             downloads_per_month_or_equivalent,
+            has_reviews,
         };
         let (sizes, lang_stats, viral_license) = page.crate_size_and_viral_license(deps?).await?;
         page.sizes = Some(sizes);

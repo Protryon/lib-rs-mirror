@@ -37,10 +37,14 @@ pub use rich_crate::RichDep;
 pub use rich_crate::DependerChangesMonthly;
 pub use rich_crate::{Cfg, Target};
 pub use semver::Version as SemVer;
+pub use creviews::Review;
+pub use creviews::Rating;
+pub use creviews::Level;
 
 use crate::tarball::CrateFile;
 use cargo_toml::Manifest;
 use cargo_toml::Package;
+use creviews::Creviews;
 use categories::Category;
 use chrono::prelude::*;
 use chrono::DateTime;
@@ -173,6 +177,7 @@ pub struct KitchenSink {
     crates_io_owners_cache: TempCache<Vec<CrateOwner>>,
     depender_changes: TempCache<Vec<DependerChanges>>,
     throttle: tokio::sync::Semaphore,
+    crev: Arc<Creviews>,
     data_path: PathBuf,
 }
 
@@ -194,11 +199,15 @@ impl KitchenSink {
         tokio::task::block_in_place(|| {
         let main_cache_dir = data_path.to_owned();
 
-        let ((crates_io, gh), index) = rayon::join(|| rayon::join(
+        let ((crates_io, gh), (index, crev)) = rayon::join(|| rayon::join(
                 || crates_io_client::CratesIoClient::new(data_path),
                 || github_info::GitHub::new(&data_path.join("github.db"), github_token)),
-            || Index::new(data_path));
+            || rayon::join(
+                || Index::new(data_path),
+                || Creviews::new(),
+            ));
         Ok(Self {
+            crev: Arc::new(crev?),
             crates_io: crates_io.context("cratesio")?,
             index: index.context("index")?,
             url_check_cache: TempCache::new(&data_path.join("url_check.db")).context("urlcheck")?,
@@ -1254,6 +1263,10 @@ impl KitchenSink {
     }
 
     pub async fn update(&self) {
+        let crev = self.crev.clone();
+        rayon::spawn(move || {
+            let _ = crev.update().map_err(|e| eprintln!("crev update: {}", e));
+        });
         self.index.update().await;
     }
 
@@ -1262,6 +1275,14 @@ impl KitchenSink {
         match origin {
             Origin::CratesIo(crate_name) => Ok(self.index.deps_stats().await.map_err(KitchenSinkErr::Deps)?.counts.get(crate_name)),
             _ => Ok(None),
+        }
+    }
+
+    /// Crev reviews
+    pub fn reviews_for_crate(&self, origin: &Origin) -> Vec<creviews::Review> {
+        match origin {
+            Origin::CratesIo(name) => self.crev.reviews_for_crate(name).unwrap_or_default(),
+            _ => vec![],
         }
     }
 

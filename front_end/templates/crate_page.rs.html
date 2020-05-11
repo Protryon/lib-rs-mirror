@@ -126,10 +126,13 @@
     </p>
     <nav><ul>
       @if !c.ver.is_yanked() {
-        <li><a class="button" href="@url.install(c.ver.origin())">Install</a></li>
-      }
-      @if let Some(doc) = c.api_reference_url() {
-        <li><a href="@doc">API reference</a></li>
+        @if c.has_reviews {
+          <li><a class="button" href="@url.reviews(c.ver.origin())">Reviews</a></li>
+        }
+        <li><a class="button" href="@url.install(c.ver.origin())">@if c.has_reviews {Installation} else {Install}</a></li>
+        @if let Some(doc) = c.api_reference_url() {
+          <li><a href="@doc">API reference</a></li>
+        }
       }
       @if let Some((url, label)) = c.repository_link() {
         <li><a href="@url" @if c.homepage_link().is_none() {property="url"}>@label</a></li>

@@ -68,6 +68,15 @@ impl Urler {
         }
     }
 
+    pub fn reviews(&self, origin: &Origin) -> String {
+        match origin {
+            Origin::CratesIo(lowercase_name) => {
+                format!("/crates/{}/crev", encode(lowercase_name))
+            },
+            _ => unreachable!(),
+        }
+    }
+
     pub fn reverse_deps(&self, origin: &Origin) -> Option<String> {
         match origin {
             Origin::CratesIo(lowercase_name) => Some(format!("/crates/{}/rev", encode(lowercase_name))),

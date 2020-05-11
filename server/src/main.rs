@@ -197,6 +197,7 @@ async fn run_server() -> Result<(), failure::Error> {
             .route("/keywords/{keyword}", web::get().to(handle_keyword))
             .route("/crates/{crate}", web::get().to(handle_crate))
             .route("/crates/{crate}/rev", web::get().to(handle_crate_reverse_dependencies))
+            .route("/crates/{crate}/crev", web::get().to(handle_crate_reviews))
             .route("/~{author}", web::get().to(handle_author))
             .route("/install/{crate:.*}", web::get().to(handle_install))
             .route("/debug/{crate:.*}", web::get().to(handle_debug))
@@ -519,6 +520,26 @@ async fn handle_crate_reverse_dependencies(req: HttpRequest) -> Result<HttpRespo
         None => return render_404_page(state, &crate_name, "crate"),
     };
     Ok(serve_cached(render_crate_reverse_dependencies(state.clone(), origin).await?))
+}
+
+async fn handle_crate_reviews(req: HttpRequest) -> Result<HttpResponse, ServerError> {
+    let crate_name = req.match_info().query("crate");
+    println!("crev for {:?}", crate_name);
+    let state: &AServerState = req.app_data().expect("appdata");
+    let crates = state.crates.load();
+    let origin = match Origin::try_from_crates_io_name(&crate_name).filter(|o| crates.crate_exists(o)) {
+        Some(o) => o,
+        None => return render_404_page(state, &crate_name, "crate"),
+    };
+    let state = state.clone();
+    Ok(serve_cached(rt_run_timeout(&state.clone().rt, 30, async move {
+        let crates = state.crates.load();
+        let ver = crates.rich_crate_version_async(&origin).await?;
+        let mut page: Vec<u8> = Vec::with_capacity(32000);
+        let reviews = crates.reviews_for_crate(ver.origin());
+        front_end::render_crate_reviews(&mut page, &reviews, &ver, &crates, &state.markup).await?;
+        Ok::<_, failure::Error>((page, 24*3600, false, None))
+    }).await?))
 }
 
 async fn handle_new_trending(req: HttpRequest) -> Result<HttpResponse, ServerError> {

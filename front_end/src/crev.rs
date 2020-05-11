@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use kitchen_sink::Origin;
 use crate::templates;
 use crate::Page;
@@ -45,6 +46,20 @@ impl<'a> ReviewsPage<'a> {
         }
     }
 
+    pub fn issue_url<'b>(&self, id: &'b str) -> Option<Cow<'b, str>> {
+        if id.starts_with("https://") {
+            return Some(id.into());
+        }
+        if id.starts_with("RUSTSEC-") {
+            return Some(format!("https://github.com/RustSec/advisory-db/blob/master/crates/{}/{}.toml", self.ver.short_name(), id).into());
+        }
+        None
+    }
+
+    pub fn issue_id<'b>(&self, id: &'b str) -> &'b str {
+        id.trim_start_matches("https://")
+    }
+
     pub fn rating_class(&self, rating: Rating) -> &str {
         match rating {
             Rating::Negative => "negative",
@@ -53,6 +68,7 @@ impl<'a> ReviewsPage<'a> {
             Rating::Strong => "strong",
         }
     }
+
     pub fn rating_label(&self, rating: Rating) -> &str {
         match rating {
             Rating::Negative => "Negative",
@@ -61,6 +77,7 @@ impl<'a> ReviewsPage<'a> {
             Rating::Strong => "Strong Positive",
         }
     }
+
     pub fn level_class(&self, level: Level) -> &str {
         match level {
             Level::None => "none",
@@ -69,6 +86,7 @@ impl<'a> ReviewsPage<'a> {
             Level::High => "high",
         }
     }
+
     pub fn level_label(&self, level: Level) -> &str {
         match level {
             Level::None => "None",
@@ -102,19 +120,19 @@ impl<'a> ReviewsPage<'a> {
         }
     }
 
-    pub fn author_name(&self, review: &Review) -> String {
+    pub fn author_name<'b>(&self, review: &'b Review) -> Cow<'b, str> {
         if let Some(url) = review.author_url.as_ref() {
             let url = url.trim_start_matches("https://");
             if url.starts_with("github.com/") {
                 let mut parts = url.split('/');
                 if let Some(name) = parts.nth(1) {
-                    return name.to_string();
+                    return name.into();
                 }
             }
             let url = url.trim_end_matches("/crev-proofs");
-            url.to_string()
+            url.into()
         } else {
-            format!("Untrusted source ({})", review.author_id)
+            format!("Untrusted source ({})", review.author_id).into()
         }
     }
 

@@ -32,7 +32,7 @@
             @if *latest_warn {
                 <p>The current version of @c.ver.capitalized_name() is @c.ver.version().</p>
             }
-            <article class="@c.version_compare(&r.version).0 @if r.comment_markdown.trim_start().is_empty() {no-text}">
+            <article class="@c.version_compare(&r.version).0 @if r.comment_markdown.trim_start().is_empty() && r.issues.is_empty() {no-text}">
                 <div class="h">
                     <p class=for><span class=version>@r.version <span>@c.version_compare(&r.version).1</span></span>
                         <span class=rating>Rating: <span class="@c.rating_class(r.rating)">@c.rating_label(r.rating)
@@ -49,10 +49,34 @@
                         on <span class="date">@r.date.format("%Y-%m-%d")</span>
                     </p>
                 </div>
-                @if !r.comment_markdown.trim_start().is_empty() {
+                @if !r.comment_markdown.trim_start().is_empty() || !r.issues.is_empty() {
                     @if *fold {<details><summary>Show review…</summary>}
                     <div class="comment">
-                        @c.render_comment(&r.comment_markdown)
+                        @if !r.comment_markdown.trim_start().is_empty() {
+                            @c.render_comment(&r.comment_markdown)
+                        }
+
+                        @if !r.issues.is_empty() {
+                            <ul>
+                                @for issue in &r.issues {
+                                    <li>
+                                        <p>
+                                            <span class=issue-label>Issue:</span> @c.level_label(issue.severity)
+                                            @for id in &issue.ids {
+                                                @if let Some(issue_url) = c.issue_url(id) {
+                                                    (<a href="@issue_url" rel="nofollow ugc noopener">@c.issue_id(id)</a>)
+                                                } else {
+                                                    (@c.issue_id(id))
+                                                }
+                                            }
+                                        </p>
+                                        @if !issue.comment_markdown.trim_start().is_empty() {
+                                            @c.render_comment(&issue.comment_markdown)
+                                        }
+                                    </li>
+                                }
+                            </ul>
+                        }
                     </div>
                     @if *fold {</details>}
                 }

@@ -28,6 +28,22 @@ impl Creviews {
 
         let mut reviews: Vec<_> = db.get_pkg_reviews_for_name("https://crates.io", crate_name).filter_map(|r| {
             let from = r.from();
+            let mut issues = Vec::new();
+            for a in &r.advisories {
+                issues.push(ReviewIssue {
+                    ids: a.ids.clone(),
+                    comment_markdown: a.comment.clone(),
+                    severity: a.severity,
+                });
+            }
+            for a in &r.issues {
+                issues.push(ReviewIssue {
+                    ids: vec![a.id.clone()],
+                    comment_markdown: a.comment.clone(),
+                    severity: a.severity,
+                });
+            }
+
             Some(Review {
                 author_id: from.id.to_string(),
                 author_url: db.lookup_url(&from.id).verified().map(|u| u.url.to_string()),
@@ -38,6 +54,7 @@ impl Creviews {
                 rating: r.review.rating.clone(),
                 comment_markdown: r.comment.clone(),
                 date: r.common.date,
+                issues,
             })
         }).collect();
 
@@ -59,4 +76,11 @@ pub struct Review {
     pub rating: Rating,
     pub comment_markdown: String,
     pub date: Date,
+    pub issues: Vec<ReviewIssue>,
+}
+
+pub struct ReviewIssue {
+    pub ids: Vec<String>,
+    pub severity: Level,
+    pub comment_markdown: String,
 }

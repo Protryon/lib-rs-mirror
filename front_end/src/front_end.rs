@@ -61,6 +61,7 @@ pub struct Page {
     noindex: bool,
     search_meta: bool,
     critical_css_data: Option<&'static str>,
+    #[allow(dead_code)]
     critical_css_dev_url: Option<&'static str>,
     local_css_data: Option<&'static str>,
 }

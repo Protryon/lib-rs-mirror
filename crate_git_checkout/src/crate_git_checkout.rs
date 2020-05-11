@@ -378,6 +378,6 @@ fn is_readme_filename(path: &Path, package: Option<&Package>) -> bool {
 fn git_fs() {
     let repo = Repository::open("../.git").expect("own git repo");
     let (m, w) = find_manifests(&repo).expect("has manifests");
-    assert_eq!(22, m.len());
+    assert_eq!(23, m.len());
     assert_eq!(0, w.len());
 }

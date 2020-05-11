@@ -73,7 +73,7 @@ pub fn auto_keywords(manifest: &Manifest, github_description: Option<&str>, read
     sw.extend(STOPWORDS.iter().map(|s| (*s).to_string())); // TODO: use real stopwords, THEN filter via STOPWORDS again, because multiple Rust-y words are fine
     // normalize space and _ to -
     let r = rake::Rake::new(sw);
-    let rake_keywords = r.run_sentences(d.iter().map(|(_, s)| s.as_str()));
+    let rake_keywords = r.run_fragments(d.iter().map(|(_, s)| s.as_str()));
     let rake_keywords = rake_keywords.iter()
         .map(|k| (
             k.score.min(1.1), //

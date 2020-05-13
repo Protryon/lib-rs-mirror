@@ -1,4 +1,5 @@
 #![allow(unused_imports)]
+use kitchen_sink::ArcRichCrateVersion;
 use crate::Page;
 use categories::Category;
 use categories::CategoryMap;
@@ -25,7 +26,7 @@ pub struct HomeCategory {
     pub pop: usize,
     pub cat: &'static Category,
     pub sub: Vec<HomeCategory>,
-    pub top: Vec<Arc<RichCrateVersion>>,
+    pub top: Vec<ArcRichCrateVersion>,
     dl: usize,
 }
 
@@ -193,7 +194,7 @@ impl<'a> HomePage<'a> {
             .ok()
     }
 
-    pub fn recently_updated_crates(&self) -> Vec<(RichCrate, Arc<RichCrateVersion>)> {
+    pub fn recently_updated_crates(&self) -> Vec<(RichCrate, ArcRichCrateVersion)> {
         self.block(async {
             futures::stream::iter(self.crates
                 .notable_recently_updated_crates(30).await

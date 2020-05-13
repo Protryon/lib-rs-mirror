@@ -1,4 +1,3 @@
-
 github:1password/typeshare/typeshare
 github:advancedresearch/path_semantics/basic_theorem_prover
 github:advancedresearch/path_semantics/boolalg
@@ -295,6 +294,7 @@ github:ruffle-rs/ruffle/ruffle_desktop
 github:ruffle-rs/ruffle/ruffle_web
 github:rust-analyzer/rust-analyzer/rust-analyzer
 github:rust-lang/rustlings/rustlings
+github:s3bk/vector/vector
 github:sandstorm-io/collections-app/sandstorm-collections-app
 github:schulke-214/connect-four/connect-four
 github:schulke-214/rsnake/rsnake

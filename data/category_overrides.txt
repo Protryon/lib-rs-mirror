@@ -666,6 +666,7 @@ objc-encode: os::macos-apis, development-tools::ffi
 olekit: parser-implementations
 onig_sys: text-processing
 ontio-bump-alloc: cryptography::cryptocurrencies
+opener: os
 openhmd-rs-sys: multimedia, rendering::graphics-api
 openldap: network-programming
 openni2: science::machine-learning

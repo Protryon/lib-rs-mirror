@@ -1,3 +1,4 @@
+use kitchen_sink::ArcRichCrateVersion;
 use chrono::prelude::*;
 use crate::Page;
 use crate::templates;
@@ -9,7 +10,6 @@ use kitchen_sink::KitchenSink;
 use kitchen_sink::Org;
 use kitchen_sink::OwnerKind;
 use kitchen_sink::RichAuthor;
-use kitchen_sink::RichCrateVersion;
 use kitchen_sink::Rustacean;
 use kitchen_sink::User;
 use kitchen_sink::UserType;
@@ -17,7 +17,7 @@ use render_readme::Renderer;
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::sync::Arc;
+
 
 pub struct OtherOwner {
     github_id: u32,
@@ -31,8 +31,8 @@ pub struct OtherOwner {
 pub struct AuthorPage<'a> {
     pub(crate) aut: &'a RichAuthor,
     pub(crate) markup: &'a Renderer,
-    pub(crate) founder_crates: Vec<(Arc<RichCrateVersion>, u32, CrateOwnerRow, Vec<OtherOwner>)>,
-    pub(crate) member_crates: Vec<(Arc<RichCrateVersion>, u32, CrateOwnerRow, Vec<OtherOwner>)>,
+    pub(crate) founder_crates: Vec<(ArcRichCrateVersion, u32, CrateOwnerRow, Vec<OtherOwner>)>,
+    pub(crate) member_crates: Vec<(ArcRichCrateVersion, u32, CrateOwnerRow, Vec<OtherOwner>)>,
     pub(crate) orgs: Vec<Org>,
     pub(crate) joined: Option<DateTime<Utc>>,
     pub(crate) founder_total: usize,
@@ -121,7 +121,7 @@ impl<'a> AuthorPage<'a> {
         })
     }
 
-    async fn look_up(kitchen_sink: &KitchenSink, rows: Vec<CrateOwnerRow>) -> Vec<(Arc<RichCrateVersion>, u32, CrateOwnerRow, Vec<OtherOwner>)> {
+    async fn look_up(kitchen_sink: &KitchenSink, rows: Vec<CrateOwnerRow>) -> Vec<(ArcRichCrateVersion, u32, CrateOwnerRow, Vec<OtherOwner>)> {
         futures::stream::iter(rows.into_iter())
             .filter_map(|row| async move {
                 let c = kitchen_sink.rich_crate_version_async(&row.origin).await.map_err(|e| eprintln!("{}", e)).ok()?;

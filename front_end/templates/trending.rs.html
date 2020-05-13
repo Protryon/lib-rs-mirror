@@ -1,13 +1,12 @@
-@use crate::templates::simple_list_html;
-@use crate::templates::base;
 @use crate::Page;
-@use kitchen_sink::RichCrateVersion;
-@use kitchen_sink::RichCrate;
+@use crate::templates::base;
+@use crate::templates::simple_list_html;
 @use crate::Urler;
-@use std::sync::Arc;
+@use kitchen_sink::ArcRichCrateVersion;
+@use kitchen_sink::RichCrate;
 @use render_readme::Renderer;
 
-@(page: &Page, trending: &[(Arc<RichCrateVersion>, RichCrate)], updated: &[(Arc<RichCrateVersion>, RichCrate)], url: &Urler, markup: &Renderer)
+@(page: &Page, trending: &[(ArcRichCrateVersion, RichCrate)], updated: &[(ArcRichCrateVersion, RichCrate)], url: &Urler, markup: &Renderer)
 
 @:base(page, {
     <header id="home">

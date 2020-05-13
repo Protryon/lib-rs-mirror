@@ -17,7 +17,7 @@ use semver::VersionReq;
 use serde_derive::*;
 use std::iter;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use triomphe::Arc;
 use std::time::Duration;
 use string_interner::StringInterner;
 use string_interner::Sym;

@@ -1,3 +1,4 @@
+@use kitchen_sink::ArcRichCrateVersion;
 @use chrono_humanize::HumanTime;
 @use crate::limit_text_len;
 @use crate::render_markdown_str;
@@ -5,11 +6,9 @@
 @use crate::Urler;
 @use kitchen_sink::Origin;
 @use kitchen_sink::RichCrate;
-@use kitchen_sink::RichCrateVersion;
 @use render_readme::Renderer;
-@use std::sync::Arc;
 
-@(crates: &[(Arc<RichCrateVersion>, RichCrate)], url: &Urler, markup: &Renderer, with_ver_and_date: bool)
+@(crates: &[(ArcRichCrateVersion, RichCrate)], url: &Urler, markup: &Renderer, with_ver_and_date: bool)
 
 @for (k, all) in crates {
     <li>

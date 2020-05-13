@@ -51,4 +51,5 @@ ahash = "0.3.4"
 deunicode = "1.1.1"
 futures = "0.3.5"
 double-checked-cell-async = "2.0.2"
+triomphe = "0.1.1"
 

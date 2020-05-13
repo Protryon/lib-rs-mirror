@@ -28,4 +28,5 @@ parking_lot = "0.10.0"
 ahash = "0.3"
 futures = "0.3.4"
 double-checked-cell-async = "2.0.2"
+triomphe = "0.1.1"
 

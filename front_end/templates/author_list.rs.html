@@ -1,3 +1,4 @@
+@use kitchen_sink::ArcRichCrateVersion;
 @use chrono_humanize::*;
 @use chrono_humanize::HumanTime;
 @use crate::AuthorPage;
@@ -5,10 +6,8 @@
 @use crate::format_downloads;
 @use crate::Urler;
 @use kitchen_sink::CrateOwnerRow;
-@use kitchen_sink::RichCrateVersion;
-@use std::sync::Arc;
 
-@(crates: &[(Arc<RichCrateVersion>, u32, CrateOwnerRow, Vec<OtherOwner>)], url: &Urler)
+@(crates: &[(ArcRichCrateVersion, u32, CrateOwnerRow, Vec<OtherOwner>)], url: &Urler)
 
 <ul class=crates-list>
   @for (k, dl, r, _) in crates {

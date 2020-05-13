@@ -75,9 +75,11 @@ use std::collections::HashSet;
 use std::convert::TryInto;
 use std::env;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use triomphe::Arc;
 use std::time::Duration;
 use std::time::SystemTime;
+
+pub type ArcRichCrateVersion = Arc<RichCrateVersion>;
 
 type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 
@@ -167,7 +169,7 @@ pub struct KitchenSink {
     crate_db: CrateDb,
     user_db: user_db::UserDb,
     gh: github_info::GitHub,
-    loaded_rich_crate_version_cache: RwLock<FxHashMap<Origin, Arc<RichCrateVersion>>>,
+    loaded_rich_crate_version_cache: RwLock<FxHashMap<Origin, ArcRichCrateVersion>>,
     category_crate_counts: DoubleCheckedCell<Option<HashMap<String, u32>>>,
     top_crates_cached: tokio::sync::RwLock<FxHashMap<String, Arc<Vec<Origin>>>>,
     git_checkout_path: PathBuf,
@@ -715,7 +717,7 @@ impl KitchenSink {
     /// This function is quite slow, as it reads everything about the crate.
     ///
     /// There's no support for getting anything else than the latest version.
-    pub async fn rich_crate_version_async(&self, origin: &Origin) -> CResult<Arc<RichCrateVersion>> {
+    pub async fn rich_crate_version_async(&self, origin: &Origin) -> CResult<ArcRichCrateVersion> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
 
         if let Some(krate) = self.loaded_rich_crate_version_cache.read().get(origin) {

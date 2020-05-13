@@ -1,3 +1,4 @@
+use kitchen_sink::ArcRichCrateVersion;
 use kitchen_sink::RevDependencies;
 use crate::download_graph::DownloadsGraph;
 use crate::templates;
@@ -30,7 +31,6 @@ use std::collections::HashSet;
 use std::f64::consts::PI;
 use std::fmt::Display;
 use std::hash::Hash;
-use std::sync::Arc;
 use tokio::runtime::Handle;
 use udedokei::LanguageExt;
 use udedokei::{Language, Lines, Stats};
@@ -70,7 +70,7 @@ pub struct CratePage<'a> {
     changelog_url: Option<String>,
     related_crates: Option<Vec<Origin>>,
     keywords_populated: Vec<(String, bool)>,
-    parent_crate: Option<Arc<RichCrateVersion>>,
+    parent_crate: Option<ArcRichCrateVersion>,
     downloads_per_month_or_equivalent: Option<usize>,
     pub has_reviews: bool,
 }
@@ -892,7 +892,7 @@ impl<'a> CratePage<'a> {
         }, main_lang_stats, viral_license))
     }
 
-    async fn get_crate_of_dependency(&self, name: &str, _semver: ()) -> CResult<Arc<RichCrateVersion>> {
+    async fn get_crate_of_dependency(&self, name: &str, _semver: ()) -> CResult<ArcRichCrateVersion> {
         // FIXME: caching doesn't hold multiple versions, so fetchnig of precise old versions is super expensive
         self.kitchen_sink.rich_crate_version_async(&Origin::from_crates_io_name(name)).await
 

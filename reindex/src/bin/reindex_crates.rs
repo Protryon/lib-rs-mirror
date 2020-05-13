@@ -1,3 +1,4 @@
+use kitchen_sink::ArcRichCrateVersion;
 use either::*;
 use failure;
 use futures::future::join_all;
@@ -14,7 +15,7 @@ use render_readme::Renderer;
 use search_index::*;
 use std::collections::HashSet;
 use std::sync::mpsc;
-use std::sync::Arc;
+use triomphe::Arc;
 use udedokei::LanguageExt;
 
 #[tokio::main]
@@ -141,7 +142,7 @@ async fn main() {
     }).await.unwrap();
 }
 
-async fn index_crate(crates: &KitchenSink, origin: &Origin, renderer: &Renderer, search_sender: &mpsc::SyncSender<(Arc<RichCrateVersion>, usize, f64)>) -> Result<Arc<RichCrateVersion>, failure::Error> {
+async fn index_crate(crates: &KitchenSink, origin: &Origin, renderer: &Renderer, search_sender: &mpsc::SyncSender<(ArcRichCrateVersion, usize, f64)>) -> Result<ArcRichCrateVersion, failure::Error> {
     let (k, v) = futures::try_join!(crates.rich_crate_async(origin), crates.rich_crate_version_async(origin))?;
 
     let (downloads_per_month, score) = crate_overall_score(crates, &k, &v, renderer).await;

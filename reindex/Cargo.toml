@@ -20,3 +20,4 @@ parking_lot = "0.10.0"
 udedokei = { path = "../udedokei" }
 tokio = { version = "0.2.11", features = ["rt-threaded", "macros", "sync", "blocking"] }
 futures = "0.3.4"
+triomphe = "0.1.1"

@@ -18,5 +18,5 @@ scopeguard = "1.1.0"
 rand = "0.7.3"
 crate_db = { path = "../crate_db", version = "0.4.5" }
 lts = "0.1.5"
-crates-index = "0.14.3"
+crates-index = "0.15.0-alpha"
 tokio = { version = "0.2.20", features = ["rt-threaded", "macros"] }

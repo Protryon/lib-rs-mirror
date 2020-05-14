@@ -242,6 +242,9 @@ github:paritytech/polkadot/polkadot-cli
 github:paritytech/polkadot/polkadot-service
 github:paritytech/substrate/substrate-cli
 github:pcwalton/sprocketnes/sprocketnes
+github:pingcap/talent-plan/labrpc
+github:pingcap/talent-plan/linearizability
+github:pingcap/talent-plan/percolator
 github:pingcap/tipb/tipb
 github:pop-os/appstream2dep11/appstream2dep11
 github:pop-os/apt-cli-wrappers/apt-cli-wrappers
@@ -277,6 +280,15 @@ github:pop-os/token_expander/token-expander
 github:purpleprotocol/purple/purple
 github:rajasekarv/native_spark/native_spark
 github:rawrasaur/rust-jdbc/jdbc
+github:rcore-os/zcore/kernel-hal
+github:rcore-os/zcore/kernel-hal-bare
+github:rcore-os/zcore/kernel-hal-unix
+github:rcore-os/zcore/linux-loader
+github:rcore-os/zcore/linux-object
+github:rcore-os/zcore/linux-syscall
+github:rcore-os/zcore/zircon-loader
+github:rcore-os/zcore/zircon-object
+github:rcore-os/zcore/zircon-syscall
 github:redisjson/redisdoc/redisjson
 github:redox-os/relibc/relibc
 github:remacs/remacs/remacs-bindings

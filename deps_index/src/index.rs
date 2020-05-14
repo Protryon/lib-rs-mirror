@@ -1,10 +1,11 @@
+pub use crates_index::DependencyKind;
+pub use crates_index::Version;
 use crate::deps_stats::DepsStats;
-use crate::git_crates_index::*;
 use crate::DepsErr;
-use crates_index;
+use crate::git_crates_index::*;
 use crates_index::Crate;
 use crates_index::Dependency;
-pub use crates_index::Version;
+use crates_index;
 use double_checked_cell_async::DoubleCheckedCell;
 use parking_lot::Mutex;
 use parking_lot::RwLock;
@@ -17,10 +18,10 @@ use semver::VersionReq;
 use serde_derive::*;
 use std::iter;
 use std::path::{Path, PathBuf};
-use triomphe::Arc;
 use std::time::Duration;
 use string_interner::StringInterner;
 use string_interner::Sym;
+use triomphe::Arc;
 
 type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 type FxHashSet<V> = std::collections::HashSet<V, ahash::RandomState>;
@@ -142,7 +143,7 @@ impl Index {
         let crates_io_index = crates_index::Index::new(&crates_index_path);
         let indexed_crates: FxHashMap<_,_> = crates_io_index.crate_index_paths().par_bridge()
                 .filter_map(|path| {
-                    let c = crates_index::Crate::new_checked(path).ok()?;
+                    let c = crates_index::Crate::new(path).ok()?;
                     Some((c.name().to_ascii_lowercase().into(), c))
                 })
                 .collect();
@@ -278,14 +279,14 @@ impl Index {
         let deps: &mut dyn Iterator<Item = _> = match deps {
             Fudge::CratesIo(dep) => {
                 iter1 = dep.iter().map(|d| {
-                    (d.crate_name().to_ascii_lowercase(), d.kind().unwrap_or("normal"), d.target().is_some(), d.is_optional(), d.requirement(), d.has_default_features(), d.features())
+                    (d.crate_name().to_ascii_lowercase(), d.kind(), d.target().is_some(), d.is_optional(), d.requirement(), d.has_default_features(), d.features())
                 });
                 &mut iter1
             },
             Fudge::Manifest((ref run, ref dev, ref build)) => {
-                iter2 = run.iter().map(|r| (r, "normal"))
-                .chain(dev.iter().map(|r| (r, "dev")))
-                .chain(build.iter().map(|r| (r, "build")))
+                iter2 = run.iter().map(|r| (r, DependencyKind::Normal))
+                .chain(dev.iter().map(|r| (r, DependencyKind::Dev)))
+                .chain(build.iter().map(|r| (r, DependencyKind::Build)))
                 .map(|(r, kind)| {
                     (r.package.to_ascii_lowercase(), kind, !r.only_for_targets.is_empty(), r.is_optional(), r.dep.req(), true, &r.with_features[..])
                 });
@@ -306,9 +307,9 @@ impl Index {
             }
 
             match kind {
-                "normal" => (),
-                "build" if wants.build => (),
-                "dev" if wants.dev => (),
+                DependencyKind::Normal => (),
+                DependencyKind::Build if wants.build => (),
+                DependencyKind::Dev if wants.dev => (),
                 _ => continue,
             }
 

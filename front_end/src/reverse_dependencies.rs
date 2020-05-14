@@ -7,6 +7,7 @@ use kitchen_sink::SemVer;
 use kitchen_sink::DependerChangesMonthly;
 use locale::Numeric;
 use render_readme::Renderer;
+use kitchen_sink::DependencyKind;
 
 use rich_crate::RichCrateVersion;
 use semver::VersionReq;
@@ -28,7 +29,7 @@ pub struct RevDepInf<'a> {
     pub depender: &'a kitchen_sink::Version,
     pub is_optional: bool,
     pub matches_latest: bool,
-    pub kind: &'a str,
+    pub kind: DependencyKind,
     pub req: VersionReq,
     pub rev_dep_count: u32,
 }
@@ -79,7 +80,7 @@ impl<'a> CratePageRevDeps<'a> {
                     own_name.eq_ignore_ascii_case(d.crate_name())
                 })
                 .map(|d| {
-                    (d.is_optional(), d.requirement(), d.kind().unwrap_or_default())
+                    (d.is_optional(), d.requirement(), d.kind())
                 })
                 .unwrap_or_default();
 
@@ -118,6 +119,14 @@ impl<'a> CratePageRevDeps<'a> {
             has_download_columns,
             changes,
         })
+    }
+
+    pub fn kind(&self, k: DependencyKind) -> &'static str {
+        match k {
+            DependencyKind::Normal => "normal",
+            DependencyKind::Dev => "dev",
+            DependencyKind::Build => "build",
+        }
     }
 
     /// Nicely rounded number of downloads

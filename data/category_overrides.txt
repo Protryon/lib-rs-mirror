@@ -113,6 +113,8 @@ cb2: command-line-utilities
 cb2_core: development-tools
 cddl: parser-implementations
 celery-rs-core: asynchronous
+alpaca-finance: web-programming, science
+market-finance: science
 celery: asynchronous
 cgl: rendering::graphics-api, os::macos-apis
 ch8asm: emulators, development-tools

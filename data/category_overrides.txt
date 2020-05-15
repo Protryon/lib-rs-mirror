@@ -19,6 +19,7 @@ allegro_primitives-sys: game-engines
 allegro_util: game-engines
 almost: rust-patterns, no-std
 alog: parser-implementations, web-programming, command-line-utilities
+alpaca-finance: web-programming, science
 alphaid: encoding
 alphavantage: web-programming
 amath: parser-implementations
@@ -32,6 +33,7 @@ apt-cache: os::unix-apis
 aquaenv: os::macos-apis, command-line-utilities, gui
 arcon: science
 argh: command-line-interface
+arsert_failure: rust-patterns
 arthas: database-implementations
 artichoke-core : development-tools
 ascon: cryptography
@@ -113,8 +115,6 @@ cb2: command-line-utilities
 cb2_core: development-tools
 cddl: parser-implementations
 celery-rs-core: asynchronous
-alpaca-finance: web-programming, science
-market-finance: science
 celery: asynchronous
 cgl: rendering::graphics-api, os::macos-apis
 ch8asm: emulators, development-tools
@@ -142,6 +142,7 @@ collisions: algorithms
 colloquy: command-line-interface
 colorsys: multimedia::images
 comma: parser-implementations
+common_failures: rust-patterns
 commoncrypto-sys: os::macos-apis
 commoncrypto: os::macos-apis, cryptography
 compose_yml: development-tools
@@ -259,12 +260,14 @@ eosio: cryptography::cryptocurrencies
 eosio_macros_internal: cryptography::cryptocurrencies
 eosio_numstr: cryptography::cryptocurrencies
 eraserhead: rust-patterns
+errer: rust-patterns
 esplugin: parser-implementations
 etclient-core: cryptography::cryptocurrencies
 euclid: science::math
 evcxr_repl: rust-patterns, command-line-utilities
 evolution_rs: science::machine-learning
 ewasm_api: wasm
+exitfailure: command-line-interface, rust-patterns
 exonum-cli: cryptography::cryptocurrencies
 exonum-configuration: cryptography::cryptocurrencies
 exonum-cryptocurrency-advanced: cryptography::cryptocurrencies
@@ -272,7 +275,9 @@ exonum-testkit: cryptography::cryptocurrencies
 exonum-time: cryptography::cryptocurrencies
 exonum: cryptography::cryptocurrencies
 factom: web-programming
+failsafe: rust-patterns, asynchronous
 failure: rust-patterns
+failure_without_backtrace: rust-patterns
 fakedata_generator: command-line-utilities, development-tools::testing
 fakesite: web-programming
 falcon-mos6502: emulators
@@ -571,6 +576,7 @@ man: development-tools, text-processing
 marge : development-tools
 marionette: development-tools::testing
 markdust: text-processing
+market-finance: science
 markov: text-processing, science::machine-learning
 matrix_bot_api: network-programming
 mdtoc: text-processing
@@ -680,6 +686,7 @@ orgize: parser-implementations
 osmesa-sys: multimedia, os::unix-apis
 osmgpsmap: science, gui
 ostrich-core: asynchronous
+outcome: rust-patterns
 outline: text-editors
 oven: web-programming
 overdose: concurrency, data-structures
@@ -1038,6 +1045,7 @@ wayk_core : network-programming
 wcxhead: development-tools
 webhook_listener: web-programming::http-server
 webidl: parser-implementations
+webmanifest: web-programming
 weighted-select: asynchronous
 weld: development-tools::profiling
 wham: simulation

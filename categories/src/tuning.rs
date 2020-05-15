@@ -327,7 +327,7 @@ lazy_static! {
         (Cond::Any(&["dep:reqwest", "dep:curl", "dep:hyper"]),
             &[("date-and-time", 0.7, 0.), ("parsing", 0.7, 0.), ("rust-patterns", 0.7, 0.), ("embedded", 0.7, 0.), ("algorithms", 0.8, 0.), ("data-structures", 0.7, 0.), ("rendering", 0.7, 0.)]),
         (Cond::Any(&["dep:tokio", "dep:actix", "dep:mio", "dep:async-std"]),
-            &[("value-formatting", 0.7, 0.), ("parsing", 0.7, 0.), ("data-structures", 0.7, 0.), ("no_std", 0.7, 0.)]),
+            &[("value-formatting", 0.7, 0.), ("parsing", 0.7, 0.), ("data-structures", 0.7, 0.), ("no-std", 0.7, 0.)]),
 
         (Cond::NotAny(&["settings", "configuration", "config", "dotenv", "configurator", "dotfile", "dotfiles", "env", "customization", "environment"]),
             &[("config", 0.75, 0.)]),

@@ -348,6 +348,7 @@ fn is_squatspam(k: &RichCrateVersion) -> bool {
             desc.ends_with(" placeholder") ||
             desc.starts_with("a placeholder") ||
             desc.starts_with("reserved for ") ||
+            desc.starts_with("empty crate") ||
             desc.starts_with("stub to squat") ||
             desc.starts_with("claiming it before someone") ||
             desc.starts_with("reserved name") ||

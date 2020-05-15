@@ -239,6 +239,7 @@ egaku2d_core: rendering::graphics-api, game-engines
 egg-mode : web-programming
 elefren: web-programming
 elfkit: parser-implementations
+embrio-core: embedded
 emerald-vault-core: cryptography::cryptocurrencies
 emlop: parser-implementations
 emmett: parser-implementations
@@ -572,6 +573,7 @@ markov: text-processing, science::machine-learning
 matrix_bot_api: network-programming
 mdtoc: text-processing
 mediawiki: web-programming
+meilisearch-core: database-implementations
 memorydb: database-implementations
 mermer-rs: text-processing, science
 meson: development-tools::build-tools

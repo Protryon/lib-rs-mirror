@@ -1,9 +1,10 @@
-use kitchen_sink::ArcRichCrateVersion;
+use futures::Future;
 use either::*;
 use failure;
-use futures::future::join_all;
 use futures::future::FutureExt;
+use futures::future::join_all;
 use futures::stream::StreamExt;
+use kitchen_sink::ArcRichCrateVersion;
 use kitchen_sink::RichCrate;
 use kitchen_sink::{self, stop, stopped, KitchenSink, MaintenanceStatus, Origin, RichCrateVersion};
 use parking_lot::Mutex;
@@ -14,6 +15,7 @@ use render_readme::Links;
 use render_readme::Renderer;
 use search_index::*;
 use std::collections::HashSet;
+use std::time::Duration;
 use tokio::sync::mpsc;
 use triomphe::Arc;
 use udedokei::LanguageExt;
@@ -103,7 +105,7 @@ async fn main() {
                 let index_finished = concurrency.acquire().await;
                 if stopped() {return;}
                 println!("{}…", i);
-                match crates.index_crate_highest_version(&origin).await {
+                match run_timeout(62, crates.index_crate_highest_version(&origin)).await {
                     Ok(()) => {},
                     err => {
                         print_res(err);
@@ -111,7 +113,7 @@ async fn main() {
                     },
                 }
                 if stopped() {return;}
-                match index_crate(&crates, &origin, &renderer, &mut tx).await {
+                match run_timeout(70, index_crate(&crates, &origin, &renderer, &mut tx)).await {
                     Ok(v) => {
                         drop(index_finished);
                         if repos {
@@ -127,7 +129,7 @@ async fn main() {
                                 }
                                 let _finished = repo_concurrency.acquire().await;
                                 if stopped() {return;}
-                                print_res(crates.index_repo(repo, v.version()).await);
+                                print_res(run_timeout(600, crates.index_repo(repo, v.version())).await);
                             }
                         }
                     },
@@ -144,7 +146,7 @@ async fn main() {
 }
 
 async fn index_crate(crates: &KitchenSink, origin: &Origin, renderer: &Renderer, search_sender: &mut mpsc::Sender<(ArcRichCrateVersion, usize, f64)>) -> Result<ArcRichCrateVersion, failure::Error> {
-    let (k, v) = futures::try_join!(crates.rich_crate_async(origin), crates.rich_crate_version_async(origin))?;
+    let (k, v) = futures::try_join!(crates.rich_crate_async(origin), run_timeout(45, crates.rich_crate_version_async(origin)))?;
 
     let (downloads_per_month, score) = crate_overall_score(crates, &k, &v, renderer).await;
     let (_, index_res) = futures::join!(
@@ -152,7 +154,7 @@ async fn index_crate(crates: &KitchenSink, origin: &Origin, renderer: &Renderer,
             search_sender.send((v.clone(), downloads_per_month, score)).await
                 .map_err(|e| {stop();e}).expect("closed channel?");
         },
-        crates.index_crate(&k, score)
+        run_timeout(60, crates.index_crate(&k, score))
     );
     index_res?;
     Ok(v)
@@ -425,4 +427,8 @@ fn print_res<T>(res: Result<T, failure::Error>) {
             }
         }
     }
+}
+
+fn run_timeout<'a, T>(secs: u64, fut: impl Future<Output=Result<T, failure::Error>> + 'a) -> impl Future<Output=Result<T, failure::Error>> + 'a {
+    tokio::time::timeout(Duration::from_secs(secs), fut).map(move |r| r.map_err(|_| failure::format_err!("timed out {}", secs)).and_then(|x| x))
 }

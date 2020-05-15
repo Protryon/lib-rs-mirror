@@ -2286,6 +2286,9 @@ impl KitchenSink {
     /// Prepare for drop: purge buffers, free memory
     pub fn cleanup(&self) {
         self.index.clear_cache();
+        let _ = self.crates_io_owners_cache.save();
+        let _ = self.depender_changes.save();
+        let _ = self.url_check_cache.save();
         self.loaded_rich_crate_version_cache.write().clear();
         let _ = self.url_check_cache.save();
         self.crates_io.cleanup();

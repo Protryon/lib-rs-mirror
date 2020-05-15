@@ -14,7 +14,7 @@ use render_readme::Links;
 use render_readme::Renderer;
 use search_index::*;
 use std::collections::HashSet;
-use std::sync::mpsc;
+use tokio::sync::mpsc;
 use triomphe::Arc;
 use udedokei::LanguageExt;
 
@@ -48,25 +48,28 @@ async fn main() {
 
     let mut indexer = Indexer::new(CrateSearchIndex::new(crates.main_cache_dir()).expect("init search")).expect("init search indexer");
 
-    let (tx, rx) = mpsc::sync_channel::<(Arc<_>, _, _)>(64);
-    let index_thread = std::thread::spawn({
+    let (tx, mut rx) = mpsc::channel::<(Arc<_>, _, _)>(64);
+    let index_thread = handle.spawn({
         let renderer = renderer.clone();
-        move || -> Result<(), failure::Error> {
-            let mut n = 0;
-            let mut next_n = 100;
-            while let Ok((ver, downloads_per_month, score)) = rx.recv() {
+        async move {
+            let mut n = 0usize;
+            let mut next_n = 100usize;
+            while let Some((ver, downloads_per_month, score)) = rx.recv().await {
                 if stopped() {break;}
-                index_search(&mut indexer, &renderer, &ver, downloads_per_month, score)?;
-                n += 1;
-                if n == next_n {
-                    next_n *= 2;
-                    println!("savepoint…");
-                    indexer.commit()?;
-                }
+                tokio::task::block_in_place(|| {
+                    index_search(&mut indexer, &renderer, &ver, downloads_per_month, score)?;
+                    n += 1;
+                    if n == next_n {
+                        next_n *= 2;
+                        println!("savepoint…");
+                        indexer.commit()?;
+                    }
+                    Ok::<_, failure::Error>(())
+                })?;
             }
-            indexer.commit()?;
+            tokio::task::block_in_place(|| indexer.commit())?;
             let _ = indexer.bye()?;
-            Ok(())
+            Ok::<_, failure::Error>(())
         }
     });
 
@@ -95,7 +98,7 @@ async fn main() {
             let repo_concurrency = Arc::clone(&repo_concurrency);
             let renderer = Arc::clone(&renderer);
             let seen_repos = Arc::clone(&seen_repos);
-            let tx = tx.clone();
+            let mut tx = tx.clone();
             waiting.push(handle.clone().spawn(async move {
                 let index_finished = concurrency.acquire().await;
                 if stopped() {return;}
@@ -108,7 +111,7 @@ async fn main() {
                     },
                 }
                 if stopped() {return;}
-                match index_crate(&crates, &origin, &renderer, &tx).await {
+                match index_crate(&crates, &origin, &renderer, &mut tx).await {
                     Ok(v) => {
                         drop(index_finished);
                         if repos {
@@ -136,18 +139,22 @@ async fn main() {
         if stopped() {return;}
         waiting.collect::<()>().await;
         if stopped() {return;}
-        tokio::task::block_in_place(|| {
-            index_thread.join().unwrap().unwrap();
-        });
+        index_thread.await.unwrap().unwrap();
     }).await.unwrap();
 }
 
-async fn index_crate(crates: &KitchenSink, origin: &Origin, renderer: &Renderer, search_sender: &mpsc::SyncSender<(ArcRichCrateVersion, usize, f64)>) -> Result<ArcRichCrateVersion, failure::Error> {
+async fn index_crate(crates: &KitchenSink, origin: &Origin, renderer: &Renderer, search_sender: &mut mpsc::Sender<(ArcRichCrateVersion, usize, f64)>) -> Result<ArcRichCrateVersion, failure::Error> {
     let (k, v) = futures::try_join!(crates.rich_crate_async(origin), crates.rich_crate_version_async(origin))?;
 
     let (downloads_per_month, score) = crate_overall_score(crates, &k, &v, renderer).await;
-    search_sender.send((v.clone(), downloads_per_month, score)).map_err(|e| {stop();e}).expect("closed channel?");
-    crates.index_crate(&k, score).await?;
+    let (_, index_res) = futures::join!(
+        async {
+            search_sender.send((v.clone(), downloads_per_month, score)).await
+                .map_err(|e| {stop();e}).expect("closed channel?");
+        },
+        crates.index_crate(&k, score)
+    );
+    index_res?;
     Ok(v)
 }
 

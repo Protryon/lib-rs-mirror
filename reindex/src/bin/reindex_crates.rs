@@ -20,10 +20,16 @@ use tokio::sync::mpsc;
 use triomphe::Arc;
 use udedokei::LanguageExt;
 
-#[tokio::main]
-async fn main() {
-    let handle = Arc::new(tokio::runtime::Handle::current());
-    handle.clone().spawn(async move {
+fn main() {
+    let mut rt = tokio::runtime::Builder::new()
+        .threaded_scheduler()
+        .enable_all()
+        .thread_name("reindex")
+        .build()
+        .unwrap();
+
+    rt.block_on(rt.spawn(async move {
+        let handle = tokio::runtime::Handle::current();
 
     let crates = Arc::new(match kitchen_sink::KitchenSink::new_default().await {
         Ok(a) => a,
@@ -75,74 +81,74 @@ async fn main() {
         }
     });
 
-        let handle = Arc::new(tokio::runtime::Handle::current());
-        let seen_repos = Arc::new(Mutex::new(HashSet::new()));
-        let concurrency = Arc::new(tokio::sync::Semaphore::new(16));
-        let repo_concurrency = Arc::new(tokio::sync::Semaphore::new(4));
-        let _ = pre.await;
-        let waiting = futures::stream::FuturesUnordered::new();
-        let c = if everything {
-            let mut c: Vec<_> = crates.all_crates().collect::<Vec<_>>();
-            c.shuffle(&mut thread_rng());
-            Either::Left(c)
-        } else if !specific.is_empty() {
-            Either::Left(specific)
-        } else {
-            Either::Right(handle.enter(|| futures::executor::block_on(crates.crates_to_reindex())).unwrap().into_iter().map(|c| c.origin().clone()))
-        };
-        for (i, origin) in c.into_iter().enumerate() {
-            if stopped() {
-                return;
-            }
-            let crates = Arc::clone(&crates);
-            let handle = Arc::clone(&handle);
-            let concurrency = Arc::clone(&concurrency);
-            let repo_concurrency = Arc::clone(&repo_concurrency);
-            let renderer = Arc::clone(&renderer);
-            let seen_repos = Arc::clone(&seen_repos);
-            let mut tx = tx.clone();
-            waiting.push(handle.clone().spawn(async move {
-                let index_finished = concurrency.acquire().await;
-                if stopped() {return;}
-                println!("{}…", i);
-                match run_timeout(62, crates.index_crate_highest_version(&origin)).await {
-                    Ok(()) => {},
-                    err => {
-                        print_res(err);
-                        return;
-                    },
-                }
-                if stopped() {return;}
-                match run_timeout(70, index_crate(&crates, &origin, &renderer, &mut tx)).await {
-                    Ok(v) => {
-                        drop(index_finished);
-                        if repos {
-                            if let Some(ref repo) = v.repository() {
-                                {
-                                    let mut s = seen_repos.lock();
-                                    let url = repo.canonical_git_url().to_string();
-                                    if s.contains(&url) {
-                                        return;
-                                    }
-                                    println!("Indexing {}", url);
-                                    s.insert(url);
-                                }
-                                let _finished = repo_concurrency.acquire().await;
-                                if stopped() {return;}
-                                print_res(run_timeout(600, crates.index_repo(repo, v.version())).await);
-                            }
-                        }
-                    },
-                    err => print_res(err),
-                }
-            }).map(drop));
+    let handle = Arc::new(tokio::runtime::Handle::current());
+    let seen_repos = Arc::new(Mutex::new(HashSet::new()));
+    let concurrency = Arc::new(tokio::sync::Semaphore::new(16));
+    let repo_concurrency = Arc::new(tokio::sync::Semaphore::new(4));
+    let _ = pre.await;
+    let waiting = futures::stream::FuturesUnordered::new();
+    let c = if everything {
+        let mut c: Vec<_> = crates.all_crates().collect::<Vec<_>>();
+        c.shuffle(&mut thread_rng());
+        Either::Left(c)
+    } else if !specific.is_empty() {
+        Either::Left(specific)
+    } else {
+        Either::Right(handle.enter(|| futures::executor::block_on(crates.crates_to_reindex())).unwrap().into_iter().map(|c| c.origin().clone()))
+    };
+    for (i, origin) in c.into_iter().enumerate() {
+        if stopped() {
+            return;
         }
-        drop(tx);
-        if stopped() {return;}
-        waiting.collect::<()>().await;
-        if stopped() {return;}
-        index_thread.await.unwrap().unwrap();
-    }).await.unwrap();
+        let crates = Arc::clone(&crates);
+        let handle = Arc::clone(&handle);
+        let concurrency = Arc::clone(&concurrency);
+        let repo_concurrency = Arc::clone(&repo_concurrency);
+        let renderer = Arc::clone(&renderer);
+        let seen_repos = Arc::clone(&seen_repos);
+        let mut tx = tx.clone();
+        waiting.push(handle.clone().spawn(async move {
+            let index_finished = concurrency.acquire().await;
+            if stopped() {return;}
+            println!("{}…", i);
+            match run_timeout(62, crates.index_crate_highest_version(&origin)).await {
+                Ok(()) => {},
+                err => {
+                    print_res(err);
+                    return;
+                },
+            }
+            if stopped() {return;}
+            match run_timeout(70, index_crate(&crates, &origin, &renderer, &mut tx)).await {
+                Ok(v) => {
+                    drop(index_finished);
+                    if repos {
+                        if let Some(ref repo) = v.repository() {
+                            {
+                                let mut s = seen_repos.lock();
+                                let url = repo.canonical_git_url().to_string();
+                                if s.contains(&url) {
+                                    return;
+                                }
+                                println!("Indexing {}", url);
+                                s.insert(url);
+                            }
+                            let _finished = repo_concurrency.acquire().await;
+                            if stopped() {return;}
+                            print_res(run_timeout(600, crates.index_repo(repo, v.version())).await);
+                        }
+                    }
+                },
+                err => print_res(err),
+            }
+        }).map(drop));
+    }
+    drop(tx);
+    if stopped() {return;}
+    waiting.collect::<()>().await;
+    if stopped() {return;}
+    index_thread.await.unwrap().unwrap();
+    })).unwrap();
 }
 
 async fn index_crate(crates: &KitchenSink, origin: &Origin, renderer: &Renderer, search_sender: &mut mpsc::Sender<(ArcRichCrateVersion, usize, f64)>) -> Result<ArcRichCrateVersion, failure::Error> {

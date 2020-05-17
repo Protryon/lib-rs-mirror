@@ -3,5 +3,15 @@ Disallow: /keywords/
 Disallow: /install
 Disallow: /search?
 
+# seo scourge
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: VelenPublicWebCrawler
+Disallow: /
+
 User-agent: SemrushBot
+Disallow: /
+
+User-agent: BLEXBot
 Disallow: /

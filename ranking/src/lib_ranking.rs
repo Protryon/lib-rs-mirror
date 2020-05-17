@@ -349,6 +349,56 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs<'_>) -> Score {
     score
 }
 
+pub struct OverallScoreInputs {
+    // ratio of peak active users to current active users (1.0 = everyone active, 0.0 = all dead)
+    pub former_glory: Option<f64>,
+    pub is_proc_macro: bool,
+    pub is_sys: bool,
+    pub is_sub_component: bool,
+    pub is_autopublished: bool,
+    pub is_deprecated: bool,
+    pub is_crates_io_published: bool,
+    pub is_yanked: bool,
+    pub is_squatspam: bool,
+}
+
+pub fn combined_score(base_score: Score, temp_score: Score, f: &OverallScoreInputs) -> f64 {
+    let mut score = (base_score.total() + temp_score.total()) * 0.5;
+
+    if let Some(former_glory) = f.former_glory {
+        score *= former_glory;
+    }
+
+    // there's usually a non-macro/non-sys sibling
+    if f.is_proc_macro || f.is_sys {
+        score *= 0.9;
+    }
+
+    if f.is_sub_component  {
+        score *= 0.9;
+    }
+
+    if f.is_autopublished {
+        score *= 0.8;
+    }
+
+    if f.is_deprecated {
+        score *= 0.2;
+    }
+
+    if !f.is_crates_io_published {
+        // installation and usage of other crate sources is more limited
+        score *= 0.75;
+    }
+
+    // k bye
+    if f.is_yanked || f.is_squatspam {
+        score *= 0.001;
+    }
+
+    score
+}
+
 #[test]
 fn test_readme_score() {
     let ren = render_readme::Renderer::new(None);

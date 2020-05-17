@@ -11,6 +11,7 @@ use parking_lot::Mutex;
 use rand::{seq::SliceRandom, thread_rng};
 use ranking::CrateTemporalInputs;
 use ranking::CrateVersionInputs;
+use ranking::OverallScoreInputs;
 use render_readme::Links;
 use render_readme::Renderer;
 use search_index::*;
@@ -226,8 +227,7 @@ async fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrat
         has_badges: k.has_badges(),
         maintenance: k.maintenance(),
         is_nightly: k.is_nightly(),
-    })
-    .total();
+    });
 
     let downloads_per_month = crates.downloads_per_month_or_equivalent(all.origin()).await.expect("dl numbers").unwrap_or(0) as u32;
     let dependency_freshness = if let Ok((runtime, _, build)) = k.direct_dependencies() {
@@ -285,40 +285,18 @@ async fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrat
     }
 
     let temp_score = ranking::crate_score_temporal(&temp_inp);
-    let temp_score = temp_score.total();
 
-    let mut score = (base_score + temp_score) * 0.5;
-    if let Some((former_glory, _)) = crates.former_glory(all.origin()).await.expect("former_glory") {
-        score *= former_glory;
-    }
-
-    // there's usually a non-macro/non-sys sibling
-    if k.is_proc_macro() || k.is_sys() {
-        score *= 0.9;
-    }
-
-    if crates.is_sub_component(k).await {
-        score *= 0.9;
-    }
-
-    if is_autopublished(&k) {
-        score *= 0.8;
-    }
-
-    if is_deprecated(&k) {
-        score *= 0.2;
-    }
-
-    match k.origin() {
-        Origin::CratesIo(_) => {},
-        // installation and usage of other crate sources is more limited
-        _ => score *= 0.75,
-    }
-
-    // k bye
-    if k.is_yanked() || is_squatspam(&k) {
-        score *= 0.001;
-    }
+    let score = ranking::combined_score(base_score, temp_score, &OverallScoreInputs {
+        former_glory: crates.former_glory(all.origin()).await.expect("former_glory").map(|(f,_)| f),
+        is_proc_macro: k.is_proc_macro(),
+        is_sys: k.is_sys(),
+        is_sub_component: crates.is_sub_component(k).await,
+        is_autopublished: is_autopublished(&k),
+        is_deprecated: is_deprecated(&k),
+        is_crates_io_published: if let Origin::CratesIo(_) = k.origin() {true} else {false},
+        is_yanked: k.is_yanked(),
+        is_squatspam: is_squatspam(&k),
+    });
 
     (downloads_per_month as usize, score)
 }

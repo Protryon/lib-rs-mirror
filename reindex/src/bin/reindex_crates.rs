@@ -40,7 +40,6 @@ fn main() {
             std::process::exit(1);
         },
     });
-    let renderer = Arc::new(Renderer::new(None));
     let pre = handle.spawn({
         let c = Arc::clone(&crates);
         async move { c.prewarm().await }
@@ -60,8 +59,8 @@ fn main() {
 
     let (tx, mut rx) = mpsc::channel::<(Arc<_>, _, _)>(64);
     let index_thread = handle.spawn({
-        let renderer = renderer.clone();
         async move {
+            let renderer = Arc::new(Renderer::new(None));
             let mut n = 0usize;
             let mut next_n = 100usize;
             while let Some((ver, downloads_per_month, score)) = rx.recv().await {
@@ -83,12 +82,7 @@ fn main() {
         }
     });
 
-    let handle = Arc::new(tokio::runtime::Handle::current());
-    let seen_repos = Arc::new(Mutex::new(HashSet::new()));
-    let concurrency = Arc::new(tokio::sync::Semaphore::new(16));
-    let repo_concurrency = Arc::new(tokio::sync::Semaphore::new(4));
     let _ = pre.await;
-    let waiting = futures::stream::FuturesUnordered::new();
     let c = if everything {
         let mut c: Vec<_> = crates.all_crates().collect::<Vec<_>>();
         c.shuffle(&mut thread_rng());
@@ -98,7 +92,20 @@ fn main() {
     } else {
         Either::Right(handle.enter(|| futures::executor::block_on(crates.crates_to_reindex())).unwrap().into_iter().map(|c| c.origin().clone()))
     };
-    for (i, origin) in c.into_iter().enumerate() {
+    main_indexing_loop(crates, Box::new(c.into_iter()), tx, repos).await;
+    if stopped() {return;}
+    index_thread.await.unwrap().unwrap();
+    })).unwrap();
+}
+
+async fn main_indexing_loop(crates: Arc<KitchenSink>, c: Box<dyn Iterator<Item=Origin> + Send>, tx: mpsc::Sender<(Arc<RichCrateVersion>, usize, f64)>, repos: bool) {
+    let renderer = Arc::new(Renderer::new(None));
+    let waiting = futures::stream::FuturesUnordered::new();
+    let handle = Arc::new(tokio::runtime::Handle::current());
+    let seen_repos = Arc::new(Mutex::new(HashSet::new()));
+    let concurrency = Arc::new(tokio::sync::Semaphore::new(16));
+    let repo_concurrency = Arc::new(tokio::sync::Semaphore::new(4));
+    for (i, origin) in c.enumerate() {
         if stopped() {
             return;
         }
@@ -148,9 +155,6 @@ fn main() {
     drop(tx);
     if stopped() {return;}
     waiting.collect::<()>().await;
-    if stopped() {return;}
-    index_thread.await.unwrap().unwrap();
-    })).unwrap();
 }
 
 async fn index_crate(crates: &KitchenSink, origin: &Origin, renderer: &Renderer, search_sender: &mut mpsc::Sender<(ArcRichCrateVersion, usize, f64)>) -> Result<ArcRichCrateVersion, failure::Error> {

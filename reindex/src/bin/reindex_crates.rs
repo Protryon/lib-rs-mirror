@@ -23,28 +23,6 @@ use udedokei::LanguageExt;
 use feat_extractor::*;
 
 fn main() {
-    let mut rt = tokio::runtime::Builder::new()
-        .threaded_scheduler()
-        .enable_all()
-        .thread_name("reindex")
-        .build()
-        .unwrap();
-
-    rt.block_on(rt.spawn(async move {
-        let handle = tokio::runtime::Handle::current();
-
-    let crates = Arc::new(match kitchen_sink::KitchenSink::new_default().await {
-        Ok(a) => a,
-        e => {
-            print_res(e);
-            std::process::exit(1);
-        },
-    });
-    let pre = handle.spawn({
-        let c = Arc::clone(&crates);
-        async move { c.prewarm().await }
-    });
-
     let everything = std::env::args().nth(1).map_or(false, |a| a == "--all");
     let specific: Vec<_> = if !everything {
         std::env::args().skip(1).map(|name| {
@@ -55,10 +33,19 @@ fn main() {
     };
     let repos = !everything;
 
-    let mut indexer = Indexer::new(CrateSearchIndex::new(crates.main_cache_dir()).expect("init search")).expect("init search indexer");
+    let mut rt = tokio::runtime::Builder::new()
+        .threaded_scheduler()
+        .enable_all()
+        .thread_name("reindex")
+        .build()
+        .unwrap();
 
+    let crates = rt.block_on(kitchen_sink::KitchenSink::new_default());
+    let crates = Arc::new(crates.unwrap());
+    let mut indexer = Indexer::new(CrateSearchIndex::new(crates.main_cache_dir()).expect("init search")).expect("init search indexer");
     let (tx, mut rx) = mpsc::channel::<(Arc<_>, _, _)>(64);
-    let index_thread = handle.spawn({
+
+    let index_thread = rt.spawn({
         async move {
             let renderer = Arc::new(Renderer::new(None));
             let mut n = 0usize;
@@ -82,19 +69,20 @@ fn main() {
         }
     });
 
-    let _ = pre.await;
-    let c = if everything {
+    let c: Box<dyn Iterator<Item=Origin> + Send> = if everything {
         let mut c: Vec<_> = crates.all_crates().collect::<Vec<_>>();
         c.shuffle(&mut thread_rng());
-        Either::Left(c)
+        Box::new(c.into_iter())
     } else if !specific.is_empty() {
-        Either::Left(specific)
+        Box::new(specific.into_iter())
     } else {
-        Either::Right(handle.enter(|| futures::executor::block_on(crates.crates_to_reindex())).unwrap().into_iter().map(|c| c.origin().clone()))
+        Box::new(rt.block_on(crates.crates_to_reindex()).unwrap().into_iter().map(|c| c.origin().clone()))
     };
-    main_indexing_loop(crates, Box::new(c.into_iter()), tx, repos).await;
-    if stopped() {return;}
-    index_thread.await.unwrap().unwrap();
+
+    rt.block_on(rt.spawn(async move {
+        main_indexing_loop(crates, c, tx, repos).await;
+        if stopped() {return;}
+        index_thread.await.unwrap().unwrap();
     })).unwrap();
 }
 

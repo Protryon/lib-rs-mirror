@@ -349,12 +349,6 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs<'_>) -> Score {
     score
 }
 
-// pub fn crate_score_contextual(inputs: &CrateContextInputs) -> Score {
-//     let mut score = Score::new();
-
-//     score
-// }
-
 #[test]
 fn test_readme_score() {
     let ren = render_readme::Renderer::new(None);

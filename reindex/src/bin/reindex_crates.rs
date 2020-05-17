@@ -6,7 +6,7 @@ use futures::future::join_all;
 use futures::stream::StreamExt;
 use kitchen_sink::ArcRichCrateVersion;
 use kitchen_sink::RichCrate;
-use kitchen_sink::{self, stop, stopped, KitchenSink, MaintenanceStatus, Origin, RichCrateVersion};
+use kitchen_sink::{self, stop, stopped, KitchenSink, Origin, RichCrateVersion};
 use parking_lot::Mutex;
 use rand::{seq::SliceRandom, thread_rng};
 use ranking::CrateTemporalInputs;
@@ -296,7 +296,8 @@ async fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrat
     if k.is_proc_macro() || k.is_sys() {
         score *= 0.9;
     }
-    if is_sub_component(crates, k).await {
+
+    if crates.is_sub_component(k).await {
         score *= 0.9;
     }
 
@@ -320,29 +321,6 @@ async fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrat
     }
 
     (downloads_per_month as usize, score)
-}
-
-/// Crates are spilt into foo and foo-core. The core is usually uninteresting/duplicate.
-async fn is_sub_component(crates: &KitchenSink, k: &RichCrateVersion) -> bool {
-    let name = k.short_name();
-    if let Some(pos) = name.rfind(|c: char| c == '-' || c == '_') {
-        match name.get(pos+1..) {
-            Some("core") | Some("shared") | Some("utils") | Some("common") |
-            Some("fork") | Some("unofficial") => {
-                if let Some(parent_name) = name.get(..pos-1) {
-                    if Origin::try_from_crates_io_name(parent_name).map_or(false, |name| crates.crate_exists(&name)) {
-                        // TODO: check if owners overlap?
-                        return true;
-                    }
-                }
-                if crates.parent_crate(k).await.is_some() {
-                    return true;
-                }
-            },
-            _ => {},
-        }
-    }
-    false
 }
 
 fn print_res<T>(res: Result<T, failure::Error>) {

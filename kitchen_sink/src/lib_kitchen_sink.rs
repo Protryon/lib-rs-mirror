@@ -1672,6 +1672,30 @@ impl KitchenSink {
         self.crate_db.parent_crate(repo, child.short_name()).await.ok()?
     }
 
+
+    /// Crates are spilt into foo and foo-core. The core is usually uninteresting/duplicate.
+    pub async fn is_sub_component(&self, k: &RichCrateVersion) -> bool {
+        let name = k.short_name();
+        if let Some(pos) = name.rfind(|c: char| c == '-' || c == '_') {
+            match name.get(pos+1..) {
+                Some("core") | Some("shared") | Some("utils") | Some("common") |
+                Some("impl") | Some("fork") | Some("unofficial") => {
+                    if let Some(parent_name) = name.get(..pos-1) {
+                        if Origin::try_from_crates_io_name(parent_name).map_or(false, |name| self.crate_exists(&name)) {
+                            // TODO: check if owners overlap?
+                            return true;
+                        }
+                    }
+                    if self.parent_crate(k).await.is_some() {
+                        return true;
+                    }
+                },
+                _ => {},
+            }
+        }
+        false
+    }
+
     async fn cachebust_string_for_repo(&self, crate_repo: &Repo) -> CResult<String> {
         Ok(self.crate_db.crates_in_repo(crate_repo).await
             .context("db crates_in_repo")?

@@ -535,12 +535,18 @@ lazy_static! {
             &[("date-and-time", 1.3, 0.18), ("value-formatting", 1.1, 0.), ("os", 0.9, 0.), ("os::windows-apis", 0.9, 0.), ("command-line-interface", 0.7, 0.), ("parsing", 0.7, 0.), ("science", 0.7, 0.), ("no-std", 0.95, 0.), ("games", 0.1, 0.), ("cryptography::cryptocurrencies", 0.8, 0.)]),
         (Cond::All(&["constant","time"]), &[("date-and-time", 0.3, 0.)]),
         (Cond::All(&["linear","time"]), &[("date-and-time", 0.7, 0.)]),
-        (Cond::Any(&["finance"]), &[("date-and-time", 0.7, 0.)]),
         (Cond::All(&["compile","time"]), &[("date-and-time", 0.4, 0.)]),
         (Cond::Any(&["uuid", "simulation", "failure", "fail", "iter", "domain", "engine", "kernel"]),
             &[("date-and-time", 0.4, 0.), ("value-formatting", 0.7, 0.), ("rendering::graphics-api", 0.9, 0.)]),
         (Cond::Any(&["nan", "profile", "float", "timecode", "tsc", "fps", "arrow", "compiler"]),
             &[("date-and-time", 0.4, 0.), ("network-programming", 0.8, 0.), ("os::windows-apis", 0.9, 0.), ("development-tools::debugging", 0.8, 0.)]),
+
+        (Cond::Any(&["finance", "financial"]), &[("date-and-time", 0.7, 0.), ("science::math", 1.2, 0.1)]),
+        (Cond::All(&["quantitative", "analysis"]), &[("date-and-time", 0.7, 0.), ("science::math", 1.2, 0.2)]),
+        (Cond::All(&["bond", "period"]), &[("date-and-time", 0.7, 0.), ("science::math", 1.2, 0.2)]),
+        (Cond::All(&["market", "quotes"]), &[("date-and-time", 0.7, 0.), ("science::math", 1.2, 0.2)]),
+        (Cond::All(&["stock", "market"]), &[("date-and-time", 0.7, 0.), ("science::math", 1.2, 0.2)]),
+        (Cond::Any(&["investment"]), &[("date-and-time", 0.7, 0.), ("science::math", 1.2, 0.1)]),
 
         (Cond::Any(&["layout"]), &[("gui", 1.1, 0.06), ("rendering::graphics-api", 1.05, 0.), ("database", 0.7, 0.)]),
 

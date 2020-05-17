@@ -307,6 +307,7 @@ findomain: network-programming
 findomain: networking
 finite: science::math
 finn-assembler: development-tools
+finql: science::math
 fitrs: parser-implementations
 fixed_width: parser-implementations
 fixedstep: game-engines
@@ -368,6 +369,7 @@ glutin_core_foundation: rendering::graphics-api
 glx: rendering::graphics-api, os::unix-apis
 goban: parser-implementations, games
 goblin: parser-implementations
+godot_rust_helper: game-engines, command-line-utilities
 google_geocoding: science, web-programming
 gosh-core: science
 gpt: filesystem
@@ -388,6 +390,7 @@ grin_store: cryptography::cryptocurrencies
 grin_wallet_impls: cryptography::cryptocurrencies
 gtfs-structures: parser-implementations
 gtrans: command-line-utilities, internationalization
+gurufocus_api: science::math, web-programming
 gwasm-dispatcher: wasm
 hash-db: rust-patterns, databases, no-std
 hash256-std-hasher: rust-patterns, no-std
@@ -428,6 +431,7 @@ igdb-rs: games
 ihex: embedded, development-tools
 ilibipt: hardware-support
 image-capture-core: os::macos-apis
+image-interlacer : multimedia::images, command-line-utilities
 image-interlacer: multimedia::images, command-line-utilities
 imdb-index: web-programming
 imdb: web-programming
@@ -540,6 +544,7 @@ loc: text-processing, command-line-utilities
 locationsharing: science, web-programming
 log_domain: science::math
 log_kv: database-implementations
+loggerv: command-line-interface
 loggify: development-tools::debugging
 lone-ranger : multimedia, web-programming
 lonsdaleite:rendering::graphics-api, os::macos-apis
@@ -726,6 +731,7 @@ playlist-decoder: parser-implementations, multimedia::audio
 playlist-duration: command-line-utilities, multimedia::audio
 plugger-core: development-tools::ffi
 pngcrush: compression
+poi: algorithms, science
 polygraph: database-implementations
 pomodoro: command-line-utilities
 portaudio: os, multimedia::audio
@@ -753,6 +759,8 @@ pwasm-utils: cryptography::cryptocurrencies
 qbsdiff: compression
 qeda: command-line-utilities
 qni-core-rs: web-programming::websocket
+qualinvest: science::math
+qualinvest_cli: command-line-utilities, science::math
 quaternion_averager: science::math
 quick-protobuf: parser-implementations
 quicksort: algorithms
@@ -871,6 +879,7 @@ scrapmetal: rust-patterns, algorithms
 sdkms: hardware-support
 seahorse: command-line-interface
 sekai: science
+self_update: development-tools, command-line-utilities
 semantic-rs: development-tools
 semver-parser: parser-implementations
 serde-humanize-rs: parser-implementations, encoding
@@ -1036,6 +1045,7 @@ vfio-bindings: os::unix-apis
 vhdl_lang: development-tools
 victoria-dom: parser-implementations, web-programming
 videocore: hardware-support, multimedia::video
+vkgen: rendering::graphics-api, command-line-utilities
 vsphere-api: web-programming
 w_result: rust-patterns
 wagyu: cryptography::cryptocurrencies
@@ -1068,6 +1078,7 @@ xmltree: parser-implementations
 xpc-connection-sys : os::macos-apis
 xpc-connection: os::macos-apis
 xsv: command-line-utilities, text-processing
+yahoo_finance_api: science::math, web-programming
 yellowsun: cryptography::cryptocurrencies
 ymlctx: config
 yoga: gui

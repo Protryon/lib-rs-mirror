@@ -170,6 +170,7 @@ crc32_digest : algorithms
 cron-parser: parser-implementations
 crossterm_style: command-line-interface
 crossterm_utils : command-line-interface
+crucio: development-tools::testing
 crunchy: development-tools
 cryptoballot: cryptography, authentication, gui
 cryptonote-wallet: cryptography::cryptocurrencies
@@ -466,6 +467,7 @@ iso8601-duration: date-and-time, parser-implementations
 iso_currency: internationalization
 ivyrust: networking
 java-desc: parser-implementations
+javadec-rs: parser-implementations, development-tools
 jeepers: science::machine-learning
 jokeyrhyme-dotfiles: development-tools
 json-tools: parser-implementations

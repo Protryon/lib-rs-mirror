@@ -148,7 +148,7 @@ pub async fn render_author_page<W: Write>(out: &mut W, aut: &RichAuthor, kitchen
     }
 
     let urler = Urler::new(None);
-    let c = AuthorPage::new(aut, kitchen_sink, renderer).await.context("New crate page")?;
+    let c = AuthorPage::new(aut, kitchen_sink, renderer).await.context("Can't load data for author page")?;
     templates::author(out, &urler, &c).context("author page io")?;
     Ok(())
 }
@@ -160,7 +160,7 @@ pub async fn render_crate_page<W: Write>(out: &mut W, all: &RichCrate, ver: &Ric
     }
 
     let urler = Urler::new(Some(ver.origin().clone()));
-    let c = CratePage::new(all, ver, kitchen_sink, renderer).await.context("New crate page")?;
+    let c = CratePage::new(all, ver, kitchen_sink, renderer).await.context("Can't load data for crate page")?;
     templates::crate_page(out, &urler, &c).context("crate page io")?;
     Ok(c.date_created())
 }

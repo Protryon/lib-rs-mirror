@@ -163,6 +163,7 @@ github:llambda/rrgeo/reverse_geocoder
 github:llambda/rrgeo/rrgeo-actix
 github:lovesh/signature-schemes/bls-acml
 github:lovesh/signature-schemes/musig-acml
+github:lucianobestia/cargo_crev_web/cargo_crev_web
 github:lumen/lumen/liblumen_beam
 github:lumen/lumen/liblumen_compiler
 github:lumen/lumen/liblumen_core

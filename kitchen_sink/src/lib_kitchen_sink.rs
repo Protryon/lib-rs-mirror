@@ -729,7 +729,7 @@ impl KitchenSink {
         if let Ok(cached) = &data {
             match origin {
                 Origin::CratesIo(name) => {
-                    let expected_ver = self.index.crate_highest_version(name, false).context("rich_crate_version2")?;
+                    let expected_ver = self.index.crate_highest_version(name, false).context("error finding crates-io index data")?;
                     let has = &cached.0.package().version;
                     let wants = expected_ver.version();
                     if has != wants {

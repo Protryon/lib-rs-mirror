@@ -132,7 +132,7 @@ impl<'a> CratePage<'a> {
             async { Ok(kitchen_sink.is_build_or_dev(ver.origin()).await?) },
             async {
                 Ok(if let Some(origin) = parent_crate {
-                    Some(kitchen_sink.rich_crate_version_async(&origin).await?)
+                    kitchen_sink.rich_crate_version_async(&origin).await.ok()
                 } else {
                     None
                 })

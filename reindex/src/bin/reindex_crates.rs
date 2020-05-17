@@ -1,5 +1,4 @@
 use futures::Future;
-use either::*;
 use failure;
 use futures::future::FutureExt;
 use futures::future::join_all;

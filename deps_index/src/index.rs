@@ -22,6 +22,7 @@ use std::time::Duration;
 use string_interner::StringInterner;
 use string_interner::Sym;
 use triomphe::Arc;
+use feat_extractor::is_deprecated_requirement;
 
 type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 type FxHashSet<V> = std::collections::HashSet<V, ahash::RandomState>;
@@ -394,7 +395,7 @@ impl Index {
     /// 0 = not used *or deprecated*
     /// 1 = everyone uses it
     pub async fn version_popularity(&self, crate_name: &str, requirement: &VersionReq) -> Result<Option<(bool, f32)>, DepsErr> {
-        if is_deprecated(crate_name, requirement) {
+        if is_deprecated_requirement(crate_name, requirement) {
             return Ok(Some((false, 0.)));
         }
 
@@ -449,24 +450,6 @@ use std::fmt;
 impl fmt::Debug for Dep {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Dep {{ {}, runtime: x{}, build: x{} }}", self.semver, self.runtime.lock().len(), self.build.lock().len())
-    }
-}
-
-pub fn is_deprecated(name: &str, requirement: &VersionReq) -> bool {
-    let v02 = "0.2.99".parse().unwrap();
-    let v01 = "0.1.99".parse().unwrap();
-    match name {
-        "time" if requirement.matches(&v01) => true,
-        "winapi" if requirement.matches(&v01) || requirement.matches(&v02) => true,
-        "rustc-serialize" | "gcc" | "rustc-benchmarks" | "rust-crypto" |
-        "flate2-crc" | "complex" | "simple_stats" | "concurrent" | "feed" |
-        "isatty" | "thread-scoped" | "target_build_utils" | "chan" | "chan-signal" |
-        "glsl-to-spirv" => true,
-        // fundamentally unsound
-        "str-concat" => true,
-        // uses old winapi
-        "user32-sys" | "shell32-sys" | "advapi32-sys" | "gdi32-sys" | "ole32-sys" | "ws2_32-sys" | "kernel32-sys" | "userenv-sys" => true,
-        _ => false,
     }
 }
 

@@ -1,6 +1,9 @@
+use rich_crate::RichCrateVersion;
 use std::collections::HashSet;
 use rich_crate::ManifestExt;
+use rich_crate::MaintenanceStatus;
 use rich_crate::Manifest;
+use semver::VersionReq;
 
 lazy_static::lazy_static! {
     /// ignore these as keywords
@@ -100,4 +103,94 @@ fn chop3words(s: &str) -> &str {
         }
     }
     s
+}
+
+
+pub fn is_deprecated(k: &RichCrateVersion) -> bool {
+    if k.version().contains("deprecated") || k.version() == "0.0.0" || k.version() == "0.0.1" {
+        return true;
+    }
+    if k.maintenance() == MaintenanceStatus::Deprecated {
+        return true;
+    }
+    if let Some(orig_desc) = k.description() {
+        let orig_desc = orig_desc.trim_matches(|c: char| !c.is_ascii_alphabetic());
+        let desc = orig_desc.to_ascii_lowercase();
+        return orig_desc.starts_with("WIP") || orig_desc.ends_with("WIP") ||
+            desc.starts_with("deprecated") ||
+            desc.starts_with("unfinished") ||
+            desc.starts_with("an unfinished") ||
+            desc.starts_with("unsafe and deprecated") ||
+            desc.starts_with("crate is abandoned") ||
+            desc.starts_with("abandoned") ||
+            desc.contains("this crate is abandoned") ||
+            desc.contains("this crate has been abandoned") ||
+            desc.contains("do not use") ||
+            desc.contains("this crate is a placeholder") ||
+            desc.contains("this is a dummy package") ||
+            desc.starts_with("an empty crate") ||
+            desc.starts_with("discontinued") ||
+            desc.starts_with("wip. ") ||
+            desc.starts_with("very early wip") ||
+            desc.starts_with("renamed to ") ||
+            desc.starts_with("crate renamed to ") ||
+            desc.starts_with("temporary fork") ||
+            desc.contains("no longer maintained") ||
+            desc.contains("this tool is abandoned") ||
+            desc.ends_with("deprecated") || desc.contains("deprecated in favor") || desc.contains("project is deprecated");
+    }
+    if let Ok(req) = k.version().parse() {
+        if is_deprecated_requirement(k.short_name(), &req) {
+            return true;
+        }
+    }
+    false
+}
+
+pub fn is_deprecated_requirement(name: &str, requirement: &VersionReq) -> bool {
+    let v02 = "0.2.99".parse().unwrap();
+    let v01 = "0.1.99".parse().unwrap();
+    match name {
+        "time" if requirement.matches(&v01) => true,
+        "winapi" if requirement.matches(&v01) || requirement.matches(&v02) => true,
+        "rustc-serialize" | "gcc" | "rustc-benchmarks" | "rust-crypto" |
+        "flate2-crc" | "complex" | "simple_stats" | "concurrent" | "feed" |
+        "isatty" | "thread-scoped" | "target_build_utils" | "chan" | "chan-signal" |
+        "glsl-to-spirv" => true,
+        // fundamentally unsound
+        "str-concat" => true,
+        // uses old winapi
+        "user32-sys" | "shell32-sys" | "advapi32-sys" | "gdi32-sys" | "ole32-sys" | "ws2_32-sys" | "kernel32-sys" | "userenv-sys" => true,
+        _ => false,
+    }
+}
+
+pub fn is_autopublished(k: &RichCrateVersion) -> bool {
+    k.description().map_or(false, |d| d.starts_with("Automatically published "))
+}
+
+pub fn is_squatspam(k: &RichCrateVersion) -> bool {
+    if k.version().contains("reserved") || k.version().contains("placeholder") {
+        return true;
+    }
+    if let Some(desc) = k.description() {
+        let desc = desc.trim_matches(|c: char| !c.is_ascii_alphabetic()).to_ascii_lowercase();
+        return desc.contains("this crate is a placeholder") ||
+            desc.contains("reserving this crate") ||
+            desc.contains("want to use this name") ||
+            desc.contains("this is a dummy package") ||
+            desc == "reserved" ||
+            desc.starts_with("placeholder") ||
+            desc.ends_with(" placeholder") ||
+            desc.starts_with("a placeholder") ||
+            desc.starts_with("empty crate") ||
+            desc.starts_with("an empty crate") ||
+            desc.starts_with("reserved for ") ||
+            desc.starts_with("stub to squat") ||
+            desc.starts_with("claiming it before someone") ||
+            desc.starts_with("reserved name") ||
+            desc.starts_with("reserved package") ||
+            desc.starts_with("reserve the name");
+    }
+    false
 }

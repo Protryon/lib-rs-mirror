@@ -334,6 +334,7 @@ fsevent-sys: os::macos-apis
 fsevent: os::macos-apis
 ftoa: value-formatting
 full_moon: parser-implementations, development-tools
+funfun: rust-patterns
 futures-core: asynchronous
 futures-executor: asynchronous
 futures-task: asynchronous
@@ -460,6 +461,7 @@ ipwhois: databases, network-programming
 iracing: games
 iron-hmac : web-programming, cryptography
 is-macro: development-tools::procedural-macro-helpers
+is-same: rust-patterns
 isbfc: emulators
 iso639-1: internationalization
 iso639_2: internationalization
@@ -704,6 +706,7 @@ packapp: os::macos-apis, command-line-utilities
 pad: text-processing
 pallet-contracts: cryptography::cryptocurrencies
 papyrus: development-tools, command-line-utilities
+parc: concurrency
 parity-db : cryptography::cryptocurrencies
 parity-scale-codec-derive: cryptography::cryptocurrencies
 parse-display-derive: rust-patterns, development-tools::procedural-macro-helpers
@@ -1066,6 +1069,7 @@ witty: web-programming, science::machine-learning
 wlambda: parser-implementations
 wnck-sys: gui
 wooting-sdk: hardware-support
+wrapping_coords2d: science::math
 wrc: memory-management
 wstring: rust-patterns
 x86: hardware-support, os

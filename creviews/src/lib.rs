@@ -20,7 +20,7 @@ impl Creviews {
     }
 
     pub fn update(&self) -> Result<(), Error> {
-        self.local.fetch_all()
+        Ok(self.local.fetch_all()?)
     }
 
     pub fn reviews_for_crate(&self, crate_name: &str) -> Result<Vec<Review>, Error> {

@@ -1,11 +1,11 @@
 [package]
 name = "creviews"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Kornel <kornel@geekhood.net>"]
 edition = "2018"
 
 [dependencies]
-crev-lib = { git = "https://github.com/crev-dev/cargo-crev", rev = "33f412210373cbcb92287441fabee7d16af55b17" }
-crev-data = { git = "https://github.com/crev-dev/cargo-crev", rev = "33f412210373cbcb92287441fabee7d16af55b17" }
-crev-wot = { git = "https://github.com/crev-dev/cargo-crev", rev = "33f412210373cbcb92287441fabee7d16af55b17" }
+crev-lib = { git = "https://github.com/crev-dev/cargo-crev", rev = "9d9c35bfbc59695181d6826444cc744eaf8ab52d" }
+crev-data = { git = "https://github.com/crev-dev/cargo-crev", rev = "9d9c35bfbc59695181d6826444cc744eaf8ab52d" }
+crev-wot = { git = "https://github.com/crev-dev/cargo-crev", rev = "9d9c35bfbc59695181d6826444cc744eaf8ab52d" }
 failure = "0.1.8"

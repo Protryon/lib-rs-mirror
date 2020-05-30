@@ -880,6 +880,7 @@ scannit-core-ffi: hardware-support
 scannit-core: web-programming
 scdlang: parser-implementations
 scoped-env: config
+scottish_names: internationalization, text-processing
 scrapmetal: rust-patterns, algorithms
 sdkms: hardware-support
 seahorse: command-line-interface

@@ -405,7 +405,7 @@ impl ManifestExt for Manifest {
                 let name = depstr.next().expect("name should be there");
                 let with_feature = depstr.next();
 
-                if let Some(dep) = normal.get_mut(name) {
+                if let Some(dep) = normal.get_mut(name).or_else(|| build.get_mut(name)) {
                     let enabled = default_features.get(for_feature).is_some();
                     if enabled {
                         if let Some(with_feature) = with_feature {

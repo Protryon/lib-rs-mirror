@@ -350,6 +350,14 @@
               }
             } else {
               <h4>No runtime deps</h4>
+              @if dev.is_empty() && build.is_empty() && normal.is_empty() {
+                @if let Some(f) = c.non_dep_features() {
+                  <h4>Features</h4>
+                  <ul>
+                    @for f in f {<li><span class="feature">@f</span></li>}
+                  </ul>
+                }
+              }
             }
             @if let Some(sz) = &c.sizes {
               @if sz.typical.tarball > 1000000 || sz.typical.tarball > sz.tarball.div(2) {
@@ -381,6 +389,16 @@
               }
               @:deps_list(c, url, &build, Some("build"))
               @:deps_list(c, url, &dev, Some("dev"))
+              @if !dev.is_empty() || !build.is_empty() || !normal.is_empty() {
+                @if let Some(f) = c.non_dep_features() {
+                  <li>
+                    other feature@if f.len() != 1 {s}:
+                    @for f in f {
+                      <span class="feature">@f</span>
+                    }
+                  </li>
+                }
+              }
             </ul>
             </nav>
           } else {

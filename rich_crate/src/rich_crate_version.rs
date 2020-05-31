@@ -426,7 +426,7 @@ impl ManifestExt for Manifest {
             let mut dep: Vec<_> = dep.into_iter()
                 .map(|(_, mut dep)| {
                     if dep.only_for_features.is_empty() && dep.name != dep.package {
-                        dep.only_for_features.insert(dep.package.clone(), false);
+                        dep.only_for_features.insert(dep.name.clone(), false);
                     }
                     dep
                 })

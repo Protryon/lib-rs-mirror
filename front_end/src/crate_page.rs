@@ -408,6 +408,24 @@ impl<'a> CratePage<'a> {
         date.format("%b %Y").to_string()
     }
 
+    pub fn non_dep_features(&self) -> Option<Vec<String>> {
+        let f = self.ver.features();
+        let tmp: Vec<_> = f.iter().filter_map(|(k,v)| {
+            let non_dep = k != "default" && v.iter().all(|feature| f.get(feature).is_some());
+            if non_dep {
+                Some(k.to_owned())
+            } else {
+                None
+            }
+        }).collect();
+
+        if !tmp.is_empty() {
+            Some(tmp)
+        } else {
+            None
+        }
+    }
+
     pub fn direct_dependencies(&self) -> Option<(Vec<RichDep>, Vec<RichDep>, Vec<RichDep>)> {
         self.ver.direct_dependencies().ok()
     }

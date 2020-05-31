@@ -350,11 +350,12 @@ impl ManifestExt for Manifest {
     /// run dev build
     fn direct_dependencies(&self) -> Result<(Vec<RichDep>, Vec<RichDep>, Vec<RichDep>), CfgErr> {
         fn to_dep((name, dep): (&String, &Dependency)) -> (String, RichDep) {
-            let package = dep.package().unwrap_or(&name).to_owned();
-            (package.clone(), RichDep {
-                package,
+            let package = dep.package().unwrap_or(&name);
+            (package.into(), RichDep {
+                package: package.into(),
+                name: name.as_str().into(),
                 dep: dep.clone(),
-                only_for_features: Vec::new(),
+                only_for_features: BTreeMap::new(),
                 only_for_targets: Vec::new(),
                 with_features: Vec::new(),
             })
@@ -369,10 +370,11 @@ impl ManifestExt for Manifest {
                 let package = dep.package().unwrap_or(&name);
                 if let Vacant(e) = dest.entry(package.to_string()) {
                     e.insert(RichDep {
-                        package: package.to_string(),
+                        package: package.into(),
+                        name: name.as_str().into(),
                         dep: dep.clone(),
                         only_for_targets: vec![target.parse()?],
-                        only_for_features: Vec::new(),
+                        only_for_features: BTreeMap::new(),
                         with_features: Vec::new(),
                     });
                     // otherwise don't add platform info to existing cross-platform deps
@@ -410,18 +412,25 @@ impl ManifestExt for Manifest {
                     if enabled {
                         if let Some(with_feature) = with_feature {
                             if !dep.dep.req_features().iter().any(|f| f == with_feature)
-                                && !dep.with_features.iter().any(|f| f == with_feature)
+                                && !dep.with_features.iter().any(|f| &**f == with_feature)
                             {
-                                dep.with_features.push(with_feature.to_string())
+                                dep.with_features.push(with_feature.into())
                             }
                         }
                     }
-                    dep.only_for_features.push((for_feature.to_string(), enabled));
+                    *dep.only_for_features.entry(for_feature.as_str().into()).or_insert(false) |= enabled;
                 }
             }
         }
         fn convsort(dep: BTreeMap<String, RichDep>) -> Vec<RichDep> {
-            let mut dep: Vec<_> = dep.into_iter().map(|(_, dep)| dep).collect();
+            let mut dep: Vec<_> = dep.into_iter()
+                .map(|(_, mut dep)| {
+                    if dep.only_for_features.is_empty() && dep.name != dep.package {
+                        dep.only_for_features.insert(dep.package.clone(), false);
+                    }
+                    dep
+                })
+                .collect();
             dep.sort_by(|a,b| {
                 a.dep.optional().cmp(&b.dep.optional())
                 .then(a.only_for_targets.is_empty().cmp(&b.only_for_targets.is_empty()))
@@ -434,19 +443,20 @@ impl ManifestExt for Manifest {
 }
 
 pub struct RichDep {
-    pub package: String,
+    pub package: Box<str>,
+    pub name: Box<str>,
     pub dep: Dependency,
     /// it's optional, used only for a platform
     pub only_for_targets: Vec<Target>,
     /// it's optional, used only if parent crate's feature is enabled
-    pub only_for_features: Vec<(String, bool)>,
+    pub only_for_features: BTreeMap<Box<str>, bool>,
     /// When used, these features of this dependency are enabled
     pub with_features: Vec<String>,
 }
 
 impl RichDep {
-    pub fn for_features(&self) -> &[(String, bool)] {
-        &self.only_for_features
+    pub fn for_features(&self) -> impl Iterator<Item=(&str, bool)> + '_ {
+        self.only_for_features.iter().map(|(k,v)| (&**k, *v))
     }
 
     pub fn is_optional(&self) -> bool {

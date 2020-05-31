@@ -1449,11 +1449,11 @@ impl KitchenSink {
         // runtime and (lesser) build-time deps
         for (deps, overall_weight) in all_deps.iter() {
             for dep in deps {
-                if let Some(rev) = raw_deps_stats.counts.get(dep.package.as_str()) {
+                if let Some(rev) = raw_deps_stats.counts.get(&dep.package) {
                     let right_popularity = rev.direct.all() > 1 && rev.direct.all() < 150 && rev.runtime.def < 500 && rev.runtime.opt < 800;
-                    if Self::dep_interesting_for_index(dep.package.as_str()).unwrap_or(right_popularity) {
+                    if Self::dep_interesting_for_index(&dep.package).unwrap_or(right_popularity) {
                         let weight = overall_weight / (1 + rev.direct.all()) as f32;
-                        weighed_deps.push((dep.package.as_str(), weight));
+                        weighed_deps.push((&dep.package, weight));
                     }
                 }
             }

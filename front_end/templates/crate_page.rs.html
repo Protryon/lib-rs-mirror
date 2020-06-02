@@ -350,7 +350,7 @@
               }
             } else {
               <h4>No runtime deps</h4>
-              @if dev.is_empty() && build.is_empty() && normal.is_empty() {
+              @if dev.is_empty() && build.is_empty() && normal.is_empty() && !c.ver.has_buildrs() {
                 @if let Some(f) = c.non_dep_features() {
                   <h4>Features</h4>
                   <ul>
@@ -389,7 +389,7 @@
               }
               @:deps_list(c, url, &build, Some("build"))
               @:deps_list(c, url, &dev, Some("dev"))
-              @if !dev.is_empty() || !build.is_empty() || !normal.is_empty() {
+              @if !dev.is_empty() || !build.is_empty() || !normal.is_empty() || c.ver.has_buildrs() {
                 @if let Some(f) = c.non_dep_features() {
                   <li>
                     other feature@if f.len() != 1 {s}:

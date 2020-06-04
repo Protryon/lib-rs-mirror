@@ -146,6 +146,9 @@ impl Index {
                 .filter_map(|path| {
                     let c = crates_index::Crate::new(path).ok()?;
                     let name = c.name().to_ascii_lowercase();
+                    if name == "test+package" {
+                        return None; // crates-io bug
+                    }
                     assert!(Origin::is_valid_crate_name(&name), "{}", &name);
                     Some((name.into(), c))
                 })

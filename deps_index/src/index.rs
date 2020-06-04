@@ -145,10 +145,12 @@ impl Index {
         let indexed_crates: FxHashMap<_,_> = crates_io_index.crate_index_paths().par_bridge()
                 .filter_map(|path| {
                     let c = crates_index::Crate::new(path).ok()?;
-                    Some((c.name().to_ascii_lowercase().into(), c))
+                    let name = c.name().to_ascii_lowercase();
+                    assert!(Origin::is_valid_crate_name(&name), "{}", &name);
+                    Some((name.into(), c))
                 })
                 .collect();
-        if indexed_crates.len() < 35000 {
+        if indexed_crates.len() < 37000 {
             return Err(DepsErr::IndexBroken);
         }
         Ok(Self {

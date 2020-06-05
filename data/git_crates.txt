@@ -147,6 +147,7 @@ github:kuy/elevato-rs/elevators
 github:kvakvs/erlangrt/erlangrt
 github:kylewlacy/sorbet-cocoa/sorbet-cocoa
 github:kzen-networks/multi-party-eddsa/multi-party-ed25519
+github:lemmynet/lemmy/lemmy_server
 github:libra/libra/libra-node
 github:libra/libra/libra-swarm
 github:libra/libra/libra-wallet
@@ -243,6 +244,7 @@ github:paritytech/polkadot/polkadot-cli
 github:paritytech/polkadot/polkadot-service
 github:paritytech/substrate/substrate-cli
 github:pcwalton/sprocketnes/sprocketnes
+github:peltoche/vixi/vixi
 github:pingcap/talent-plan/labrpc
 github:pingcap/talent-plan/linearizability
 github:pingcap/talent-plan/percolator
@@ -346,6 +348,7 @@ github:tailhook/marafet/marafet
 github:tailhook/marafet/marafet_css
 github:tailhook/vagga/vagga
 github:tanakh/cargo-atcoder/cargo-atcoder
+github:tari-project/validator-node/tari_validator_node
 github:tauri-apps/tauri/tauri
 github:thebracket/rltk_rs/rltk
 github:thepowersgang/rust_os/kernel

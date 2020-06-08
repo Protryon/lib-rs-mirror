@@ -2,6 +2,7 @@ User-Agent: *
 Disallow: /keywords/
 Disallow: /install
 Disallow: /search?
+Disallow: /crates/faker
 
 # seo scourge
 User-agent: AhrefsBot

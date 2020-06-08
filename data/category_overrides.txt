@@ -47,6 +47,7 @@ atomicring: concurrency, data-structures
 atomsh: command-line-utilities
 audit-filter : development-tools::testing
 augr-core: command-line-utilities
+avsser: command-line-utilities, multimedia
 azul-simplecss: parser-implementations, web-programming
 background-jobs-core: asynchronous
 background-jobs-server: asynchronous
@@ -296,6 +297,9 @@ fec: encoding
 fedora-prime: os::unix-apis, command-line-utilities
 festive: development-tools::testing
 ff: algorithms
+ffcli: command-line-utilities, multimedia
+ffmpeg-next : multimedia::video
+ffmpeg-screen-recorder: multimedia::video, command-line-utilities
 file-metadata  : filesystem, os::macos-apis
 file-metadata-mditem-macros : filesystem, os::macos-apis
 file_scanner: parser-implementations
@@ -588,6 +592,7 @@ markdust: text-processing
 market-finance: science
 markov: text-processing, science::machine-learning
 matrix_bot_api: network-programming
+matrixmultiply: science::math
 mdtoc: text-processing
 mediawiki: web-programming
 meilisearch-core: database-implementations
@@ -889,6 +894,7 @@ self_update: development-tools, command-line-utilities
 semantic-rs: development-tools
 semver-parser: parser-implementations
 serde-humanize-rs: parser-implementations, encoding
+serenity: web-programming
 serenium: development-tools::testing
 sfl_parser: parser-implementations
 sgf-parser: parser-implementations
@@ -926,6 +932,7 @@ specs_sprite: game-engines
 speculo: development-tools
 spinning_top: concurrency
 splinter: cryptography::cryptocurrencies
+sqa-ffmpeg : multimedia::video
 sqlparser: parser-implementations
 sqlx-core :databases
 ssb_parser: parser-implementations
@@ -976,6 +983,7 @@ teloxide: web-programming
 tempus_fugit: development-tools::profiling
 termcodes: command-line-interface, no-std
 termplay: multimedia::images, multimedia::video
+termplay: multimedia::video, command-line-utilities
 text_io: text-processing
 tgaimage: multimedia::images
 thingvellir: concurrency
@@ -998,6 +1006,7 @@ trans-gen-java : development-tools
 trans-gen-ruby : development-tools
 trans-gen-scala : development-tools
 trans-schema : development-tools
+transcode: command-line-utilities, multimedia
 transit_model: filesystem
 trashmap: data-structures
 trie-db: rust-patterns

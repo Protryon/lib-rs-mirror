@@ -127,11 +127,11 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
         Ok(())
     }
 
-    pub fn get<Q>(&self, key: &Q) -> Result<Option<T>, Error> where K: Borrow<Q>, Q: Eq + Hash + std::fmt::Display + ?Sized {
+    pub fn get<Q>(&self, key: &Q) -> Result<Option<T>, Error> where K: Borrow<Q>, Q: Eq + Hash + std::fmt::Debug + ?Sized {
         let kw = self.lock_for_read()?;
         Ok(match kw.data.as_ref().unwrap().get(key) {
             Some(gz) => Some(Self::ungz(gz).map_err(|e| {
-                eprintln!("ungz of {} failed in {}", key, self.path.display());
+                eprintln!("ungz of {:?} failed in {}", key, self.path.display());
                 drop(kw);
                 let _ = self.delete(key);
                 e
@@ -166,7 +166,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
 
     #[inline]
     pub async fn get_json<Q, B>(&self, key: &Q, url: impl AsRef<str>, on_miss: impl FnOnce(B) -> Option<T>) -> Result<Option<T>, Error>
-    where B: for<'a> Deserialize<'a>, K: Borrow<Q> + for<'a> From<&'a Q>, Q: Eq + Hash + std::fmt::Display + ?Sized {
+    where B: for<'a> Deserialize<'a>, K: Borrow<Q> + for<'a> From<&'a Q>, Q: Eq + Hash + std::fmt::Debug + ?Sized {
         if let Some(res) = self.get(key)? {
             return Ok(Some(res));
         }

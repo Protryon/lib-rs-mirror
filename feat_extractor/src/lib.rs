@@ -5,6 +5,8 @@ use rich_crate::MaintenanceStatus;
 use rich_crate::Manifest;
 use semver::VersionReq;
 
+pub mod wlita;
+
 lazy_static::lazy_static! {
     /// ignore these as keywords
     pub(crate) static ref STOPWORDS: HashSet<&'static str> = [
@@ -59,7 +61,7 @@ fn extract_text_phrases(manifest: &Manifest, github_description: Option<&str>, r
             }
             let par = par.trim_start_matches(|c: char| c.is_whitespace() || c == '#' || c == '=' || c == '*' || c == '-');
             let par = par.replace("http://", " ").replace("https://", " ");
-            if !par.is_empty() {
+            if !par.trim_start().is_empty() {
                 let par = par.to_lowercase();
                 len += par.len();
                 out.push((0.4, par));

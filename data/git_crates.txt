@@ -30,6 +30,7 @@ github:bbodi/rust-voxlap/voxlap
 github:benanders/rjni/rjni
 github:benschza/pier/pier
 github:bitshifter/mathbench-rs/mathbench
+github:bolcom/unftp/unftp
 github:breeswish/slog-global/slog-global
 github:bytecodealliance/wasmtime/wasmtime-cli
 github:caelunshun/feather/feather-blocks

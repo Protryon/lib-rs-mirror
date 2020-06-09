@@ -1,3 +1,5 @@
+use std::convert::TryInto;
+use simple_cache::TempCache;
 use futures::Future;
 use failure;
 use futures::future::FutureExt;
@@ -42,6 +44,7 @@ fn main() {
     let crates = rt.block_on(kitchen_sink::KitchenSink::new_default());
     let crates = Arc::new(crates.unwrap());
     let mut indexer = Indexer::new(CrateSearchIndex::new(crates.main_cache_dir()).expect("init search")).expect("init search indexer");
+    let lines = TempCache::new(crates.main_cache_dir().join("search-uniq-lines.dat")).expect("init lines cache");
     let (tx, mut rx) = mpsc::channel::<(Arc<_>, _, _)>(64);
 
     let index_thread = rt.spawn({
@@ -52,7 +55,7 @@ fn main() {
             while let Some((ver, downloads_per_month, score)) = rx.recv().await {
                 if stopped() {break;}
                 tokio::task::block_in_place(|| {
-                    index_search(&mut indexer, &renderer, &ver, downloads_per_month, score)?;
+                    index_search(&mut indexer, &lines, &renderer, &ver, downloads_per_month, score)?;
                     n += 1;
                     if n == next_n {
                         next_n *= 2;
@@ -159,19 +162,52 @@ async fn index_crate(crates: &KitchenSink, origin: &Origin, renderer: &Renderer,
     Ok(v)
 }
 
-fn index_search(indexer: &mut Indexer, renderer: &Renderer, k: &RichCrateVersion, downloads_per_month: usize, score: f64) -> Result<(), failure::Error> {
+fn index_search(indexer: &mut Indexer, lines: &TempCache<(String, f64), [u8; 16]>, renderer: &Renderer, k: &RichCrateVersion, downloads_per_month: usize, score: f64) -> Result<(), failure::Error> {
     let keywords: Vec<_> = k.keywords().iter().map(|s| s.as_str()).collect();
-
-    let mut lib_tmp = None;
-    let readme = k.readme().map(|readme| &readme.markup).or_else(|| {
-        lib_tmp = k.lib_file_markdown();
-        lib_tmp.as_ref()
-    }).map(|markup| {
-        renderer.visible_text(markup)
-    });
     let version = k.version();
 
-    indexer.add(k.origin(), k.short_name(), version, k.description().unwrap_or(""), &keywords, readme.as_ref().map(|s| s.as_str()), downloads_per_month as u64, score);
+    let mut variables = Vec::with_capacity(15);
+    variables.push(k.short_name());
+    if let Some(r) = k.repository() {
+        if let Some(name) = r.repo_name() {
+            variables.push(name);
+        }
+        variables.push(r.url.as_str());
+    }
+    for name in k.authors().iter().filter_map(|a| a.name.as_deref()) {
+        variables.push(name);
+    }
+    variables.sort_by_key(|a| !a.len()); // longest first
+
+    let mut dupe_sentences = HashSet::new();
+    let mut unique_text = String::with_capacity(4000);
+    let mut cb = |key: &str, orig: &str| {
+        let key: [u8; 16] = blake3::hash(key.as_bytes()).as_bytes()[..16].try_into().unwrap();
+        if dupe_sentences.insert(key) {
+            let (matches, wins) = if let Ok(Some((their_crate_name, their_score))) = lines.get(&key) {
+                (k.short_name() == their_crate_name, score > their_score)
+            } else {
+                (true, true)
+            };
+            if wins {
+                lines.set(key, (k.short_name().to_string(), score)).expect("upd lines");
+            }
+            if matches || wins {
+                unique_text.push_str(orig);
+                unique_text.push('\n');
+            }
+        }
+    };
+
+    let mut dedup = wlita::WLITA::new(variables.iter(), &mut cb);
+    if let Some(markup) = k.readme().map(|readme| &readme.markup) {
+        dedup.add_text(&renderer.visible_text(markup));
+    }
+    if let Some(markup) = k.lib_file_markdown() {
+        dedup.add_text(&renderer.visible_text(&markup));
+    }
+
+    indexer.add(k.origin(), k.short_name(), version, k.description().unwrap_or(""), &keywords, Some(unique_text.as_str()).filter(|s| !s.trim_start().is_empty()), downloads_per_month as u64, score);
     Ok(())
 }
 

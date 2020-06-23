@@ -45,6 +45,9 @@ github:citybound/citybound/citybound
 github:cjbassi/ytop/package-publisher
 github:cjbassi/ytop/ytop
 github:cristicbz/rust-doom/rs_doom
+github:dabreegster/abstreet/ezgui
+github:dabreegster/abstreet/map_editor
+github:dabreegster/abstreet/sim
 github:dalamar42/rayt/rayt
 github:dani-garcia/bitwarden_rs/bitwarden_rs
 github:darrint/device-blocker/device-blocker

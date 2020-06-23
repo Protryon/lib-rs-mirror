@@ -91,7 +91,7 @@
             @if let Some((repo, package)) = c.ver.origin().clone().into_repo() {
                 <pre class="to-copy @if c.is_build {build-}dependencies-toml"><code>@package = @"{" git = "@repo.canonical_git_url().unwrap()" @"}"</code></pre>
             }
-            <p>The <code>@c.ver.lib_name()</code> library will automatically available globally.
+            <p>The <code>@c.ver.lib_name()</code> library will be automatically available globally.
             @if let Some(url) = c.api_reference_url() {
                 Read the <a href="@url"><code>@c.ver.lib_name()</code> library documentation</a>.
             }</p>

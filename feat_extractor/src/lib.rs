@@ -159,6 +159,8 @@ pub fn is_deprecated_requirement(name: &str, requirement: &VersionReq) -> bool {
         "flate2-crc" | "complex" | "simple_stats" | "concurrent" | "feed" |
         "isatty" | "thread-scoped" | "target_build_utils" | "chan" | "chan-signal" |
         "glsl-to-spirv" => true,
+        // futures 0.1
+        "futures-preview" | "futures-core-preview" | "tokio-io" | "tokio-timer" | "tokio-codec" => true,
         // fundamentally unsound
         "str-concat" => true,
         // uses old winapi

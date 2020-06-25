@@ -1,4 +1,5 @@
 #![allow(unused_imports)]
+use std::time::Duration;
 use kitchen_sink::ArcRichCrateVersion;
 use crate::Page;
 use categories::Category;
@@ -129,8 +130,9 @@ impl<'a> HomePage<'a> {
                 }
 
                 for c in top {
-                    if let Ok(c) = self.crates.rich_crate_version_async(&c).await {
-                        if seen.insert(c.origin().to_owned()) {
+                    if seen.insert(c.clone()) {
+                        let get_crate = tokio::time::timeout(Duration::from_secs(1), self.crates.rich_crate_version_async(&c));
+                        if let Ok(Ok(c)) = get_crate.await {
                             cat.top.push(c);
                         }
                     }
@@ -200,9 +202,11 @@ impl<'a> HomePage<'a> {
                 .notable_recently_updated_crates(30).await
                 .expect("recent crates")
                 .into_iter())
-                .filter_map(move |(o, _)| async move {
+                .map(move |(o, _)| async move {
                     futures::try_join!(self.crates.rich_crate_async(&o), self.crates.rich_crate_version_async(&o)).ok()
                 })
+                .buffer_unordered(8)
+                .filter_map(|x| async {x})
                 .collect::<Vec<_>>().await
             })
     }

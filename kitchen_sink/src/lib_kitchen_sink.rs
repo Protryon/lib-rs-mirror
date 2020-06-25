@@ -506,9 +506,11 @@ impl KitchenSink {
             self.index.crates_io_crates() // too slow to scan all GH crates
         });
         let stream = futures::stream::iter(all.iter())
-            .filter_map(move |(name, _)| async move {
+            .map(move |(name, _)| async move {
                 self.rich_crate_async(&Origin::from_crates_io_name(&*name)).await.map_err(|e| eprintln!("{}: {}", name, e)).ok()
-            });
+            })
+            .buffer_unordered(8)
+            .filter_map(|x| async {x});
         let mut crates = stream.filter(move |k| {
             let latest = k.versions().iter().map(|v| v.created_at.as_str()).max().unwrap_or("");
             let res = if let Ok(timestamp) = DateTime::parse_from_rfc3339(latest) {
@@ -522,14 +524,17 @@ impl KitchenSink {
         .collect::<Vec<_>>().await;
 
         let mut crates2 = futures::stream::iter(self.crate_db.crates_to_reindex().await?.into_iter())
-            .filter_map(move |origin| async move {
+            .map(move |origin| async move {
                 self.rich_crate_async(&origin).await.map_err(|e| {
                     eprintln!("Can't reindex {:?}: {}", origin, e);
                     for e in e.iter_chain() {
                         eprintln!("• {}", e);
                     }
                 }).ok()
-            }).collect::<Vec<_>>().await;
+            })
+            .buffer_unordered(8)
+            .filter_map(|x| async {x})
+            .collect::<Vec<_>>().await;
 
         crates.append(&mut crates2);
         Ok(crates)
@@ -2136,13 +2141,13 @@ impl KitchenSink {
     // Sorted from the top, returns origins
     pub async fn top_crates_in_category(&self, slug: &str) -> CResult<Arc<Vec<Origin>>> {
         {
-            let cache = tokio::time::timeout(Duration::from_secs(10), self.top_crates_cached.read()).await?;
+            let cache = tokio::time::timeout(Duration::from_secs(5), self.top_crates_cached.read()).await?;
             if let Some(category) = cache.get(slug) {
                 return Ok(category.clone());
             }
         }
 
-        let mut cache = tokio::time::timeout(Duration::from_secs(20), self.top_crates_cached.write()).await?;
+        let mut cache = tokio::time::timeout(Duration::from_secs(15), self.top_crates_cached.write()).await?;
 
         let total_count = self.category_crate_count(slug).await?;
         let wanted_num = ((total_count / 2 + 25) / 50 * 50).max(100);
@@ -2168,19 +2173,29 @@ impl KitchenSink {
     /// To make categories more varied, lower score of crates by same authors, with same keywords
     async fn knock_duplicates(&self, crates: &mut Vec<(Origin, f64)>) {
         let with_owners = futures::stream::iter(crates.drain(..))
-        .filter_map(|(o, score)| async move {
-            let c = match self.rich_crate_version_async(&o).await {
-                Ok(c) => c,
-                Err(e) => {
+        .map(|(o, score)| async move {
+            let get_crate = tokio::time::timeout(Duration::from_secs(1), self.rich_crate_version_async(&o));
+            let keywords = match get_crate.await {
+                Ok(Ok(c)) => {
+                    if c.is_yanked() {
+                        return None;
+                    }
+                    c.keywords().to_owned()
+                },
+                Err(_) => {
+                    eprintln!("{:?} Timed out", o);
+                    Vec::new()
+                },
+                Ok(Err(e)) => {
                     eprintln!("Skipping {:?} because {}", o, e);
                     return None;
                 },
             };
-            if c.is_yanked() {
-                return None;
-            }
-            Some((o, score, self.crate_owners(c.origin()).await.unwrap_or_default(), c.keywords().to_owned()))
+            let owners = self.crate_owners(&o).await.unwrap_or_default();
+            Some((o, score, owners, keywords))
         })
+        .buffer_unordered(16)
+        .filter_map(|x| async {x})
         .collect::<Vec<_>>().await;
 
         let mut top_keywords = HashMap::new();

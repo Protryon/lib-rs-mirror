@@ -803,7 +803,7 @@ impl<'a> CratePage<'a> {
     async fn crate_size_and_viral_license(&self, deps: DepInfMap) -> CResult<(CrateSizes, Stats, Option<CrateLicense>)> {
         let mut viral_license: Option<CrateLicense> = None;
         let tmp: Vec<_> = futures::stream::iter(deps)
-            .filter_map(|(name, (depinf, semver))| async move {
+            .map(|(name, (depinf, semver))| async move {
                 if depinf.ty == DepTy::Dev {
                     return None;
                 }
@@ -844,6 +844,8 @@ impl<'a> CratePage<'a> {
 
                 Some((depinf, krate, weight, weight_minimal))
             })
+            .buffer_unordered(8)
+            .filter_map(|x| async {x})
             .collect::<Vec<_>>().await;
 
         let mut main_lang_stats = self.ver.language_stats().clone();

@@ -114,14 +114,13 @@ impl<'a> HomePage<'a> {
             // mark seen from least popular (assuming they're more specific)
             for (cat, top) in c.iter_mut().rev() {
                 let mut dl = 0;
-                let top: Vec<_> = top.as_ref()
-                    .expect("top_crates_in_category fail")
+                let top: Vec<_> = top.as_ref().map(|v| v.as_slice())
+                    .map_err(|e| eprintln!("top fail: {}", e)).unwrap_or_default()
                     .iter()
                     .take(35)
                     .filter(|c| seen.get(c).is_none())
                     .take(8)
-                    .cloned()
-                    .collect();
+                    .cloned().collect();
 
                 for c in top.iter() {
                     if let Ok(Some(d)) = self.crates.downloads_per_month_or_equivalent(c).await {

@@ -91,19 +91,21 @@ impl<'a> HomePage<'a> {
             let mut c = Vec::new();
             for (_, cat) in root.iter() {
                 if stopped() { return Vec::new(); }
-                    // depth first - important!
-                    let sub = self.make_all_categories(&cat.sub, seen).await;
-                    let own_pop = self.crates.category_crate_count(&cat.slug).await.unwrap_or(0) as usize;
+                // depth first - important!
+                let (sub, own_pop) = futures::join!(
+                        self.make_all_categories(&cat.sub, seen),
+                        self.crates.category_crate_count(&cat.slug));
+                let own_pop = own_pop.unwrap_or(0) as usize;
 
-                    c.push(HomeCategory {
-                        // make container as popular as its best child (already sorted), because homepage sorts by top-level only
-                        pop: sub.get(0).map(|c| c.pop).unwrap_or(0).max(own_pop),
-                        dl: sub.get(0).map(|c| c.dl).unwrap_or(0),
-                        top: Vec::with_capacity(8),
-                        sub,
-                        cat,
-                    })
-                }
+                c.push(HomeCategory {
+                    // make container as popular as its best child (already sorted), because homepage sorts by top-level only
+                    pop: sub.get(0).map(|c| c.pop).unwrap_or(0).max(own_pop),
+                    dl: sub.get(0).map(|c| c.dl).unwrap_or(0),
+                    top: Vec::with_capacity(8),
+                    sub,
+                    cat,
+                })
+            }
             c.sort_by(|a, b| b.pop.cmp(&a.pop));
 
             let mut c = futures::future::join_all(c.into_iter().map(|cat| async move {

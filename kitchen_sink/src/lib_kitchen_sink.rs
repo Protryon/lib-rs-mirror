@@ -1339,7 +1339,7 @@ impl KitchenSink {
     pub async fn top_category(&self, krate: &RichCrateVersion) -> Option<(u32, String)> {
         let crate_origin = krate.origin();
         let cats = join_all(krate.category_slugs().map(|slug| slug.into_owned()).map(|slug| async move {
-            let c = tokio::time::timeout(Duration::from_secs(5), self.top_crates_in_category(&slug)).await??;
+            let c = tokio::time::timeout(Duration::from_secs(6), self.top_crates_in_category(&slug)).await??;
             Ok::<_, CError>((c, slug))
         })).await;
         cats.into_iter().filter_map(|cats| cats.ok()).filter_map(|(cat, slug)| {
@@ -2182,7 +2182,7 @@ impl KitchenSink {
     async fn knock_duplicates(&self, crates: &mut Vec<(Origin, f64)>) {
         let with_owners = futures::stream::iter(crates.drain(..))
         .map(|(o, score)| async move {
-            let get_crate = tokio::time::timeout(Duration::from_secs(2), self.rich_crate_version_async(&o));
+            let get_crate = tokio::time::timeout(Duration::from_secs(3), self.rich_crate_version_async(&o));
             let keywords = match get_crate.await {
                 Ok(Ok(c)) => {
                     if c.is_yanked() {

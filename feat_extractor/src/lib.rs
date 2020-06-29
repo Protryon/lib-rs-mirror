@@ -183,6 +183,7 @@ pub fn is_squatspam(k: &RichCrateVersion) -> bool {
         let desc = desc.trim_matches(|c: char| !c.is_ascii_alphabetic()).to_ascii_lowercase();
         return desc.contains("this crate is a placeholder") ||
             desc.contains("reserving this crate") ||
+            desc.contains("this crate has been retired") ||
             desc.contains("want to use this name") ||
             desc.contains("this is a dummy package") ||
             desc == "reserved" ||

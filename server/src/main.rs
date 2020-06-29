@@ -191,6 +191,7 @@ async fn run_server() -> Result<(), failure::Error> {
             .wrap(middleware::Logger::default())
             .route("/", web::get().to(handle_home))
             .route("/search", web::get().to(handle_search))
+            .route("/game-engines", web::get().to(handle_game_redirect))
             .route("/index", web::get().to(handle_search)) // old crates.rs/index url
             .route("/categories/{rest:.*}", web::get().to(handle_redirect))
             .route("/new", web::get().to(handle_new_trending))
@@ -381,6 +382,10 @@ async fn handle_redirect(req: HttpRequest) -> HttpResponse {
     let inf = req.match_info();
     let rest = inf.query("rest");
     HttpResponse::PermanentRedirect().header("Location", format!("/{}", rest)).body("")
+}
+
+async fn handle_game_redirect(_: HttpRequest) -> HttpResponse {
+    HttpResponse::PermanentRedirect().header("Location", "/game-development").body("")
 }
 
 async fn handle_git_crate(req: HttpRequest, slug: &'static str) -> Result<HttpResponse, ServerError> {

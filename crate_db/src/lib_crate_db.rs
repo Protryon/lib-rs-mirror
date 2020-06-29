@@ -89,7 +89,7 @@ impl CrateDb {
 
         tokio::task::block_in_place(|| {
             let conn = self.conn.get_or(|| self.connect().map(|conn| {
-                let _ = conn.busy_timeout(std::time::Duration::from_secs(3));
+                let _ = conn.busy_timeout(std::time::Duration::from_secs(4));
                 RefCell::new(conn)
             }));
             match conn {

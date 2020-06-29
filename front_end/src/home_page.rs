@@ -132,7 +132,7 @@ impl<'a> HomePage<'a> {
 
                 let top_resolved = futures::stream::iter(top.into_iter().filter(|c| seen.insert(c.clone())))
                     .map(|c| async move {
-                        Ok::<_, failure::Error>(tokio::time::timeout(Duration::from_secs(20), self.crates.rich_crate_version_async(&c)).await??)
+                        Ok::<_, failure::Error>(tokio::time::timeout(Duration::from_secs(30), self.crates.rich_crate_version_async(&c)).await??)
                     })
                     .buffered(8)
                     .collect::<Vec<_>>().await;

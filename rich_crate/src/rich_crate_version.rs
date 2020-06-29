@@ -83,9 +83,15 @@ impl RichCrateVersion {
     }
 
     pub fn category_slugs(&self) -> impl Iterator<Item = Cow<'_, str>> {
-        Categories::fixed_category_slugs(
-            self.derived.categories.as_ref().unwrap_or(&self.package().categories)
-        ).into_iter()
+        let mut warnings = Vec::new();
+        let iter = Categories::fixed_category_slugs(
+            self.derived.categories.as_ref().unwrap_or(&self.package().categories),
+            &mut warnings,
+        ).into_iter();
+        if !warnings.is_empty() {
+            eprintln!("{}: {}", self.short_name(), warnings.join("; "));
+        }
+        iter
     }
 
     pub fn license(&self) -> Option<&str> {

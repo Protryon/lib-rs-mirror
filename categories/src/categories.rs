@@ -130,7 +130,7 @@ impl Categories {
         })
     }
 
-    pub fn fixed_category_slugs(cats: &[String]) -> Vec<Cow<'_, str>> {
+    pub fn fixed_category_slugs<'a, 'z>(cats: &'a [String], warnings: &'z mut Vec<String>) -> Vec<Cow<'a, str>> {
         let mut cats = Self::filtered_category_slugs(cats).enumerate()
         .filter_map(|(idx, s)| {
             let s = s.trim_matches(':');
@@ -158,7 +158,7 @@ impl Categories {
         })
         .filter(|(_, _, s)| {
             if !CATEGORIES.from_slug(s).1 {
-                println!("invalid cat name {}", s);
+                warnings.push(format!("invalid cat name {}", s));
                 return false;
             }
             true

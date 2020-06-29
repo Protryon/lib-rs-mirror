@@ -1473,7 +1473,11 @@ impl KitchenSink {
         let category_slugs = if let Some(overrides) = self.category_overrides.get(origin.short_crate_name()) {
             &overrides
         } else {
-            tmp = categories::Categories::fixed_category_slugs(&package.categories);
+            let mut warnings = Vec::new();
+            tmp = categories::Categories::fixed_category_slugs(&package.categories, &mut warnings);
+            if !warnings.is_empty() {
+                eprintln!("{}: {}", package.name, warnings.join("; "));
+            }
             &tmp
         };
 

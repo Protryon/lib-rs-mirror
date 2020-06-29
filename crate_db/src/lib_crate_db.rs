@@ -185,12 +185,16 @@ impl CrateDb {
             } else {
                 None
             };
-            let categories = if categories::Categories::fixed_category_slugs(&package.categories).is_empty() {
+            let mut warnings = Vec::new();
+            let categories = if categories::Categories::fixed_category_slugs(&package.categories, &mut warnings).is_empty() {
                 Some(self.crate_categories_tx(conn, &origin, &keywords, 0.1).context("catdb")?
                     .into_iter().map(|(_, c)| c).collect())
             } else {
                 None
             };
+            if !warnings.is_empty() {
+                eprintln!("{}: {}", name, warnings.join("; "));
+            }
 
             Ok((manifest, Derived {
                 path_in_repo,

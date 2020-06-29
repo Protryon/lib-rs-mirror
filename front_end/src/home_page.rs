@@ -159,7 +159,7 @@ impl<'a> HomePage<'a> {
             // these categories are easily confusable, so keep them together
             Self::avg_pair(&mut ranked, "hardware-support", "embedded");
             Self::avg_pair(&mut ranked, "parser-implementations", "parsing");
-            Self::avg_pair(&mut ranked, "games", "game-engines");
+            Self::avg_pair(&mut ranked, "games", "game-development");
             Self::avg_pair(&mut ranked, "web-programming", "wasm");
             Self::avg_pair(&mut ranked, "asynchronous", "concurrency");
             Self::avg_pair(&mut ranked, "rendering", "multimedia");

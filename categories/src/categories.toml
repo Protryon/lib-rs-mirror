@@ -381,15 +381,15 @@ Crates for dealing with files and filesystems."""
 obvious-keywords = ["filesystem", "file", "fs"]
 preference = 1.1
 
-[game-engines]
-name = "Game development"
+[game-development]
+name = "Game dev"
 title = "Rust game dev"
 description = """
 Crates for creating games.\
 """
 short-description = """
 Crates for creating games."""
-obvious-keywords = ["engine", "gamedev", "game-dev", "game", "game-engine"]
+obvious-keywords = ["engine", "gamedev", "game-dev", "game", "game-engine", "game-development"]
 preference = 1.2
 
 [games]

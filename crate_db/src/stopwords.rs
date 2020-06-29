@@ -36,6 +36,7 @@ lazy_static! {
     pub(crate) static ref COND_STOPWORDS: HashMap<&'static str, Option<&'static [&'static str]>> = [
         ("game-engine", Some(&["game", "ffi"][..])),
         ("game-engines", Some(&["game", "ffi"])),
+        ("game-development", Some(&["game", "ffi"])),
         ("game-dev", Some(&["game", "games"])),
         ("gamedev", Some(&["game", "games"])),
         ("game", Some(&["wasm", "webassembly"])), // wasm games are nice, but should be in games category

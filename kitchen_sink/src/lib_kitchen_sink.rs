@@ -1072,11 +1072,15 @@ impl KitchenSink {
                     *cat = "cryptography::cryptocurrencies".into();
                 }
             }
+            // crates-io added a better category
+            if cat == "game-engines" {
+                *cat = "game-development".to_string();
+            }
             if cat == "games" {
                 if package.keywords.iter().any(|k| {
                     k == "game-dev" || k == "game-development" || eq(k,"gamedev") || eq(k,"framework") || eq(k,"utilities") || eq(k,"parser") || eq(k,"api")
                 }) {
-                    *cat = "game-engines".into();
+                    *cat = "game-development".into();
                 }
             }
             if cat == "science" || cat == "algorithms" {

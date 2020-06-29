@@ -2174,7 +2174,7 @@ impl KitchenSink {
     async fn knock_duplicates(&self, crates: &mut Vec<(Origin, f64)>) {
         let with_owners = futures::stream::iter(crates.drain(..))
         .map(|(o, score)| async move {
-            let get_crate = tokio::time::timeout(Duration::from_secs(1), self.rich_crate_version_async(&o));
+            let get_crate = tokio::time::timeout(Duration::from_secs(2), self.rich_crate_version_async(&o));
             let keywords = match get_crate.await {
                 Ok(Ok(c)) => {
                     if c.is_yanked() {
@@ -2183,7 +2183,7 @@ impl KitchenSink {
                     c.keywords().to_owned()
                 },
                 Err(_) => {
-                    eprintln!("{:?} Timed out", o);
+                    eprintln!("{:?} Timed out in ranking", o);
                     Vec::new()
                 },
                 Ok(Err(e)) => {

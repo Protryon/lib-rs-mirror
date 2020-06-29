@@ -113,7 +113,6 @@ impl<'a> HomePage<'a> {
 
             // mark seen from least popular (assuming they're more specific)
             for (cat, top) in c.iter_mut().rev() {
-                let mut dl = 0;
                 let top: Vec<_> = top.as_ref().map(|v| v.as_slice())
                     .map_err(|e| eprintln!("top fail: {}", e)).unwrap_or_default()
                     .iter()
@@ -122,18 +121,24 @@ impl<'a> HomePage<'a> {
                     .take(8)
                     .cloned().collect();
 
-                for c in top.iter() {
-                    if let Ok(Some(d)) = self.crates.downloads_per_month_or_equivalent(c).await {
-                        dl += d;
-                    }
-                }
+                let dl = futures::stream::iter(top.clone())
+                    .map(|c| async move {self.crates.downloads_per_month_or_equivalent(&c).await})
+                    .buffer_unordered(8)
+                    .fold(0, |sum, dl| async move {
+                        sum + dl.ok().flatten().unwrap_or(0)
+                    }).await;
 
-                for c in top {
-                    if seen.insert(c.clone()) {
-                        let get_crate = tokio::time::timeout(Duration::from_secs(1), self.crates.rich_crate_version_async(&c));
-                        if let Ok(Ok(c)) = get_crate.await {
-                            cat.top.push(c);
-                        }
+                let top_resolved = futures::stream::iter(top.into_iter().filter(|c| seen.insert(c.clone())))
+                    .map(|c| async move {
+                        Ok::<_, failure::Error>(tokio::time::timeout(Duration::from_secs(5), self.crates.rich_crate_version_async(&c)).await??)
+                    })
+                    .buffered(8)
+                    .collect::<Vec<_>>().await;
+
+                for c in top_resolved {
+                    match c {
+                        Ok(c) => cat.top.push(c),
+                        Err(e) => eprintln!("catstream: {} (in {})", e, cat.cat.slug),
                     }
                 }
                 cat.dl = dl.max(cat.dl);

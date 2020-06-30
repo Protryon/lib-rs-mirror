@@ -19,6 +19,7 @@ use std::collections::HashSet;
 use std::future::Future;
 use std::path::PathBuf;
 use std::sync::Arc;
+use tokio::time::timeout;
 
 /// The list on the homepage looks flat, but it's actually a tree.
 ///
@@ -130,12 +131,12 @@ impl<'a> HomePage<'a> {
                         sum + dl.ok().flatten().unwrap_or(0)
                     }).await;
 
-                let top_resolved = futures::stream::iter(top.into_iter().filter(|c| seen.insert(c.clone())))
+                let top_resolved = futures::future::join_all(
+                    top.into_iter()
+                    .filter(|c| seen.insert(c.clone()))
                     .map(|c| async move {
-                        Ok::<_, failure::Error>(tokio::time::timeout(Duration::from_secs(30), self.crates.rich_crate_version_async(&c)).await??)
-                    })
-                    .buffered(8)
-                    .collect::<Vec<_>>().await;
+                        Ok::<_, failure::Error>(timeout(Duration::from_secs(58), self.crates.rich_crate_version_async(&c)).await??)
+                    })).await;
 
                 for c in top_resolved {
                     match c {

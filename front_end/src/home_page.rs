@@ -64,12 +64,15 @@ impl<'a> HomePage<'a> {
         // it's not the same order as before, but that's fine, it adds more variety
         for cat in cats {
             // depth first
-            self.add_updated_to_all_categories(&mut cat.sub, seen).await;
+            let (_, recently_updated) = futures::join!(
+                self.add_updated_to_all_categories(&mut cat.sub, seen),
+                self.crates.recently_updated_crates_in_category(&cat.cat.slug)
+            );
 
             let mut n = 0u16;
-            for c in self.crates.recently_updated_crates_in_category(&cat.cat.slug).await.expect("recently_updated_crates_in_category") {
-                if let Ok(c) = self.crates.rich_crate_version_async(&c).await {
-                    if seen.insert(c.origin().to_owned()) {
+            for c in recently_updated.expect("recently_updated_crates_in_category") {
+                if seen.insert(c.clone()) {
+                    if let Ok(Ok(c)) = timeout(Duration::from_secs(5), self.crates.rich_crate_version_async(&c)).await {
                         cat.top.push(c);
                         if n >= 2 {
                             break;

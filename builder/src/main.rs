@@ -55,7 +55,7 @@ fn analyze_crate(all: &CratesIndexCrate, db: &BuildDb, crates: &KitchenSink, doc
     db.set_raw_build_info(origin, ver.version(), &stdout, &stderr)?;
 
     for f in parse_analyses(&stdout, &stderr) {
-        println!("{:#?}", f);
+        println!("f={:#?}", f);
         if let Some(rustc_version) = f.rustc_version {
             for (rustc_override, name, version, compat) in f.crates {
                 let rustc_version = rustc_override.unwrap_or(&rustc_version);

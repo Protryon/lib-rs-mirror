@@ -149,7 +149,7 @@ impl<'a> AuthorPage<'a> {
     }
 
     pub fn twitter_link(&self) -> Option<(String, &str)> {
-        eprintln!("{:?}", self.rustacean);
+        eprintln!("tw link {:?}", self.rustacean);
         self.rustacean.as_ref().and_then(|r| r.twitter.as_deref())
         .map(|t| t.trim_start_matches('@'))
         .filter(|t| !t.is_empty())

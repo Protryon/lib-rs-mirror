@@ -138,7 +138,7 @@ impl<'a> HomePage<'a> {
                     top.into_iter()
                     .filter(|c| seen.insert(c.clone()))
                     .map(|c| async move {
-                        Ok::<_, failure::Error>(timeout(Duration::from_secs(58), self.crates.rich_crate_version_async(&c)).await??)
+                        Ok::<_, failure::Error>(timeout(Duration::from_secs(29), self.crates.rich_crate_version_async(&c)).await??)
                     })).await;
 
                 for c in top_resolved {

@@ -78,6 +78,7 @@ use std::path::{Path, PathBuf};
 use triomphe::Arc;
 use std::time::Duration;
 use std::time::SystemTime;
+use std::sync::Mutex;
 
 pub type ArcRichCrateVersion = Arc<RichCrateVersion>;
 
@@ -171,7 +172,7 @@ pub struct KitchenSink {
     gh: github_info::GitHub,
     loaded_rich_crate_version_cache: RwLock<FxHashMap<Origin, ArcRichCrateVersion>>,
     category_crate_counts: DoubleCheckedCell<Option<HashMap<String, u32>>>,
-    top_crates_cached: tokio::sync::RwLock<FxHashMap<String, Arc<Vec<Origin>>>>,
+    top_crates_cached: Mutex<FxHashMap<String, Arc<DoubleCheckedCell<Arc<Vec<Origin>>>>>>,
     git_checkout_path: PathBuf,
     main_cache_dir: PathBuf,
     yearly: AllDownloads,
@@ -220,7 +221,7 @@ impl KitchenSink {
             loaded_rich_crate_version_cache: RwLock::new(FxHashMap::default()),
             git_checkout_path: data_path.join("git"),
             category_crate_counts: DoubleCheckedCell::new(),
-            top_crates_cached: tokio::sync::RwLock::new(FxHashMap::default()),
+            top_crates_cached: Mutex::new(FxHashMap::default()),
             yearly: AllDownloads::new(&main_cache_dir),
             main_cache_dir,
             category_overrides: Self::load_category_overrides(&data_path.join("category_overrides.txt"))?,
@@ -2148,34 +2149,36 @@ impl KitchenSink {
 
     // Sorted from the top, returns origins
     pub async fn top_crates_in_category(&self, slug: &str) -> CResult<Arc<Vec<Origin>>> {
-        {
-            let cache = tokio::time::timeout(Duration::from_secs(5), self.top_crates_cached.read()).await?;
-            if let Some(category) = cache.get(slug) {
-                return Ok(category.clone());
-            }
-        }
-
-        let mut cache = tokio::time::timeout(Duration::from_secs(15), self.top_crates_cached.write()).await?;
-
-        let total_count = self.category_crate_count(slug).await?;
-        let wanted_num = ((total_count / 2 + 25) / 50 * 50).max(100);
-
         use std::collections::hash_map::Entry::*;
-        Ok(match cache.entry(slug.to_owned()) {
-            Occupied(e) => Arc::clone(e.get()),
-            Vacant(e) => {
+
+        let cell = {
+            let mut cache = self.top_crates_cached.lock().unwrap();
+            match cache.entry(slug.to_owned()) {
+                Occupied(e) => Arc::clone(e.get()),
+                Vacant(e) => {
+                    let cell = Arc::new(DoubleCheckedCell::new());
+                    e.insert(cell.clone());
+                    cell
+                }
+            }
+        };
+
+        let res = cell.get_or_try_init(async {
+            Box::pin(async {
+                let total_count = self.category_crate_count(slug).await?;
+                let wanted_num = ((total_count / 2 + 25) / 50 * 50).max(100);
+
                 let mut crates = if slug == "uncategorized" {
-                    Box::pin(self.crate_db.top_crates_uncategorized(wanted_num + 50)).await?
+                    self.crate_db.top_crates_uncategorized(wanted_num + 50).await?
                 } else {
                     self.crate_db.top_crates_in_category_partially_ranked(slug, wanted_num + 50).await?
                 };
-                Box::pin(self.knock_duplicates(&mut crates)).await;
+                self.knock_duplicates(&mut crates).await;
                 let crates: Vec<_> = crates.into_iter().map(|(o, _)| o).take(wanted_num as usize).collect();
-                let res = Arc::new(crates);
-                e.insert(Arc::clone(&res));
-                res
-            },
-        })
+                Ok::<_, failure::Error>(Arc::new(crates))
+            }).await
+        }).await?;
+        Ok(Arc::clone(res))
     }
 
     /// To make categories more varied, lower score of crates by same authors, with same keywords

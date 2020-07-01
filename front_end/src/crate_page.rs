@@ -72,6 +72,7 @@ pub struct CratePage<'a> {
     keywords_populated: Vec<(String, bool)>,
     parent_crate: Option<ArcRichCrateVersion>,
     downloads_per_month_or_equivalent: Option<usize>,
+    has_docs_rs: bool,
     pub has_reviews: bool,
 }
 
@@ -146,7 +147,8 @@ impl<'a> CratePage<'a> {
         )?;
 
         let deps = kitchen_sink.all_dependencies_flattened(ver);
-        let api_reference_url = if kitchen_sink.has_docs_rs(ver.origin(), ver.short_name(), ver.version()).await {
+        let has_docs_rs = kitchen_sink.has_docs_rs(ver.origin(), ver.short_name(), ver.version()).await;
+        let api_reference_url = if has_docs_rs {
             Some(format!("https://docs.rs/{}", ver.short_name()))
         } else {
             None
@@ -174,6 +176,7 @@ impl<'a> CratePage<'a> {
             parent_crate,
             downloads_per_month_or_equivalent,
             has_reviews,
+            has_docs_rs,
         };
         let (sizes, lang_stats, viral_license) = page.crate_size_and_viral_license(deps?).await?;
         page.sizes = Some(sizes);
@@ -659,14 +662,19 @@ impl<'a> CratePage<'a> {
 
     /// `(url, label)`
     pub fn repository_link(&self) -> Option<(Cow<'_, str>, String)> {
-        self.ver.repository_http_url().map(|(repo, url)| {
+        if let Some((repo, url)) = self.ver.repository_http_url() {
             let label_prefix = repo.site_link_label();
             let label = match repo.host() {
                 RepoHost::GitHub(ref host) | RepoHost::GitLab(ref host) | RepoHost::BitBucket(ref host) => format!("{} ({})", label_prefix, host.owner),
                 RepoHost::Other => url_domain(&url).map(|host| format!("{} ({})", label_prefix, host)).unwrap_or_else(|| label_prefix.to_string()),
             };
-            (url, label)
-        })
+            Some((url, label))
+        } else if self.has_docs_rs {
+            // crates without a repo get docs.rs' HTTP crate file viewer link
+            Some((format!("https://docs.rs/crate/{}/{}/source/", self.ver.short_name(), self.ver.version()).into(), "Source".into()))
+        } else {
+            None
+        }
     }
 
     /// Most relevant keyword for this crate and rank in listing for that keyword

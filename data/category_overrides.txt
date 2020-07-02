@@ -752,6 +752,7 @@ pq-sys: database
 preftool-env: config
 pretty: text-processing, command-line-interface
 proc-concat-bytes: data-structures, rust-patterns
+process-memory-reader: development-tools::debugging
 prodash: asynchronous, visualization
 project-cleanup: command-line-utilities, development-tools
 prometheus-parser: parser-implementations

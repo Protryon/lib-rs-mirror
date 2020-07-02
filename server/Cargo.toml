@@ -1,6 +1,6 @@
 [package]
 name = "crates-server"
-version = "0.14.25"
+version = "0.14.26"
 authors = ["Kornel <kornel@geekhood.net>"]
 edition = "2018"
 description = "Crates.rs web server"
@@ -24,20 +24,21 @@ search_index = { path = "../search_index" }
 repo_url = { path = "../repo_url" }
 kitchen_sink = { path = "../kitchen_sink", version = "0.9" }
 front_end = { path = "../front_end", version = "0.4" }
-urlencoding = "1.0.0"
+urlencoding = "1.1.1"
 failure = "0.1.8"
-tokio = { version = "0.2.20", features = ["rt-threaded", "macros", "time"] }
+tokio = { version = "0.2.21", features = ["rt-threaded", "macros", "time"] }
 categories = { path = "../categories" }
-arc-swap = "0.4.6"
-signal-hook = "0.1.14"
+arc-swap = "0.4.7"
+signal-hook = "0.1.16"
 locale = "0.2.2"
 cap = "0.1.0"
 actix-rt = "1.1.1"
 futures = "0.3.5"
-actix-files = "0.2.1"
-actix-threadpool = "0.3.1"
+actix-files = "0.2.2"
+actix-threadpool = "0.3.2"
 either = "1.5.3"
 qstring = "0.7.2"
-chrono = "0.4.11"
-blake3 = { version = "0.3.3", default-features = false }
-base64 = "0.12.1"
+chrono = "0.4.12"
+blake3 = { version = "0.3.4", default-features = false }
+base64 = "0.12.3"
+html-minifier = "2.0.10"

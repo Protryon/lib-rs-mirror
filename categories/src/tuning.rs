@@ -953,7 +953,7 @@ lazy_static! {
         (Cond::All(&["validate", "numbers"]), &[("games", 0.3, 0.)]),
         (Cond::Any(&["engine", "amethyst"]), &[("game-development", 1.3, 0.1), ("games", 0.7, 0.)]),
         (Cond::Any(&["gamedev", "game-dev", "game-development"]), &[("game-development", 1.3, 0.2), ("games", 0.25, 0.), ("science", 0.5, 0.), ("concurrency", 0.75, 0.), ("science::ml", 0.8, 0.), ("science::math", 0.9, 0.), ("multimedia::video", 0.75, 0.)]),
-        (Cond::Any(&["game-engine", "ecs", "game-loop", "game-development"]), &[("game-development", 1.5, 0.2), ("rendering::engine", 0.8, 0.), ("games", 0.95, 0.), ("command-line-utilities", 0.75, 0.), ("rendering::data-formats", 0.2, 0.)]),
+        (Cond::Any(&["game-engine", "game-engines", "ecs", "game-loop", "game-development"]), &[("game-development", 1.5, 0.2), ("rendering::engine", 0.8, 0.), ("games", 0.95, 0.), ("command-line-utilities", 0.75, 0.), ("rendering::data-formats", 0.2, 0.)]),
         (Cond::All(&["game", "engine"]), &[("game-development", 1.5, 0.3), ("games", 0.3, 0.), ("rendering::data-formats", 0.2, 0.), ("filesystem", 0.7, 0.), ("no-std", 0.8, 0.), ("filesystem", 0.8, 0.), ("command-line-interface", 0.8, 0.)]),
         (Cond::All(&["game", "development"]), &[("game-development", 1.3, 0.2), ("games", 0.3, 0.)]),
         (Cond::All(&["game", "dev"]), &[("game-development", 1.2, 0.), ("games", 0.9, 0.)]),

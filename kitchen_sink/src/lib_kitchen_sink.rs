@@ -1084,6 +1084,10 @@ impl KitchenSink {
                     *cat = "game-development".into();
                 }
             }
+            // got out of sync with crates-io
+            if cat == "mathematics" {
+                *cat = "science::math".to_string();
+            }
             if cat == "science" || cat == "algorithms" {
                 let is_nn = |k: &String| k == "neural-network" || eq(k,"machine-learning") || eq(k,"neuralnetworks") || eq(k,"neuralnetwork") || eq(k,"tensorflow") || eq(k,"deep-learning");
                 let is_math = |k: &String| {

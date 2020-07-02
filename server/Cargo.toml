@@ -1,6 +1,6 @@
 [package]
 name = "crates-server"
-version = "0.14.26"
+version = "0.14.25"
 authors = ["Kornel <kornel@geekhood.net>"]
 edition = "2018"
 description = "Crates.rs web server"
@@ -41,4 +41,3 @@ qstring = "0.7.2"
 chrono = "0.4.11"
 blake3 = { version = "0.3.3", default-features = false }
 base64 = "0.12.1"
-html-minifier = "2.0.9"

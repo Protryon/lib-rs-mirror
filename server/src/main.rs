@@ -257,7 +257,6 @@ fn handle_static_page(state: &ServerState, path: &str) -> Result<Option<HttpResp
         .replace("$TOTAL_CRATE_NUM", &Numeric::english().format_int(total_crate_num));
     let mut page = Vec::with_capacity(md.len() * 2);
     front_end::render_static_page(&mut page, path_capitalized, &Markup::Markdown(md), &state.markup)?;
-    minify_html(&mut page);
     Ok(Some(HttpResponse::Ok()
         .content_type("text/html;charset=UTF-8")
         .header("Cache-Control", "public, max-age=7200, stale-while-revalidate=604800, stale-if-error=86400")
@@ -348,7 +347,6 @@ async fn handle_category(req: HttpRequest, cat: &'static Category) -> Result<Htt
         run_timeout(30, async move {
             let mut page: Vec<u8> = Vec::with_capacity(150000);
             front_end::render_category(&mut page, cat, &crates, &state.markup).await?;
-            minify_html(&mut page);
             Ok::<_, failure::Error>((page, None))
         })
     }).await?))
@@ -369,7 +367,6 @@ async fn handle_home(req: HttpRequest) -> Result<HttpResponse, ServerError> {
             let crates = state.crates.load();
             let mut page: Vec<u8> = Vec::with_capacity(32000);
             front_end::render_homepage(&mut page, &crates).await?;
-            minify_html(&mut page);
             Ok::<_, failure::Error>((page, Some(Utc::now().into())))
         })
     }).await?))
@@ -470,7 +467,6 @@ async fn handle_install(req: HttpRequest) -> Result<HttpResponse, ServerError> {
         let ver = crates.rich_crate_version_async(&origin).await?;
         let mut page: Vec<u8> = Vec::with_capacity(32000);
         front_end::render_install_page(&mut page, &ver, &crates, &state.markup).await?;
-        minify_html(&mut page);
         Ok::<_, failure::Error>((page, None))
     }).await?;
     Ok(serve_cached((page, 7200, false, last_mod)))
@@ -498,7 +494,6 @@ async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
             let crates = state.crates.load();
             let mut page: Vec<u8> = Vec::with_capacity(32000);
             front_end::render_author_page(&mut page, &aut, &crates, &state.markup).await?;
-            minify_html(&mut page);
             Ok::<_, failure::Error>((page, None))
         })
         })
@@ -549,7 +544,6 @@ async fn handle_crate_reviews(req: HttpRequest) -> Result<HttpResponse, ServerEr
         let mut page: Vec<u8> = Vec::with_capacity(32000);
         let reviews = crates.reviews_for_crate(ver.origin());
         front_end::render_crate_reviews(&mut page, &reviews, &ver, &crates, &state.markup).await?;
-        minify_html(&mut page);
         Ok::<_, failure::Error>((page, 24*3600, false, None))
     }).await?))
 }
@@ -562,7 +556,6 @@ async fn handle_new_trending(req: HttpRequest) -> Result<HttpResponse, ServerErr
             let crates = state.crates.load();
             let mut page: Vec<u8> = Vec::with_capacity(32000);
             front_end::render_trending_crates(&mut page, &crates, &state.markup).await?;
-            minify_html(&mut page);
             Ok::<_, failure::Error>((page, None))
     })}).await?))
 }
@@ -644,7 +637,6 @@ fn render_crate_page(state: AServerState, origin: Origin) -> impl Future<Output 
         let (all, ver) = futures::try_join!(crates.rich_crate_async(&origin), crates.rich_crate_version_async(&origin))?;
         let mut page: Vec<u8> = Vec::with_capacity(32000);
         let last_mod = front_end::render_crate_page(&mut page, &all, &ver, &crates, &state.markup).await?;
-        minify_html(&mut page);
         Ok::<_, failure::Error>((page, last_mod))
     })
 }
@@ -656,7 +648,6 @@ async fn render_crate_reverse_dependencies(state: AServerState, origin: Origin) 
         let ver = crates.rich_crate_version_async(&origin).await?;
         let mut page: Vec<u8> = Vec::with_capacity(32000);
         front_end::render_crate_reverse_dependencies(&mut page, &ver, &crates, &state.markup).await?;
-        minify_html(&mut page);
         Ok::<_, failure::Error>((page, 24*3600, false, None))
     }).await
 }
@@ -679,7 +670,6 @@ async fn handle_keyword(req: HttpRequest) -> Result<HttpResponse, ServerError> {
         if !results.is_empty() {
             let mut page: Vec<u8> = Vec::with_capacity(32000);
             front_end::render_keyword_page(&mut page, &query, &results, &state2.markup)?;
-            minify_html(&mut page);
             Ok((query, Some(page)))
         } else {
             Ok((query, None))
@@ -752,7 +742,7 @@ async fn handle_search(req: HttpRequest) -> Result<HttpResponse, ServerError> {
                         let results = state.index.search(&query, 50, true)?;
                         let mut page = Vec::with_capacity(32000);
                         front_end::render_serp_page(&mut page, &query, &results, &state.markup)?;
-                        minify_html(&mut page);
+
                         Ok::<_, failure::Error>((page, 600u32, false, None))
                     }).await
                 }
@@ -871,15 +861,5 @@ impl actix_web::ResponseError for ServerError {
             .content_type("text/html;charset=UTF-8")
             .content_length(page.len() as u64)
             .body(page)
-    }
-}
-
-fn minify_html(page: &mut Vec<u8>) {
-    let mut m = html_minifier::HTMLMinifier::new();
-    // digest wants bytes anyway
-    if let Ok(()) = m.digest(unsafe {std::str::from_utf8_unchecked(&page)}) {
-        let out = m.get_html();
-        page.clear();
-        page.extend_from_slice(out.as_bytes());
     }
 }

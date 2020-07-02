@@ -83,6 +83,7 @@ bnf: parsers
 bnf: parsing
 boxcars: parser-implementations
 br4infuck: emulators
+bracket-color: multimedia::images
 brain-brainfuck: emulators, command-line-utilities
 brain-rs: emulators
 brain: emulators
@@ -696,6 +697,7 @@ openldap: network-programming
 openni2: science::machine-learning
 openpol: games
 oping: network-programming
+orbtk-tree: gui
 orgize: parser-implementations
 osmesa-sys: multimedia, os::unix-apis
 osmgpsmap: science, gui
@@ -714,6 +716,7 @@ papyrus: development-tools, command-line-utilities
 parc: concurrency
 parity-db : cryptography::cryptocurrencies
 parity-scale-codec-derive: cryptography::cryptocurrencies
+parity-scale-codec: cryptography::cryptocurrencies
 parse-display-derive: rust-patterns, development-tools::procedural-macro-helpers
 parse-display: rust-patterns
 parse_cfg: parser-implementations, rust-patterns

@@ -116,6 +116,9 @@ pub fn is_deprecated(k: &RichCrateVersion) -> bool {
         return true;
     }
     if let Some(orig_desc) = k.description() {
+        if orig_desc == "..." { // spam by mahkoh
+            return true;
+        }
         let orig_desc = orig_desc.trim_matches(|c: char| !c.is_ascii_alphabetic());
         let desc = orig_desc.to_ascii_lowercase();
         return orig_desc.starts_with("WIP") || orig_desc.ends_with("WIP") ||

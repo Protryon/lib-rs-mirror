@@ -1,7 +1,7 @@
 [package]
 edition = "2018"
 name = "kitchen_sink"
-version = "0.9.3"
+version = "0.9.4"
 authors = ["Kornel <kornel@geekhood.net>"]
 publish = false
 
@@ -43,11 +43,11 @@ semver = { version = "0.9.0", features = ["serde"] }
 ctrlc = "3.1.4"
 flate2 = "1.0.14"
 string-interner = "0.7.1"
-parking_lot = "0.10.2"
+parking_lot = "0.11"
 udedokei = { path = "../udedokei" }
 tar = "0.4.26"
 libflate = "1.0.0"
-ahash = "0.3.4"
+ahash = "0.4"
 deunicode = "1.1.1"
 futures = "0.3.5"
 double-checked-cell-async = "2.0.2"

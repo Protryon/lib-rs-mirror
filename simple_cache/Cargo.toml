@@ -1,5 +1,5 @@
 [package]
-version = "0.7.6"
+version = "0.7.7"
 edition = "2018"
 name = "simple_cache"
 authors = ["Kornel <kornel@geekhood.net>"]
@@ -16,6 +16,6 @@ thread_local = "1.0.1"
 tempfile = "3.1.0"
 rmp-serde = "0.14.3"
 flate2 = "1.0.14"
-parking_lot = "0.10.2"
-ahash = "0.3.4"
+parking_lot = "0.11"
+ahash = "0.4"
 tokio = { version = "0.2.20", features = ["macros", "sync"] }

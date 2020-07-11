@@ -982,21 +982,29 @@ impl KitchenSink {
             meta.lib_file = None;
         }
 
-        // Process crate's text to guess non-lowercased name
-        let mut words = vec![package.name.as_str()];
-        let readme_txt;
-        if let Some(ref r) = meta.readme {
-            readme_txt = render_readme::Renderer::new(None).visible_text(&r.1);
-            words.push(&readme_txt);
-        }
-        if let Some(ref s) = package.description {words.push(s);}
-        if let Some(ref s) = github_description {words.push(s);}
-        if let Some(ref s) = github_name {words.push(s);}
-        if let Some(ref s) = package.homepage {words.push(s);}
-        if let Some(ref s) = package.documentation {words.push(s);}
-        if let Some(ref s) = package.repository {words.push(s);}
+        let capitalized_name = if package.name != package.name.to_ascii_lowercase() {
+            // if the crate name isn't all-lowercase, then keep it as-is
+            package.name.clone()
+        } else {
+            // Process crate's text to guess non-lowercased name
+            let mut words = vec![package.name.as_str()];
+            let readme_txt;
+            if let Some(ref r) = meta.readme {
+                readme_txt = render_readme::Renderer::new(None).visible_text(&r.1);
+                words.push(&readme_txt);
+            }
+            if let Some(ref lib) = meta.lib_file {
+                words.push(&lib);
+            }
+            if let Some(ref s) = package.description {words.push(s);}
+            if let Some(ref s) = github_description {words.push(s);}
+            if let Some(ref s) = github_name {words.push(s);}
+            if let Some(ref s) = package.homepage {words.push(s);}
+            if let Some(ref s) = package.documentation {words.push(s);}
+            if let Some(ref s) = package.repository {words.push(s);}
 
-        let capitalized_name = Self::capitalized_name(&package.name, words.into_iter());
+            Self::capitalized_name(&package.name, words.into_iter())
+        };
 
         let has_buildrs = meta.has("build.rs");
         let has_code_of_conduct = meta.has("CODE_OF_CONDUCT.md") || meta.has("docs/CODE_OF_CONDUCT.md") || meta.has(".github/CODE_OF_CONDUCT.md");
@@ -1506,18 +1514,16 @@ impl KitchenSink {
         Ok(())
     }
 
-    fn capitalized_name<'a>(name: &str, source_words: impl Iterator<Item = &'a str>) -> String {
-        let mut first_capital = String::with_capacity(name.len());
+    fn capitalized_name<'a>(name: &str, source_sentences: impl Iterator<Item = &'a str>) -> String {
         let mut ch = name.chars();
-        if let Some(f) = ch.next() {
-            first_capital.extend(f.to_uppercase());
-            first_capital.extend(ch.map(|c| if c == '_' { ' ' } else { c }));
-        }
+        let mut first_capital = String::with_capacity(name.len());
+        first_capital.extend(ch.next().unwrap().to_uppercase());
+        first_capital.extend(ch.map(|c| if c == '_' { ' ' } else { c }));
 
         let mut words = HashMap::with_capacity(100);
         let lcname = name.to_lowercase();
         let shouty = name.to_uppercase();
-        for s in source_words {
+        for s in source_sentences {
             for s in s.split(|c: char| !c.is_ascii_alphanumeric() && c != '-' && c != '_').filter(|&w| w != lcname && w.eq_ignore_ascii_case(&lcname)) {
                 let mut points = 2;
                 if lcname.len() > 2 {

@@ -247,10 +247,10 @@ async fn error_for_response(res: reqwest::Response) -> GHError {
 fn parse_next_link(link: &str) -> Option<String> {
     for part in link.split(',') {
         if part.contains(r#"; rel="next""#) {
-            if let Some(start) = link.find('<') {
-                let link = &link[start + 1..];
-                if let Some(end) = link.find('>') {
-                    return Some(link[..end].to_owned());
+            if let Some(start) = part.find('<') {
+                let next_link = &part[start + 1..];
+                if let Some(end) = next_link.find('>') {
+                    return Some(next_link[..end].to_owned());
                 }
             }
         }
@@ -301,5 +301,13 @@ mod test {
     async fn req_test() {
         let gh = Client::new_from_env();
         gh.get().path("users/octocat/orgs").send().await.unwrap();
+    }
+
+    #[test]
+    fn parse_next_link_test() {
+        let example = "\"<https://api.github.com/organizations/fakeid/repos?page=1>; rel=\"prev\", <https://api.github.com/organizations/fakeid/repos?page=3>; rel=\"next\", <https://api.github.com/organizations/fakeid/repos?page=38>; rel=\"last\", <https://api.github.com/organizations/fakeid/repos?page=1>; rel=\"first\"";
+
+        let expected = Some(String::from("https://api.github.com/organizations/fakeid/repos?page=3"));
+        assert_eq!(parse_next_link(example), expected)
     }
 }

@@ -393,8 +393,15 @@
                 @if let Some(f) = c.non_dep_features() {
                   <li>
                     other feature@if f.len() != 1 {s}:
-                    @for f in f {
+                    @for f in f.iter().take(100) {
                       <span class="feature">@f</span>
+                    }
+                    @if f.len() > 100 {
+                      <details><summary>and more…</summary>
+                        @for f in f.iter().skip(100) {
+                          <span class="feature">@f</span>
+                        }
+                      </details>
                     }
                   </li>
                 }

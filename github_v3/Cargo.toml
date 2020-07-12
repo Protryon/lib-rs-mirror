@@ -7,7 +7,7 @@ keywords = ["github", "restful", "api", "async"]
 categories = ["web-programming", "web-programming::http-client"]
 edition = "2018"
 readme = "README.md"
-repository = "https://gitlab.com/crates.rs/crates.rs/-/tree/master/github_v3"
+repository = "https://gitlab.com/crates.rs/crates.rs/-/tree/HEAD/github_v3"
 homepage = "https://lib.rs/github_v3"
 license = "CC0-1.0"
 

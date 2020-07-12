@@ -1,6 +1,6 @@
 # Async client for GitHub API v3 (`application/vnd.github.v3+json`)
 
-Written for [https://lib.rs](https://lib.rs). Supports only `get()` requests, because I didn't need more. [PR's welcome](https://gitlab.com/crates.rs/crates.rs/-/tree/master/github_v3).
+Written for [https://lib.rs](https://lib.rs). Supports only `get()` requests, because I didn't need more. [PR's welcome](https://gitlab.com/crates.rs/crates.rs/-/tree/HEAD/github_v3).
 
 * Uses `async`/`await` and `std::futures`.
 

@@ -30,11 +30,11 @@ If you'd like to help improve it:
 ### Where to find the code?
 
  * If you want to change look'n'feel (CSS): [see the `style` subproject](https://gitlab.com/crates.rs/style).
- * If you want to change HTML of the templates: [see the `front_end` dir](https://gitlab.com/crates.rs/crates.rs/tree/master/front_end).
+ * If you want to change HTML of the templates: [see the `front_end` dir](https://gitlab.com/crates.rs/crates.rs/tree/HEAD/front_end).
  * If you want to show new kind of data on the pages:
-     1. Fetch/compute that data in [one of the subprojects](https://gitlab.com/crates.rs) most relevant for that type of data (e.g. there's a subproject for [interacting with GitHub API](https://gitlab.com/crates.rs/crates.rs/tree/master/github_info) if you want to get information from there).
-     2. Expose that data source [in the `kitchen_sink` dir](https://gitlab.com/crates.rs/crates.rs/tree/master/kitchen_sink) which connects all data sources together.
-     3. Put that data in the page helper objects (e.g. `CratePage`) [in the `front_end` dir](https://gitlab.com/crates.rs/crates.rs/tree/master/front_end).
+     1. Fetch/compute that data in [one of the subprojects](https://gitlab.com/crates.rs) most relevant for that type of data (e.g. there's a subproject for [interacting with GitHub API](https://gitlab.com/crates.rs/crates.rs/tree/HEAD/github_info) if you want to get information from there).
+     2. Expose that data source [in the `kitchen_sink` dir](https://gitlab.com/crates.rs/crates.rs/tree/HEAD/kitchen_sink) which connects all data sources together.
+     3. Put that data in the page helper objects (e.g. `CratePage`) [in the `front_end` dir](https://gitlab.com/crates.rs/crates.rs/tree/HEAD/front_end).
      4. Use the data in HTML templates.
 
 ## Building step-by-step

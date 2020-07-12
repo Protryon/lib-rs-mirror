@@ -51,7 +51,7 @@ impl<'a> ReviewsPage<'a> {
             return Some(id.into());
         }
         if id.starts_with("RUSTSEC-") {
-            return Some(format!("https://github.com/RustSec/advisory-db/blob/master/crates/{}/{}.toml", self.ver.short_name(), id).into());
+            return Some(format!("https://github.com/RustSec/advisory-db/blob/HEAD/crates/{}/{}.toml", self.ver.short_name(), id).into());
         }
         None
     }

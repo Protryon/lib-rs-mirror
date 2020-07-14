@@ -549,7 +549,7 @@ Libraries that function without the Rust standard library.
 """
 siblings = ["embedded"]
 obvious-keywords = ["no_std", "no-std"]
-preference = 0.8
+preference = 0.6
 
 [os]
 name = "Operating systems"

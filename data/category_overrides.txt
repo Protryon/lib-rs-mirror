@@ -15,6 +15,7 @@ alass-core: algorithms
 alert-after: gui, command-line-utilities
 alfred: development-tools, os::macos-apis
 algorust: algorithms
+aliyun-openapi-core-rust-sdk : web-programming
 allegro_examples: game-development, multimedia
 allegro_primitives-sys: game-development
 allegro_util: game-development
@@ -123,6 +124,7 @@ cb2_core: development-tools
 cddl: parser-implementations
 celery-rs-core: asynchronous
 celery: asynchronous
+cfn: web-programming
 cgl: rendering::graphics-api, os::macos-apis
 ch8asm: emulators, development-tools
 chariot_slp: games, parser-implementations
@@ -172,6 +174,7 @@ cox: web-programming
 coz: development-tools::profiling
 cqc: simulation
 cqrs-core: asynchronous
+crabler: web-programming
 crate-race: development-tools::profiling
 crates-index-diff: development-tools
 crates_io_api: web-programming
@@ -276,6 +279,7 @@ esplugin-ffi : games, parser-implementations
 esplugin: parser-implementations
 etclient-core: cryptography::cryptocurrencies
 euclid: science::math
+eval: parser-implementations
 evcxr_repl: rust-patterns, command-line-utilities
 evolution_rs: science::machine-learning
 ewasm_api: wasm
@@ -373,6 +377,7 @@ geoplaces: science
 geoplaces: science, web-programming
 geos: science::math
 getch: os
+ghlabel: web-programming
 gifriend: multimedia::images
 giphy: web-programming
 girage: cryptography, gui
@@ -620,6 +625,7 @@ mindjuice: emulators
 mine_sweeper: games
 minidump-processor:development-tools::debugging
 minidump: parser-implementations
+minifier: web-programming, compression
 minimad: text-processing, parser-implementations
 miniquad: gui
 mlc: command-line-utilities, text-processing
@@ -698,9 +704,11 @@ nuscenes-data: parser-implementations
 nv-xml: parser-implementations
 nvim-rs: text-editors
 nvim_windows_remote: text-editors
+nyaasi-scraper : parser-implementations
 nzsc2p: games
 nzsc_core: game-development
 objc-encode: os::macos-apis, development-tools::ffi
+okapi: web-programming
 olekit: parser-implementations
 onig_sys: text-processing
 ontio-bump-alloc: cryptography::cryptocurrencies
@@ -1095,8 +1103,10 @@ waybackrust: web-programming
 wayk_core : network-programming
 wcxhead: development-tools
 webhook_listener: web-programming::http-server
+webicon: web-programming
 webidl: parser-implementations
 webmanifest: web-programming
+webpage: web-programming
 weighted-select: asynchronous
 weld: development-tools::profiling
 wham: simulation

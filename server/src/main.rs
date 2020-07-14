@@ -877,9 +877,9 @@ impl actix_web::ResponseError for ServerError {
 fn minify_html(page: &mut Vec<u8>) {
     let mut m = html_minifier::HTMLMinifier::new();
     // digest wants bytes anyway
-    if let Ok(()) = m.digest(unsafe {std::str::from_utf8_unchecked(&page)}) {
+    if let Ok(()) = m.digest(&page) {
         let out = m.get_html();
         page.clear();
-        page.extend_from_slice(out.as_bytes());
+        page.extend_from_slice(out);
     }
 }

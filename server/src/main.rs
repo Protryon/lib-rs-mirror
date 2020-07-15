@@ -199,8 +199,10 @@ async fn run_server() -> Result<(), failure::Error> {
             .route("/keywords/{keyword}", web::get().to(handle_keyword))
             .route("/crates/{crate}", web::get().to(handle_crate))
             .route("/crates/{crate}/rev", web::get().to(handle_crate_reverse_dependencies))
+            .route("/crates/{crate}/reverse_dependencies", web::get().to(handle_crate_reverse_dependencies_redir))
             .route("/crates/{crate}/crev", web::get().to(handle_crate_reviews))
             .route("/~{author}", web::get().to(handle_author))
+            .route("/users/{author}", web::get().to(handle_author_redirect))
             .route("/install/{crate:.*}", web::get().to(handle_install))
             .route("/debug/{crate:.*}", web::get().to(handle_debug))
             .route("/gh/{owner}/{repo}/{crate}", web::get().to(handle_github_crate))
@@ -386,6 +388,18 @@ async fn handle_redirect(req: HttpRequest) -> HttpResponse {
     let inf = req.match_info();
     let rest = inf.query("rest");
     HttpResponse::PermanentRedirect().header("Location", format!("/{}", rest)).body("")
+}
+
+async fn handle_crate_reverse_dependencies_redir(req: HttpRequest) -> HttpResponse {
+    let inf = req.match_info();
+    let rest = inf.query("crate");
+    HttpResponse::PermanentRedirect().header("Location", format!("/crates/{}/rev", rest)).body("")
+}
+
+async fn handle_author_redirect(req: HttpRequest) -> HttpResponse {
+    let inf = req.match_info();
+    let rest = inf.query("author");
+    HttpResponse::PermanentRedirect().header("Location", format!("/~{}", rest)).body("")
 }
 
 async fn handle_game_redirect(_: HttpRequest) -> HttpResponse {

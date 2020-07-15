@@ -438,7 +438,7 @@ lazy_static! {
         (Cond::All(&["qr", "code"]), &[("multimedia::images", 1.15, 0.)]),
         (Cond::Any(&["qr-code", "qrcode"]), &[("multimedia::images", 1.2, 0.05)]),
         (Cond::Any(&["flif", "png", "jpeg2000", "jpeg", "exif", "svg", "pixel"]), &[
-            ("multimedia::images", 1.3, 0.15), ("encoding", 0.8, 0.), ("parsing", 0.8, 0.), ("data-structures", 0.9, 0.)]),
+            ("multimedia::images", 1.3, 0.15), ("encoding", 0.8, 0.), ("parsing", 0.8, 0.), ("rust-patterns", 0.6, 0.), ("data-structures", 0.9, 0.)]),
         (Cond::Any(&["imagemagick", "gamma", "photo", "openexr"]), &[
             ("multimedia::images", 1.3, 0.15), ("encoding", 0.5, 0.), ("parsing", 0.6, 0.), ("data-structures", 0.8, 0.)]),
         (Cond::Any(&["color", "colors", "opencv"]), &[("multimedia::images", 1.2, 0.1), ("multimedia", 1.1, 0.)]),

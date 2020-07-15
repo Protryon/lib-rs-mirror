@@ -234,6 +234,7 @@ docx: parser-implementations, text-processing
 doryen-fov: game-development
 doublepivot-quicksort: algorithms
 doubter: development-tools::testing
+draw: multimedia::images
 duct: development-tools, command-line-utilities
 duct_sh: command-line-interface
 dull: command-line-utilities, command-line-interface
@@ -290,7 +291,7 @@ exonum-cryptocurrency-advanced: cryptography::cryptocurrencies
 exonum-testkit: cryptography::cryptocurrencies
 exonum-time: cryptography::cryptocurrencies
 exonum: cryptography::cryptocurrencies
-extract-frontmatter : parser-implementations
+extract-frontmatter : parser-implementations, web-programming
 factom: web-programming
 failsafe: rust-patterns, asynchronous
 failure: rust-patterns
@@ -363,6 +364,7 @@ ga: science::machine-learning, algorithms
 galah: science
 gallop: parsing
 game-loop: game-development
+gamemap: development-tools
 ganit: development-tools, science::math
 gary-core: development-tools
 gaviota-sys: game-development
@@ -373,6 +375,7 @@ geckodriver: development-tools::testing
 generic-core: encoding
 genp: authentication
 genpass: authentication, command-line-utilities
+geopattern: multimedia::images
 geoplaces: science
 geoplaces: science, web-programming
 geos: science::math
@@ -612,6 +615,7 @@ market-finance: science
 markov: text-processing, science::machine-learning
 matrix_bot_api: network-programming
 matrixmultiply: science::math
+matter: parser-implementations, web-programming
 mdtoc: text-processing
 mediawiki: web-programming
 meilisearch-core: database-implementations
@@ -628,6 +632,7 @@ minidump: parser-implementations
 minifier: web-programming, compression
 minimad: text-processing, parser-implementations
 miniquad: gui
+mksvg: multimedia::images
 mlc: command-line-utilities, text-processing
 mnemonic: command-line-utilities, authentication
 mobi: parser-implementations
@@ -723,6 +728,7 @@ orgize: parser-implementations
 osmesa-sys: multimedia, os::unix-apis
 osmgpsmap: science, gui
 ostrich-core: asynchronous
+othello: games
 outcome: rust-patterns
 outline: text-editors
 oven: web-programming
@@ -785,6 +791,7 @@ prometheus_wireguard_exporter: network-programming
 psyche-core : game-development
 psyche-core: science::machine-learning
 pulsar: network-programming
+puzzle_cube: games
 pwasm-abi-derive: cryptography::cryptocurrencies
 pwasm-abi: cryptography::cryptocurrencies
 pwasm-ethereum: cryptography::cryptocurrencies
@@ -1022,6 +1029,7 @@ tgaimage: multimedia::images
 thingvellir: concurrency
 thorin: development-tools::debugging
 thrift_codec: encoding, web-programming
+thud: games
 time-parse: date-and-time, parser-implementations
 timeago: date-and-time
 tinkerforge: hardware-support, embedded
@@ -1068,6 +1076,7 @@ typename: rust-patterns
 ucd-trie: data-structures, text-processing
 ucd-util: text-processing
 udp_netmsg: network-programming
+ugdb: development-tools::debugging, command-line-utilities
 ul: rendering::graphics-api
 ullage: development-tools
 ultrastar-txt: parser-implementations

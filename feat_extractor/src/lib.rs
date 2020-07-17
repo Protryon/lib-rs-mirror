@@ -156,14 +156,15 @@ pub fn is_deprecated_requirement(name: &str, requirement: &VersionReq) -> bool {
     let v02 = "0.2.99".parse().unwrap();
     let v01 = "0.1.99".parse().unwrap();
     match name {
-        "time" if requirement.matches(&v01) => true,
+        "time" | "tokio" | "futures" if requirement.matches(&v01) => true,
         "winapi" if requirement.matches(&v01) || requirement.matches(&v02) => true,
         "rustc-serialize" | "gcc" | "rustc-benchmarks" | "rust-crypto" |
         "flate2-crc" | "complex" | "simple_stats" | "concurrent" | "feed" |
         "isatty" | "thread-scoped" | "target_build_utils" | "chan" | "chan-signal" |
         "glsl-to-spirv" => true,
         // futures 0.1
-        "futures-preview" | "futures-core-preview" | "tokio-io" | "tokio-timer" | "tokio-codec" => true,
+        "futures-preview" | "futures-core-preview" | "tokio-io" | "tokio-timer" | "tokio-codec" |
+        "tokio-executor" | "tokio-reactor" | "tokio-core" | "futures-cpupool" => true,
         // fundamentally unsound
         "str-concat" => true,
         // uses old winapi

@@ -27,6 +27,8 @@ impl Creviews {
         let db = self.local.load_db()?;
 
         let mut reviews: Vec<_> = db.get_pkg_reviews_for_name("https://crates.io", crate_name).filter_map(|r| {
+            let review = r.review()?;
+
             let from = r.from();
             let mut issues = Vec::new();
             for a in &r.advisories {
@@ -49,9 +51,9 @@ impl Creviews {
                 author_url: db.lookup_url(&from.id).verified().map(|u| u.url.to_string()),
                 unmaintained: r.flags.unmaintained,
                 version: r.package.id.version.clone(),
-                thoroughness: r.review.thoroughness,
-                understanding: r.review.understanding,
-                rating: r.review.rating.clone(),
+                thoroughness: review.thoroughness,
+                understanding: review.understanding,
+                rating: review.rating.clone(),
                 comment_markdown: r.comment.clone(),
                 date: r.common.date,
                 issues,

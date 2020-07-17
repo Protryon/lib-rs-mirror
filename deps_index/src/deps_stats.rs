@@ -3,7 +3,7 @@ use crate::Origin;
 use crate::DepsErr;
 use parking_lot::Mutex;
 use rayon::prelude::*;
-use string_interner::Sym;
+use string_interner::symbol::SymbolU32 as Sym;
 
 type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 type FxHashSet<V> = std::collections::HashSet<V, ahash::RandomState>;

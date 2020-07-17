@@ -20,7 +20,8 @@ use std::iter;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use string_interner::StringInterner;
-use string_interner::Sym;
+use string_interner::symbol::SymbolU32 as Sym;
+
 use triomphe::Arc;
 use feat_extractor::is_deprecated_requirement;
 
@@ -133,7 +134,7 @@ pub struct Index {
     pub crates_index_path: PathBuf,
     git_index: GitIndex,
 
-    pub inter: RwLock<StringInterner<Sym>>,
+    pub inter: RwLock<StringInterner<Sym, string_interner::backend::StringBackend<Sym>>>,
     pub cache: RwLock<FxHashMap<(Box<str>, Features), ArcDepSet>>,
     deps_stats: DoubleCheckedCell<DepsStats>,
 }

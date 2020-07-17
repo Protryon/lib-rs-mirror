@@ -22,7 +22,7 @@ rayon = "1.3.0"
 reqwest = "0.10"
 semver-parser = "0.9.0"
 semver = { version = "0.9.0", features = ["serde"] }
-string-interner = "0.7.1"
+string-interner = "0.12"
 parking_lot = "0.11"
 ahash = "0.4"
 futures = "0.3.4"

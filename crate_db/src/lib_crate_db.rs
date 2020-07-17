@@ -382,7 +382,7 @@ impl CrateDb {
             if !had_explicit_categories {
                 let mut tmp = insert_keyword.keywords.iter().collect::<Vec<_>>();
                 tmp.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
-                write!(&mut out, "#{} ", tmp.into_iter().take(20).map(|(k, _)| k.to_string()).collect::<Vec<_>>().join(" #"))?;
+                write!(&mut out, "#{} ", tmp.into_iter().take(10).map(|(k, _)| k.to_string()).collect::<Vec<_>>().join(" #"))?;
             }
 
             if categories.is_empty() {
@@ -449,7 +449,7 @@ impl CrateDb {
             categories::adjusted_relevance(candidates, &keywords_collected, 0.01, 15)
         } else {
             let cat_w = 0.2 + 0.2 * c.manifest.package().keywords.len() as f64;
-            self.guess_crate_categories_tx(conn, &c.origin, &keywords_collected, if is_important_ish {0.1} else {0.3})?.into_iter()
+            self.guess_crate_categories_tx(conn, &c.origin, &keywords_collected, if is_important_ish {0.1} else {0.25})?.into_iter()
             .map(|(w, slug)| {
                 ((w * cat_w).min(0.99), slug)
             }).collect()
@@ -462,14 +462,16 @@ impl CrateDb {
 
         let max_weight = categories.iter().map(|&(w, _)| w)
             .max_by(|a, b| a.partial_cmp(&b).unwrap_or(Ordering::Equal))
-            .unwrap_or(0.3)
-            .max(0.3); // prevents div/0, ensures odd choices stay low
+            .unwrap_or(0.1)
+            .max(0.1); // prevents div/0, ensures odd choices stay low
 
         let categories = categories
             .into_iter()
-            .map(|(relevance_weight, slug)| {
-                let rank_weight = relevance_weight / max_weight * if relevance_weight >= max_weight * 0.99 { 1. } else { 0.4 }; // a crate is only in 1 category
-                (rank_weight, relevance_weight, slug)
+            .map(|(category_relevance, slug)| {
+                let rank_weight = category_relevance / max_weight
+                    * if category_relevance >= max_weight * 0.99 { 1. } else { 0.4 } // a crate is only in 1 category
+                    * if category_relevance > 0.2 { 1. } else { 0.75 }; // keep bad category guesses out of sight
+                (rank_weight, category_relevance, slug)
             })
             .collect();
 

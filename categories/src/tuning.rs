@@ -698,7 +698,7 @@ lazy_static! {
         (Cond::Any(&["monoidal", "monoid", "type-level", "bijective", "impl", "semigroup"]),
             &[("rust-patterns", 1.1, 0.1), ("command-line-utilities", 0.7, 0.), ("internationalization", 0.7, 0.), ("development-tools", 0.8, 0.), ("os::macos-apis", 0.8, 0.),
             ("memory-management", 0.8, 0.), ("command-line-interface", 0.8, 0.), ("games", 0.5, 0.), ("parser-implementations", 0.7, 0.)]),
-        (Cond::Any(&["iterator", "stack", "type-inference", "builder", "nan", "zero-cost"]),
+        (Cond::Any(&["iterator", "owned-string", "stack", "type-inference", "builder", "nan", "zero-cost"]),
             &[("rust-patterns", 1.1, 0.1), ("algorithms", 1.1, 0.1), ("gui", 0.9, 0.)]),
         (Cond::Any(&["structure", "endian", "big-endian", "binary", "binaries", "storing-values"]),
             &[("data-structures", 1.2, 0.1), ("algorithms", 1.1, 0.), ("science", 0.8, 0.), ("multimedia::audio", 0.9, 0.), ("command-line-utilities", 0.9, 0.), ("text-editors", 0.7, 0.), ("internationalization", 0.7, 0.)]),
@@ -881,7 +881,7 @@ lazy_static! {
         (Cond::Any(&["repl", "pack"]), &[("parsing", 0.8, 0.)]),
 
         (Cond::Any(&["cli"]), &[("command-line-utilities", 1.1, 0.), ("command-line-interface", 1.1, 0.), ("rust-patterns", 0.6, 0.)]),
-        (Cond::Any(&["tui"]), &[("command-line-interface", 1.1, 0.1)]),
+        (Cond::Any(&["tui", "command-line-arguments", "cli-args"]), &[("command-line-interface", 1.1, 0.1)]),
         (Cond::Any(&["dep:clap", "dep:docopt", "dep:structopt", "dep:ncurses"]), &[("command-line-utilities", 1.15, 0.1), ("command-line-interface", 0.9, 0.)]),
         (Cond::All(&["curses", "interface"]), &[("command-line-interface", 1.1, 0.05)]),
         (Cond::All(&["terminal", "ui"]), &[("command-line-interface", 1.1, 0.), ("multimedia::encoding", 0.8, 0.)]),
@@ -1144,7 +1144,7 @@ lazy_static! {
                 &[("rendering::graphics-api", 1.3, 0.15), ("science::math", 0.8, 0.), ("algorithms", 0.8, 0.), ("rendering", 1.1, 0.1), ("rendering::data-formats", 0.9, 0.),
                 ("web-programming::websocket", 0.15, 0.), ("rendering::graphics-api", 1.1, 0.1),("rendering::engine", 1.05, 0.05), ("games", 0.8, 0.),
                 ("hardware-support", 0.8, 0.), ("development-tools::testing", 0.6, 0.), ("no-std", 0.5, 0.), ("memory-management", 0.8, 0.)]),
-        (Cond::Any(&["opengl", "directwrite", "gl", "skia", "vulkan", "spirv", "shader", "directx"]),
+        (Cond::Any(&["opengl", "directwrite", "gl", "skia", "gltf", "spirv", "shader", "directx"]),
                 &[("rendering::graphics-api", 1.3, 0.15), ("science::math", 0.8, 0.), ("rust-patterns", 0.8, 0.), ("rendering", 1.1, 0.1), ("rendering::data-formats", 0.9, 0.),
                 ("web-programming::websocket", 0.15, 0.), ("rendering::graphics-api", 1.1, 0.1),("rendering::engine", 1.05, 0.05),
                 ("games", 0.8, 0.), ("hardware-support", 0.8, 0.), ("development-tools::testing", 0.6, 0.), ("memory-management", 0.8, 0.)]),
@@ -1207,10 +1207,10 @@ pub fn adjusted_relevance(mut candidates: HashMap<String, f64>, keywords: &HashS
     let mut res: Vec<_> = candidates.into_iter()
         .filter(|&(_, v)| v >= min_category_match_threshold)
         .filter(|&(ref k, _)| CATEGORIES.from_slug(k).1)
-        .take(max_num_categories)
         .map(|(k, v)| (v, k))
         .collect();
     res.sort_by(|a, b| b.0.partial_cmp(&a.0).expect("nan"));
+    res.truncate(max_num_categories);
     res
 }
 

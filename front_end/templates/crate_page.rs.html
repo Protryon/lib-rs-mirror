@@ -162,8 +162,8 @@
                   @if let Some(extra) = parts.1 {<span>@extra</span>}
                 </h3>
               }
-              @if c.ver.edition() == Edition::E2018 {
-                <p class="edition-2018">✓ Uses <a href="https://doc.rust-lang.org/edition-guide/rust-2018/index.html">Rust 2018</a> edition</p>
+              @if c.ver.edition() == Edition::E2015 {
+                <p class="edition-2018">Uses old Rust 2015</p>
               }
               <table>
                 @for (i,gr) in c.top_versions().enumerate() {

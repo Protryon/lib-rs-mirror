@@ -9,6 +9,9 @@ readme = "README.md"
 [package.metadata.deb]
 assets = [
     ["target/release/crates-server", "usr/bin/", "755"],
+    ["target/release/reindex_crates", "usr/bin/", "755"],
+    ["target/release/reindex_users", "usr/bin/", "755"],
+    ["target/release/datadump", "usr/bin/", "755"],
     ["../data/page/*", "/var/lib/crates-server/page/", "644"],
     ["../data/git_crates.txt", "/var/lib/crates-server/", "644"],
     ["../data/category_overrides.txt", "/var/lib/crates-server/", "644"],

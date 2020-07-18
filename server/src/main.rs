@@ -50,6 +50,8 @@ struct ServerState {
     rt: Runtime,
     background_job: tokio::sync::Semaphore,
     foreground_job: tokio::sync::Semaphore,
+    start_time: Instant,
+    last_ok_response: AtomicU32,
 }
 
 type AServerState = web::Data<ServerState>;
@@ -117,22 +119,22 @@ async fn run_server() -> Result<(), failure::Error> {
         rt,
         background_job: tokio::sync::Semaphore::new(4),
         foreground_job: tokio::sync::Semaphore::new(32),
+        start_time: Instant::now(),
+        last_ok_response: AtomicU32::new(0),
     });
 
-    let start_time = Arc::new(Instant::now());
     let timestamp = Arc::new(AtomicU32::new(0));
 
     // refresher thread
     state.rt.spawn({
         let state = state.clone();
-        let start_time = start_time.clone();
         let timestamp = timestamp.clone();
         async move {
             let mut last_reload = Instant::now();
             state.crates.load().prewarm().await;
             loop {
                 tokio::time::delay_for(Duration::from_secs(1)).await;
-                let elapsed = start_time.elapsed().as_secs() as u32;
+                let elapsed = state.start_time.elapsed().as_secs() as u32;
                 timestamp.store(elapsed, Ordering::SeqCst);
                 let should_reload = if 1 == HUP_SIGNAL.swap(0, Ordering::SeqCst) {
                     println!("HUP!");
@@ -169,11 +171,14 @@ async fn run_server() -> Result<(), failure::Error> {
         }});
 
     // watchdog
-    std::thread::spawn(move || {
+    std::thread::spawn({
+        let state = Arc::clone(&state);
+        move || {
         loop {
             std::thread::sleep(Duration::from_secs(1));
-            let expected = start_time.elapsed().as_secs() as u32;
+            let expected = state.start_time.elapsed().as_secs() as u32;
             let rt_timestamp = timestamp.load(Ordering::SeqCst);
+            let response_timestamp = state.last_ok_response.load(Ordering::SeqCst);
             if rt_timestamp > expected + 2 {
                 eprintln!("Update loop is {}s behind", rt_timestamp - expected);
                 if rt_timestamp - expected > 10 {
@@ -181,8 +186,12 @@ async fn run_server() -> Result<(), failure::Error> {
                     std::process::exit(1);
                 }
             }
+            if response_timestamp > expected + 60*5 {
+                eprintln!("no requests for 5 minutes? probably a deadlock");
+                std::process::exit(2);
+            }
         }
-    });
+    }});
 
     let server = HttpServer::new(move || {
         App::new()
@@ -223,6 +232,11 @@ async fn run_server() -> Result<(), failure::Error> {
     Ok(())
 }
 
+fn mark_server_still_alive(state: &ServerState) {
+    let elapsed = state.start_time.elapsed().as_secs() as u32;
+    state.last_ok_response.store(elapsed, Ordering::SeqCst);
+}
+
 fn find_category<'a>(slugs: impl Iterator<Item = &'a str>) -> Option<&'static Category> {
     let mut found = None;
     let mut current_sub = &CATEGORIES.root;
@@ -260,6 +274,8 @@ fn handle_static_page(state: &ServerState, path: &str) -> Result<Option<HttpResp
     let mut page = Vec::with_capacity(md.len() * 2);
     front_end::render_static_page(&mut page, path_capitalized, &Markup::Markdown(md), &state.markup)?;
     minify_html(&mut page);
+
+    mark_server_still_alive(&state);
     Ok(Some(HttpResponse::Ok()
         .content_type("text/html;charset=UTF-8")
         .header("Cache-Control", "public, max-age=7200, stale-while-revalidate=604800, stale-if-error=86400")
@@ -351,6 +367,7 @@ async fn handle_category(req: HttpRequest, cat: &'static Category) -> Result<Htt
             let mut page: Vec<u8> = Vec::with_capacity(150000);
             front_end::render_category(&mut page, cat, &crates, &state.markup).await?;
             minify_html(&mut page);
+            mark_server_still_alive(&state);
             Ok::<_, failure::Error>((page, None))
         })
     }).await?))
@@ -372,6 +389,7 @@ async fn handle_home(req: HttpRequest) -> Result<HttpResponse, ServerError> {
             let mut page: Vec<u8> = Vec::with_capacity(32000);
             front_end::render_homepage(&mut page, &crates).await?;
             minify_html(&mut page);
+            mark_server_still_alive(&state);
             Ok::<_, failure::Error>((page, Some(Utc::now().into())))
         })
     }).await?))
@@ -485,6 +503,7 @@ async fn handle_install(req: HttpRequest) -> Result<HttpResponse, ServerError> {
         let mut page: Vec<u8> = Vec::with_capacity(32000);
         front_end::render_install_page(&mut page, &ver, &crates, &state.markup).await?;
         minify_html(&mut page);
+        mark_server_still_alive(&state);
         Ok::<_, failure::Error>((page, None))
     }).await?;
     Ok(serve_cached((page, 7200, false, last_mod)))
@@ -507,14 +526,15 @@ async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let cache_file = state.page_cache_dir.join(format!("@{}.html", login));
     Ok(serve_cached(
         with_file_cache(state, cache_file, 3600, {
-        let state = state.clone();
-        run_timeout(60, async move {
-            let crates = state.crates.load();
-            let mut page: Vec<u8> = Vec::with_capacity(32000);
-            front_end::render_author_page(&mut page, &aut, &crates, &state.markup).await?;
-            minify_html(&mut page);
-            Ok::<_, failure::Error>((page, None))
-        })
+            let state = state.clone();
+            run_timeout(60, async move {
+                let crates = state.crates.load();
+                let mut page: Vec<u8> = Vec::with_capacity(32000);
+                front_end::render_author_page(&mut page, &aut, &crates, &state.markup).await?;
+                minify_html(&mut page);
+                mark_server_still_alive(&state);
+                Ok::<_, failure::Error>((page, None))
+            })
         })
         .await?,
     ))
@@ -564,6 +584,7 @@ async fn handle_crate_reviews(req: HttpRequest) -> Result<HttpResponse, ServerEr
         let reviews = crates.reviews_for_crate(ver.origin());
         front_end::render_crate_reviews(&mut page, &reviews, &ver, &crates, &state.markup).await?;
         minify_html(&mut page);
+        mark_server_still_alive(&state);
         Ok::<_, failure::Error>((page, 24*3600, false, None))
     }).await?))
 }
@@ -659,6 +680,7 @@ fn render_crate_page(state: AServerState, origin: Origin) -> impl Future<Output 
         let mut page: Vec<u8> = Vec::with_capacity(32000);
         let last_mod = front_end::render_crate_page(&mut page, &all, &ver, &crates, &state.markup).await?;
         minify_html(&mut page);
+        mark_server_still_alive(&state);
         Ok::<_, failure::Error>((page, last_mod))
     })
 }
@@ -671,6 +693,7 @@ async fn render_crate_reverse_dependencies(state: AServerState, origin: Origin) 
         let mut page: Vec<u8> = Vec::with_capacity(32000);
         front_end::render_crate_reverse_dependencies(&mut page, &ver, &crates, &state.markup).await?;
         minify_html(&mut page);
+        mark_server_still_alive(&state);
         Ok::<_, failure::Error>((page, 24*3600, false, None))
     }).await
 }

@@ -1,3 +1,4 @@
+use tokio::runtime::Handle;
 use actix_web::body::Body;
 use actix_web::dev::Url;
 use actix_web::http::header::HeaderValue;
@@ -30,7 +31,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{Duration, Instant, SystemTime};
-use tokio::runtime::Runtime;
 use urlencoding::decode;
 use urlencoding::encode;
 
@@ -47,7 +47,7 @@ struct ServerState {
     crates: ArcSwap<KitchenSink>,
     page_cache_dir: PathBuf,
     data_dir: PathBuf,
-    rt: Runtime,
+    rt: Handle,
     background_job: tokio::sync::Semaphore,
     foreground_job: tokio::sync::Semaphore,
     start_time: Instant,
@@ -58,7 +58,19 @@ type AServerState = web::Data<ServerState>;
 
 fn main() {
     let mut sys = actix_rt::System::new("actix-server");
-    let res = sys.block_on(run_server());
+
+    let rt = tokio::runtime::Builder::new()
+        .threaded_scheduler()
+        .enable_all()
+        .core_threads(2)
+        .max_threads(8)
+        .thread_name("server-bg")
+        .build()
+        .unwrap();
+
+    let res = sys.block_on(run_server(rt.handle().clone()));
+
+    rt.shutdown_timeout(Duration::from_secs(1));
 
     if let Err(e) = res {
         for c in e.iter_chain() {
@@ -68,7 +80,7 @@ fn main() {
     }
 }
 
-async fn run_server() -> Result<(), failure::Error> {
+async fn run_server(rt: Handle) -> Result<(), failure::Error> {
     unsafe {
         signal_hook::register(signal_hook::SIGHUP, || HUP_SIGNAL.store(1, Ordering::SeqCst))
     }?;
@@ -89,14 +101,6 @@ async fn run_server() -> Result<(), failure::Error> {
     assert!(public_document_root.exists(), "DOCUMENT_ROOT {} does not exist", public_document_root.display());
     assert!(data_dir.exists(), "CRATE_DATA_DIR {} does not exist", data_dir.display());
 
-    let rt = tokio::runtime::Builder::new()
-        .threaded_scheduler()
-        .enable_all()
-        .core_threads(2)
-        .max_threads(8)
-        .thread_name("server-bg")
-        .build()
-        .unwrap();
 
     let crates = rt.spawn({
         let data_dir = data_dir.clone();
@@ -842,7 +846,7 @@ fn run_timeout<R, T: 'static + Send>(secs: u64, fut: R) -> impl Future<Output=Re
     Box::pin(tokio::time::timeout(Duration::from_secs(secs), fut).map(|res| res?))
 }
 
-async fn rt_run_timeout<R, T: 'static + Send>(rt: &Runtime, secs: u64, fut: R) -> Result<T, failure::Error> where R: 'static + Send + Future<Output=Result<T, failure::Error>> {
+async fn rt_run_timeout<R, T: 'static + Send>(rt: &Handle, secs: u64, fut: R) -> Result<T, failure::Error> where R: 'static + Send + Future<Output=Result<T, failure::Error>> {
     rt.spawn(tokio::time::timeout(Duration::from_secs(secs), fut)).await??
 }
 

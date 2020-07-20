@@ -1,6 +1,6 @@
 [package]
 name = "crates-server"
-version = "0.15.0"
+version = "0.15.1"
 authors = ["Kornel <kornel@geekhood.net>"]
 edition = "2018"
 description = "Crates.rs web server"
@@ -16,6 +16,8 @@ assets = [
     ["../data/git_crates.txt", "/var/lib/crates-server/", "644"],
     ["../data/category_overrides.txt", "/var/lib/crates-server/", "644"],
     ["../builder/docker/*", "/var/lib/crates-server/", "755"],
+    ["../style/public/index.css", "/var/www/lib.rs/public/", "644"],
+    ["../style/public/fira/*", "/var/www/lib.rs/public/fira/", "644"],
 ]
 
 [dependencies]

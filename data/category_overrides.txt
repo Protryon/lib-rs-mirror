@@ -121,6 +121,7 @@ casperlabs-engine-test-support: cryptography::cryptocurrencies
 casperlabs-types: cryptography::cryptocurrencies
 cb2: command-line-utilities
 cb2_core: development-tools
+cdchunking: algorithms
 cddl: parser-implementations
 celery-rs-core: asynchronous
 celery: asynchronous
@@ -141,11 +142,14 @@ classreader: parser-implementations, development-tools
 click: development-tools
 cloc: text-processing
 clocksource: date-and-time, os
+cmd_lib: command-line-utilities, rust-patterns
 cmdline_words_parser: parser-implementations, command-line-interface
 coap: network-programming
 codec-impl: cryptography::cryptocurrencies
+codegame: game-development
 codenano: science
 codespan-lsp: encoding
+codespan-reporting : command-line-interface
 codice_fiscale: parser-implementations
 collectd-plugin : os
 collider: science::math, game-development
@@ -222,6 +226,7 @@ diceware: command-line-utilities, authentication
 dicom-core: multimedia::images
 diesel: databases
 differential-geometry: science::math
+dijo: command-line-utilities, date-and-time
 direction: rust-patterns
 dirs-sys : filesystem, os
 dither: multimedia::images
@@ -303,6 +308,7 @@ falcon-raptor: development-tools
 fast-floats: rust-patterns
 fast-socks5: network-programming, web-programming::http-client, web-programming::http-server
 fast_uaparser: parser-implementations
+fastcdc: algorithms
 fastcgi-client: asynchronous, web-programming::http-client
 fastdl: caching
 favy: multimedia::images
@@ -324,6 +330,7 @@ fin_data: value-formatting
 finality-grandpa:cryptography::cryptocurrencies
 finchers-core: web-programming::http-server
 find-files: filesystem
+findomain: command-line-utilities, network-programming
 findomain: network-programming
 findomain: networking
 finite: science::math
@@ -371,6 +378,7 @@ gaviota-sys: game-development
 gcnctrlusb: hardware-support, emulators
 gdnative-video: game-development, multimedia::video
 gdnative_bindings_generator: game-development
+gearhash: algorithms
 geckodriver: development-tools::testing
 generic-core: encoding
 genp: authentication
@@ -463,6 +471,7 @@ image-interlacer: multimedia::images, command-line-utilities
 imdb-index: web-programming
 imdb: web-programming
 impl-codec: cryptography::cryptocurrencies
+indicatif: command-line-interface
 indradb-lib: database-implementations
 indradb: database-implementations
 indy-sys:cryptography::cryptocurrencies
@@ -624,6 +633,7 @@ mermer-rs: text-processing, science
 meson: development-tools::build-tools
 message-meta: parser-implementations, text-processing
 metac: parser-implementations, development-tools
+metal: rendering::graphics-api, os::macos-apis
 metar: parser-implementations
 mindjuice: emulators
 mine_sweeper: games
@@ -704,6 +714,7 @@ notice-core: asynchronous
 notif: gui
 nq: development-tools, command-line-utilities
 ntriple: parser-implementations
+nu-source: command-line-interface
 num_sys: value-formatting
 nuscenes-data: parser-implementations
 nv-xml: parser-implementations
@@ -1047,6 +1058,7 @@ trans-gen-java : development-tools
 trans-gen-ruby : development-tools
 trans-gen-scala : development-tools
 trans-schema : development-tools
+trans: encoding
 transcode: command-line-utilities, multimedia
 transit_model: filesystem
 trashmap: data-structures

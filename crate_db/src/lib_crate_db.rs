@@ -562,9 +562,9 @@ impl CrateDb {
                 s
             }
 
-            Ok(if let Some(child) = repo.repo_name().and_then(|n| paths.get(n).or_else(|| paths.get(unprefix(n)))) {
+            Ok(if let Some(child) = repo.repo_name().and_then(|n| paths.get(n).or_else(|| paths.get(unprefix(n)))).filter(|c| *c != child_name) {
                 Origin::try_from_crates_io_name(child)
-            } else if let Some(child) = repo.owner_name().and_then(|n| paths.get(n).or_else(|| paths.get(unprefix(n)))) {
+            } else if let Some(child) = repo.owner_name().and_then(|n| paths.get(n).or_else(|| paths.get(unprefix(n)))).filter(|c| *c != child_name) {
                 Origin::try_from_crates_io_name(child)
             } else {
                 None

@@ -18,6 +18,10 @@ assets = [
     ["../builder/docker/*", "/var/lib/crates-server/", "755"],
     ["../style/public/index.css", "/var/www/lib.rs/public/", "644"],
     ["../style/public/fira/*", "/var/www/lib.rs/public/fira/", "644"],
+    ["../front_end/public/robots.txt", "/var/www/lib.rs/public/", "644"],
+    ["../front_end/public/*.png", "/var/www/lib.rs/public/", "644"],
+    ["../front_end/public/*.svg", "/var/www/lib.rs/public/", "644"],
+    ["../front_end/public/opensearch.xml", "/var/www/lib.rs/public/", "644"],
 ]
 
 [dependencies]

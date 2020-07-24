@@ -16,3 +16,6 @@ Disallow: /
 
 User-agent: BLEXBot
 Disallow: /
+
+User-agent: MJ12bot
+Disallow: /

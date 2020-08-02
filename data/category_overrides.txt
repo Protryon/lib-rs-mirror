@@ -33,6 +33,7 @@ aocl: command-line-utilities
 approvals: development-tools::testing
 apt-cache: os::unix-apis
 aquaenv: os::macos-apis, command-line-utilities, gui
+archivelib: compression
 arcon: science
 argh: command-line-interface
 arsert_failure: rust-patterns
@@ -101,6 +102,7 @@ buffett-core: web-programming
 c2rust-ast-exporter: value-formatting, encoding
 c2rust-ast-printer : value-formatting
 c2rust-refactor : development-tools
+c2rust-transpile: development-tools
 c3: parser-implementations
 c3p0_pool_pg: databases
 ca-rules : parser-implementations
@@ -121,6 +123,7 @@ casperlabs-engine-test-support: cryptography::cryptocurrencies
 casperlabs-types: cryptography::cryptocurrencies
 cb2: command-line-utilities
 cb2_core: development-tools
+cborg: encoding
 cdchunking: algorithms
 cddl: parser-implementations
 celery-rs-core: asynchronous
@@ -285,6 +288,7 @@ esplugin-ffi : games, parser-implementations
 esplugin: parser-implementations
 etclient-core: cryptography::cryptocurrencies
 euclid: science::math
+euka: cryptography::cryptocurrencies
 eval: parser-implementations
 evcxr_repl: rust-patterns, command-line-utilities
 evolution_rs: science::machine-learning
@@ -739,6 +743,8 @@ orgize: parser-implementations
 osmesa-sys: multimedia, os::unix-apis
 osmgpsmap: science, gui
 ostrich-core: asynchronous
+osvr-sys: multimedia, rendering::graphics-api
+osvr: multimedia, rendering::graphics-api
 othello: games
 outcome: rust-patterns
 outline: text-editors
@@ -1051,6 +1057,8 @@ toast: development-tools
 toks: parser-implementations, web-programming
 trace-time : development-tools::profiling
 trackable: development-tools::debugging
+tracy-client-sys: development-tools::profiling
+tracy-client: development-tools::profiling
 traitcast_core: rust-patterns
 trans-gen-core : development-tools
 trans-gen-go : development-tools
@@ -1139,6 +1147,7 @@ wooting-sdk: hardware-support
 wrapping_coords2d: science::math
 wrc: memory-management
 wstring: rust-patterns
+wy: algorithms
 x86: hardware-support, os
 x86test-types: development-tools::testing
 x86test: development-tools::testing

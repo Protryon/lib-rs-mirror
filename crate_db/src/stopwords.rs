@@ -69,6 +69,7 @@ lazy_static! {
         ("machine-learning", Some(&["math", "statistics"])),
         ("neural-networks", Some(&["math", "statistics", "network"])),
         ("neural", Some(&["network"])),
+        ("fantasy", Some(&["console"])),
         ("learning", Some(&["network"])),
         ("database", Some(&["embedded"])),
         ("robotics", Some(&["localization"])),

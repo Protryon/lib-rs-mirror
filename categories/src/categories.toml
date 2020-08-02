@@ -110,7 +110,7 @@ Applications to run at the command line.\
 """
 short-description = """
 Applications to run at the command line."""
-obvious-keywords = ["cli", "command-line", "command-line-tool", "command-line-utility"]
+obvious-keywords = ["cli", "command-line", "command-line-tool", "tool", "command-line-utility"]
 preference = 0.8
 
 [compression]
@@ -158,14 +158,13 @@ obvious-keywords = ["cryptography", "crypto"]
 preference = 1
 
 [cryptography.categories.cryptocurrencies]
-# fake, like the money
 name = "Cryptocurrencies"
 title = "cryptocurrencies in Rust"
 description = """
 Libraries and tools for digital currencies, and distributed ledgers.\
 """
 short-description = "Coins, blockchains and wallets."
-obvious-keywords = ["cryptography", "crypto", "cryptocurrency"]
+obvious-keywords = ["cryptography", "blockchain", "crypto", "cryptocurrency"]
 preference = 1.2
 
 [database]
@@ -177,7 +176,7 @@ Crates to interface with database management systems.\
 short-description = """
 Interface with database management systems."""
 siblings = ["database-implementations"]
-obvious-keywords = ["database", "db"]
+obvious-keywords = ["database", "db", "storage"]
 preference = 1.1
 
 [database-implementations]
@@ -190,7 +189,7 @@ Store and query large amounts of data in an efficient manner.\
 short-description = """
 Database management systems implemented in Rust."""
 siblings = ["database"]
-obvious-keywords = ["database", "db"]
+obvious-keywords = ["database", "db", "storage"]
 preference = 1
 
 [data-structures]
@@ -208,6 +207,7 @@ preference = 0.9
 [date-and-time]
 name = "Date and time"
 title = "Rust date/time library"
+obvious-keywords = ["date", "time"]
 description = """
 Crates to manage the inherent complexity of dealing with the fourth \
 dimension.\
@@ -247,7 +247,7 @@ Subcommands that extend the capabilities of Cargo.\
 """
 short-description = """
 Subcommands that extend the capabilities of Cargo."""
-obvious-keywords = ["cargo", "cargo-subcommand", "subcommand", "cli", "plugin"]
+obvious-keywords = ["cargo", "cargo-subcommand", "subcommand", "cli", "plugin", "crates"]
 preference = 1.1
 
 [development-tools.categories.debugging]
@@ -315,7 +315,7 @@ Crates to help with Sending, receiving, formatting, and parsing email.\
 """
 short-description = """
 Sending, receiving, formatting, and parsing email."""
-obvious-keywords = ["email"]
+obvious-keywords = ["email", "mail", "e-mail"]
 preference = 1.2
 
 [embedded]
@@ -378,7 +378,7 @@ Crates for dealing with files and filesystems.\
 """
 short-description = """
 Crates for dealing with files and filesystems."""
-obvious-keywords = ["filesystem", "file", "fs"]
+obvious-keywords = ["filesystem", "file", "fs", "directory"]
 preference = 1.1
 
 [game-development]
@@ -406,6 +406,14 @@ Fun and entertainment. Games implemented in the Rust programming language."""
 obvious-keywords = ["game", "games", "play"]
 preference = 1
 
+# lots of dupes with graphics-api category
+# [graphics]
+# name = "Graphics"
+# description = """
+# Crates for graphics libraries and applications, including raster and vector \
+# graphics primitives such as geometry, curves, and color.\
+# """
+
 [gui]
 name = "GUI"
 title = "Rust GUI library"
@@ -414,7 +422,7 @@ Crates to help you create a graphical user interface.\
 """
 short-description = """
 Create a graphical user interface."""
-obvious-keywords = ["gui", "ui", "interface"]
+obvious-keywords = ["gui", "ui", "user-interface", "interface"]
 preference = 1.1
 
 [hardware-support]
@@ -485,7 +493,7 @@ Crates that record, output, or process audio.
 short-description = """
 Record, output, or process audio.
 """
-obvious-keywords = ["audio", "media"]
+obvious-keywords = ["audio", "sound", "media"]
 preference = 1.2
 
 [multimedia.categories.video]
@@ -565,6 +573,7 @@ preference = 1
 [os.categories.macos-apis]
 name = "macOS APIs"
 title = "Rust API for macOS"
+obvious-keywords = ["macos", "apple", "mac", "osx"]
 description = """
 Bindings to macOS-specific APIs.\
 """
@@ -580,7 +589,7 @@ Bindings to Unix-specific APIs.\
 """
 short-description = """
 Bindings to Unix-specific APIs."""
-obvious-keywords = ["unix", "system"]
+obvious-keywords = ["unix", "system", "linux"]
 preference = 1.1
 
 [os.categories.windows-apis]
@@ -638,7 +647,7 @@ High-level solutions for rendering on the screen.\
 """
 short-description = """
 High-level solutions for rendering on the screen."""
-obvious-keywords = ["engine", "engines", "rendering"]
+obvious-keywords = ["engine", "engines", "rendering", "renderer"]
 preference = 0.9
 
 [rendering.categories.graphics-api]
@@ -650,7 +659,7 @@ system's rendering capabilities.\
 """
 short-description = """
 Direct access to the hardware's or the operating system's rendering capabilities."""
-obvious-keywords = ["graphics", "api"]
+obvious-keywords = ["graphics", "api", "rendering"]
 preference = 1
 
 [rendering.categories.data-formats]
@@ -663,6 +672,7 @@ Loading and parsing of data formats related to 2D or 3D rendering, like \
 """
 short-description = """
 Loading and parsing of data for 2D/3D rendering, like 3D models or animations."""
+obvious-keywords = ["formats", "format"]
 preference = 1
 
 [rust-patterns]
@@ -688,9 +698,17 @@ biology, machine learning, geoscience, and other scientific fields.\
 short-description = """
 Solving problems involving math, physics, and other scientific fields."""
 preference = 1
+obvious-keywords = ["science"]
+
+[science.categories.robotics]
+name = "Robotics"
+description = """
+Crates related to robotics.\
+"""
+preference = 0.2
 
 [science.categories.math]
-# fake
+# crates-io has it as mathematics at the top level
 name = "Math"
 title = "Rust math library"
 description = """
@@ -698,7 +716,7 @@ Crates related to solving mathematical problems.\
 """
 short-description = """
 Solving problems involving math and logic."""
-obvious-keywords = ["math", "mathematics", "science"]
+obvious-keywords = ["math", "maths", "mathematics", "science"]
 preference = 1.1
 
 [science.categories.ml]
@@ -732,7 +750,7 @@ documents, usually with an emphasis on processing text.\
 """
 short-description = """
 Combine templates with data to produce documents, usually with an emphasis on processing text."""
-obvious-keywords = ["template", "templating"]
+obvious-keywords = ["template", "templating", "language"]
 preference = 1.1
 
 [text-editors]
@@ -743,7 +761,7 @@ Applications for editing text.\
 """
 short-description = """
 Applications for editing text."""
-obvious-keywords = ["text", "editor"]
+obvious-keywords = ["text", "editor", "text-editor"]
 preference = 1
 
 [text-processing]
@@ -835,7 +853,7 @@ Crates to communicate over the WebSocket protocol.\
 """
 short-description = """
 Communicate over the WebSocket protocol."""
-obvious-keywords = ["websocket", "websockets", "web"]
+obvious-keywords = ["websocket", "websockets", "ws", "web"]
 preference = 1.2
 
 # [uncategorized]

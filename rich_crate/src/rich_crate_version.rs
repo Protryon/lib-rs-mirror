@@ -6,11 +6,9 @@ use cargo_toml::{Dependency, Manifest, Package};
 pub use cargo_toml::{DepsSet, Edition, FeatureSet, MaintenanceStatus, TargetDepsSet};
 use categories::Categories;
 use repo_url::Repo;
-use semver;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::collections::HashSet;
-use udedokei;
 
 pub use parse_cfg::ParseError as CfgErr;
 pub use parse_cfg::{Cfg, Target};
@@ -95,11 +93,11 @@ impl RichCrateVersion {
     }
 
     pub fn license(&self) -> Option<&str> {
-        self.package().license.as_ref().map(|s| s.as_str())
+        self.package().license.as_deref()
     }
 
     pub fn license_name(&self) -> Option<&str> {
-        self.package().license.as_ref().map(|s| match s.as_str() {
+        self.package().license.as_deref().map(|s| match s {
             "" => "(unspecified)",
             "MIT OR Apache-2.0" | "MIT/Apache-2.0" | "MIT / Apache-2.0" => "MIT/Apache",
             "Apache-2.0/ISC/MIT" => "MIT/Apache/ISC",
@@ -110,7 +108,7 @@ impl RichCrateVersion {
     }
 
     pub fn license_file(&self) -> Option<&str> {
-        self.package().license_file.as_ref().map(|s| s.as_str())
+        self.package().license_file.as_deref()
     }
 
     /// Either original keywords or guessed ones
@@ -137,8 +135,8 @@ impl RichCrateVersion {
 
     /// Without trailing '.' to match website's style
     pub fn description(&self) -> Option<&str> {
-        self.package().description.as_ref().map(|d| {
-            let d = d.as_str().trim();
+        self.package().description.as_deref().map(|d| {
+            let d = d.trim();
             if d.contains(". ") {d} // multiple sentences, leave them alone
             else {d.trim_end_matches('.')}
         })
@@ -156,7 +154,7 @@ impl RichCrateVersion {
 
     pub fn repository_http_url(&self) -> Option<(&Repo, Cow<'_, str>)> {
         self.repository().map(|repo| {
-            let relpath = self.derived.path_in_repo.as_ref().map(|s| s.as_str()).unwrap_or("");
+            let relpath = self.derived.path_in_repo.as_deref().unwrap_or("");
             (repo, repo.canonical_http_url(relpath))
         })
     }
@@ -171,7 +169,7 @@ impl RichCrateVersion {
 
     /// Contents of the `src/lib.rs` from the crate, if available
     pub fn lib_file(&self) -> Option<&str> {
-        self.derived.lib_file.as_ref().map(|s| s.as_str())
+        self.derived.lib_file.as_deref()
     }
 
     pub fn lib_file_markdown(&self) -> Option<Markup> {
@@ -237,8 +235,7 @@ impl RichCrateVersion {
 
     pub fn lib_name(&self) -> &str {
         self.manifest.lib.as_ref()
-            .and_then(|l| l.name.as_ref())
-            .map(|n| n.as_str())
+            .and_then(|l| l.name.as_deref())
             .unwrap_or_else(|| self.short_name())
     }
 
@@ -252,7 +249,7 @@ impl RichCrateVersion {
 
     pub fn bin_names(&self) -> Vec<&str> {
         self.manifest.bin.iter().map(|bin| {
-            bin.name.as_ref().map(|n| n.as_str()).unwrap_or_else(|| self.short_name())
+            bin.name.as_deref().unwrap_or_else(|| self.short_name())
         }).collect()
     }
 
@@ -336,7 +333,7 @@ impl ManifestExt for Manifest {
     }
 
     fn links(&self) -> Option<&str> {
-        self.package().links.as_ref().map(|s| s.as_str())
+        self.package().links.as_deref()
     }
 
     fn is_sys(&self, has_buildrs: bool) -> bool {

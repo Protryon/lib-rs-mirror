@@ -5,7 +5,6 @@ use crate::DepsErr;
 use crate::git_crates_index::*;
 use crates_index::Crate;
 use crates_index::Dependency;
-use crates_index;
 use double_checked_cell_async::DoubleCheckedCell;
 use parking_lot::Mutex;
 use parking_lot::RwLock;
@@ -169,9 +168,11 @@ impl Index {
 
     pub async fn update(&self) {
         let path = self.crates_index_path.to_owned();
-        let _ = tokio::task::spawn_blocking(move || {
-            let _ = crates_index::Index::new(path).update().map_err(|e| eprintln!("{}", e));
-        }).await;
+        tokio::task::spawn_blocking(move || {
+            eprintln!("Updating crates index");
+            let _ = crates_index::Index::new(&path).update().map_err(|e| eprintln!("crates index update error: {} at {}", e, path.display()));
+            eprintln!("Done updating crates index");
+        }).await.expect("spawn fail");
     }
 
     /// Crates available in the crates.io index

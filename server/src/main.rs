@@ -12,15 +12,12 @@ use categories::CATEGORIES;
 use categories::Category;
 use chrono::prelude::*;
 use crate::writer::*;
-use env_logger;
 use failure::ResultExt;
-use front_end;
 use futures::future::Future;
 use futures::future::FutureExt;
 use kitchen_sink::filter::ImageOptimAPIFilter;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::Origin;
-use kitchen_sink;
 use locale::Numeric;
 use render_readme::{Highlighter, Markup, Renderer};
 use repo_url::SimpleRepo;
@@ -347,7 +344,7 @@ async fn default_handler(req: HttpRequest) -> Result<HttpResponse, ServerError> 
 
 fn render_404_page(state: &AServerState, path: &str, item_name: &str) -> Result<HttpResponse, ServerError> {
     let decoded = decode(path).ok();
-    let rawtext = decoded.as_ref().map(|d| d.as_str()).unwrap_or(path);
+    let rawtext = decoded.as_deref().unwrap_or(path);
 
     let query = rawtext.chars().map(|c| if c.is_alphanumeric() { c } else { ' ' }).take(100).collect::<String>();
     let query = query.trim();
@@ -811,13 +808,13 @@ async fn handle_sitemap(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let _ = state.rt.spawn({
         let state = state.clone();
         async move {
-        let mut w = std::io::BufWriter::with_capacity(16000, w);
-        let crates = state.crates.load();
-        if let Err(e) = front_end::render_sitemap(&mut w, &crates).await {
-            if let Ok(mut w) = w.into_inner() {
-                w.fail(e.into());
+            let mut w = std::io::BufWriter::with_capacity(16000, w);
+            let crates = state.crates.load();
+            if let Err(e) = front_end::render_sitemap(&mut w, &crates).await {
+                if let Ok(mut w) = w.into_inner() {
+                    w.fail(e);
+                }
             }
-        }
         }
     });
 

@@ -1,6 +1,4 @@
-use failure;
 use rusqlite::types::ToSql;
-
 use github_info::User;
 use github_info::UserType;
 use parking_lot::Mutex;

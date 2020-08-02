@@ -1,5 +1,4 @@
 use crate::KitchenSinkErr;
-use ctrlc;
 use std::process;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Once;

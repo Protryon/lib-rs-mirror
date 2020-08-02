@@ -1,4 +1,3 @@
-use categories;
 use chrono::prelude::*;
 use failure::*;
 use heck::KebabCase;

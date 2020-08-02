@@ -217,7 +217,7 @@ fn flatten(dep: &Dep, depinf: DepInf, collected: &mut FxHashMap<Sym, (DepInf, Mi
 
 fn flatten_set(depset: &ArcDepSet, depinf: DepInf, collected: &mut FxHashMap<Sym, (DepInf, MiniVer)>, visitor: &mut DepVisitor) {
     visitor.visit(depset, depinf, |vis, (name, _), dep| {
-        collected.entry(name.clone())
+        collected.entry(*name)
             .and_modify(|(old, semver)| {
                 if depinf.default {old.default = true;}
                 if depinf.direct {

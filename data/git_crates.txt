@@ -44,6 +44,7 @@ github:changlan/kytan/kytan
 github:citybound/citybound/citybound
 github:cjbassi/ytop/package-publisher
 github:cjbassi/ytop/ytop
+github:cormac-obrien/richter/richter
 github:cristicbz/rust-doom/rs_doom
 github:dabreegster/abstreet/ezgui
 github:dabreegster/abstreet/map_editor
@@ -97,6 +98,8 @@ github:garkimasera/rusted-ruins/rusted-ruins
 github:gekkio/mooneye-gb/mooneye-gb
 github:getzola/zola/zola
 github:google/rust-shell/shell
+github:graphprotocol/graph-node/graph-graphql
+github:graphprotocol/graph-node/graph-store-postgres
 github:greshake/i3status-rust/i3status-rs
 github:guywaldman/ravro/ravro
 github:habitat-sh/habitat/hab
@@ -214,6 +217,8 @@ github:mozilla/neqo/neqo-interop
 github:mozilla/neqo/neqo-qpack
 github:mozilla/neqo/neqo-server
 github:mozilla/neqo/neqo-transport
+github:mullvad/mullvadvpn-app/mullvad-cli
+github:mullvad/mullvadvpn-app/talpid-core
 github:mvdnes/rboy/rboy
 github:myfreeweb/freepass/freepass-cli
 github:nasso/screensnap/screensnap

@@ -1375,7 +1375,7 @@ impl KitchenSink {
         let user = self.gh.user_by_login(&user.login).await?.ok_or_else(|| KitchenSinkErr::AuthorNotFound(user.login.clone()))?;
         if !self.user_db.email_has_github(&commit.email)? {
             println!("{} => {}", commit.email, user.login);
-            self.user_db.index_user(&user, Some(&commit.email), commit.name.as_ref().map(|s| s.as_str()))?;
+            self.user_db.index_user(&user, Some(&commit.email), commit.name.as_deref())?;
         }
         Ok(())
     }
@@ -1385,7 +1385,7 @@ impl KitchenSink {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
         if !self.user_db.email_has_github(&commit.email)? {
             println!("{} => {}", commit.email, user.login);
-            self.user_db.index_user(&user, Some(&commit.email), commit.name.as_ref().map(|s| s.as_str()))?;
+            self.user_db.index_user(&user, Some(&commit.email), commit.name.as_deref())?;
         }
         Ok(())
     }

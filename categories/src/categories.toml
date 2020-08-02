@@ -702,9 +702,11 @@ obvious-keywords = ["science"]
 
 [science.categories.robotics]
 name = "Robotics"
+title = "Robotics"
+short-description = "Crates related to robotics"
+siblings = ["embedded"]
 description = """
-Crates related to robotics.\
-"""
+Crates related to robotics. Build firmware for robots, drones and autonomous machines."""
 preference = 0.2
 
 [science.categories.math]

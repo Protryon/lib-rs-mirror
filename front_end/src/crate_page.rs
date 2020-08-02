@@ -995,9 +995,9 @@ impl ReleaseCounts {
     }
 }
 
-fn is_permissive_license(l: &str) -> bool {
+fn is_not_viral(l: &str) -> bool {
     l.starts_with("MIT") || l.starts_with("Apache") || l.starts_with("BSD") || l.starts_with("Zlib") ||
-    l.starts_with("IJG") || l.starts_with("CC0") || l.starts_with("ISC") || l.starts_with("FTL")
+    l.starts_with("IJG") || l.starts_with("CC0") || l.starts_with("ISC") || l.starts_with("FTL") || l.starts_with("MPL")
 }
 
 // FIXME: this is very lousy parsing, but crates-io allows non-SPDX syntax, so I can't use a proper SPDX parser.
@@ -1006,7 +1006,7 @@ fn virality_score(license: &str) -> u8 {
         l.split('/').flat_map(|l| l.split("OR"))
         .filter_map(|l| {
             let l = l.trim_start();
-            if is_permissive_license(l) {
+            if is_not_viral(l) {
                 Some(0)
             } else if l.starts_with("AGPL") {
                 Some(6)
@@ -1016,7 +1016,7 @@ fn virality_score(license: &str) -> u8 {
                 Some(4)
             } else if l.starts_with("LGPL") {
                 Some(2)
-            } else if l.starts_with("GFDL") || l.starts_with("MPL") {
+            } else if l.starts_with("GFDL") {
                 Some(1)
             } else {
                 None
@@ -1031,12 +1031,12 @@ fn test_vir() {
     assert_eq!(0, virality_score("FTL / GPL-2.0"));
     assert_eq!(0, virality_score("AGPL OR MIT"));
     assert_eq!(0, virality_score("MIT/Apache/LGPL"));
-    assert_eq!(1, virality_score("MPL/LGPL"));
+    assert_eq!(0, virality_score("MPL/LGPL"));
     assert_eq!(2, virality_score("Apache/MIT AND LGPL"));
     assert_eq!(Ordering::Greater, compare_virality("LGPL", Some("MIT")));
     assert_eq!(Ordering::Greater, compare_virality("AGPL", Some("LGPL")));
     assert_eq!(Ordering::Equal, compare_virality("GPL-3.0", Some("GPL-2.0")));
-    assert_eq!(Ordering::Less, compare_virality("CC0-1.0 OR GPL", Some("MPL-2.0")));
+    assert_eq!(Ordering::Less, compare_virality("CC0-1.0 OR GPL", Some("LGPL-2.0+")));
 }
 
 fn compare_virality(license: &str, other_license: Option<&str>) -> Ordering {

@@ -67,6 +67,7 @@ beacon: cryptography::cryptocurrencies
 begonia: command-line-interface
 belay: development-tools
 bfc: emulators
+bigbed: parser-implementations
 bigbro: os, filesystem
 billecta: web-programming
 binaryen-sys: wasm
@@ -131,6 +132,7 @@ celery: asynchronous
 cfn: web-programming
 cgl: rendering::graphics-api, os::macos-apis
 ch8asm: emulators, development-tools
+changelog: development-tools
 chariot_slp: games, parser-implementations
 checkm: science, parser-implementations
 chi:development-tools
@@ -218,6 +220,7 @@ deno_core: web-programming, development-tools
 deno_lib_bindings: development-tools::ffi
 deno_typescript: web-programming, development-tools
 deoxy-core: data-structures
+dependent_ghost: rust-patterns
 deribit: web-programming
 derp: parser-implementations
 derpy: development-tools
@@ -416,6 +419,7 @@ gptman: command-line-utilities, filesystem
 gpx: parser-implementations, science
 graftpress_core: web-programming
 grammarly: web-programming
+grammers-client: web-programming
 graphcore: data-structures
 graviton_core: development-tools
 greenie-proc : development-tools, rust-patterns
@@ -651,6 +655,7 @@ mlc: command-line-utilities, text-processing
 mnemonic: command-line-utilities, authentication
 mobi: parser-implementations
 mockery: development-tools::testing
+mod_exp: cryptography
 modbot: web-programming
 modbus-core: network-programming
 moltenvk_deps: os::macos-apis, rendering::graphics-api

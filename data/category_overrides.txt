@@ -100,6 +100,7 @@ bspline: rendering
 btc_spv_bin:cryptography::cryptocurrencies
 buffered-reader: rust-patterns
 buffett-core: web-programming
+build-info: development-tools::build-tools
 c2rust-ast-exporter: value-formatting, encoding
 c2rust-ast-printer : value-formatting
 c2rust-refactor : development-tools
@@ -133,6 +134,7 @@ cfn: web-programming
 cgl: rendering::graphics-api, os::macos-apis
 ch8asm: emulators, development-tools
 changelog: development-tools
+chanvese: algorithms
 chariot_slp: games, parser-implementations
 checkm: science, parser-implementations
 chi:development-tools
@@ -264,6 +266,7 @@ easy_adds: rust-patterns
 easyunits: rust-patterns
 eclectica: development-tools
 eetf: encoding
+eff-wordlist: authentication
 egaku2d_core: rendering::graphics-api, game-development
 egg-mode : web-programming
 elefren: web-programming
@@ -324,6 +327,8 @@ fddf: command-line-utilities, filesystem
 fdfast: filesystem
 fec: encoding
 fedora-prime: os::unix-apis, command-line-utilities
+ferrum-plugin : rust-patterns
+ferrum: web-programming::http-server
 festive: development-tools::testing
 ff: algorithms
 ffcli: command-line-utilities, multimedia
@@ -412,6 +417,7 @@ glx: rendering::graphics-api, os::unix-apis
 goban: parser-implementations, games
 goblin: parser-implementations
 godot_rust_helper: game-development, command-line-utilities
+goertzel-filter: algorithms
 google_geocoding: science, web-programming
 gosh-core: science
 gpt: filesystem
@@ -444,6 +450,8 @@ hdlc: network-programming
 hdwallet-bitcoin: cryptography::cryptocurrencies
 heliometer: emulators
 hexe_core: game-development
+hexf-impl : value-formatting
+hexf: value-formatting
 holochain:cryptography::cryptocurrencies
 holochain_common:cryptography::cryptocurrencies
 holochain_conductor_lib:cryptography::cryptocurrencies
@@ -565,6 +573,7 @@ libass: web-programming
 libblas-sys: science::math
 libc-interface : os
 libdoh: network-programming, asynchronous
+libgit2-sys : development-tools
 libinput-sys: os
 libipld-core : network-programming
 liblapack-sys: science::math
@@ -643,6 +652,7 @@ message-meta: parser-implementations, text-processing
 metac: parser-implementations, development-tools
 metal: rendering::graphics-api, os::macos-apis
 metar: parser-implementations
+mfkart: multimedia
 mindjuice: emulators
 mine_sweeper: games
 minidump-processor:development-tools::debugging
@@ -664,6 +674,7 @@ monger: databases
 monotron-api : embedded
 moonlander-gp: science::machine-learning
 mothra: command-line-utilities
+mozdevice: development-tools
 mozjs_sys : web-programming
 mp3-duration-sum: command-line-utilities, multimedia::audio
 mqtt-codec: network-programming
@@ -737,6 +748,7 @@ okapi: web-programming
 olekit: parser-implementations
 onig_sys: text-processing
 ontio-bump-alloc: cryptography::cryptocurrencies
+opencv: multimedia::images
 opener: os
 openhmd-rs-sys: multimedia, rendering::graphics-api
 openldap: network-programming
@@ -878,6 +890,7 @@ rfind_url: parser-implementations
 rg3d-core: rendering::graphics-api, game-development
 rgraph: concurrency
 rhq-core: development-tools
+richter: games
 ritual_build: development-tools, command-line-utilities
 ritual_common: development-tools::ffi
 riven: games
@@ -923,6 +936,7 @@ rust_admob_ssv: networking, parser-implementations
 rust_fixed_width: data-structures
 rusta: games, parser-implementations
 rustasm6502: emulators
+rustboot: os
 rustfilt: development-tools, parser-implementations
 rustils: rust-patterns
 rustler_sys: development-tools::ffi
@@ -963,6 +977,7 @@ shippai:rust-patterns
 shlex : value-formatting, command-line-interface
 shuteye: os, date-and-time
 sic_core: multimedia::images
+sidekiq-rs : asynchronous
 sigv4: command-line-utilities, web-programming
 simple-ssl-acme-cloudflare: cryptography, command-line-utilities
 simple_json: parser-implementations
@@ -1129,6 +1144,7 @@ vhdl_lang: development-tools
 victoria-dom: parser-implementations, web-programming
 videocore: hardware-support, multimedia::video
 vkgen: rendering::graphics-api, command-line-utilities
+vmread-sys : os::windows-apis
 vsphere-api: web-programming
 w_result: rust-patterns
 wagyu: cryptography::cryptocurrencies

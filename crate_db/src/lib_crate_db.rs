@@ -630,22 +630,29 @@ impl CrateDb {
         }).await
     }
 
-    pub async fn index_crate_owners(&self, origin: &Origin, owners: &[CrateOwner]) -> FResult<bool> {
+    /// Replaces entire author_crates table
+    pub async fn index_crate_all_owners(&self, all_owners: &[(Origin, Vec<CrateOwner>)]) -> FResult<bool> {
         self.with_write("index_crate_owners", |tx| {
             let mut get_crate_id = tx.prepare_cached("SELECT id FROM crates WHERE origin = ?1")?;
-            let mut insert = tx.prepare_cached("INSERT OR IGNORE INTO author_crates(github_id, crate_id, invited_by_github_id, invited_at) VALUES(?1, ?2, ?3, ?4)")?;
-            let crate_id: u32 = match get_crate_id.query_row(&[&origin.to_str()], |row| row.get(0)) {
-                Ok(id) => id,
-                Err(_) => return Ok(false),
-            };
-            for o in owners {
-                if let Some(github_id) = o.github_id {
-                    let invited_by_github_id = match o.invited_by_github_id {
-                        Some(id) if id != github_id => Some(id),
-                        _ => None,
-                    };
-                    let args: &[&dyn ToSql] = &[&github_id, &crate_id, &invited_by_github_id, &o.invited_at];
-                    insert.execute(args)?;
+            let mut insert = tx.prepare_cached("INSERT INTO author_crates(github_id, crate_id, invited_by_github_id, invited_at) VALUES(?1, ?2, ?3, ?4)")?;
+            let mut wipe = tx.prepare_cached("DELETE FROM author_crates")?;
+            wipe.execute(NO_PARAMS)?;
+
+            for (origin, owners) in all_owners {
+                let crate_id: u32 = match get_crate_id.query_row(&[&origin.to_str()], |row| row.get(0)) {
+                    Ok(id) => id,
+                    Err(rusqlite::Error::QueryReturnedNoRows) => continue,
+                    Err(e) => Err(e)?,
+                };
+                for o in owners {
+                    if let Some(github_id) = o.github_id {
+                        let invited_by_github_id = match o.invited_by_github_id {
+                            Some(id) if id != github_id => Some(id),
+                            _ => None,
+                        };
+                        let args: &[&dyn ToSql] = &[&github_id, &crate_id, &invited_by_github_id, &o.invited_at];
+                        insert.execute(args)?;
+                    }
                 }
             }
             Ok(true)

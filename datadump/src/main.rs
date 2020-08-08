@@ -2,6 +2,7 @@
 #![allow(dead_code)]
 use std::collections::HashSet;
 use chrono::prelude::*;
+use rayon::prelude::*;
 use kitchen_sink::CrateOwner;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::Origin;
@@ -114,7 +115,7 @@ async fn main() -> Result<(), BoxErr> {
 
                     if let (Some(crates), Some(versions)) = (&crates, &versions) {
                         if let Some(downloads) = downloads.take() {
-                            eprintln!("Indexing {} crates, {} versions, {} downloads", crates.len(), versions.len(), downloads.len());
+                            eprintln!("Indexing {} crates, {} downloads", versions.len(), downloads.len());
                             index_downloads(crates, versions, &downloads, &ksink)?;
                         }
                     }
@@ -123,9 +124,10 @@ async fn main() -> Result<(), BoxErr> {
 
             if let (Some(crates), Some(teams), Some(users)) = (crates, teams, users) {
                 if let Some(crate_owners) = crate_owners.take() {
-                    eprintln!("Indexing owners of {} crates", crate_owners.len());
                     handle.spawn(async move {
-                        index_owners(&crates, crate_owners, &teams, &users, &ksink).await.unwrap();
+                        eprintln!("Indexing owners of {} crates", crate_owners.len());
+                        let owners = process_owners(&crates, crate_owners, &teams, &users);
+                        ksink.index_crates_io_crate_all_owners(owners).await.unwrap();
                     });
                 }
             }
@@ -245,55 +247,69 @@ fn index_dependencies(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDe
     Ok(())
 }
 
-#[inline(never)]
-async fn index_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users: &Users, ksink: &KitchenSink) -> Result<(), BoxErr> {
-    for (crate_id, owners) in owners {
-        if let Some(k) = crates.get(&crate_id) {
-            let owners: Vec<_> = owners
-                .into_iter()
-                .filter_map(|o| {
-                    let invited_at = o.created_at.splitn(2, '.').next().unwrap().to_string(); // trim millis part
-                    let invited_by_github_id =
-                        o.created_by_id.and_then(|id| users.get(&id).map(|u| u.github_id as u32).or_else(|| teams.get(&id).map(|t| t.github_id)));
-                    Some(match o.owner_kind {
-                        0 => {
-                            let u = users.get(&o.owner_id).expect("owner consistency");
-                            if u.github_id <= 0 {
-                                return None;
-                            }
-                            CrateOwner {
-                                login: u.login.to_owned(),
-                                invited_at: Some(invited_at),
-                                invited_by_github_id,
-                                github_id: u.github_id.try_into().ok(),
-                                name: Some(u.name.to_owned()),
-                                avatar: None,
-                                url: None,
-                                kind: OwnerKind::User,
-                            }
-                        },
-                        1 => {
-                            let u = teams.get(&o.owner_id).expect("owner consistency");
-                            CrateOwner {
-                                login: u.login.to_owned(),
-                                invited_at: Some(invited_at),
-                                github_id: Some(u.github_id),
-                                invited_by_github_id,
-                                name: Some(u.name.to_owned()),
-                                avatar: None,
-                                url: None,
-                                kind: OwnerKind::Team,
-                            }
-                        },
-                        _ => panic!("bad owner type"),
-                    })
-                })
-                .collect();
-            let origin = Origin::from_crates_io_name(k);
-            ksink.index_crates_io_crate_owners(&origin, owners).await?;
+fn process_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users: &Users) -> Vec<(Origin, Vec<CrateOwner>)> {
+    owners.into_par_iter()
+    .filter_map(move |(crate_id, owners)| {
+        crates.get(&crate_id).map(|k| (crate_id, owners, Origin::from_crates_io_name(k)))
+    })
+    .map(move |(crate_id, owners, origin)| {
+        let mut owners: Vec<_> = owners
+            .into_iter()
+            .filter_map(|o| {
+                let invited_at = o.created_at.splitn(2, '.').next().unwrap().to_string(); // trim millis part
+                let invited_by_github_id =
+                    o.created_by_id.and_then(|id| users.get(&id).map(|u| u.github_id as u32).or_else(|| teams.get(&id).map(|t| t.github_id)));
+                let mut o = match o.owner_kind {
+                    0 => {
+                        let u = users.get(&o.owner_id).expect("owner consistency");
+                        if u.github_id <= 0 {
+                            return None;
+                        }
+                        CrateOwner {
+                            login: u.login.to_owned(),
+                            invited_at: Some(invited_at),
+                            invited_by_github_id,
+                            github_id: u.github_id.try_into().ok(),
+                            name: Some(u.name.to_owned()),
+                            avatar: None,
+                            url: None,
+                            kind: OwnerKind::User,
+                        }
+                    },
+                    1 => {
+                        let u = teams.get(&o.owner_id).expect("owner consistency");
+                        CrateOwner {
+                            login: u.login.to_owned(),
+                            invited_at: Some(invited_at),
+                            github_id: Some(u.github_id),
+                            invited_by_github_id,
+                            name: Some(u.name.to_owned()),
+                            avatar: None,
+                            url: None,
+                            kind: OwnerKind::Team,
+                        }
+                    },
+                    _ => panic!("bad owner type"),
+                };
+                if o.github_id == o.invited_by_github_id {
+                    o.invited_by_github_id = None;
+                }
+                Some(o)
+            })
+            .collect();
+
+        owners.sort_by(|a,b| a.invited_at.cmp(&b.invited_at));
+
+        // crates.io has some data missing in old crates
+        if let Some((first_owner, rest)) = owners.split_first_mut() {
+            for other in rest {
+                if other.invited_by_github_id.is_none() {
+                    other.invited_by_github_id = first_owner.invited_by_github_id.or(first_owner.github_id);
+                }
+            }
         }
-    }
-    Ok(())
+        (origin, owners)
+    }).collect()
 }
 
 #[derive(Deserialize)]

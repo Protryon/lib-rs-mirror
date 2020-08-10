@@ -61,6 +61,8 @@ lazy_static! {
         ("sliding", Some(&["window", "windows"])),
         ("web", Some(&["windows", "macos", "mac", "osx", "linux"])),
         ("macos", Some(&["core"])),
+        ("osx", Some(&["core"])),
+        ("mac", Some(&["core"])),
         ("module", Some(&["core"])),
         ("wasm", Some(&["embedded", "javascript", "no-std", "no_std", "feature:no_std", "deploy"])),
         ("javascript", Some(&["embedded", "no-std", "no_std", "feature:no_std"])),

@@ -47,6 +47,7 @@ ass-rs: web-programming
 assembly-core: development-tools
 ast_node: parser-implementations
 async-codec: asynchronous
+atelier_core: web-programming
 atomicring: concurrency, data-structures
 atomsh: command-line-utilities
 audit-filter : development-tools::testing
@@ -248,6 +249,8 @@ doryen-fov: game-development
 doublepivot-quicksort: algorithms
 doubter: development-tools::testing
 draw: multimedia::images
+dsf-core : network-programming
+dsf-rpc : network-programming
 duct: development-tools, command-line-utilities
 duct_sh: command-line-interface
 dull: command-line-utilities, command-line-interface
@@ -297,6 +300,7 @@ euclid: science::math
 euka: cryptography::cryptocurrencies
 eval: parser-implementations
 evcxr_repl: rust-patterns, command-line-utilities
+eventually-core : databases
 evolution_rs: science::machine-learning
 ewasm_api: wasm
 exitfailure: command-line-interface, rust-patterns
@@ -449,6 +453,7 @@ hdf5: data-structures
 hdlc: network-programming
 hdwallet-bitcoin: cryptography::cryptocurrencies
 heliometer: emulators
+hesoyam_core: databases
 hexe_core: game-development
 hexf-impl : value-formatting
 hexf: value-formatting
@@ -672,6 +677,7 @@ moltenvk_deps: os::macos-apis, rendering::graphics-api
 monger-core : databases
 monger: databases
 monotron-api : embedded
+monstermaker_core: game-development
 moonlander-gp: science::machine-learning
 mothra: command-line-utilities
 mozdevice: development-tools
@@ -744,6 +750,7 @@ nyaasi-scraper : parser-implementations
 nzsc2p: games
 nzsc_core: game-development
 objc-encode: os::macos-apis, development-tools::ffi
+obozrenie-core : game-development
 okapi: web-programming
 olekit: parser-implementations
 onig_sys: text-processing
@@ -755,6 +762,8 @@ openldap: network-programming
 openni2: science::machine-learning
 openpol: games
 oping: network-programming
+ops : development-tools::debugging, web-programming::http-server
+ops-core : web-programming::http-server
 orbtk-tree: gui
 orgize: parser-implementations
 osmesa-sys: multimedia, os::unix-apis
@@ -833,6 +842,7 @@ pwasm-libc: cryptography::cryptocurrencies
 pwasm-std: cryptography::cryptocurrencies
 pwasm-utils-cli : cryptography::cryptocurrencies
 pwasm-utils: cryptography::cryptocurrencies
+pxcmprs-core : multimedia
 qbsdiff: compression
 qeda: command-line-utilities
 qni-core-rs: web-programming::websocket
@@ -966,6 +976,7 @@ sekai: science
 self_update: development-tools, command-line-utilities
 semantic-rs: development-tools
 semver-parser: parser-implementations
+sentry-core: development-tools::debugging
 serde-humanize-rs: parser-implementations, encoding
 serenity: web-programming
 serenium: development-tools::testing
@@ -1121,6 +1132,7 @@ ul: rendering::graphics-api
 ullage: development-tools
 ultrastar-txt: parser-implementations
 unison-fsmonitor : os::macos-apis, command-line-utilities
+uniui_core: network-programming
 uploads-im-client: web-programming
 urdf-rs: parser-implementations
 uriparse: parser-implementations, web-programming
@@ -1159,6 +1171,7 @@ webmanifest: web-programming
 webpage: web-programming
 weighted-select: asynchronous
 weld: development-tools::profiling
+wf2_core: development-tools
 wham: simulation
 wikipedia: web-programming
 witty: web-programming, science::machine-learning
@@ -1187,6 +1200,7 @@ yellowsun: cryptography::cryptocurrencies
 ymlctx: config
 yoga: gui
 yoin-core : internationalization
+ytop: os, visualization
 yubirs: authentication
 zapper_derive: development-tools::procedural-macro-helpers
 zemeroth: games

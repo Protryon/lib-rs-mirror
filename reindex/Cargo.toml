@@ -1,5 +1,5 @@
 [package]
-version = "0.3.7"
+version = "0.3.8"
 edition = "2018"
 name = "reindex"
 authors = ["Kornel <kornel@geekhood.net>"]

@@ -2,7 +2,7 @@
 edition = "2018"
 description = "Analyze git repository containing Cargo crates"
 name = "crate_git_checkout"
-version = "0.4.6"
+version = "0.4.7"
 authors = ["Kornel <kornel@geekhood.net>"]
 
 [lib]

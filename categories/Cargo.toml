@@ -1,7 +1,7 @@
 [package]
 edition = "2018"
 name = "categories"
-version = "0.1.6"
+version = "0.1.7"
 authors = ["Kornel <kornel@geekhood.net>"]
 license = "MIT OR Apache-2.0"
 description = "List of categories from crates.io"

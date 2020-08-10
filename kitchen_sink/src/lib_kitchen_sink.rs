@@ -1521,8 +1521,8 @@ impl KitchenSink {
         first_capital.extend(ch.map(|c| if c == '_' { ' ' } else { c }));
 
         let mut words = HashMap::with_capacity(100);
-        let lcname = name.to_lowercase();
-        let shouty = name.to_uppercase();
+        let lcname = name.to_ascii_lowercase();
+        let shouty = name.to_ascii_uppercase();
         for s in source_sentences {
             for s in s.split(|c: char| !c.is_ascii_alphanumeric() && c != '-' && c != '_').filter(|&w| w != lcname && w.eq_ignore_ascii_case(&lcname)) {
                 let mut points = 2;
@@ -1542,10 +1542,15 @@ impl KitchenSink {
             }
         }
 
+        let can_capitalize = words.get(&first_capital).is_some();
         if let Some((name, _)) = words.into_iter().max_by_key(|&(_, v)| v) {
             name
         } else {
-            first_capital
+            if can_capitalize {
+                first_capital
+            } else {
+                name.to_owned()
+            }
         }
     }
 

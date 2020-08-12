@@ -16,3 +16,6 @@ front_end/public/crates
 tarballs-tmp
 data/docker/
 *.gz
+/category_overrides.txt
+/page
+/git_crates.txt

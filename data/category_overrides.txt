@@ -861,6 +861,7 @@ raptorq: network-programming
 rascam: hardware-support, multimedia::video
 ratio: science::math
 rcore: development-tools
+rdftk_core: web-programming
 rdispatcher: concurrency
 rdkafka: asynchronous, network-programming
 reader_for_microxml: parser-implementations
@@ -1204,5 +1205,7 @@ ytop: os, visualization
 yubirs: authentication
 zapper_derive: development-tools::procedural-macro-helpers
 zemeroth: games
+zfs-core-sys: os, filesystem
+zfs-core: filesystem
 zmq-sys: network-programming
 zvxryb-broadphase : game-development, algorithms

@@ -512,12 +512,12 @@ preference = 1.2
 name = "Images"
 title = "Rust image library"
 description = """
-Crates that process or build images.
+Crates that process images or generate graphics.
 """
 short-description = """
-Process or build images.
+Process or make images.
 """
-obvious-keywords = ["image", "images"]
+obvious-keywords = ["image", "images", "graphics"]
 preference = 1.1
 
 [multimedia.categories.encoding]

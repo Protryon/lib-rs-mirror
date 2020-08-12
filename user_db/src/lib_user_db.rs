@@ -4,7 +4,7 @@ use github_info::UserType;
 use parking_lot::Mutex;
 use rusqlite::*;
 use std::path::Path;
-type Result<T> = std::result::Result<T, failure::Error>;
+type Result<T, E=failure::Error> = std::result::Result<T, E>;
 
 mod schema;
 

@@ -414,6 +414,9 @@ impl<'a> CratePage<'a> {
     pub fn non_dep_features(&self) -> Option<Vec<String>> {
         let f = self.ver.features();
         let tmp: Vec<_> = f.iter().filter_map(|(k,v)| {
+            if k.starts_with("_") {
+                return None; // hidden feature
+            }
             let non_dep = k != "default" && v.iter().all(|feature| f.get(feature).is_some());
             if non_dep {
                 Some(k.to_owned())

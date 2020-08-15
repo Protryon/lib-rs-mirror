@@ -163,6 +163,8 @@ collectd-plugin : os
 collider: science::math, game-development
 collisions: algorithms
 colloquy: command-line-interface
+color-eyre: rust-patterns
+color-spantrace: command-line-interface
 colorsys: multimedia::images
 comma: parser-implementations
 common_failures: rust-patterns

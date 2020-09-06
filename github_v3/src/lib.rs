@@ -148,8 +148,8 @@ impl Client {
                 client: reqwest::Client::builder()
                     .user_agent(concat!("rust-github-v3/{}", env!("CARGO_PKG_VERSION")))
                     .default_headers(default_headers)
-                    .connect_timeout(Duration::from_secs(7))
-                    .timeout(Duration::from_secs(30))
+                    .connect_timeout(Duration::from_secs(4))
+                    .timeout(Duration::from_secs(20))
                     .build()
                     .unwrap(),
                 wait_sec: AtomicU32::new(0),

@@ -79,6 +79,7 @@ use triomphe::Arc;
 use std::time::Duration;
 use std::time::SystemTime;
 use std::sync::Mutex;
+use tokio::time::timeout;
 
 pub type ArcRichCrateVersion = Arc<RichCrateVersion>;
 
@@ -729,7 +730,7 @@ impl KitchenSink {
         if let Some(krate) = self.loaded_rich_crate_version_cache.read().get(origin) {
             return Ok(krate.clone());
         }
-        let mut data = tokio::time::timeout(Duration::from_secs(30), self.crate_db.rich_crate_version_data(origin))
+        let mut data = timeout(Duration::from_secs(7), self.crate_db.rich_crate_version_data(origin))
             .await.map_err(|_| KitchenSinkErr::DataTimedOut)?;
 
         if let Ok(cached) = &data {
@@ -750,9 +751,11 @@ impl KitchenSink {
         let (manifest, derived) = match data {
             Ok(v) => v,
             Err(e) => {
-                eprintln!("getting {:?}: {}", origin, e);
-                Box::pin(self.index_crate_highest_version(origin)).await?; // Pin to lower stack usage
-                match Box::pin(self.crate_db.rich_crate_version_data(origin)).await {
+                eprintln!("Getting/indexing {:?}: {}", origin, e);
+                let reindex = timeout(Duration::from_secs(60), self.index_crate_highest_version(origin));
+                Box::pin(reindex).await.map_err(|_| KitchenSinkErr::DataTimedOut)??; // Pin to lower stack usage
+                let get_data = timeout(Duration::from_secs(30), self.crate_db.rich_crate_version_data(origin));
+                match Box::pin(get_data).await.map_err(|_| KitchenSinkErr::DataTimedOut)? {
                     Ok(v) => v,
                     Err(e) => return Err(e),
                 }
@@ -1352,7 +1355,7 @@ impl KitchenSink {
     pub async fn top_category(&self, krate: &RichCrateVersion) -> Option<(u32, String)> {
         let crate_origin = krate.origin();
         let cats = join_all(krate.category_slugs().map(|slug| slug.into_owned()).map(|slug| async move {
-            let c = tokio::time::timeout(Duration::from_secs(6), self.top_crates_in_category(&slug)).await??;
+            let c = timeout(Duration::from_secs(6), self.top_crates_in_category(&slug)).await??;
             Ok::<_, CError>((c, slug))
         })).await;
         cats.into_iter().filter_map(|cats| cats.ok()).filter_map(|(cat, slug)| {
@@ -2189,7 +2192,7 @@ impl KitchenSink {
     async fn knock_duplicates(&self, crates: &mut Vec<(Origin, f64)>) {
         let with_owners = futures::stream::iter(crates.drain(..))
         .map(|(o, score)| async move {
-            let get_crate = tokio::time::timeout(Duration::from_secs(1), self.rich_crate_version_async(&o));
+            let get_crate = timeout(Duration::from_secs(1), self.rich_crate_version_async(&o));
             let (k, owners) = futures::join!(get_crate, self.crate_owners(&o));
             let keywords = match k {
                 Ok(Ok(c)) => {

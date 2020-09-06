@@ -41,15 +41,15 @@ pub use creviews::Review;
 pub use creviews::Rating;
 pub use creviews::Level;
 
-use crate::tarball::CrateFile;
+pub use crates_io_client::CrateOwner;
 use cargo_toml::Manifest;
 use cargo_toml::Package;
-use creviews::Creviews;
 use categories::Category;
-use chrono::prelude::*;
 use chrono::DateTime;
+use chrono::prelude::*;
+use crate::tarball::CrateFile;
 use crate_db::{builddb::BuildDb, CrateDb, CrateVersionData, RepoChange};
-pub use crates_io_client::CrateOwner;
+use creviews::Creviews;
 use double_checked_cell_async::DoubleCheckedCell;
 use failure::ResultExt;
 use futures::future::join_all;
@@ -75,11 +75,11 @@ use std::collections::HashSet;
 use std::convert::TryInto;
 use std::env;
 use std::path::{Path, PathBuf};
-use triomphe::Arc;
+use std::sync::Mutex;
 use std::time::Duration;
 use std::time::SystemTime;
-use std::sync::Mutex;
 use tokio::time::timeout;
+use triomphe::Arc;
 
 pub type ArcRichCrateVersion = Arc<RichCrateVersion>;
 

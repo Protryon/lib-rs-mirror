@@ -7,26 +7,26 @@ quick_error! {
         Io(err: io::Error) {
             from()
             display("Simple cache error: {}", err)
-            cause(err)
+            source(err)
         }
         Net(err: reqwest::Error) {
             from()
             display("{}", err)
-            cause(err)
+            source(err)
         }
         Db(err: rusqlite::Error) {
             from()
             display("Simple cache db: {}", err)
-            cause(err)
+            source(err)
         }
         RmpEnc(err:  rmp_serde::encode::Error) {
             from()
             display("KV cache enc: {}", err)
-            cause(err)
+            source(err)
         }
         RmpDec(err: rmp_serde::decode::Error) {
             from()
-            cause(err)
+            source(err)
         }
         KvPoison {}
         NotInCache {}
@@ -36,7 +36,7 @@ quick_error! {
         }
         Parse(err: serde_json::Error, data: Vec<u8>) {
             display("{}\n{}", err, String::from_utf8_lossy(data))
-            cause(err)
+            source(err)
         }
         Other(err: String) {
             display("{}", err)

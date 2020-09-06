@@ -1,7 +1,7 @@
 [package]
 edition = "2018"
 name = "categories"
-version = "0.1.7"
+version = "0.1.8"
 authors = ["Kornel <kornel@geekhood.net>"]
 license = "MIT OR Apache-2.0"
 description = "List of categories from crates.io"
@@ -15,4 +15,4 @@ serde = "1.0.104"
 toml = "0.5.5"
 serde_derive = "1.0.104"
 lazy_static = "1.4.0"
-quick-error = "1.2.2"
+quick-error = "2"

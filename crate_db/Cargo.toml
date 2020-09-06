@@ -1,7 +1,7 @@
 [package]
 edition = "2018"
 name = "crate_db"
-version = "0.4.11"
+version = "0.4.12"
 authors = ["Kornel <kornel@geekhood.net>"]
 description = "Internal index of crates used by crates.rs"
 
@@ -10,7 +10,7 @@ name ="crate_db"
 path = "src/lib_crate_db.rs"
 
 [dependencies]
-rusqlite = "0.23.1"
+rusqlite = "0.24"
 rich_crate = { path = "../rich_crate" }
 categories = { path = "../categories" }
 failure = "0.1.8"

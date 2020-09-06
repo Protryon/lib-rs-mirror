@@ -24,7 +24,7 @@ quick_error! {
         Cache(err: Box<simple_cache::Error>) {
             display("GH can't decode cache: {}", err)
             from(e: simple_cache::Error) -> (Box::new(e))
-            cause(err)
+            source(err)
         }
         GitHub(err: String) {
             display("{}", err)
@@ -33,12 +33,12 @@ quick_error! {
         Json(err: Box<serde_json::Error>, call: Option<&'static str>) {
             display("JSON decode error {} in {}", err, call.unwrap_or("github_info"))
             from(e: serde_json::Error) -> (Box::new(e), None)
-            cause(err)
+            source(err)
         }
         Time(err: std::time::SystemTimeError) {
             display("{}", err)
             from()
-            cause(err)
+            source(err)
         }
     }
 }

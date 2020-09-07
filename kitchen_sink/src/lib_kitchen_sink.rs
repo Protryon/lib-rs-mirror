@@ -3,6 +3,9 @@
 #[macro_use]
 extern crate serde_derive;
 
+#[macro_use]
+extern crate log;
+
 mod yearly;
 pub use crate::yearly::*;
 pub use deps_index::*;
@@ -193,7 +196,7 @@ impl KitchenSink {
         let github_token = match env::var("GITHUB_TOKEN") {
             Ok(t) => t,
             Err(_) => {
-                eprintln!("warning: Environment variable GITHUB_TOKEN is not set.\nGet token from https://github.com/settings/tokens and export GITHUB_TOKEN=…\nWithout it some requests will fail and new crates won't be analyzed properly.");
+                warn!("warning: Environment variable GITHUB_TOKEN is not set.\nGet token from https://github.com/settings/tokens and export GITHUB_TOKEN=…\nWithout it some requests will fail and new crates won't be analyzed properly.");
                 "".to_owned()
             },
         };
@@ -202,6 +205,8 @@ impl KitchenSink {
     }
 
     pub async fn new(data_path: &Path, github_token: &str) -> CResult<Self> {
+        let _ = env_logger::try_init();
+
         tokio::task::block_in_place(|| {
         let main_cache_dir = data_path.to_owned();
 
@@ -511,7 +516,7 @@ impl KitchenSink {
         });
         let stream = futures::stream::iter(all.iter())
             .map(move |(name, _)| async move {
-                self.rich_crate_async(&Origin::from_crates_io_name(&*name)).await.map_err(|e| eprintln!("{}: {}", name, e)).ok()
+                self.rich_crate_async(&Origin::from_crates_io_name(&*name)).await.map_err(|e| error!("{}: {}", name, e)).ok()
             })
             .buffer_unordered(8)
             .filter_map(|x| async {x});
@@ -520,7 +525,7 @@ impl KitchenSink {
             let res = if let Ok(timestamp) = DateTime::parse_from_rfc3339(latest) {
                 timestamp.timestamp() >= min_timestamp as i64
             } else {
-                eprintln!("Can't parse {} of {}", latest, k.name());
+                error!("Can't parse {} of {}", latest, k.name());
                 true
             };
             async move { res }
@@ -530,9 +535,9 @@ impl KitchenSink {
         let mut crates2 = futures::stream::iter(self.crate_db.crates_to_reindex().await?.into_iter())
             .map(move |origin| async move {
                 self.rich_crate_async(&origin).await.map_err(|e| {
-                    eprintln!("Can't reindex {:?}: {}", origin, e);
+                    error!("Can't reindex {:?}: {}", origin, e);
                     for e in e.iter_chain() {
-                        eprintln!("• {}", e);
+                        error!("• {}", e);
                     }
                 }).ok()
             })
@@ -615,7 +620,7 @@ impl KitchenSink {
                     let num_full = r.tag_name?;
                     let num = num_full.trim_start_matches(|c:char| !c.is_numeric());
                     // verify that it semver-parses
-                    let _ = SemVer::parse(num).map_err(|e| eprintln!("{:?}: ignoring {}, {}", origin, num_full, e)).ok()?;
+                    let _ = SemVer::parse(num).map_err(|e| warn!("{:?}: ignoring {}, {}", origin, num_full, e)).ok()?;
                     Some(CrateVersion {
                         num: num.to_string(),
                         yanked: r.draft.unwrap_or(false),
@@ -644,7 +649,7 @@ impl KitchenSink {
             return Ok(versions);
         }
         let _f = self.throttle.acquire().await;
-        eprintln!("Need to scan repo {:?}", repo);
+        info!("Need to scan repo {:?}", repo);
         tokio::task::block_in_place(|| {
             let checkout = crate_git_checkout::checkout(repo, &self.git_checkout_path)?;
             let mut pkg_ver = crate_git_checkout::find_versions(&checkout)?;
@@ -711,11 +716,11 @@ impl KitchenSink {
             .with_context(|_| format!("crates.io meta for {} {}", name, latest_in_index))?;
         let mut meta = meta.ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?;
         if !meta.versions.iter().any(|v| v.num == latest_in_index) {
-            eprintln!("Crate data missing latest version {}@{}", name, latest_in_index);
+            warn!("Crate data missing latest version {}@{}", name, latest_in_index);
             meta = type_erase(self.crates_io.crate_meta(name, &format!("{}-try-again", latest_in_index))).await?
                 .ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?;
             if !meta.versions.iter().any(|v| v.num == latest_in_index) {
-                eprintln!("Error: crate data is borked {}@{}. Has only: {:?}", name, latest_in_index, meta.versions.iter().map(|v| &v.num).collect::<Vec<_>>());
+                error!("Error: crate data is borked {}@{}. Has only: {:?}", name, latest_in_index, meta.versions.iter().map(|v| &v.num).collect::<Vec<_>>());
             }
         }
         Ok(meta)
@@ -730,8 +735,11 @@ impl KitchenSink {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
 
         if let Some(krate) = self.loaded_rich_crate_version_cache.read().get(origin) {
+            trace!("rich_crate_version_async HIT {:?}", origin);
             return Ok(krate.clone());
         }
+        trace!("rich_crate_version_async MISS {:?}", origin);
+
         let mut data = timeout(Duration::from_secs(7), self.crate_db.rich_crate_version_data(origin))
             .await.map_err(|_| KitchenSinkErr::DataTimedOut)?;
 
@@ -742,7 +750,7 @@ impl KitchenSink {
                     let has = &cached.0.package().version;
                     let wants = expected_ver.version();
                     if has != wants {
-                        eprintln!("Ignoring derived cache of {}, because it's {}, and crates-io is {}", name, has, wants);
+                        info!("Ignoring derived cache of {}, because it's {}, and crates-io is {}", name, has, wants);
                         data = Err(KitchenSinkErr::CacheExpired.into());
                     }
                 },
@@ -753,7 +761,7 @@ impl KitchenSink {
         let (manifest, derived) = match data {
             Ok(v) => v,
             Err(e) => {
-                eprintln!("Getting/indexing {:?}: {}", origin, e);
+                debug!("Getting/indexing {:?}: {}", origin, e);
                 let reindex = timeout(Duration::from_secs(60), self.index_crate_highest_version(origin));
                 type_erase(reindex).await.map_err(|_| KitchenSinkErr::DataTimedOut)??; // Pin to lower stack usage
                 let get_data = timeout(Duration::from_secs(30), self.crate_db.rich_crate_version_data(origin));
@@ -776,6 +784,7 @@ impl KitchenSink {
     pub async fn changelog_url(&self, k: &RichCrateVersion) -> Option<String> {
         let repo = k.repository()?;
         if let RepoHost::GitHub(ref gh) = repo.host() {
+            trace!("get gh changelog_url");
             let releases = self.gh.releases(gh, &self.cachebust_string_for_repo(repo).await.ok()?).await.ok()??;
             if releases.iter().any(|rel| rel.body.as_ref().map_or(false, |b| b.len() > 15)) {
                 return Some(format!("https://github.com/{}/{}/releases", gh.owner, gh.repo));
@@ -802,10 +811,10 @@ impl KitchenSink {
                 .ok_or_else(|| {
                     let (has, err) = crate_git_checkout::find_manifests(&checkout).unwrap_or_default();
                     for e in err {
-                        eprintln!("parse err: {}", e.0);
+                        warn!("parse err: {}", e.0);
                     }
                     for h in has {
-                        eprintln!("has: {} -> {}", h.0, h.2.package.as_ref().map(|p| p.name.as_str()).unwrap_or("?"));
+                        info!("has: {} -> {}", h.0, h.2.package.as_ref().map(|p| p.name.as_str()).unwrap_or("?"));
                     }
                     KitchenSinkErr::CrateNotFoundInRepo(package.to_string(), repo.canonical_git_url().into_owned())
                 })?;
@@ -924,6 +933,7 @@ impl KitchenSink {
         // TODO: also ignore useless keywords that are unique db-wide
         let gh = match maybe_repo.as_ref() {
             Some(repo) => if let RepoHost::GitHub(ref gh) = repo.host() {
+                trace!("get gh topics");
                 self.gh.topics(gh, &self.cachebust_string_for_repo(repo).await.context("fetch topics")?).await?
             } else {None},
             _ => None,
@@ -1173,7 +1183,7 @@ impl KitchenSink {
                 },
                 Err(err) => {
                     warnings.insert(Warning::ErrorCloning(repo.canonical_git_url().to_string()));
-                    eprintln!("Checkout of {} ({}) failed: {}", package.name, repo.canonical_git_url(), err);
+                    error!("Checkout of {} ({}) failed: {}", package.name, repo.canonical_git_url(), err);
                 },
             }
         }
@@ -1182,10 +1192,10 @@ impl KitchenSink {
 
     async fn add_readme_from_crates_io(&self, meta: &mut CrateFile, name: &str, ver: &str) {
         if let Ok(Some(html)) = self.crates_io.readme(name, ver).await {
-            eprintln!("Found readme on crates.io {}@{}", name, ver);
+            debug!("Found readme on crates.io {}@{}", name, ver);
             meta.readme = Some((String::new(), Markup::Html(String::from_utf8_lossy(&html).to_string())));
         } else {
-            eprintln!("No readme on crates.io for {}@{}", name, ver);
+            debug!("No readme on crates.io for {}@{}", name, ver);
         }
     }
 
@@ -1239,7 +1249,7 @@ impl KitchenSink {
             return res;
         }
         type_erase(async {
-            eprintln!("CHK: {}", url);
+            debug!("CHK: {}", url);
             let req = reqwest::Client::builder().build().unwrap();
             let res = req.get(url).send().await.map(|res| {
                 res.status().is_success()
@@ -1294,7 +1304,7 @@ impl KitchenSink {
     pub async fn update(&self) {
         let crev = self.crev.clone();
         rayon::spawn(move || {
-            let _ = crev.update().map_err(|e| eprintln!("crev update: {}", e));
+            let _ = crev.update().map_err(|e| debug!("crev update: {}", e));
         });
         self.index.update().await;
     }
@@ -1407,7 +1417,7 @@ impl KitchenSink {
                     }
                 },
                 Ok(None) => println!("{} not found on github", email),
-                Err(e) => eprintln!("•••• {}", e),
+                Err(e) => error!("•••• {}", e),
             }
         }
         Ok(())
@@ -1452,6 +1462,8 @@ impl KitchenSink {
 
     pub async fn index_crate_highest_version(&self, origin: &Origin) -> CResult<()> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
+        debug!("Indexing {:?}", origin);
+
         self.crate_db.before_index_latest(origin).await?;
 
         let (source_data, manifest, _warn) = match origin {
@@ -1498,7 +1510,7 @@ impl KitchenSink {
             let mut warnings = Vec::new();
             tmp = categories::Categories::fixed_category_slugs(&package.categories, &mut warnings);
             if !warnings.is_empty() {
-                eprintln!("{}: {}", package.name, warnings.join("; "));
+                warn!("{}: {}", package.name, warnings.join("; "));
             }
             &tmp
         };
@@ -1597,7 +1609,7 @@ impl KitchenSink {
             let (manif, warnings) = crate_git_checkout::find_manifests(&checkout)
                 .with_context(|_| format!("find manifests in {}", url))?;
             for warn in warnings {
-                eprintln!("warning: {}", warn.0);
+                warn!("warning: {}", warn.0);
             }
             Ok::<_, CError>((checkout, manif.into_iter().filter_map(|(subpath, _, manifest)| {
                 manifest.package.map(|p| (subpath, p.name))
@@ -1635,7 +1647,7 @@ impl KitchenSink {
                                         continue;
                                     }
                                     if !is_alnum(dep1) {
-                                        eprintln!("Bad crate name {} in {}", dep1, url);
+                                        error!("Bad crate name {} in {}", dep1, url);
                                         continue;
                                     }
                                     // Not really a replacement, but a recommendation if A then B
@@ -1647,7 +1659,7 @@ impl KitchenSink {
                 } else {
                     for crate_name in removed {
                         if !is_alnum(&crate_name) {
-                            eprintln!("Bad crate name {} in {}", crate_name, url);
+                            error!("Bad crate name {} in {}", crate_name, url);
                             continue;
                         }
 
@@ -1683,6 +1695,7 @@ impl KitchenSink {
                 return Ok(Some(gh));
             }
         }
+        debug!("gh user cache miss {}", github_login);
         Ok(Box::pin(self.gh.user_by_login(github_login)).await?) // errs on 404
     }
 
@@ -1750,11 +1763,13 @@ impl KitchenSink {
 
     #[inline]
     pub async fn user_github_orgs(&self, github_login: &str) -> CResult<Option<Vec<UserOrg>>> {
+        trace!("gh orgs {}", github_login);
         Ok(self.gh.user_orgs(github_login).await?)
     }
 
     #[inline]
     pub async fn github_org(&self, github_login: &str) -> CResult<Option<Org>> {
+        trace!("gh org {}", github_login);
         Ok(self.gh.org(github_login).await?)
     }
 
@@ -1771,6 +1786,7 @@ impl KitchenSink {
                 // multiple crates share a repo, which causes cache churn when version "changes"
                 // so pick one of them and track just that one version
                 let cachebust = self.cachebust_string_for_repo(crate_repo).await.context("contrib")?;
+                debug!("getting contributors for {:?}", repo);
                 let contributors = self.gh.contributors(repo, &cachebust).await.context("contributors")?.unwrap_or_default();
                 if contributors.len() >= 100 {
                     hit_max_contributor_count = true;
@@ -2204,11 +2220,11 @@ impl KitchenSink {
                     c.keywords().to_owned()
                 },
                 Err(_) => {
-                    eprintln!("{:?} Timed out in ranking", o);
+                    warn!("{:?} Timed out in ranking", o);
                     Vec::new()
                 },
                 Ok(Err(e)) => {
-                    eprintln!("Skipping {:?} because {}", o, e);
+                    error!("Skipping {:?} because {}", o, e);
                     return None;
                 },
             };
@@ -2324,7 +2340,7 @@ impl KitchenSink {
             .get_or_init(async {match self.crate_db.category_crate_counts().await {
                 Ok(res) => Some(res),
                 Err(err) => {
-                    eprintln!("error: can't get category counts: {}", err);
+                    error!("error: can't get category counts: {}", err);
                     None
                 },
             }})

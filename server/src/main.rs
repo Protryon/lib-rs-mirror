@@ -31,6 +31,9 @@ use std::time::{Duration, Instant, SystemTime};
 use urlencoding::decode;
 use urlencoding::encode;
 
+#[macro_use]
+extern crate log;
+
 mod writer;
 
 #[global_allocator]
@@ -163,7 +166,7 @@ async fn run_server(rt: Handle) -> Result<(), failure::Error> {
                             state.crates.load().prewarm().await;
                         },
                         Err(e) => {
-                            eprintln!("Refresh failed: {}", e);
+                            error!("Refresh failed: {}", e);
                             std::process::exit(1);
                         },
                     }
@@ -182,14 +185,14 @@ async fn run_server(rt: Handle) -> Result<(), failure::Error> {
             let rt_timestamp = timestamp.load(Ordering::SeqCst);
             let response_timestamp = state.last_ok_response.load(Ordering::SeqCst);
             if rt_timestamp + 5 < expected {
-                eprintln!("Update loop is {}s behind", expected - rt_timestamp);
+                warn!("Update loop is {}s behind", expected - rt_timestamp);
                 if rt_timestamp + 60 < expected {
-                    eprintln!("tokio is dead");
+                    error!("tokio is dead");
                     std::process::exit(1);
                 }
             }
             if response_timestamp + 60*5 < expected {
-                eprintln!("no requests for 5 minutes? probably a deadlock");
+                warn!("no requests for 5 minutes? probably a deadlock");
                 std::process::exit(2);
             }
         }
@@ -629,7 +632,7 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
             let last_mod = if timestamp > 0 {Some(DateTime::from_utc(NaiveDateTime::from_timestamp(timestamp as _, 0), FixedOffset::east(0)))} else {None};
             let cache_time_remaining = cache_time.saturating_sub(age_secs);
 
-            println!("Using cached page {} {}s fresh={:?} acc={:?}", cache_file.display(), cache_time_remaining, is_fresh, is_acceptable);
+            debug!("Using cached page {} {}s fresh={:?} acc={:?}", cache_file.display(), cache_time_remaining, is_fresh, is_acceptable);
 
             if !is_fresh {
                 let _ = state.rt.spawn({
@@ -638,29 +641,29 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
                     if let Ok(_s) = state.background_job.try_acquire() {
                         match generate.await {
                             Ok((mut page, last_mod)) => {
-                                eprintln!("Done refresh of {}", cache_file.display());
+                                debug!("Done refresh of {}", cache_file.display());
                                 let timestamp = last_mod.map(|a| a.timestamp() as u32).unwrap_or(0);
                                 page.extend_from_slice(&timestamp.to_le_bytes()); // The worst data format :)
 
                                 if let Err(e) = std::fs::write(&cache_file, &page) {
-                                    eprintln!("warning: Failed writing to {}: {}", cache_file.display(), e);
+                                    error!("warning: Failed writing to {}: {}", cache_file.display(), e);
                                 }
                             },
                             Err(e) => {
-                                eprintln!("Refresh err: {} {}", e.iter_chain().map(|e| e.to_string()).collect::<Vec<_>>().join("; "), cache_file.display());
+                                error!("Refresh err: {} {}", e.iter_chain().map(|e| e.to_string()).collect::<Vec<_>>().join("; "), cache_file.display());
                             },
                         }
                     } else {
-                        eprintln!("Skipped refresh of {}", cache_file.display());
+                        info!("Skipped refresh of {}", cache_file.display());
                     }
                 }});
             }
             return Ok((page_cached, if !is_fresh { cache_time_remaining / 4 } else { cache_time_remaining }.max(2), !is_acceptable, last_mod));
         }
 
-        println!("Cache miss {} {}", cache_file.display(), age_secs);
+        debug!("Cache miss {} {}", cache_file.display(), age_secs);
     } else {
-        println!("Cache miss {} no file", cache_file.display());
+        debug!("Cache miss {} no file", cache_file.display());
     }
 
     let (page, last_mod) = state.rt.spawn({
@@ -670,7 +673,7 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
             Ok::<_, failure::Error>(generate.await?)
         }}).await??;
     if let Err(e) = std::fs::write(&cache_file, &page) {
-        eprintln!("warning: Failed writing to {}: {}", cache_file.display(), e);
+        error!("warning: Failed writing to {}: {}", cache_file.display(), e);
     }
     Ok((page, cache_time, false, last_mod))
 }

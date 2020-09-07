@@ -1,9 +1,6 @@
+use serde_derive::*;
 use std::collections::HashMap;
 use std::path::Path;
-use std::path::PathBuf;
-
-use serde_derive::*;
-use tokei;
 
 pub use tokei::LanguageType as Language;
 
@@ -233,7 +230,7 @@ impl Collect {
         if lang == Language::Rust {
             self.rust_code_stats(file_content);
         }
-        let res = lang.parse_from_str(PathBuf::default(), file_content, &tokei::Config {
+        let res = lang.parse_from_str(file_content, &tokei::Config {
             no_ignore: Some(true),
             no_ignore_parent: Some(true),
             treat_doc_strings_as_comments: Some(true),

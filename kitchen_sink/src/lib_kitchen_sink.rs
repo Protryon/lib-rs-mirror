@@ -2547,7 +2547,7 @@ async fn index_test() {
     let stats = idx.deps_stats().await.unwrap();
     assert!(stats.total > 13800);
     let lode = stats.counts.get("lodepng").unwrap();
-    assert_eq!(12, lode.runtime.def);
+    assert_eq!(13, lode.runtime.def);
 }
 
 

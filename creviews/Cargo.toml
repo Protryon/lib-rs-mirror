@@ -5,7 +5,7 @@ authors = ["Kornel <kornel@geekhood.net>"]
 edition = "2018"
 
 [dependencies]
-crev-lib = { git = "https://github.com/crev-dev/cargo-crev", rev = "9af4758981dcfdddd7866d4e926d576028f80661" }
-crev-data = { git = "https://github.com/crev-dev/cargo-crev", rev = "9af4758981dcfdddd7866d4e926d576028f80661" }
-crev-wot = { git = "https://github.com/crev-dev/cargo-crev", rev = "9af4758981dcfdddd7866d4e926d576028f80661" }
+crev-lib = { git = "https://github.com/crev-dev/cargo-crev", rev = "e6822d9c6a4b76373a98ac5ad5a1cadb73feae05" }
+crev-data = { git = "https://github.com/crev-dev/cargo-crev", rev = "e6822d9c6a4b76373a98ac5ad5a1cadb73feae05" }
+crev-wot = { git = "https://github.com/crev-dev/cargo-crev", rev = "e6822d9c6a4b76373a98ac5ad5a1cadb73feae05" }
 failure = "0.1.8"

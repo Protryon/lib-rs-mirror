@@ -69,15 +69,16 @@ impl<'a> HomePage<'a> {
                 self.crates.recently_updated_crates_in_category(&cat.cat.slug)
             );
 
-            let mut n = 0u16;
+            // Aim for 140 characters of crate names, so that categories are visually similar
+            let mut text_length = cat.top.iter().map(|c| c.short_name().len() as u32 + 1).sum::<u32>();
             for c in recently_updated.expect("recently_updated_crates_in_category") {
                 if seen.insert(c.clone()) {
                     if let Ok(Ok(c)) = timeout(Duration::from_secs(5), self.crates.rich_crate_version_async(&c)).await {
+                        text_length += c.short_name().len() as u32 + 1;
                         cat.top.push(c);
-                        if n >= 2 {
+                        if text_length >= 140 {
                             break;
                         }
-                        n += 1;
                     }
                 }
             }

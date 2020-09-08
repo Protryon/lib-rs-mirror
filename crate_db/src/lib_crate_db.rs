@@ -948,7 +948,7 @@ impl CrateDb {
         }).await
     }
 
-    /// Newly added or updated crates in the category
+    /// Newly added or updated crates in the category, filtered to include only not-terrible crates
     ///
     /// Returns `origin` strings
     pub async fn recently_updated_crates_in_category(&self, slug: &str) -> FResult<Vec<Origin>> {
@@ -960,6 +960,7 @@ impl CrateDb {
                     join crate_versions v using (crate_id)
                     join crates k on v.crate_id = k.id
                     where c.slug = ?1
+                        and k.ranking > 0.3 -- skip spam
                     group by v.crate_id
                     having count(*) > 1 -- so these are updates, not new releases
                     order by 1 desc

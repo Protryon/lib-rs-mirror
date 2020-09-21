@@ -200,6 +200,9 @@ github:mgattozzi/haskellrs/haskellrs
 github:mgattozzi/rushs/rushs
 github:microsoft/electionguard-verifier/electionguard_verify
 github:microsoft/inno-updater/inno_updater
+github:microsoft/onefuzz/onefuzz
+github:microsoft/onefuzz/onefuzz-agent
+github:microsoft/onefuzz/onefuzz-supervisor
 github:microsoft/winrt-rs/winmd
 github:microsoft/winrt-rs/winmd_macros
 github:microsoft/winrt-rs/winrt
@@ -235,6 +238,7 @@ github:mozilla/neqo/neqo-interop
 github:mozilla/neqo/neqo-qpack
 github:mozilla/neqo/neqo-server
 github:mozilla/neqo/neqo-transport
+github:mrdimas/rusty-shooter/rusty-shooter
 github:mullvad/mullvadvpn-app/mullvad-cli
 github:mullvad/mullvadvpn-app/talpid-core
 github:mvdnes/rboy/rboy

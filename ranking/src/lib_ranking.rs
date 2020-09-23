@@ -106,7 +106,7 @@ fn cargo_toml_score(cr: &CrateVersionInputs<'_>) -> Score {
     // we care about being able to analyze
     s.has("has_repository_link", 20, cr.has_repository_link);
 
-    // helps crates.rs show crate in the right place
+    // helps lib.rs show crate in the right place
     s.has("has_keywords", 10, cr.has_keywords);
     s.has("has_categories", 5, cr.has_categories);
 

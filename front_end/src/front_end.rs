@@ -1,4 +1,4 @@
-//! This crate generates HTML templates for crates.rs
+//! This crate generates HTML templates for https://lib.rs
 //!
 //! Most template require their own type of struct that does
 //! some lightweight conversion from data model/APIs,

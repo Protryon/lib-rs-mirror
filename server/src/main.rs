@@ -58,6 +58,8 @@ struct ServerState {
 type AServerState = web::Data<ServerState>;
 
 fn main() {
+    env_logger::init();
+
     let mut sys = actix_rt::System::new("actix-server");
 
     let rt = tokio::runtime::Builder::new()
@@ -75,7 +77,7 @@ fn main() {
 
     if let Err(e) = res {
         for c in e.iter_chain() {
-            eprintln!("Error: {}", c);
+            error!("Error: {}", c);
         }
         std::process::exit(1);
     }
@@ -89,7 +91,6 @@ async fn run_server(rt: Handle) -> Result<(), failure::Error> {
         signal_hook::register(signal_hook::SIGUSR1, || HUP_SIGNAL.store(1, Ordering::SeqCst))
     }?;
 
-    env_logger::init();
     kitchen_sink::dont_hijack_ctrlc();
 
     let public_document_root: PathBuf = env::var_os("DOCUMENT_ROOT").map(From::from).unwrap_or_else(|| "../style/public".into());
@@ -142,10 +143,10 @@ async fn run_server(rt: Handle) -> Result<(), failure::Error> {
                 let elapsed = state.start_time.elapsed().as_secs() as u32;
                 timestamp.store(elapsed, Ordering::SeqCst);
                 let should_reload = if 1 == HUP_SIGNAL.swap(0, Ordering::SeqCst) {
-                    println!("HUP!");
+                    info!("HUP!");
                     true
                 } else if last_reload.elapsed() > Duration::from_secs(30*60) {
-                    println!("Reloading state on a timer");
+                    info!("Reloading state on a timer");
                     true
                 } else {
                     false
@@ -163,7 +164,7 @@ async fn run_server(rt: Handle) -> Result<(), failure::Error> {
                                 }
                             }).await;
                             state.crates.store(k);
-                            println!("Reloaded state");
+                            info!("Reloaded state");
                             state.crates.load().prewarm().await;
                         },
                         Err(e) => {
@@ -231,10 +232,10 @@ async fn run_server(rt: Handle) -> Result<(), failure::Error> {
     .expect("Can not bind to 127.0.0.1:32531")
     .shutdown_timeout(1);
 
-    println!("Starting HTTP server {} on http://127.0.0.1:32531", env!("CARGO_PKG_VERSION"));
+    info!("Starting HTTP server {} on http://127.0.0.1:32531", env!("CARGO_PKG_VERSION"));
     server.run().await?;
 
-    println!("bye!");
+    info!("bye!");
     Ok(())
 }
 
@@ -380,7 +381,7 @@ async fn handle_category(req: HttpRequest, cat: &'static Category) -> Result<Htt
 }
 
 async fn handle_home(req: HttpRequest) -> Result<HttpResponse, ServerError> {
-    println!("home route");
+    debug!("home route");
     let query = req.query_string().trim_start_matches('?');
     if !query.is_empty() && query.find('=').is_none() {
         return Ok(HttpResponse::TemporaryRedirect().header("Location", format!("/search?q={}", query)).finish());
@@ -436,7 +437,7 @@ async fn handle_git_crate(req: HttpRequest, slug: &'static str) -> Result<HttpRe
     let owner = inf.query("owner");
     let repo = inf.query("repo");
     let crate_name = inf.query("crate");
-    println!("{} crate {}/{}/{}", slug, owner, repo, crate_name);
+    debug!("{} crate {}/{}/{}", slug, owner, repo, crate_name);
     if !is_alnum_dot(&owner) || !is_alnum_dot(&repo) || !is_alnum(&crate_name) {
         return render_404_page(state, &crate_name, "git crate");
     }
@@ -517,7 +518,7 @@ async fn handle_install(req: HttpRequest) -> Result<HttpResponse, ServerError> {
 
 async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let login = req.match_info().query("author");
-    println!("author page for {:?}", login);
+    debug!("author page for {:?}", login);
     let state: &AServerState = req.app_data().expect("appdata");
     let crates = state.crates.load();
     let aut = match crates.author_by_login(&login).await {
@@ -548,7 +549,7 @@ async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
 
 async fn handle_crate(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let crate_name = req.match_info().query("crate");
-    println!("crate page for {:?}", crate_name);
+    debug!("crate page for {:?}", crate_name);
     let state: &AServerState = req.app_data().expect("appdata");
     let crates = state.crates.load();
     let origin = match Origin::try_from_crates_io_name(&crate_name).filter(|o| crates.crate_exists(o)) {
@@ -563,7 +564,7 @@ async fn handle_crate(req: HttpRequest) -> Result<HttpResponse, ServerError> {
 
 async fn handle_crate_reverse_dependencies(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let crate_name = req.match_info().query("crate");
-    println!("rev deps for {:?}", crate_name);
+    debug!("rev deps for {:?}", crate_name);
     let state: &AServerState = req.app_data().expect("appdata");
     let crates = state.crates.load();
     let origin = match Origin::try_from_crates_io_name(&crate_name).filter(|o| crates.crate_exists(o)) {
@@ -575,7 +576,7 @@ async fn handle_crate_reverse_dependencies(req: HttpRequest) -> Result<HttpRespo
 
 async fn handle_crate_reviews(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let crate_name = req.match_info().query("crate");
-    println!("crev for {:?}", crate_name);
+    debug!("crev for {:?}", crate_name);
     let state: &AServerState = req.app_data().expect("appdata");
     let crates = state.crates.load();
     let origin = match Origin::try_from_crates_io_name(&crate_name).filter(|o| crates.crate_exists(o)) {
@@ -859,12 +860,12 @@ struct ServerError {
 impl ServerError {
     pub fn new(err: failure::Error) -> Self {
         for cause in err.iter_chain() {
-            eprintln!("• {}", cause);
+            error!("• {}", cause);
             // The server is stuck and useless
             let s = cause.to_string();
             if s.contains("Too many open files") || s.contains("instance has previously been poisoned") ||
                s.contains("inconsistent park state") || s.contains("failed to allocate an alternative stack") {
-                eprintln!("Fatal error: {}", s);
+                error!("Fatal error: {}", s);
                 std::process::exit(2);
             }
         }

@@ -33,7 +33,7 @@ impl CratesIoClient {
         Ok(Self {
             cache: TempCache::new(&cache_base_path.join("cratesio.bin"))?,
             crates: SimpleCache::new(&cache_base_path.join("crates.db"))?,
-            sem: tokio::sync::Semaphore::new(4),
+            sem: tokio::sync::Semaphore::new(2),
         })
     }
 

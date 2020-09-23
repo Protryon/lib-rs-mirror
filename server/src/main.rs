@@ -1,4 +1,3 @@
-use tokio::runtime::Handle;
 use actix_web::body::Body;
 use actix_web::dev::Url;
 use actix_web::http::header::HeaderValue;
@@ -25,9 +24,11 @@ use search_index::CrateSearchIndex;
 use std::convert::TryInto;
 use std::env;
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{Duration, Instant, SystemTime};
+use tokio::runtime::Handle;
 use urlencoding::decode;
 use urlencoding::encode;
 
@@ -843,7 +844,7 @@ async fn handle_feed(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     .body(page))
 }
 
-fn run_timeout<R, T: 'static + Send>(secs: u64, fut: R) -> impl Future<Output=Result<T, failure::Error>> where R: Future<Output=Result<T, failure::Error>> {
+fn run_timeout<R, T: 'static + Send>(secs: u64, fut: R) -> Pin<Box<dyn Future<Output=Result<T, failure::Error>> + Send>> where R: 'static + Send + Future<Output=Result<T, failure::Error>> {
     Box::pin(tokio::time::timeout(Duration::from_secs(secs), fut).map(|res| res?))
 }
 

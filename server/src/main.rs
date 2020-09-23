@@ -299,7 +299,7 @@ async fn default_handler(req: HttpRequest) -> Result<HttpResponse, ServerError> 
     }
 
     if let Some(cat) = find_category(path.split('/').skip(1)) {
-        return handle_category(req, cat).await;
+        return Box::pin(handle_category(req, cat)).await;
     }
 
     match handle_static_page(state, path) {
@@ -312,7 +312,7 @@ async fn default_handler(req: HttpRequest) -> Result<HttpResponse, ServerError> 
     let crates = state.crates.load();
     let (found_crate, found_keyword) = rt_run_timeout(&state.rt, 10, async move {
         let crate_maybe = match Origin::try_from_crates_io_name(&name) {
-            Some(o) => crates.rich_crate_async(&o).await.ok(),
+            Some(o) => Box::pin(crates.rich_crate_async(&o)).await.ok(),
             _ => None,
         };
         match crate_maybe {
@@ -320,7 +320,7 @@ async fn default_handler(req: HttpRequest) -> Result<HttpResponse, ServerError> 
             None => {
                 let inverted_hyphens: String = name.chars().map(|c| if c == '-' {'_'} else if c == '_' {'-'} else {c.to_ascii_lowercase()}).collect();
                 let crate_maybe = match Origin::try_from_crates_io_name(&inverted_hyphens) {
-                    Some(o) => crates.rich_crate_async(&o).await.ok(),
+                    Some(o) => Box::pin(crates.rich_crate_async(&o)).await.ok(),
                     _ => None,
                 };
                 match crate_maybe {
@@ -685,7 +685,7 @@ fn render_crate_page(state: AServerState, origin: Origin) -> impl Future<Output 
         let crates = state.crates.load();
         let (all, ver) = futures::try_join!(crates.rich_crate_async(&origin), crates.rich_crate_version_async(&origin))?;
         let mut page: Vec<u8> = Vec::with_capacity(32000);
-        let last_mod = front_end::render_crate_page(&mut page, &all, &ver, &crates, &state.markup).await?;
+        let last_mod = Box::pin(front_end::render_crate_page(&mut page, &all, &ver, &crates, &state.markup)).await?;
         minify_html(&mut page);
         mark_server_still_alive(&state);
         Ok::<_, failure::Error>((page, last_mod))

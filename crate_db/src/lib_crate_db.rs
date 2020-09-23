@@ -52,6 +52,13 @@ pub struct CrateVersionData<'a> {
     pub category_slugs: &'a [Cow<'a, str>],
     pub repository: Option<&'a Repo>,
     pub extracted_auto_keywords: Vec<(f32, String)>,
+    pub cache_key: u64,
+}
+
+pub struct CachedCrate {
+    pub manifest: Manifest,
+    pub derived: Derived,
+    pub cache_key: u64,
 }
 
 impl CrateDb {
@@ -122,7 +129,7 @@ impl CrateDb {
         Ok(db)
     }
 
-    pub async fn rich_crate_version_data(&self, origin: &Origin) -> FResult<(Manifest, Derived)> {
+    pub async fn rich_crate_version_data(&self, origin: &Origin) -> FResult<CachedCrate> {
         struct Row {
             capitalized_name: String,
             crate_compressed_size: u32,
@@ -132,6 +139,7 @@ impl CrateDb {
             is_nightly: bool,
             is_yanked: bool,
             has_code_of_conduct: bool,
+            cache_key: u64,
         }
         self.with_read("rich_crate_version_data", |conn| {
             let args: &[&dyn ToSql] = &[&origin.to_str()];
@@ -158,6 +166,7 @@ impl CrateDb {
                     let manifest = rmp_serde::from_slice(manifest).map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
                     let language_stats = row.get_raw("language_stats").as_blob()?;
                     let language_stats = rmp_serde::from_slice(language_stats).map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
+                    let cache_key: i64 = row.get("cache_key")?; // sqlite makes it signed :/
                     Ok((manifest, readme, Row {
                         lib_file: row.get("lib_file")?,
                         capitalized_name: row.get("capitalized_name")?,
@@ -167,6 +176,7 @@ impl CrateDb {
                         is_nightly: row.get("is_nightly")?,
                         is_yanked: row.get("is_yanked")?,
                         has_code_of_conduct: row.get("has_code_of_conduct")?,
+                        cache_key: cache_key as u64,
                     }, language_stats))
                 })?;
 
@@ -195,7 +205,10 @@ impl CrateDb {
                 eprintln!("{}: {}", name, warnings.join("; "));
             }
 
-            Ok((manifest, Derived {
+            Ok(CachedCrate {
+                cache_key: row.cache_key,
+                manifest,
+                derived: Derived {
                 path_in_repo,
                 readme,
                 categories,
@@ -209,7 +222,7 @@ impl CrateDb {
                 is_yanked: row.is_yanked,
                 has_code_of_conduct: row.has_code_of_conduct,
                 language_stats,
-            }))
+            }})
         }).await
     }
 
@@ -319,9 +332,9 @@ impl CrateDb {
             let mut insert_category = tx.prepare_cached("INSERT OR IGNORE INTO categories (crate_id, slug, rank_weight, relevance_weight) VALUES (?1, ?2, ?3, ?4)")?;
             let mut get_crate_id = tx.prepare_cached("SELECT id, recent_downloads FROM crates WHERE origin = ?1")?;
             let mut insert_derived = tx.prepare_cached("INSERT OR REPLACE INTO crate_derived (
-                 crate_id, readme, readme_format, readme_base_url, readme_base_image_url, crate_compressed_size, crate_decompressed_size, capitalized_name, lib_file, has_buildrs, is_nightly, is_yanked, has_code_of_conduct, manifest, language_stats)
+                 crate_id, readme, readme_format, readme_base_url, readme_base_image_url, crate_compressed_size, crate_decompressed_size, capitalized_name, lib_file, has_buildrs, is_nightly, is_yanked, has_code_of_conduct, manifest, language_stats,cache_key)
                 VALUES (
-                :crate_id,:readme,:readme_format,:readme_base_url,:readme_base_image_url,:crate_compressed_size,:crate_decompressed_size,:capitalized_name,:lib_file,:has_buildrs,:is_nightly,:is_yanked,:has_code_of_conduct,:manifest,:language_stats)
+                :crate_id,:readme,:readme_format,:readme_base_url,:readme_base_image_url,:crate_compressed_size,:crate_decompressed_size,:capitalized_name,:lib_file,:has_buildrs,:is_nightly,:is_yanked,:has_code_of_conduct,:manifest,:language_stats,:cache_key)
                 ")?;
 
             let args: &[&dyn ToSql] = &[&origin, &0, &0];
@@ -342,6 +355,7 @@ impl CrateDb {
 
             let manifest = rmp_serde::encode::to_vec_named(c.manifest).context("manifest rmp")?;
             let language_stats = rmp_serde::encode::to_vec_named(&c.source_data.language_stats).context("lang rmp")?;
+            let cache_key = c.cache_key as i64;
             let named_args: &[(&str, &dyn ToSql)] = &[
                 (":crate_id", &crate_id),
                 (":readme", &readme),
@@ -358,6 +372,7 @@ impl CrateDb {
                 (":has_code_of_conduct", &c.source_data.has_code_of_conduct),
                 (":manifest", &manifest),
                 (":language_stats", &language_stats),
+                (":cache_key", &cache_key),
             ];
             insert_derived.execute_named(named_args).context("insert_derived")?;
 

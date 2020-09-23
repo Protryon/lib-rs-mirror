@@ -746,11 +746,9 @@ impl KitchenSink {
         if let Ok(cached) = &data {
             match origin {
                 Origin::CratesIo(name) => {
-                    let expected_ver = self.index.crate_highest_version(name, false).context("error finding crates-io index data")?;
-                    let has = &cached.0.package().version;
-                    let wants = expected_ver.version();
-                    if has != wants {
-                        info!("Ignoring derived cache of {}, because it's {}, and crates-io is {}", name, has, wants);
+                    let expected_cache_key = self.index.cache_key_for_crate(name).context("error finding crates-io index data")?;
+                    if expected_cache_key != cached.cache_key {
+                        info!("Ignoring derived cache of {}, because it changed", name);
                         data = Err(KitchenSinkErr::CacheExpired.into());
                     }
                 },
@@ -758,8 +756,8 @@ impl KitchenSink {
             }
         }
 
-        let (manifest, derived) = match data {
-            Ok(v) => v,
+        let data = match data {
+            Ok(data) => data,
             Err(e) => {
                 debug!("Getting/indexing {:?}: {}", origin, e);
                 let reindex = timeout(Duration::from_secs(60), self.index_crate_highest_version(origin));
@@ -772,7 +770,7 @@ impl KitchenSink {
             },
         };
 
-        let krate = Arc::new(RichCrateVersion::new(origin.clone(), manifest, derived));
+        let krate = Arc::new(RichCrateVersion::new(origin.clone(), data.manifest, data.derived));
         let mut cache = self.loaded_rich_crate_version_cache.write();
         if cache.len() > 4000 {
             cache.clear();
@@ -1466,16 +1464,19 @@ impl KitchenSink {
 
         self.crate_db.before_index_latest(origin).await?;
 
-        let (source_data, manifest, _warn) = match origin {
+        let ((source_data, manifest, _warn), cache_key) = match origin {
             Origin::CratesIo(ref name) => {
+                let cache_key = self.index.cache_key_for_crate(name)?;
                 let ver = self.index.crate_highest_version(name, false).context("rich_crate_version2")?;
-                type_erase(self.rich_crate_version_data_from_crates_io(ver)).await.context("rich_crate_version_data_from_crates_io")?
+                let res = type_erase(self.rich_crate_version_data_from_crates_io(ver)).await.context("rich_crate_version_data_from_crates_io")?;
+                (res, cache_key)
             },
             Origin::GitHub { .. } | Origin::GitLab { .. } => {
                 if !self.crate_exists(origin) {
                     Err(KitchenSinkErr::GitCrateNotAllowed(origin.to_owned()))?
                 }
-                type_erase(self.rich_crate_version_from_repo(&origin)).await?
+                let res = type_erase(self.rich_crate_version_from_repo(&origin)).await?;
+                (res, 0)
             },
         };
 
@@ -1518,6 +1519,7 @@ impl KitchenSink {
         let extracted_auto_keywords = feat_extractor::auto_keywords(&manifest, source_data.github_description.as_deref(), readme_text.as_deref());
 
         self.crate_db.index_latest(CrateVersionData {
+            cache_key,
             category_slugs,
             authors: &authors,
             origin,

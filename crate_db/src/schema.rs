@@ -74,6 +74,7 @@ impl CrateDb {
                 is_nightly      INTEGER, -- bool
                 is_yanked       INTEGER, -- bool
                 has_code_of_conduct       INTEGER, -- bool
+                cache_key       INTEGER NOT NULL, -- u64
                 manifest        BLOB NOT NULL,
                 language_stats  BLOB NOT NULL
             );

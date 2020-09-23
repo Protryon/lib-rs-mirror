@@ -209,6 +209,21 @@ impl Index {
         .ok_or_else(|| DepsErr::CrateNotFound(Origin::from_crates_io_name(name)))
     }
 
+    /// Changes when crates-io metadata changes (something is published or yanked)
+    pub fn cache_key_for_crate(&self, name: &str) -> Result<u64, DepsErr> {
+        use std::hash::Hash;
+        use std::hash::Hasher;
+        let mut hasher = ahash::AHasher::default();
+
+        let c = self.crates_io_crate_by_lowercase_name(name)?;
+        for v in c.versions() {
+            v.version().hash(&mut hasher);
+            v.checksum().hash(&mut hasher);
+            v.is_yanked().hash(&mut hasher);
+        }
+        Ok(hasher.finish())
+    }
+
     pub fn crate_highest_version(&self, name: &str, stable_only: bool) -> Result<&Version, DepsErr> {
         debug_assert_eq!(name, name.to_ascii_lowercase());
         Ok(Self::highest_crates_io_version(self.crates_io_crate_by_lowercase_name(name)?, stable_only))

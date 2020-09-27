@@ -1209,10 +1209,13 @@ categories = ["1", "two", "GAMES", "science", "::science::math::"]
         authors: &[],
         category_slugs: &[],
         repository: None,
+        cache_key: 1,
         extracted_auto_keywords: Vec::new(),
     }).await.unwrap();
     assert_eq!(1, db.crates_with_keyword("test-crate").await.unwrap());
-    let (new_manifest, new_derived) = db.rich_crate_version_data(&origin).await.unwrap();
+    let new = db.rich_crate_version_data(&origin).await.unwrap();
+    let new_manifest = new.manifest;
+    let new_derived = new.derived;
     assert_eq!(manifest.package().name, new_manifest.package().name);
     assert_eq!(manifest.package().keywords, new_manifest.package().keywords);
     assert_eq!(manifest.package().categories, new_manifest.package().categories);

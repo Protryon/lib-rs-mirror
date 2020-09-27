@@ -4,7 +4,7 @@ data/*.xz
 data/Makefile
 data/index.html
 data/git
-data/tantivy
+data/tantivy*
 data/staging
 *.db-journal
 *.db-wal

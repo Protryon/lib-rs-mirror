@@ -173,6 +173,7 @@ pub struct KitchenSink {
     crates_io: crates_io_client::CratesIoClient,
     docs_rs: docs_rs_client::DocsRsClient,
     url_check_cache: TempCache<bool>,
+    readme_check_cache: TempCache<()>,
     crate_db: CrateDb,
     user_db: user_db::UserDb,
     gh: github_info::GitHub,
@@ -222,6 +223,7 @@ impl KitchenSink {
             crates_io: crates_io.context("cratesio")?,
             index: index.context("index")?,
             url_check_cache: TempCache::new(&data_path.join("url_check.db")).context("urlcheck")?,
+            readme_check_cache: TempCache::new(&data_path.join("readme_check.db")).context("readmecheck")?,
             docs_rs: docs_rs_client::DocsRsClient::new(data_path.join("docsrs.db")).context("docs")?,
             crate_db: CrateDb::new(Self::assert_exists(data_path.join("crate_data.db"))?).context("db")?,
             user_db: user_db::UserDb::new(Self::assert_exists(data_path.join("users.db"))?).context("udb")?,
@@ -1189,10 +1191,16 @@ impl KitchenSink {
     }
 
     async fn add_readme_from_crates_io(&self, meta: &mut CrateFile, name: &str, ver: &str) {
+        let key = format!("{}/{}", name, ver);
+        if let Ok(Some(_)) = self.readme_check_cache.get(key.as_str()) {
+            return;
+        }
+
         if let Ok(Some(html)) = self.crates_io.readme(name, ver).await {
             debug!("Found readme on crates.io {}@{}", name, ver);
             meta.readme = Some((String::new(), Markup::Html(String::from_utf8_lossy(&html).to_string())));
         } else {
+            let _ = self.readme_check_cache.set(key, ());
             debug!("No readme on crates.io for {}@{}", name, ver);
         }
     }
@@ -2367,8 +2375,8 @@ impl KitchenSink {
         let _ = self.crates_io_owners_cache.save();
         let _ = self.depender_changes.save();
         let _ = self.url_check_cache.save();
+        let _ = self.readme_check_cache.save();
         self.loaded_rich_crate_version_cache.write().clear();
-        let _ = self.url_check_cache.save();
         self.crates_io.cleanup();
     }
 

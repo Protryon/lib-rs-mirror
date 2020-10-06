@@ -146,8 +146,10 @@ pub enum KitchenSinkErr {
     Stopped,
     #[fail(display = "Deps stats timeout")]
     DepsNotAvailable,
-    #[fail(display = "Crate timeout")]
+    #[fail(display = "Crate data timeout")]
     DataTimedOut,
+    #[fail(display = "Crate derived cache timeout")]
+    DerivedDataTimedOut,
     #[fail(display = "Missing github login for crate owner")]
     OwnerWithoutLogin,
     #[fail(display = "Git index parsing failed: {}", _0)]
@@ -742,8 +744,8 @@ impl KitchenSink {
         }
         trace!("rich_crate_version_async MISS {:?}", origin);
 
-        let mut data = timeout(Duration::from_secs(7), self.crate_db.rich_crate_version_data(origin))
-            .await.map_err(|_| KitchenSinkErr::DataTimedOut)?;
+        let mut data = timeout(Duration::from_secs(2), self.crate_db.rich_crate_version_data(origin))
+            .await.map_err(|_| KitchenSinkErr::DerivedDataTimedOut)?;
 
         if let Ok(cached) = &data {
             match origin {
@@ -764,8 +766,8 @@ impl KitchenSink {
                 debug!("Getting/indexing {:?}: {}", origin, e);
                 let reindex = timeout(Duration::from_secs(60), self.index_crate_highest_version(origin));
                 type_erase(reindex).await.map_err(|_| KitchenSinkErr::DataTimedOut)??; // Pin to lower stack usage
-                let get_data = timeout(Duration::from_secs(30), self.crate_db.rich_crate_version_data(origin));
-                match type_erase(get_data).await.map_err(|_| KitchenSinkErr::DataTimedOut)? {
+                let get_data = timeout(Duration::from_secs(10), self.crate_db.rich_crate_version_data(origin));
+                match type_erase(get_data).await.map_err(|_| KitchenSinkErr::DerivedDataTimedOut)? {
                     Ok(v) => v,
                     Err(e) => return Err(e),
                 }

@@ -189,6 +189,7 @@ pub struct KitchenSink {
     crates_io_owners_cache: TempCache<Vec<CrateOwner>>,
     depender_changes: TempCache<Vec<DependerChanges>>,
     throttle: tokio::sync::Semaphore,
+    auto_indexing_throttle: tokio::sync::Semaphore,
     crev: Arc<Creviews>,
     data_path: PathBuf,
 }
@@ -240,6 +241,7 @@ impl KitchenSink {
             crates_io_owners_cache: TempCache::new(&data_path.join("cio-owners.tmp"))?,
             depender_changes: TempCache::new(&data_path.join("deps-changes2.tmp"))?,
             throttle: tokio::sync::Semaphore::new(40),
+            auto_indexing_throttle: tokio::sync::Semaphore::new(4),
             data_path: data_path.into(),
         })
         })
@@ -764,6 +766,7 @@ impl KitchenSink {
             Ok(data) => data,
             Err(e) => {
                 debug!("Getting/indexing {:?}: {}", origin, e);
+                let _th = timeout(Duration::from_secs(30), self.auto_indexing_throttle.acquire()).await?;
                 let reindex = timeout(Duration::from_secs(60), self.index_crate_highest_version(origin));
                 type_erase(reindex).await.map_err(|_| KitchenSinkErr::DataTimedOut)??; // Pin to lower stack usage
                 let get_data = timeout(Duration::from_secs(10), self.crate_db.rich_crate_version_data(origin));

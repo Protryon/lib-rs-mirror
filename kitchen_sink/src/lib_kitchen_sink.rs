@@ -1802,7 +1802,10 @@ impl KitchenSink {
                 // so pick one of them and track just that one version
                 let cachebust = self.cachebust_string_for_repo(crate_repo).await.context("contrib")?;
                 debug!("getting contributors for {:?}", repo);
-                let contributors = self.gh.contributors(repo, &cachebust).await.context("contributors")?.unwrap_or_default();
+                let contributors = match timeout(Duration::from_secs(10), self.gh.contributors(repo, &cachebust)).await {
+                    Ok(c) => c.context("contributors")?.unwrap_or_default(),
+                    Err(_timeout) => vec![],
+                };
                 if contributors.len() >= 100 {
                     hit_max_contributor_count = true;
                 }

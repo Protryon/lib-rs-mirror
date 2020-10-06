@@ -350,3 +350,19 @@ fn print_res<T>(res: Result<T, failure::Error>) {
 fn run_timeout<'a, T>(secs: u64, fut: impl Future<Output=Result<T, failure::Error>> + 'a) -> impl Future<Output=Result<T, failure::Error>> + 'a {
     tokio::time::timeout(Duration::from_secs(secs), fut).map(move |r| r.map_err(|_| failure::format_err!("timed out {}", secs)).and_then(|x| x))
 }
+
+
+#[test]
+fn stable_hash() {
+    use std::hash::Hasher;
+    use ahash::AHasher;
+
+    let mut hasher = AHasher::new_with_keys(1234, 5678);
+
+    hasher.write_u32(1989);
+    hasher.write_u8(11);
+    hasher.write_u8(9);
+    hasher.write(b"Huh?");
+
+    assert_eq!(6962876520762553374, hasher.finish());
+}

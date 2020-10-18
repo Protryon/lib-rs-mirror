@@ -1,12 +1,13 @@
 # Lib.rs (Crates.rs)
 
-[Lib.rs](https://lib.rs) is a fast, lightweight way to browse information about all applications and libraries written in [Rust](https://www.rust-lang.org/).
+[Lib.rs](https://lib.rs) is a fast, lightweight index of [Rust](https://www.rust-lang.org/) libraries and applications.
 
 Crates [published](https://doc.rust-lang.org/cargo/reference/publishing.html) to crates.io will automatically show up on lib.rs. Lib.rs is not a registry on its own, and it's not affiliated with crates.io or the Rust project.
 
 ## Building
 
  0. [Install Rust](https://www.rust-lang.org/install.html), [Node.js](https://nodejs.org/download/) (Node is used for [Sass styles](https://gitlab.com/crates.rs/style)), and [Docutils](http://docutils.sourceforge.net/) (for `.rst` readmes).
+    * Rust versions 1.46-1.48 are not supported due to a bug in the compiler. Until [the bug](https://github.com/rust-lang/rust/issues/75992) is fixed, use Rust 1.45.0: `rustup default 1.45.0`
 
  1. Clone this repository **recursively**, so that all subprojects are included:
 
@@ -52,16 +53,8 @@ If you'd like to help improve it:
     npm run build
     ```
 
- 4. Generate HTML (this may take a few minutes):
 
-    ```sh
-    cd ../front_end
-    cargo run --release --bin website
-    ```
-
-    If all goes well, this will create about 7000 HTML files in the `front_end/public/` directory.
-
- 4. Alternatively, start a local server:
+ 4. Start a local server (open it in a new terminal or run in the background):
 
      ```
      cd ../server
@@ -77,8 +70,10 @@ If you'd like to help improve it:
 
     This will launch a local web server on [localhost:3000](http://localhost:3000) that serves HTML from `front_end/public/` and *live reload* styles from `style/src/*.scss`, so you can browse the site and edit the styles locally.
 
+    Note that opening of the homepage for the first time takes *a long time*, because it may need to fetch and cache thousands of crates.
+
 ### Troubleshooting
 
 * If you get "patch for … in … did not resolve to any crates." error when building, delete `Cargo.lock` files from the project.
-
-
+* If you get "deadline elapsed" error pages, just refresh. Cache takes time.
+* Search won't work until you run `reindex_crates --all` from the `reindex` subproject.

@@ -28,4 +28,5 @@ ahash = "0.4.4"
 futures = "0.3.5"
 double-checked-cell-async = "2.0.2"
 triomphe = "0.1.1"
+smol_str = "=0.1.16" # https://github.com/rust-analyzer/smol_str/issues/27
 

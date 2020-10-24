@@ -10,7 +10,6 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::collections::HashSet;
 
-pub use parse_cfg::ParseError as CfgErr;
 pub use parse_cfg::{Cfg, Target};
 
 #[derive(Debug, Clone)]
@@ -290,7 +289,7 @@ impl RichCrateVersion {
     }
 
     /// Runtime, dev, build
-    pub fn direct_dependencies(&self) -> Result<(Vec<RichDep>, Vec<RichDep>, Vec<RichDep>), CfgErr> {
+    pub fn direct_dependencies(&self) -> (Vec<RichDep>, Vec<RichDep>, Vec<RichDep>) {
         self.manifest.direct_dependencies()
     }
 
@@ -306,7 +305,7 @@ impl RichCrateVersion {
 }
 
 pub trait ManifestExt {
-    fn direct_dependencies(&self) -> Result<(Vec<RichDep>, Vec<RichDep>, Vec<RichDep>), CfgErr>;
+    fn direct_dependencies(&self) -> (Vec<RichDep>, Vec<RichDep>, Vec<RichDep>);
     fn has_bin(&self) -> bool;
     fn has_cargo_bin(&self) -> bool;
     fn is_proc_macro(&self) -> bool;
@@ -351,7 +350,7 @@ impl ManifestExt for Manifest {
     }
 
     /// run dev build
-    fn direct_dependencies(&self) -> Result<(Vec<RichDep>, Vec<RichDep>, Vec<RichDep>), CfgErr> {
+    fn direct_dependencies(&self) -> (Vec<RichDep>, Vec<RichDep>, Vec<RichDep>) {
         fn to_dep((name, dep): (&String, &Dependency)) -> (String, RichDep) {
             let package = dep.package().unwrap_or(&name);
             (package.into(), RichDep {
@@ -367,28 +366,31 @@ impl ManifestExt for Manifest {
         let mut build: BTreeMap<String, RichDep> = self.build_dependencies.iter().map(to_dep).collect();
         let mut dev: BTreeMap<String, RichDep> = self.dev_dependencies.iter().map(to_dep).collect();
 
-        fn add_targets(dest: &mut BTreeMap<String, RichDep>, src: &DepsSet, target: &str) -> Result<(), CfgErr> {
+        fn add_targets(dest: &mut BTreeMap<String, RichDep>, src: &DepsSet, target: &str) {
             for (name, dep) in src {
                 use std::collections::btree_map::Entry::*;
                 let package = dep.package().unwrap_or(&name);
                 if let Vacant(e) = dest.entry(package.to_string()) {
+                    let mut only_for_targets = Vec::new();
+                    if let Ok(target) = target.parse().map_err(|e| log::warn!("Bad target '{}': {}", target, e)) {
+                        only_for_targets.push(target);
+                    }
                     e.insert(RichDep {
                         package: package.into(),
                         name: name.as_str().into(),
                         dep: dep.clone(),
-                        only_for_targets: vec![target.parse()?],
+                        only_for_targets,
                         only_for_features: BTreeMap::new(),
                         with_features: Vec::new(),
                     });
                     // otherwise don't add platform info to existing cross-platform deps
                 }
             }
-            Ok(())
         }
         for (ref target, ref plat) in &self.target {
-            add_targets(&mut normal, &plat.dependencies, target)?;
-            add_targets(&mut build, &plat.build_dependencies, target)?;
-            add_targets(&mut dev, &plat.dev_dependencies, target)?;
+            add_targets(&mut normal, &plat.dependencies, target);
+            add_targets(&mut build, &plat.build_dependencies, target);
+            add_targets(&mut dev, &plat.dev_dependencies, target);
         }
 
         // Don't display deps twice if they're required anyway
@@ -441,7 +443,7 @@ impl ManifestExt for Manifest {
             });
             dep
         }
-        Ok((convsort(normal), convsort(dev), convsort(build)))
+        (convsort(normal), convsort(dev), convsort(build))
     }
 }
 
@@ -466,13 +468,12 @@ impl RichDep {
         !self.only_for_features.is_empty()
     }
 
-    pub fn add_target(&mut self, target: &str) -> Result<(), CfgErr> {
+    pub fn add_target(&mut self, target: &str) {
         self.only_for_targets.push(
             target.parse().unwrap_or_else(|_| {
                 Target::Cfg(Cfg::Equal("target".to_string(), target.to_string()))
             }),
         );
-        Ok(())
     }
 }
 

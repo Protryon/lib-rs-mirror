@@ -111,7 +111,7 @@ impl IVersion for RichCrateVersion {
     type Features = std::collections::BTreeMap<String, Vec<String>>;
     fn name(&self) -> &str {self.short_name()}
     fn version(&self) -> &str {self.version()}
-    fn dependencies(&self) -> Fudge {Fudge::Manifest(self.direct_dependencies().unwrap())}
+    fn dependencies(&self) -> Fudge {Fudge::Manifest(self.direct_dependencies())}
     fn features(&self) -> &Self::Features {self.features()}
     fn is_yanked(&self) -> bool {self.is_yanked()}
 }

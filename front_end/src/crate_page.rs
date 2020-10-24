@@ -434,7 +434,7 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn direct_dependencies(&self) -> Option<(Vec<RichDep>, Vec<RichDep>, Vec<RichDep>)> {
-        self.ver.direct_dependencies().ok()
+        Some(self.ver.direct_dependencies())
     }
 
     pub fn up_to_date_class(&self, richdep: &RichDep) -> &str {

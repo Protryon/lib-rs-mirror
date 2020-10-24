@@ -58,7 +58,14 @@ struct ServerState {
 type AServerState = web::Data<ServerState>;
 
 fn main() {
-    env_logger::init();
+    let mut b = env_logger::Builder::from_default_env();
+    b.filter_module("html5ever", log::LevelFilter::Error);
+    b.filter_module("tokei", log::LevelFilter::Error);
+    b.filter_module("hyper", log::LevelFilter::Warn);
+    if cfg!(debug_assertions) {
+        b.filter_level(log::LevelFilter::Debug);
+    }
+    b.init();
 
     let mut sys = actix_rt::System::new("actix-server");
 

@@ -737,7 +737,16 @@ impl KitchenSink {
     /// This function is quite slow, as it reads everything about the crate.
     ///
     /// There's no support for getting anything else than the latest version.
-    pub async fn rich_crate_version_async(&self, origin: &Origin) -> CResult<ArcRichCrateVersion> {
+    pub fn rich_crate_version_async<'a>(&'a self, origin: &'a Origin) -> Pin<Box<dyn Future<Output=CResult<ArcRichCrateVersion>> + Send + 'a>> {
+        type_erase(self.rich_crate_version_async_opt(origin, false))
+    }
+
+    /// Same as rich_crate_version_async, but it won't try to refresh the data. Just fails if there's no cached data.
+    pub fn rich_crate_version_stale_is_ok<'a>(&'a self, origin: &'a Origin) -> Pin<Box<dyn Future<Output=CResult<ArcRichCrateVersion>> + Send + 'a>> {
+        type_erase(self.rich_crate_version_async_opt(origin, true))
+    }
+
+    async fn rich_crate_version_async_opt(&self, origin: &Origin, allow_stale: bool) -> CResult<ArcRichCrateVersion> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
 
         if let Some(krate) = self.loaded_rich_crate_version_cache.read().get(origin) {
@@ -746,31 +755,36 @@ impl KitchenSink {
         }
         trace!("rich_crate_version_async MISS {:?}", origin);
 
-        let mut data = timeout(Duration::from_secs(2), self.crate_db.rich_crate_version_data(origin))
+        let mut maybe_data = timeout(Duration::from_secs(2), self.crate_db.rich_crate_version_data(origin))
             .await.map_err(|_| KitchenSinkErr::DerivedDataTimedOut)?;
 
-        if let Ok(cached) = &data {
+        if let Ok(cached) = &maybe_data {
             match origin {
                 Origin::CratesIo(name) => {
-                    let expected_cache_key = self.index.cache_key_for_crate(name).context("error finding crates-io index data")?;
-                    if expected_cache_key != cached.cache_key {
-                        info!("Ignoring derived cache of {}, because it changed", name);
-                        data = Err(KitchenSinkErr::CacheExpired.into());
+                    if !allow_stale {
+                        let expected_cache_key = self.index.cache_key_for_crate(name).context("error finding crates-io index data")?;
+                        if expected_cache_key != cached.cache_key {
+                            info!("Ignoring derived cache of {}, because it changed", name);
+                            maybe_data = Err(KitchenSinkErr::CacheExpired.into());
+                        }
                     }
                 },
                 _ => {}, // TODO: figure out when to invalidate cache of git-repo crates
             }
         }
 
-        let data = match data {
+        let data = match maybe_data {
             Ok(data) => data,
             Err(e) => {
+                if allow_stale {
+                    return Err(e);
+                }
                 debug!("Getting/indexing {:?}: {}", origin, e);
                 let _th = timeout(Duration::from_secs(30), self.auto_indexing_throttle.acquire()).await?;
                 let reindex = timeout(Duration::from_secs(60), self.index_crate_highest_version(origin));
-                type_erase(reindex).await.map_err(|_| KitchenSinkErr::DataTimedOut)??; // Pin to lower stack usage
+                type_erase(reindex).await.map_err(|_| KitchenSinkErr::DataTimedOut)?.context("reindexing")?; // Pin to lower stack usage
                 let get_data = timeout(Duration::from_secs(10), self.crate_db.rich_crate_version_data(origin));
-                match type_erase(get_data).await.map_err(|_| KitchenSinkErr::DerivedDataTimedOut)? {
+                match type_erase(get_data).await.map_err(|_| KitchenSinkErr::DerivedDataTimedOut).context("getting data after reindex")? {
                     Ok(v) => v,
                     Err(e) => return Err(e),
                 }
@@ -778,11 +792,13 @@ impl KitchenSink {
         };
 
         let krate = Arc::new(RichCrateVersion::new(origin.clone(), data.manifest, data.derived));
-        let mut cache = self.loaded_rich_crate_version_cache.write();
-        if cache.len() > 4000 {
-            cache.clear();
+        if !allow_stale {
+            let mut cache = self.loaded_rich_crate_version_cache.write();
+            if cache.len() > 4000 {
+                cache.clear();
+            }
+            cache.insert(origin.clone(), krate.clone());
         }
-        cache.insert(origin.clone(), krate.clone());
         Ok(krate)
     }
 
@@ -2228,7 +2244,7 @@ impl KitchenSink {
     async fn knock_duplicates(&self, crates: &mut Vec<(Origin, f64)>) {
         let with_owners = futures::stream::iter(crates.drain(..))
         .map(|(o, score)| async move {
-            let get_crate = timeout(Duration::from_secs(1), self.rich_crate_version_async(&o));
+            let get_crate = timeout(Duration::from_secs(1), self.rich_crate_version_stale_is_ok(&o));
             let (k, owners) = futures::join!(get_crate, self.crate_owners(&o));
             let keywords = match k {
                 Ok(Ok(c)) => {

@@ -926,7 +926,7 @@ impl<'a> CratePage<'a> {
 
     async fn get_crate_of_dependency(&self, name: &str, _semver: ()) -> CResult<ArcRichCrateVersion> {
         // FIXME: caching doesn't hold multiple versions, so fetchnig of precise old versions is super expensive
-        self.kitchen_sink.rich_crate_version_async(&Origin::from_crates_io_name(name)).await
+        self.kitchen_sink.rich_crate_version_stale_is_ok(&Origin::from_crates_io_name(name)).await
 
         // let krate = self.kitchen_sink.index.crate_by_name(&Origin::from_crates_io_name(name))?;
         // let ver = krate.versions()

@@ -257,7 +257,8 @@ async fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrat
     });
 
     let downloads_per_month = crates.downloads_per_month_or_equivalent(all.origin()).await.expect("dl numbers").unwrap_or(0) as u32;
-    let dependency_freshness = if let Ok((runtime, _, build)) = k.direct_dependencies() {
+    let (runtime, _, build) = k.direct_dependencies();
+    let dependency_freshness = {
         // outdated dev deps don't matter
         join_all(runtime.iter().chain(&build).filter_map(|richdep| {
             if !richdep.dep.is_crates_io() {
@@ -276,8 +277,6 @@ async fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrat
             else {popularity}
         })
         .collect()
-    } else {
-        Vec::new()
     };
 
     let mut temp_inp = CrateTemporalInputs {

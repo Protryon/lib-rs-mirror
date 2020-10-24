@@ -15,6 +15,7 @@ use kitchen_sink::CrateAuthor;
 use kitchen_sink::DepInfMap;
 use kitchen_sink::{DepTy, KitchenSink, Origin};
 use locale::Numeric;
+use log::warn;
 use render_readme::Links;
 use render_readme::Renderer;
 use rich_crate::Readme;
@@ -283,7 +284,7 @@ impl<'a> CratePage<'a> {
             let base = docs_url.as_ref().map(|u| (u.as_str(), u.as_str()));
             let (html, warnings) = self.markup.page(&markup, base, self.nofollow(), Some(self.ver.short_name()));
             if !warnings.is_empty() {
-                eprintln!("{} lib: {:?}", self.ver.short_name(), warnings);
+                warn!("{} lib: {:?}", self.ver.short_name(), warnings);
             }
             templates::Html(html)
         })
@@ -305,7 +306,7 @@ impl<'a> CratePage<'a> {
         };
         let (html, warnings) = self.markup.page(&readme.markup, urls, self.nofollow(), Some(self.ver.short_name()));
         if !warnings.is_empty() {
-            eprintln!("{} readme: {:?}", self.ver.short_name(), warnings);
+            warn!("{} readme: {:?}", self.ver.short_name(), warnings);
         }
         templates::Html(html)
     }
@@ -723,7 +724,7 @@ impl<'a> CratePage<'a> {
         self.all.versions().iter().filter_map(|v| Some(Version {
             yanked: v.yanked,
             num: &v.num,
-            semver: SemVer::parse(&v.num).map_err(|e| eprintln!("semver parse {} {:?}", e, v.num)).ok()?,
+            semver: SemVer::parse(&v.num).map_err(|e| warn!("semver parse {} {:?}", e, v.num)).ok()?,
             created_at: DateTime::parse_from_rfc3339(&v.created_at).expect("created_at parse"),
         }))
     }
@@ -757,7 +758,7 @@ impl<'a> CratePage<'a> {
 
         let dl = downloads_per_month_or_equivalent.unwrap_or(100);
         let min_recent_downloads = (dl as u32 / 2).min(200);
-        kitchen_sink.related_crates(ver, min_recent_downloads).await.map_err(|e| eprintln!("related crates fail: {}", e)).ok()
+        kitchen_sink.related_crates(ver, min_recent_downloads).await.map_err(|e| warn!("related crates fail: {}", e)).ok()
     }
 
     /// data for piechart
@@ -825,7 +826,7 @@ impl<'a> CratePage<'a> {
                 let krate = match self.get_crate_of_dependency(&name, ()).await {
                     Ok(k) => k,
                     Err(e) => {
-                        eprintln!("bad dep not counted: {}", e);
+                        warn!("bad dep not counted: {}", e);
                         return None;
                     },
                 };

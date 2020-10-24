@@ -52,6 +52,7 @@ Crate pages highlight out-of-date dependency versions:
 * If there's a version number in bold dark red, the crate uses outdated or deprecated version of the dependency.
 
 
+## Policies
 
-
+lib.rs follows crates-io's policies and Rust's [Code of Conduct](https://www.rust-lang.org/policies/code-of-conduct).
 

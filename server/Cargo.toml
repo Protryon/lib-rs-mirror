@@ -26,7 +26,7 @@ assets = [
 
 [dependencies]
 actix-web = "2.0.0"
-env_logger = "0.7.1"
+env_logger = "0.8"
 log = "0.4.8"
 render_readme = { path = "../render_readme", version = "0.7" }
 search_index = { path = "../search_index" }
@@ -49,5 +49,5 @@ either = "1.5.3"
 qstring = "0.7.2"
 chrono = "0.4.12"
 blake3 = { version = "0.3.4", default-features = false }
-base64 = "0.12.3"
+base64 = "0.13"
 html-minifier = "3"

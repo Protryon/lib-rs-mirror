@@ -277,7 +277,13 @@ fn process_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users:
                         }
                     },
                     1 => {
-                        let u = teams.get(&o.owner_id).expect("owner consistency");
+                        let u = match teams.get(&o.owner_id) {
+                            Some(t) => t,
+                            None => {
+                                eprintln!("error: id {} is not in {} teams. Bad obj: {:?}", o.owner_id, teams.len(), o);
+                                return None;
+                            },
+                        };
                         CrateOwner {
                             login: u.login.to_owned(),
                             invited_at: Some(invited_at),
@@ -312,7 +318,7 @@ fn process_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users:
     }).collect()
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 struct CrateOwnerRow {
     crate_id: u32,
     created_at: String,

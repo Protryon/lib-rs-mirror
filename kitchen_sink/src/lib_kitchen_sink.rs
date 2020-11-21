@@ -782,7 +782,8 @@ impl KitchenSink {
                 debug!("Getting/indexing {:?}: {}", origin, e);
                 let _th = timeout(Duration::from_secs(30), self.auto_indexing_throttle.acquire()).await?;
                 let reindex = timeout(Duration::from_secs(60), self.index_crate_highest_version(origin));
-                type_erase(reindex).await.map_err(|_| KitchenSinkErr::DataTimedOut)?.context("reindexing")?; // Pin to lower stack usage
+                type_erase(reindex).await.map_err(|_| KitchenSinkErr::DataTimedOut)?
+                    .with_context(|_| format!("reindexing {:?}", origin))?; // Pin to lower stack usage
                 let get_data = timeout(Duration::from_secs(10), self.crate_db.rich_crate_version_data(origin));
                 match type_erase(get_data).await.map_err(|_| KitchenSinkErr::DerivedDataTimedOut).context("getting data after reindex")? {
                     Ok(v) => v,

@@ -24,7 +24,7 @@ semver-parser = "0.9.0"
 semver = { version = "0.10.0", features = ["serde"] }
 string-interner = "0.12.0"
 parking_lot = "0.11.0"
-ahash = "0.4.4"
+ahash = "0.6"
 futures = "0.3.5"
 double-checked-cell-async = "2.0.2"
 triomphe = "0.1.1"

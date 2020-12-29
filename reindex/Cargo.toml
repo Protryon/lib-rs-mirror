@@ -25,4 +25,4 @@ simple_cache = { path = "../simple_cache", version = "0.7.0" }
 blake3 = "0.3.4"
 
 [dev-dependencies]
-ahash = "0.4.5"
+ahash = "0.6"

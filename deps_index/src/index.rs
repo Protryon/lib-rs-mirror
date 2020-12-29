@@ -535,5 +535,5 @@ fn stable_hash() {
     hasher.write_u8(9);
     hasher.write(b"Huh?");
 
-    assert_eq!(6962876520762553374, hasher.finish());
+    assert_eq!(13780556590398363848, hasher.finish());
 }

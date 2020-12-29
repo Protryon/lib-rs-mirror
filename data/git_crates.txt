@@ -17,9 +17,6 @@ github:andars/pebble.rs/pebble
 github:andschwa/rust-genetic-algorithm/rust-genetic-algorithm
 github:arthrp/consoletimer/consoletimer
 github:arthrp/quick-skeleton/quickskeleton
-github:artichoke/artichoke/artichoke-backend
-github:artichoke/artichoke/artichoke-core
-github:artichoke/artichoke/artichoke-frontend
 github:atom-archive/xray/xray_cli
 github:atom-archive/xray/xray_core
 github:atom-archive/xray/xray_server

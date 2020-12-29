@@ -15,7 +15,7 @@ serde = "1.0.107"
 serde_json = "1.0.52"
 serde_derive = "1.0.107"
 scopeguard = "1.1.0"
-rand = "0.7.3"
+rand = "0.8"
 crate_db = { path = "../crate_db", version = "0.4.5" }
 lts = "0.1.5"
 crates-index = "0.16"

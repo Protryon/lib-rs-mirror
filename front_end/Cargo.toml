@@ -10,7 +10,7 @@ name = "front_end"
 path = "src/front_end.rs"
 
 [build-dependencies]
-ructe = "0.12"
+ructe = "0.13"
 
 [dependencies]
 kitchen_sink = { path = "../kitchen_sink", version = "0.9" }

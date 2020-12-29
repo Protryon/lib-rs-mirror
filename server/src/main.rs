@@ -92,10 +92,10 @@ fn main() {
 
 async fn run_server(rt: Handle) -> Result<(), failure::Error> {
     unsafe {
-        signal_hook::register(signal_hook::SIGHUP, || HUP_SIGNAL.store(1, Ordering::SeqCst))
+        signal_hook::low_level::register(signal_hook::consts::SIGHUP, || HUP_SIGNAL.store(1, Ordering::SeqCst))
     }?;
     unsafe {
-        signal_hook::register(signal_hook::SIGUSR1, || HUP_SIGNAL.store(1, Ordering::SeqCst))
+        signal_hook::low_level::register(signal_hook::consts::SIGUSR1, || HUP_SIGNAL.store(1, Ordering::SeqCst))
     }?;
 
     kitchen_sink::dont_hijack_ctrlc();

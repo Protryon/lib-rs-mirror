@@ -1,6 +1,6 @@
 [package]
 name = "crates-server"
-version = "1.0.5"
+version = "1.0.6"
 authors = ["Kornel <kornel@geekhood.net>"]
 edition = "2018"
 description = "Crates.rs web server"
@@ -37,8 +37,8 @@ urlencoding = "1.1.1"
 failure = "0.1.8"
 tokio = { version = "0.2.21", features = ["rt-threaded", "macros", "time"] }
 categories = { path = "../categories" }
-arc-swap = "0.4.7"
-signal-hook = "0.1.16"
+arc-swap = "1"
+signal-hook = "0.3"
 locale = "0.2.2"
 cap = "0.1.0"
 actix-rt = "1.1.1"

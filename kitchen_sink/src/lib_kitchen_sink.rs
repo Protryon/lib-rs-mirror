@@ -975,7 +975,7 @@ impl KitchenSink {
             }
         }
 
-        if let Origin::CratesIo(_) = &origin {
+        if origin.is_crates_io() {
             // Delete the original docs.rs link, because we have our own
             // TODO: what if the link was to another crate or a subpage?
             if package.documentation.as_ref().map_or(false, |s| Self::is_docs_rs_link(s)) {
@@ -1295,10 +1295,10 @@ impl KitchenSink {
 
     /// name is case-sensitive!
     pub async fn has_docs_rs(&self, origin: &Origin, name: &str, ver: &str) -> bool {
-        match origin {
-            Origin::CratesIo(_) => type_erase(self.docs_rs.builds(name, ver)).await.unwrap_or(true), // fail open
-            _ => false,
+        if !origin.is_crates_io() {
+            return false;
         }
+        type_erase(self.docs_rs.builds(name, ver)).await.unwrap_or(true) // fail open
     }
 
     fn is_same_url<A: AsRef<str> + std::fmt::Debug>(a: Option<A>, b: Option<&String>) -> bool {

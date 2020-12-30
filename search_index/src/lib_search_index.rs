@@ -124,7 +124,7 @@ impl CrateSearchIndex {
                 description: take_string(doc.remove("description")),
                 keywords: take_string(doc.remove("keywords")),
                 version: take_string(doc.remove("crate_version")),
-                monthly_downloads: if let Origin::CratesIo(_) = &origin {take_int(doc.get("monthly_downloads"))} else {0},
+                monthly_downloads: if origin.is_crates_io() { take_int(doc.get("monthly_downloads")) } else { 0 },
                 origin,
             })
         })

@@ -47,7 +47,7 @@
                     <h2>Installing @for bin in &bins {<code>@bin</code> } executables</h2>
                 }
                 <p>Assuming you have <a href="https://www.rust-lang.org/tools/install">Rust/Cargo installed</a>, run this command in a terminal:</p>
-                @if let Origin::CratesIo(_) = c.ver.origin() {
+                @if c.ver.origin().is_crates_io() {
                     <pre class="to-copy"><code><b>cargo install</b> -f @c.ver.short_name()</code></pre>
                 }
                 @if let Some((repo, package)) = c.ver.origin().clone().into_repo() {
@@ -85,7 +85,7 @@
             }
             }
             <p>To add it manually, edit your project's <code>Cargo.toml</code> file and add to the @if c.is_build {<code>[build-dependencies]</code> or} <code>[dependencies]</code> section:</p>
-            @if let Origin::CratesIo(_) = c.ver.origin() {
+            @if c.ver.origin().is_crates_io() {
                 <pre class="to-copy @if c.is_build {build-}dependencies-toml"><code>@c.ver.short_name() = "@c.ver.version()"</code></pre>
             }
             @if let Some((repo, package)) = c.ver.origin().clone().into_repo() {
@@ -106,7 +106,7 @@
                 <pre class="to-copy cargo-edit"><code><b>cargo add</b> @package --git @repo.canonical_git_url().unwrap()</code></pre>
             }
             <p>To add it manually, edit your project's <code>Cargo.toml</code> file and add to the <code>[dependencies]</code> section:</p>
-            @if let Origin::CratesIo(_) = c.ver.origin() {
+            @if c.ver.origin().is_crates_io() {
                 <pre class="to-copy dependencies-toml"><code>@c.ver.short_name() = "@c.ver.version()"</code></pre>
             }
             @if let Some((repo, package)) = c.ver.origin().clone().into_repo() {

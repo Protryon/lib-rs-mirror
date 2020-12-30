@@ -319,7 +319,7 @@ async fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrat
         is_sub_component: crates.is_sub_component(k).await,
         is_autopublished: is_autopublished(&k),
         is_deprecated: is_deprecated(&k),
-        is_crates_io_published: if let Origin::CratesIo(_) = k.origin() {true} else {false},
+        is_crates_io_published: k.origin().is_crates_io(),
         is_yanked: k.is_yanked(),
         is_squatspam: is_squatspam(&k),
     });

@@ -7,7 +7,7 @@ Crates [published](https://doc.rust-lang.org/cargo/reference/publishing.html) to
 ## Building
 
  0. [Install Rust](https://www.rust-lang.org/install.html), [Node.js](https://nodejs.org/download/) (Node is used for [Sass styles](https://gitlab.com/crates.rs/style)), and [Docutils](http://docutils.sourceforge.net/) (for `.rst` readmes).
-    * Rust versions 1.46-1.48 are not supported due to a bug in the compiler. Until [the bug](https://github.com/rust-lang/rust/issues/75992) is fixed, use Rust 1.45.0: `rustup default 1.45.0`
+    * Rust 1.48 or later
 
  1. Clone this repository **recursively**, so that all subprojects are included:
 

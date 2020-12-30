@@ -673,7 +673,7 @@ impl<'a> CratePage<'a> {
                 RepoHost::Other => url_domain(&url).map(|host| format!("{} ({})", label_prefix, host)).unwrap_or_else(|| label_prefix.to_string()),
             };
             Some((url, label))
-        } else if self.has_docs_rs {
+        } else if self.ver.origin().is_crates_io() {
             // crates without a repo get docs.rs' HTTP crate file viewer link
             Some((format!("https://docs.rs/crate/{}/{}/source/", self.ver.short_name(), self.ver.version()).into(), "Source".into()))
         } else {

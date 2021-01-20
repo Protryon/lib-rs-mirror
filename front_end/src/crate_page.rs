@@ -73,7 +73,6 @@ pub struct CratePage<'a> {
     keywords_populated: Vec<(String, bool)>,
     parent_crate: Option<ArcRichCrateVersion>,
     downloads_per_month_or_equivalent: Option<usize>,
-    has_docs_rs: bool,
     pub has_reviews: bool,
 }
 
@@ -177,7 +176,6 @@ impl<'a> CratePage<'a> {
             parent_crate,
             downloads_per_month_or_equivalent,
             has_reviews,
-            has_docs_rs,
         };
         let (sizes, lang_stats, viral_license) = page.crate_size_and_viral_license(deps?).await?;
         page.sizes = Some(sizes);

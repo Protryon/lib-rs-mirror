@@ -71,6 +71,10 @@ pub struct CrateTemporalInputs<'a> {
     pub number_of_indirect_reverse_deps: u32,
     /// Includes non-optional (i.e. it's the upper bound, not just the optional ones)
     pub number_of_indirect_reverse_optional_deps: u32,
+
+    /// Whether Debian has packaged this crate
+    pub is_in_debian: bool,
+
     // most recent commit
     // avg time issues are left unanswered?
     // pub crate_score_context_free: f64,
@@ -335,6 +339,12 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs<'_>) -> Score {
     // if it's new, it doesn't have to have many downloads.
     // if it's aging, it'd better have more users
     score.has("Any traction", 2, (cr.downloads_per_month as f64 * freshness_score) > 1000.);
+
+    // Score added in an unusual way, because not being in Debian is not neccessarily a bad thing
+    // (e.g. a crate may be for Windows or Mac only)
+    if cr.is_in_debian {
+        score.has("Debian endorsement", 2, true);
+    }
 
     // Don't expect apps to have rev deps (omitting these entirely proprtionally increases importance of other factors)
     if !is_app_only {

@@ -26,6 +26,7 @@ members = [
 "server",
 "feat_extractor",
 "deps_index",
+"debcargo_list",
 ]
 
 [profile.dev]

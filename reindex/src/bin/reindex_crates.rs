@@ -22,9 +22,11 @@ use tokio::sync::mpsc;
 use triomphe::Arc;
 use udedokei::LanguageExt;
 use feat_extractor::*;
+use debcargo_list::DebcargoList;
 
 struct Reindexer {
     crates: KitchenSink,
+    deblist: DebcargoList,
 }
 
 fn main() {
@@ -46,8 +48,13 @@ fn main() {
         .unwrap();
 
     let crates = rt.block_on(kitchen_sink::KitchenSink::new_default()).unwrap();
+    let deblist = DebcargoList::new(crates.main_cache_dir()).expect("deblist");
+    if everything {
+        deblist.update().expect("debcargo"); // it needs to be updated sometime, but not frequently
+    }
     let r = Arc::new(Reindexer {
         crates,
+        deblist,
     });
     let mut indexer = Indexer::new(CrateSearchIndex::new(r.crates.main_cache_dir()).expect("init search")).expect("init search indexer");
     let lines = TempCache::new(r.crates.main_cache_dir().join("search-uniq-lines.dat")).expect("init lines cache");
@@ -290,6 +297,8 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
         .collect()
     };
 
+    let is_in_debian = self.deblist.has(k.short_name()).map_err(|e| eprintln!("debcargo check: {}", e)).unwrap_or(false);
+
     let mut temp_inp = CrateTemporalInputs {
         versions: all.versions(),
         is_app: k.is_app(),
@@ -301,6 +310,7 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
         number_of_indirect_reverse_deps: 0,
         number_of_indirect_reverse_optional_deps: 0,
         dependency_freshness,
+        is_in_debian,
     };
 
     if let Some(deps) = crates.crates_io_dependents_stats_of(k.origin()).await.expect("depsstats") {

@@ -22,6 +22,7 @@ tokio = { version = "0.2.11", features = ["rt-threaded", "macros", "sync", "bloc
 futures = "0.3.4"
 triomphe = "0.1.1"
 simple_cache = { path = "../simple_cache", version = "0.7.0" }
+debcargo_list = { path = "../debcargo_list" }
 blake3 = "0.3.4"
 
 [dev-dependencies]

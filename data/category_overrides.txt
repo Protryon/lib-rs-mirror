@@ -207,6 +207,9 @@ cuckoocache: concurrency, caching, data-structures
 cute-dnd-dice: game-development
 cvssrust: parser-implementations
 cxmr-util-servers : web-programming::http-server
+czkawka_core: command-line-utilities, filesystem
+czkawka_gui: filesystem, visualization
+czkawka_gui_orbtk: filesystem, visualization
 d4t4: parser-implementations
 darling_core: development-tools::procedural-macro-helpers
 dbcrossbar: databases
@@ -827,6 +830,7 @@ ppg: command-line-utilities, authentication
 pq-sys: database
 preftool-env: config
 pretty: text-processing, command-line-interface
+printpdf: text-processing
 proc-concat-bytes: data-structures, rust-patterns
 process-memory-reader: development-tools::debugging
 prodash: asynchronous, visualization

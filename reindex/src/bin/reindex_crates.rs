@@ -23,6 +23,10 @@ use triomphe::Arc;
 use udedokei::LanguageExt;
 use feat_extractor::*;
 
+struct Reindexer {
+    crates: KitchenSink,
+}
+
 fn main() {
     let everything = std::env::args().nth(1).map_or(false, |a| a == "--all");
     let specific: Vec<_> = if !everything {
@@ -41,10 +45,12 @@ fn main() {
         .build()
         .unwrap();
 
-    let crates = rt.block_on(kitchen_sink::KitchenSink::new_default());
-    let crates = Arc::new(crates.unwrap());
-    let mut indexer = Indexer::new(CrateSearchIndex::new(crates.main_cache_dir()).expect("init search")).expect("init search indexer");
-    let lines = TempCache::new(crates.main_cache_dir().join("search-uniq-lines.dat")).expect("init lines cache");
+    let crates = rt.block_on(kitchen_sink::KitchenSink::new_default()).unwrap();
+    let r = Arc::new(Reindexer {
+        crates,
+    });
+    let mut indexer = Indexer::new(CrateSearchIndex::new(r.crates.main_cache_dir()).expect("init search")).expect("init search indexer");
+    let lines = TempCache::new(r.crates.main_cache_dir().join("search-uniq-lines.dat")).expect("init lines cache");
     let (tx, mut rx) = mpsc::channel::<(Arc<_>, _, _)>(64);
 
     let index_thread = rt.spawn({
@@ -72,34 +78,34 @@ fn main() {
     });
 
     let c: Box<dyn Iterator<Item=Origin> + Send> = if everything {
-        let mut c: Vec<_> = crates.all_crates().collect::<Vec<_>>();
+        let mut c: Vec<_> = r.crates.all_crates().collect::<Vec<_>>();
         c.shuffle(&mut thread_rng());
         Box::new(c.into_iter())
     } else if !specific.is_empty() {
         Box::new(specific.into_iter())
     } else {
-        Box::new(rt.block_on(crates.crates_to_reindex()).unwrap().into_iter().map(|c| c.origin().clone()))
+        Box::new(rt.block_on(r.crates.crates_to_reindex()).unwrap().into_iter().map(|c| c.origin().clone()))
     };
 
     rt.block_on(rt.spawn(async move {
-        main_indexing_loop(crates, c, tx, repos).await;
+        main_indexing_loop(r, c, tx, repos).await;
         if stopped() {return;}
         index_thread.await.unwrap().unwrap();
     })).unwrap();
 }
 
-async fn main_indexing_loop(crates: Arc<KitchenSink>, c: Box<dyn Iterator<Item=Origin> + Send>, tx: mpsc::Sender<(Arc<RichCrateVersion>, usize, f64)>, repos: bool) {
+async fn main_indexing_loop(r: Arc<Reindexer>, crate_origins: Box<dyn Iterator<Item=Origin> + Send>, tx: mpsc::Sender<(Arc<RichCrateVersion>, usize, f64)>, repos: bool) {
     let renderer = Arc::new(Renderer::new(None));
     let waiting = futures::stream::FuturesUnordered::new();
     let handle = Arc::new(tokio::runtime::Handle::current());
     let seen_repos = Arc::new(Mutex::new(HashSet::new()));
     let concurrency = Arc::new(tokio::sync::Semaphore::new(16));
     let repo_concurrency = Arc::new(tokio::sync::Semaphore::new(4));
-    for (i, origin) in c.enumerate() {
+    for (i, origin) in crate_origins.enumerate() {
         if stopped() {
             return;
         }
-        let crates = Arc::clone(&crates);
+        let r = Arc::clone(&r);
         let handle = Arc::clone(&handle);
         let concurrency = Arc::clone(&concurrency);
         let repo_concurrency = Arc::clone(&repo_concurrency);
@@ -110,7 +116,7 @@ async fn main_indexing_loop(crates: Arc<KitchenSink>, c: Box<dyn Iterator<Item=O
             let index_finished = concurrency.acquire().await;
             if stopped() {return;}
             println!("{}…", i);
-            match run_timeout(62, crates.index_crate_highest_version(&origin)).await {
+            match run_timeout(62, r.crates.index_crate_highest_version(&origin)).await {
                 Ok(()) => {},
                 err => {
                     print_res(err);
@@ -118,7 +124,7 @@ async fn main_indexing_loop(crates: Arc<KitchenSink>, c: Box<dyn Iterator<Item=O
                 },
             }
             if stopped() {return;}
-            match run_timeout(70, index_crate(&crates, &origin, &renderer, &mut tx)).await {
+            match run_timeout(70, r.index_crate(&origin, &renderer, &mut tx)).await {
                 Ok(v) => {
                     drop(index_finished);
                     if repos {
@@ -134,7 +140,7 @@ async fn main_indexing_loop(crates: Arc<KitchenSink>, c: Box<dyn Iterator<Item=O
                             }
                             let _finished = repo_concurrency.acquire().await;
                             if stopped() {return;}
-                            print_res(run_timeout(600, crates.index_repo(repo, v.version())).await);
+                            print_res(run_timeout(600, r.crates.index_repo(repo, v.version())).await);
                         }
                     }
                 },
@@ -147,10 +153,12 @@ async fn main_indexing_loop(crates: Arc<KitchenSink>, c: Box<dyn Iterator<Item=O
     waiting.collect::<()>().await;
 }
 
-async fn index_crate(crates: &KitchenSink, origin: &Origin, renderer: &Renderer, search_sender: &mut mpsc::Sender<(ArcRichCrateVersion, usize, f64)>) -> Result<ArcRichCrateVersion, failure::Error> {
+impl Reindexer {
+async fn index_crate(&self, origin: &Origin, renderer: &Renderer, search_sender: &mut mpsc::Sender<(ArcRichCrateVersion, usize, f64)>) -> Result<ArcRichCrateVersion, failure::Error> {
+    let crates = &self.crates;
     let (k, v) = futures::try_join!(crates.rich_crate_async(origin), run_timeout(45, crates.rich_crate_version_async(origin)))?;
 
-    let (downloads_per_month, score) = crate_overall_score(crates, &k, &v, renderer).await;
+    let (downloads_per_month, score) = self.crate_overall_score(&k, &v, renderer).await;
     let (_, index_res) = futures::join!(
         async {
             search_sender.send((v.clone(), downloads_per_month, score)).await
@@ -160,6 +168,7 @@ async fn index_crate(crates: &KitchenSink, origin: &Origin, renderer: &Renderer,
     );
     index_res?;
     Ok(v)
+}
 }
 
 fn index_search(indexer: &mut Indexer, lines: &TempCache<(String, f64), [u8; 16]>, renderer: &Renderer, k: &RichCrateVersion, downloads_per_month: usize, score: f64) -> Result<(), failure::Error> {
@@ -211,7 +220,9 @@ fn index_search(indexer: &mut Indexer, lines: &TempCache<(String, f64), [u8; 16]
     Ok(())
 }
 
-async fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) -> (usize, f64) {
+impl Reindexer {
+async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) -> (usize, f64) {
+    let crates = &self.crates;
     let contrib_info = crates.all_contributors(&k).await.map_err(|e| eprintln!("{}", e)).ok();
     let contributors_count = if let Some((authors, _owner_only, _, extra_contributors)) = &contrib_info {
         (authors.len() + extra_contributors) as u32
@@ -325,6 +336,7 @@ async fn crate_overall_score(crates: &KitchenSink, all: &RichCrate, k: &RichCrat
     });
 
     (downloads_per_month as usize, score)
+}
 }
 
 fn print_res<T>(res: Result<T, failure::Error>) {

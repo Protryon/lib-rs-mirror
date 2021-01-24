@@ -142,6 +142,7 @@ impl Index {
     pub fn new(data_dir: &Path) -> Result<Self, DepsErr> {
         let crates_index_path = data_dir.join("index");
         let crates_io_index = crates_index::Index::new(&crates_index_path);
+        #[allow(deprecated)]
         let indexed_crates: FxHashMap<_,_> = crates_io_index.crate_index_paths().par_bridge()
                 .filter_map(|path| {
                     let c = crates_index::Crate::new(path).ok()?;

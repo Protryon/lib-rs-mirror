@@ -62,6 +62,8 @@ impl CrateDb {
 
             CREATE TABLE IF NOT EXISTS crate_derived (
                 crate_id        INTEGER NOT NULL UNIQUE,
+                keywords        TEXT NOT NULL, -- comma-separated filtered kebab-cased
+                categories      TEXT NOT NULL, -- comma-separated filtered slugs
                 readme          TEXT,
                 readme_format   TEXT,
                 readme_base_url TEXT,

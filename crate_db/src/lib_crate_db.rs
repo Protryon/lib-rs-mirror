@@ -135,6 +135,8 @@ impl CrateDb {
             crate_compressed_size: u32,
             crate_decompressed_size: u32,
             lib_file: Option<String>,
+            keywords: Vec<String>,
+            categories: Vec<String>,
             has_buildrs: bool,
             is_nightly: bool,
             is_yanked: bool,
@@ -163,6 +165,8 @@ impl CrateDb {
                     };
 
                     let manifest = row.get_raw("manifest").as_blob()?;
+                    let keywords = row.get_raw("keywords").as_str()?.split(',').filter(|s| s.len() > 0).map(String::from).collect::<Vec<_>>();
+                    let categories = row.get_raw("categories").as_str()?.split(',').filter(|s| s.len() > 0).map(String::from).collect::<Vec<_>>();
                     let manifest = rmp_serde::from_slice(manifest).map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
                     let language_stats = row.get_raw("language_stats").as_blob()?;
                     let language_stats = rmp_serde::from_slice(language_stats).map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
@@ -177,6 +181,8 @@ impl CrateDb {
                         is_yanked: row.get("is_yanked")?,
                         has_code_of_conduct: row.get("has_code_of_conduct")?,
                         cache_key: cache_key as u64,
+                        keywords,
+                        categories,
                     }, language_stats))
                 })?;
 
@@ -188,22 +194,18 @@ impl CrateDb {
                 None => None,
             };
 
-            let keywords: HashSet<_> = package.keywords.iter().filter(|k| !k.is_empty()).map(|s| s.to_kebab_case()).collect();
-            let keywords_derived = if keywords.is_empty() {
-                Some(self.keywords_tx(conn, &origin).context("keywordsdb2")?)
+            let keywords = if row.keywords.is_empty() {
+                self.keywords_tx(conn, &origin).context("keywordsdb2")?
             } else {
-                None
+                row.keywords
             };
-            let mut warnings = Vec::new();
-            let categories = if categories::Categories::fixed_category_slugs(&package.categories, &mut warnings).is_empty() {
-                Some(self.crate_categories_tx(conn, &origin, &keywords, 0.1).context("catdb")?
-                    .into_iter().map(|(_, c)| c).collect())
+            let categories = if row.categories.is_empty() {
+                let keywords = keywords.iter().cloned().collect();
+                self.crate_categories_tx(conn, &origin, &keywords, 0.1).context("catdb")?
+                    .into_iter().map(|(_, c)| c).collect()
             } else {
-                None
+                row.categories
             };
-            if !warnings.is_empty() {
-                eprintln!("{}: {}", name, warnings.join("; "));
-            }
 
             Ok(CachedCrate {
                 cache_key: row.cache_key,
@@ -215,7 +217,7 @@ impl CrateDb {
                 capitalized_name: row.capitalized_name,
                 crate_compressed_size: row.crate_compressed_size,
                 crate_decompressed_size: row.crate_decompressed_size,
-                keywords: keywords_derived,
+                keywords,
                 lib_file: row.lib_file,
                 has_buildrs: row.has_buildrs,
                 is_nightly: row.is_nightly,
@@ -264,6 +266,7 @@ impl CrateDb {
         let mut insert_keyword = KeywordInsert::new()?;
         let all_explicit_keywords = package.keywords.iter()
             .chain(c.source_data.github_keywords.iter().flatten());
+
         for (i, k) in all_explicit_keywords.enumerate() {
             let mut w: f64 = 100. / (6 + i * 2) as f64;
             if STOPWORDS.get(k.as_str()).is_some() {
@@ -332,9 +335,9 @@ impl CrateDb {
             let mut insert_category = tx.prepare_cached("INSERT OR IGNORE INTO categories (crate_id, slug, rank_weight, relevance_weight) VALUES (?1, ?2, ?3, ?4)")?;
             let mut get_crate_id = tx.prepare_cached("SELECT id, recent_downloads FROM crates WHERE origin = ?1")?;
             let mut insert_derived = tx.prepare_cached("INSERT OR REPLACE INTO crate_derived (
-                 crate_id, readme, readme_format, readme_base_url, readme_base_image_url, crate_compressed_size, crate_decompressed_size, capitalized_name, lib_file, has_buildrs, is_nightly, is_yanked, has_code_of_conduct, manifest, language_stats,cache_key)
+                 crate_id, readme, readme_format, readme_base_url, readme_base_image_url, crate_compressed_size, crate_decompressed_size, capitalized_name, lib_file, has_buildrs, is_nightly, is_yanked, has_code_of_conduct, manifest, language_stats,cache_key, keywords, categories)
                 VALUES (
-                :crate_id,:readme,:readme_format,:readme_base_url,:readme_base_image_url,:crate_compressed_size,:crate_decompressed_size,:capitalized_name,:lib_file,:has_buildrs,:is_nightly,:is_yanked,:has_code_of_conduct,:manifest,:language_stats,:cache_key)
+                :crate_id,:readme,:readme_format,:readme_base_url,:readme_base_image_url,:crate_compressed_size,:crate_decompressed_size,:capitalized_name,:lib_file,:has_buildrs,:is_nightly,:is_yanked,:has_code_of_conduct,:manifest,:language_stats,:cache_key,:keywords,:categories)
                 ")?;
 
             let args: &[&dyn ToSql] = &[&origin, &0, &0];
@@ -356,25 +359,6 @@ impl CrateDb {
             let manifest = rmp_serde::encode::to_vec_named(c.manifest).context("manifest rmp")?;
             let language_stats = rmp_serde::encode::to_vec_named(&c.source_data.language_stats).context("lang rmp")?;
             let cache_key = c.cache_key as i64;
-            let named_args: &[(&str, &dyn ToSql)] = &[
-                (":crate_id", &crate_id),
-                (":readme", &readme),
-                (":readme_format", &readme_format),
-                (":readme_base_url", &readme_base_url),
-                (":readme_base_image_url", &readme_base_image_url),
-                (":crate_compressed_size", &c.source_data.crate_compressed_size),
-                (":crate_decompressed_size", &c.source_data.crate_decompressed_size),
-                (":capitalized_name", &c.source_data.capitalized_name),
-                (":lib_file", &c.source_data.lib_file),
-                (":has_buildrs", &c.source_data.has_buildrs),
-                (":is_nightly", &c.source_data.is_nightly),
-                (":is_yanked", &c.source_data.is_yanked),
-                (":has_code_of_conduct", &c.source_data.has_code_of_conduct),
-                (":manifest", &manifest),
-                (":language_stats", &language_stats),
-                (":cache_key", &cache_key),
-            ];
-            insert_derived.execute_named(named_args).context("insert_derived")?;
 
             let is_important_ish = downloads > 2000;
 
@@ -387,6 +371,7 @@ impl CrateDb {
             }
 
             clear_categories.execute(&[&crate_id]).context("clear cat")?;
+            insert_keyword.pre_commit(&tx, crate_id).context("clear kw")?;
 
             let (categories, had_explicit_categories) = {
                 let keywords = insert_keyword.keywords.iter().map(|(k,_)| k.to_string());
@@ -405,12 +390,12 @@ impl CrateDb {
             if !had_explicit_categories && !categories.is_empty() {
                 write!(&mut out, "[guessed categories]: ")?;
             }
-            for (rank, rel, slug) in categories {
+            for (rank, rel, slug) in &categories {
                 write!(&mut out, ">{}, ", slug)?;
-                let args: &[&dyn ToSql] = &[&crate_id, &slug, &rank, &rel];
+                let args: &[&dyn ToSql] = &[&crate_id, slug, rank, rel];
                 insert_category.execute(args).context("insert cat")?;
                 if had_explicit_categories {
-                    insert_keyword.add(&slug, rel/3., false);
+                    insert_keyword.add(slug, rel/3., false);
                 }
             }
 
@@ -424,9 +409,37 @@ impl CrateDb {
                 let url = repo.canonical_git_url();
                 insert_keyword.add(&format!("repo:{}", url), 1., false); // crates in monorepo probably belong together
             }
+
             // yanked crates may contain garbage, or needlessly come up in similar crates
             // so knock all keywords' importance if it's yanked
             insert_keyword.commit(&tx, crate_id, if c.source_data.is_yanked {0.1} else {1.})?;
+
+            let mut keywords: Vec<_> = package.keywords.iter().filter(|k| !k.is_empty()).map(|s| s.to_kebab_case()).collect();
+            if keywords.is_empty() {
+                keywords = self.keywords_tx(tx, &c.origin).context("keywordsdb2")?;
+            }
+
+            let named_args: &[(&str, &dyn ToSql)] = &[
+                (":crate_id", &crate_id),
+                (":readme", &readme),
+                (":readme_format", &readme_format),
+                (":readme_base_url", &readme_base_url),
+                (":readme_base_image_url", &readme_base_image_url),
+                (":categories", &categories.iter().map(|(_,_,slug)| slug.to_owned()).collect::<Vec<_>>().join(",")),
+                (":keywords", &keywords.join(",")),
+                (":crate_compressed_size", &c.source_data.crate_compressed_size),
+                (":crate_decompressed_size", &c.source_data.crate_decompressed_size),
+                (":capitalized_name", &c.source_data.capitalized_name),
+                (":lib_file", &c.source_data.lib_file),
+                (":has_buildrs", &c.source_data.has_buildrs),
+                (":is_nightly", &c.source_data.is_nightly),
+                (":is_yanked", &c.source_data.is_yanked),
+                (":has_code_of_conduct", &c.source_data.has_code_of_conduct),
+                (":manifest", &manifest),
+                (":language_stats", &language_stats),
+                (":cache_key", &cache_key),
+            ];
+            insert_derived.execute_named(named_args).context("insert_derived")?;
 
             mark_updated.execute(&[&crate_id, &next_timestamp]).context("mark updated crate")?;
             println!("{}", out);
@@ -1076,12 +1089,14 @@ pub enum RepoChange {
 pub struct KeywordInsert {
     /// k => (weight, explicit)
     keywords: HashMap<String, (f64, bool)>,
+    ready: bool,
 }
 
 impl KeywordInsert {
     pub fn new() -> FResult<Self> {
         Ok(Self {
             keywords: HashMap::new(),
+            ready: false,
         })
     }
 
@@ -1119,13 +1134,23 @@ impl KeywordInsert {
         }
     }
 
+    /// Clears old keywords from the db
+    pub fn pre_commit(&mut self, conn: &Connection, crate_id: u32) -> FResult<()> {
+        let mut clear_keywords = conn.prepare_cached("DELETE FROM crate_keywords WHERE crate_id = ?1")?;
+        clear_keywords.execute(&[&crate_id]).context("clear cat")?;
+        self.ready = true;
+        Ok(())
+    }
+
+    /// Call pre_commit first
     pub fn commit(mut self, conn: &Connection, crate_id: u32, overall_weight: f64) -> FResult<()> {
+        assert!(self.ready);
+
         let mut select_id = conn.prepare_cached("SELECT id, visible FROM keywords WHERE keyword = ?1")?;
         let mut insert_name = conn.prepare_cached("INSERT OR IGNORE INTO keywords (keyword, visible) VALUES (?1, ?2)")?;
         let mut insert_value = conn.prepare_cached("INSERT OR IGNORE INTO crate_keywords(keyword_id, crate_id, weight, explicit)
             VALUES (?1, ?2, ?3, ?4)")?;
         let mut make_visible = conn.prepare_cached("UPDATE keywords SET visible = 1 WHERE id = ?1")?;
-        let mut clear_keywords = conn.prepare_cached("DELETE FROM crate_keywords WHERE crate_id = ?1")?;
 
         for (cond, stopwords) in COND_STOPWORDS.iter() {
             if self.keywords.get(*cond).is_some() {
@@ -1142,7 +1167,6 @@ impl KeywordInsert {
             }
         }
 
-        clear_keywords.execute(&[&crate_id]).context("clear cat")?;
         for (word, (weight, visible)) in self.keywords {
             let args: &[&dyn ToSql] = &[&word, if visible { &1 } else { &0 }];
             insert_name.execute(args)?;

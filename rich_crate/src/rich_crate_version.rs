@@ -70,10 +70,6 @@ impl RichCrateVersion {
         !self.package().categories.is_empty()
     }
 
-    pub fn has_categories(&self) -> bool {
-        !self.package().categories.is_empty() || self.derived.categories.as_ref().map_or(false, |c| !c.is_empty())
-    }
-
     /// Finds preferred capitalization for the name
     pub fn capitalized_name(&self) -> &str {
         &self.derived.capitalized_name
@@ -82,7 +78,7 @@ impl RichCrateVersion {
     pub fn category_slugs(&self) -> impl Iterator<Item = Cow<'_, str>> {
         let mut warnings = Vec::new();
         let iter = Categories::fixed_category_slugs(
-            self.derived.categories.as_ref().unwrap_or(&self.package().categories),
+            &self.derived.categories,
             &mut warnings,
         ).into_iter();
         if !warnings.is_empty() {
@@ -112,8 +108,7 @@ impl RichCrateVersion {
 
     /// Either original keywords or guessed ones
     pub fn keywords(&self) -> &[String] {
-        self.derived.keywords.as_ref()
-        .unwrap_or(&self.package().keywords)
+        &self.derived.keywords
     }
 
     /// Globally unique URL-like string identifying source & the crate within that source
@@ -480,8 +475,8 @@ impl RichDep {
 /// Metadata guessed
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Derived {
-    pub categories: Option<Vec<String>>,
-    pub keywords: Option<Vec<String>>,
+    pub categories: Vec<String>,
+    pub keywords: Vec<String>,
     pub path_in_repo: Option<String>,
     pub language_stats: udedokei::Stats,
     pub crate_compressed_size: u32,

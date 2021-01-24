@@ -67,7 +67,7 @@ fn main() {
     }
     b.init();
 
-    let mut sys = actix_rt::System::new("actix-server");
+    let mut sys = actix_web::rt::System::new("actix-server");
 
     let rt = tokio::runtime::Builder::new()
         .threaded_scheduler()
@@ -293,7 +293,7 @@ fn handle_static_page(state: &ServerState, path: &str) -> Result<Option<HttpResp
     Ok(Some(HttpResponse::Ok()
         .content_type("text/html;charset=UTF-8")
         .header("Cache-Control", "public, max-age=7200, stale-while-revalidate=604800, stale-if-error=86400")
-        .content_length(page.len() as u64)
+        .no_chunking(page.len() as u64)
         .body(page)))
 }
 
@@ -366,7 +366,7 @@ fn render_404_page(state: &AServerState, path: &str, item_name: &str) -> Result<
 
     Ok(HttpResponse::NotFound()
         .content_type("text/html;charset=UTF-8")
-        .content_length(page.len() as u64)
+        .no_chunking(page.len() as u64)
         .header("Cache-Control", "public, max-age=60, stale-while-revalidate=3600, stale-if-error=3600")
         .body(page))
 }
@@ -499,7 +499,7 @@ async fn handle_debug(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     Ok(HttpResponse::Ok()
         .content_type("text/html;charset=UTF-8")
         .header("Cache-Control", "no-cache")
-        .content_length(page.len() as u64)
+        .no_chunking(page.len() as u64)
         .body(page))
 }
 
@@ -741,7 +741,7 @@ async fn handle_keyword(req: HttpRequest) -> Result<HttpResponse, ServerError> {
         HttpResponse::Ok()
             .content_type("text/html;charset=UTF-8")
             .header("Cache-Control", "public, max-age=172800, stale-while-revalidate=604800, stale-if-error=86400")
-            .content_length(page.len() as u64)
+            .no_chunking(page.len() as u64)
             .body(page)
     } else {
         HttpResponse::TemporaryRedirect().header("Location", format!("/search?q={}", urlencoding::encode(&query))).finish()
@@ -773,7 +773,7 @@ fn serve_cached((page, cache_time, refresh, last_modified): (Vec<u8>, u32, bool,
                 h.header("Last-Modified", l.to_rfc2822());
             }
         })
-        .content_length(page.len() as u64)
+        .no_chunking(page.len() as u64)
         .body(page)
 }
 
@@ -815,7 +815,7 @@ async fn handle_search(req: HttpRequest) -> Result<HttpResponse, ServerError> {
 }
 
 async fn handle_sitemap(req: HttpRequest) -> Result<HttpResponse, ServerError> {
-    let (w, page) = writer::<_, failure::Error>().await;
+    let (w, page) = writer::<_, ServerError>().await;
     let state: &AServerState = req.app_data().expect("appdata");
     let _ = state.rt.spawn({
         let state = state.clone();
@@ -824,7 +824,7 @@ async fn handle_sitemap(req: HttpRequest) -> Result<HttpResponse, ServerError> {
             let crates = state.crates.load();
             if let Err(e) = front_end::render_sitemap(&mut w, &crates).await {
                 if let Ok(mut w) = w.into_inner() {
-                    w.fail(e);
+                    w.fail(e.into());
                 }
             }
         }
@@ -848,7 +848,7 @@ async fn handle_feed(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     Ok(HttpResponse::Ok()
     .content_type("application/atom+xml;charset=UTF-8")
     .header("Cache-Control", "public, max-age=10800, stale-while-revalidate=259200, stale-if-error=72000")
-    .content_length(page.len() as u64)
+    .no_chunking(page.len() as u64)
     .body(page))
 }
 
@@ -920,7 +920,7 @@ impl actix_web::ResponseError for ServerError {
         front_end::render_error(&mut page, &self.err);
         HttpResponse::InternalServerError()
             .content_type("text/html;charset=UTF-8")
-            .content_length(page.len() as u64)
+            .no_chunking(page.len() as u64)
             .body(page)
     }
 }

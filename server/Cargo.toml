@@ -1,6 +1,6 @@
 [package]
 name = "crates-server"
-version = "1.0.6"
+version = "1.0.7"
 authors = ["Kornel <kornel@geekhood.net>"]
 edition = "2018"
 description = "Crates.rs web server"
@@ -25,7 +25,7 @@ assets = [
 ]
 
 [dependencies]
-actix-web = "2.0.0"
+actix-web = "3"
 env_logger = "0.8"
 log = "0.4.8"
 render_readme = { path = "../render_readme", version = "0.7" }
@@ -43,7 +43,7 @@ locale = "0.2.2"
 cap = "0.1.0"
 actix-rt = "1.1.1"
 futures = "0.3.5"
-actix-files = "0.2.2"
+actix-files = "0.5"
 actix-threadpool = "0.3.2"
 either = "1.5.3"
 qstring = "0.7.2"

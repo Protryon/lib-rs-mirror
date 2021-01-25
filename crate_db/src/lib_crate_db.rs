@@ -354,7 +354,6 @@ impl CrateDb {
                 },
                 None => (None, None, None, None),
             };
-                    eprintln!("Indexing base_url {:?}", readme_base_url);
 
             let manifest = rmp_serde::encode::to_vec_named(c.manifest).context("manifest rmp")?;
             let language_stats = rmp_serde::encode::to_vec_named(&c.source_data.language_stats).context("lang rmp")?;

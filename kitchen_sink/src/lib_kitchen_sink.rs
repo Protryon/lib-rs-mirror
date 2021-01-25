@@ -755,8 +755,11 @@ impl KitchenSink {
         }
         trace!("rich_crate_version_async MISS {:?}", origin);
 
-        let mut maybe_data = timeout(Duration::from_secs(2), self.crate_db.rich_crate_version_data(origin))
-            .await.map_err(|_| KitchenSinkErr::DerivedDataTimedOut)?;
+        let mut maybe_data = timeout(Duration::from_secs(3), self.crate_db.rich_crate_version_data(origin))
+            .await.map_err(|_| {
+                warn!("db data fetch for {:?} timed out", origin);
+                KitchenSinkErr::DerivedDataTimedOut
+            })?;
 
         if let Ok(cached) = &maybe_data {
             match origin {
@@ -785,7 +788,10 @@ impl KitchenSink {
                 type_erase(reindex).await.map_err(|_| KitchenSinkErr::DataTimedOut)?
                     .with_context(|_| format!("reindexing {:?}", origin))?; // Pin to lower stack usage
                 let get_data = timeout(Duration::from_secs(10), self.crate_db.rich_crate_version_data(origin));
-                match type_erase(get_data).await.map_err(|_| KitchenSinkErr::DerivedDataTimedOut).context("getting data after reindex")? {
+                match type_erase(get_data).await.map_err(|_|  {
+                    warn!("rich_crate_version_data timeout");
+                    KitchenSinkErr::DerivedDataTimedOut
+                }).context("getting data after reindex")? {
                     Ok(v) => v,
                     Err(e) => return Err(e),
                 }
@@ -2259,7 +2265,10 @@ impl KitchenSink {
                     Vec::new()
                 },
                 Ok(Err(e)) => {
-                    error!("Skipping {:?} because {}", o, e);
+                    error!("Skipping dedup {:?} because {}", o, e);
+                    for e in e.iter_chain() {
+                        error!(" • because {}", e);
+                    }
                     return None;
                 },
             };

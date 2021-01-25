@@ -345,24 +345,32 @@ async fn default_handler(req: HttpRequest) -> Result<HttpResponse, ServerError> 
         return Ok(HttpResponse::TemporaryRedirect().header("Location", format!("/keywords/{}", encode(&keyword))).body(""));
     }
 
-    render_404_page(state, path, "crate or category")
+    render_404_page(state, path, "crate or category").await
 }
 
-fn render_404_page(state: &AServerState, path: &str, item_name: &str) -> Result<HttpResponse, ServerError> {
+fn render_404_page(state: &AServerState, path: &str, item_name: &str) -> impl Future<Output = Result<HttpResponse, ServerError>> {
+    let item_name = item_name.to_owned();
     let decoded = decode(path).ok();
     let rawtext = decoded.as_deref().unwrap_or(path);
 
     let query = rawtext.chars().map(|c| if c.is_alphanumeric() { c } else { ' ' }).take(100).collect::<String>();
-    let query = query.trim();
-    let results = state.index.search(query, 5, false).unwrap_or_default();
-    let mut page: Vec<u8> = Vec::with_capacity(32000);
-    front_end::render_404_page(&mut page, query, item_name, &results, &state.markup)?;
+    let query = query.trim().to_owned();
+    let state = state.clone();
 
-    Ok(HttpResponse::NotFound()
-        .content_type("text/html;charset=UTF-8")
-        .no_chunking(page.len() as u64)
-        .header("Cache-Control", "public, max-age=60, stale-while-revalidate=3600, stale-if-error=3600")
-        .body(page))
+    tokio::task::spawn_blocking(move || {
+        let results = state.index.search(&query, 5, false).unwrap_or_default();
+        let mut page: Vec<u8> = Vec::with_capacity(32000);
+        front_end::render_404_page(&mut page, &query, &item_name, &results, &state.markup)?;
+        Ok(page)
+    }).map(|res| {
+        res?.map(|page| {
+            HttpResponse::NotFound()
+                .content_type("text/html;charset=UTF-8")
+                .no_chunking(page.len() as u64)
+                .header("Cache-Control", "public, max-age=60, stale-while-revalidate=3600, stale-if-error=3600")
+                .body(page)
+        })
+    })
 }
 
 async fn handle_category(req: HttpRequest, cat: &'static Category) -> Result<HttpResponse, ServerError> {
@@ -446,7 +454,7 @@ async fn handle_git_crate(req: HttpRequest, slug: &'static str) -> Result<HttpRe
     let crate_name = inf.query("crate");
     debug!("{} crate {}/{}/{}", slug, owner, repo, crate_name);
     if !is_alnum_dot(&owner) || !is_alnum_dot(&repo) || !is_alnum(&crate_name) {
-        return render_404_page(state, &crate_name, "git crate");
+        return render_404_page(state, &crate_name, "git crate").await;
     }
 
     let cache_file = state.page_cache_dir.join(format!("{},{},{},{}.html", slug, owner, repo, crate_name));
@@ -503,9 +511,10 @@ async fn handle_debug(req: HttpRequest) -> Result<HttpResponse, ServerError> {
 
 async fn handle_install(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let state2: &AServerState = req.app_data().expect("appdata");
-    let origin = if let Some(o) = get_origin_from_subpath(req.match_info()) {o}
-    else {
-        return render_404_page(&state2, req.path().trim_start_matches("/install"), "crate");
+    let origin = if let Some(o) = get_origin_from_subpath(req.match_info()) {
+        o
+    } else {
+        return render_404_page(&state2, req.path().trim_start_matches("/install"), "crate").await;
     };
 
     let state = state2.clone();
@@ -529,7 +538,7 @@ async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let aut = match crates.author_by_login(&login).await {
         Ok(aut) => aut,
         Err(_) => {
-            return render_404_page(state, login, "user");
+            return render_404_page(state, login, "user").await;
         }
     };
     if aut.github.login != login {
@@ -559,7 +568,7 @@ async fn handle_crate(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let crates = state.crates.load();
     let origin = match Origin::try_from_crates_io_name(&crate_name).filter(|o| crates.crate_exists(o)) {
         Some(o) => o,
-        None => return render_404_page(state, &crate_name, "crate"),
+        None => return render_404_page(state, &crate_name, "crate").await,
     };
     let cache_file = state.page_cache_dir.join(format!("{}.html", crate_name));
     Ok(serve_cached(with_file_cache(state, cache_file, 600, {
@@ -574,7 +583,7 @@ async fn handle_crate_reverse_dependencies(req: HttpRequest) -> Result<HttpRespo
     let crates = state.crates.load();
     let origin = match Origin::try_from_crates_io_name(&crate_name).filter(|o| crates.crate_exists(o)) {
         Some(o) => o,
-        None => return render_404_page(state, &crate_name, "crate"),
+        None => return render_404_page(state, &crate_name, "crate").await,
     };
     Ok(serve_cached(render_crate_reverse_dependencies(state.clone(), origin).await?))
 }
@@ -586,7 +595,7 @@ async fn handle_crate_reviews(req: HttpRequest) -> Result<HttpResponse, ServerEr
     let crates = state.crates.load();
     let origin = match Origin::try_from_crates_io_name(&crate_name).filter(|o| crates.crate_exists(o)) {
         Some(o) => o,
-        None => return render_404_page(state, &crate_name, "crate"),
+        None => return render_404_page(state, &crate_name, "crate").await,
     };
     let state = state.clone();
     Ok(serve_cached(
@@ -742,7 +751,7 @@ async fn handle_keyword(req: HttpRequest) -> Result<HttpResponse, ServerError> {
         } else {
             Ok((query, None))
         }
-    }).await?;
+    }).await??;
 
     Ok(if let Some(page) = page {
         HttpResponse::Ok()
@@ -803,18 +812,16 @@ async fn handle_search(req: HttpRequest) -> Result<HttpResponse, ServerError> {
         q if !q.trim_start().is_empty() => {
             let state: &AServerState = req.app_data().expect("appdata");
             let query = q.to_owned();
-            let page = state.rt.spawn({
+            let page = tokio::task::spawn_blocking({
                 let state = state.clone();
-                async move {
-                    tokio::task::spawn_blocking(move || {
-                        let results = state.index.search(&query, 50, true)?;
-                        let mut page = Vec::with_capacity(32000);
-                        front_end::render_serp_page(&mut page, &query, &results, &state.markup)?;
-                        minify_html(&mut page);
-                        Ok::<_, failure::Error>((page, 600u32, false, None))
-                    }).await
+                move || {
+                    let results = state.index.search(&query, 50, true)?;
+                    let mut page = Vec::with_capacity(32000);
+                    front_end::render_serp_page(&mut page, &query, &results, &state.markup)?;
+                    minify_html(&mut page);
+                    Ok::<_, failure::Error>((page, 600u32, false, None))
                 }
-            }).await???;
+            }).await??;
             Ok(serve_cached(page))
         },
         _ => Ok(HttpResponse::PermanentRedirect().header("Location", "/").finish()),

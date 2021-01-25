@@ -1,6 +1,6 @@
 use crate::index::*;
-use crate::Origin;
 use crate::DepsErr;
+use crate::Origin;
 use parking_lot::Mutex;
 use rayon::prelude::*;
 use string_interner::symbol::SymbolU32 as Sym;
@@ -184,7 +184,9 @@ impl Index {
                 }
                 match depinf.ty {
                     DepTy::Runtime => {
-                        if depinf.direct {n.direct.runtime = n.direct.runtime.checked_add(1).expect("overflow"); }
+                        if depinf.direct {
+                            n.direct.runtime = n.direct.runtime.checked_add(1).expect("overflow");
+                        }
                         if depinf.default {
                             n.runtime.def = n.runtime.def.checked_add(1).expect("overflow");
                         } else {
@@ -192,7 +194,9 @@ impl Index {
                         }
                     },
                     DepTy::Build => {
-                        if depinf.direct {n.direct.build = n.direct.build.checked_add(1).expect("overflow"); }
+                        if depinf.direct {
+                            n.direct.build = n.direct.build.checked_add(1).expect("overflow");
+                        }
                         if depinf.default {
                             n.build.def = n.build.def.checked_add(1).expect("overflow");
                         } else {
@@ -200,7 +204,9 @@ impl Index {
                         }
                     },
                     DepTy::Dev => {
-                        if depinf.direct {n.direct.dev = n.direct.dev.checked_add(1).expect("overflow"); }
+                        if depinf.direct {
+                            n.direct.dev = n.direct.dev.checked_add(1).expect("overflow");
+                        }
                         n.dev = n.dev.checked_add(1).expect("overflow");
                     },
                 }

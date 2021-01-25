@@ -1,7 +1,6 @@
-
 use crev_data::proof::content::CommonOps;
-pub use crev_data::Level;
 pub use crev_data::proof::Date;
+pub use crev_data::Level;
 pub use crev_data::Rating;
 pub use crev_data::Version;
 use crev_lib::*;

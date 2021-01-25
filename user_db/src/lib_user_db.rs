@@ -1,10 +1,10 @@
-use rusqlite::types::ToSql;
 use github_info::User;
 use github_info::UserType;
 use parking_lot::Mutex;
+use rusqlite::types::ToSql;
 use rusqlite::*;
 use std::path::Path;
-type Result<T, E=failure::Error> = std::result::Result<T, E>;
+type Result<T, E = failure::Error> = std::result::Result<T, E>;
 
 mod schema;
 

@@ -1,13 +1,13 @@
 use crate::Page;
 use kitchen_sink::CResult;
+use kitchen_sink::DependencyKind;
+use kitchen_sink::DependerChangesMonthly;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::Origin;
 use kitchen_sink::RevDependencies;
 use kitchen_sink::SemVer;
-use kitchen_sink::DependerChangesMonthly;
 use locale::Numeric;
 use render_readme::Renderer;
-use kitchen_sink::DependencyKind;
 
 use rich_crate::RichCrateVersion;
 use semver::VersionReq;
@@ -266,7 +266,7 @@ impl<'a> CratePageRevDeps<'a> {
             }
         }).collect();
 
-        let mut years = Vec::with_capacity(entries.len()/12+1);
+        let mut years = Vec::with_capacity(entries.len() / 12 + 1);
         let mut curr_year = entries[0].year;
         let mut curr_year_months = 0;
         for e in &entries {

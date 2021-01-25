@@ -7,27 +7,32 @@ extern crate serde_derive;
 extern crate log;
 
 mod yearly;
-use tokio::task::spawn_blocking;
 pub use crate::yearly::*;
 pub use deps_index::*;
+use tokio::task::spawn_blocking;
 pub mod filter;
 
 mod ctrlcbreak;
-mod tarball;
 pub use crate::ctrlcbreak::*;
+mod tarball;
 
-pub use crate_db::CrateOwnerRow;
 pub use crate_db::builddb::Compat;
 pub use crate_db::builddb::CompatibilityInfo;
+pub use crate_db::CrateOwnerRow;
 pub use crates_io_client::CrateDepKind;
 pub use crates_io_client::CrateDependency;
 use crates_io_client::CrateMetaFile;
 pub use crates_io_client::CrateMetaVersion;
+pub use crates_io_client::CrateOwner;
 pub use crates_io_client::OwnerKind;
+pub use creviews::Level;
+pub use creviews::Rating;
+pub use creviews::Review;
 pub use github_info::Org;
 pub use github_info::User;
 pub use github_info::UserOrg;
 pub use github_info::UserType;
+pub use rich_crate::DependerChangesMonthly;
 pub use rich_crate::Edition;
 pub use rich_crate::MaintenanceStatus;
 use rich_crate::ManifestExt;
@@ -36,27 +41,22 @@ pub use rich_crate::Origin;
 pub use rich_crate::RichCrate;
 pub use rich_crate::RichCrateVersion;
 pub use rich_crate::RichDep;
-pub use rich_crate::DependerChangesMonthly;
 pub use rich_crate::{Cfg, Target};
 pub use semver::Version as SemVer;
-pub use creviews::Review;
-pub use creviews::Rating;
-pub use creviews::Level;
-pub use crates_io_client::CrateOwner;
 
+use crate::tarball::CrateFile;
 use cargo_toml::Manifest;
 use cargo_toml::Package;
 use categories::Category;
-use chrono::DateTime;
 use chrono::prelude::*;
-use crate::tarball::CrateFile;
+use chrono::DateTime;
 use crate_db::{builddb::BuildDb, CrateDb, CrateVersionData, RepoChange};
 use creviews::Creviews;
 use double_checked_cell_async::DoubleCheckedCell;
 use failure::ResultExt;
 use futures::future::join_all;
-use futures::Future;
 use futures::stream::StreamExt;
+use futures::Future;
 use github_info::GitCommitAuthor;
 use github_info::GitHubRepo;
 use github_info::MinimalUser;
@@ -829,13 +829,9 @@ impl KitchenSink {
 
     async fn rich_crate_version_from_repo(&self, origin: &Origin) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
         let (repo, package) = match origin {
-            Origin::GitHub {repo, package} => {
-                (RepoHost::GitHub(repo.clone()).try_into().expect("repohost"), &**package)
-            },
-            Origin::GitLab {repo, package} => {
-                (RepoHost::GitLab(repo.clone()).try_into().expect("repohost"), &**package)
-            },
-            _ => unreachable!()
+            Origin::GitHub { repo, package } => (RepoHost::GitHub(repo.clone()).try_into().expect("repohost"), &**package),
+            Origin::GitLab { repo, package } => (RepoHost::GitLab(repo.clone()).try_into().expect("repohost"), &**package),
+            _ => unreachable!(),
         };
 
         tokio::task::yield_now().await;
@@ -1279,7 +1275,7 @@ impl KitchenSink {
             }
         }
 
-         if let Some(url) = package.documentation.as_ref() {
+        if let Some(url) = package.documentation.as_ref() {
             if !self.check_url_is_valid(url).await {
                 warnings.insert(Warning::BrokenLink("documentation".to_string(), package.documentation.as_ref().unwrap().to_string()));
                 package.documentation = None;
@@ -1772,7 +1768,6 @@ impl KitchenSink {
         self.crate_db.parent_crate(repo, child.short_name()).await.ok()?
     }
 
-
     /// Crates are spilt into foo and foo-core. The core is usually uninteresting/duplicate.
     pub async fn is_sub_component(&self, k: &RichCrateVersion) -> bool {
         let name = k.short_name();
@@ -1809,7 +1804,7 @@ impl KitchenSink {
             .map(|c| c.version().to_string())
             .next()
             .unwrap_or_else(|| {
-                let weeks = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).expect("clock").as_secs() / (3600*24*7);
+                let weeks = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).expect("clock").as_secs() / (3600 * 24 * 7);
                 format!("w{}", weeks)
             }))
     }
@@ -2133,7 +2128,7 @@ impl KitchenSink {
         // which makes data more even and pads the December's holiday drop a bit
         let mut by_month = HashMap::with_capacity(daily_changes.len());
         for d in &daily_changes {
-            let w = by_month.entry((d.at.y, (d.at.o/30).min(11))).or_insert(DependerChangesMonthly {
+            let w = by_month.entry((d.at.y, (d.at.o / 30).min(11))).or_insert(DependerChangesMonthly {
                 year: d.at.y,
                 month0: (d.at.o/30).min(11),
                 added: 0, added_total: 0,
@@ -2147,8 +2142,8 @@ impl KitchenSink {
 
         let first = &daily_changes[0];
         let last = daily_changes.last().unwrap();
-        let mut curr = (first.at.y, (first.at.o/30).min(11));
-        let end = (last.at.y, (last.at.o/30).min(11));
+        let mut curr = (first.at.y, (first.at.o / 30).min(11));
+        let end = (last.at.y, (last.at.o / 30).min(11));
         let mut monthly = Vec::with_capacity(by_month.len());
         let mut added_total = 0;
         let mut removed_total = 0;
@@ -2432,9 +2427,7 @@ impl KitchenSink {
     #[inline]
     pub async fn author_by_login(&self, login: &str) -> CResult<RichAuthor> {
         let github = self.gh.user_by_login(login).await?.ok_or_else(|| KitchenSinkErr::AuthorNotFound(login.to_owned()))?;
-        Ok(RichAuthor {
-            github
-        })
+        Ok(RichAuthor { github })
     }
 }
 
@@ -2551,19 +2544,19 @@ impl MiniDate {
 
     pub fn half_way(self, other: Self) -> Self {
         let diff = (other.y as i32 - self.y as i32) * 365 + (other.o as i32 - self.o as i32);
-        self.days_later(diff/2)
+        self.days_later(diff / 2)
     }
 }
 
 #[test]
 fn minidate() {
-    let a = MiniDate::new(Utc.ymd(2020,2,2));
-    let b = MiniDate::new(Utc.ymd(2024,4,4));
-    let c = MiniDate::new(Utc.ymd(2022,3,5));
+    let a = MiniDate::new(Utc.ymd(2020, 2, 2));
+    let b = MiniDate::new(Utc.ymd(2024, 4, 4));
+    let c = MiniDate::new(Utc.ymd(2022, 3, 5));
     assert_eq!(c, a.half_way(b));
 
-    let d = MiniDate::new(Utc.ymd(1999,12,31));
-    let e = MiniDate::new(Utc.ymd(2000,1,1));
+    let d = MiniDate::new(Utc.ymd(1999, 12, 31));
+    let e = MiniDate::new(Utc.ymd(2000, 1, 1));
     assert_eq!(e, d.days_later(1));
     assert_eq!(d, e.days_later(-1));
 }
@@ -2599,7 +2592,6 @@ fn fetch_uppercase_name() {
     })).unwrap();
 }
 
-
 #[tokio::test]
 async fn index_test() {
     let idx = Index::new(&KitchenSink::data_path().unwrap()).unwrap();
@@ -2608,7 +2600,6 @@ async fn index_test() {
     let lode = stats.counts.get("lodepng").unwrap();
     assert_eq!(13, lode.runtime.def);
 }
-
 
 fn is_alnum(q: &str) -> bool {
     q.as_bytes().iter().copied().all(|c| c.is_ascii_alphanumeric() || c == b'_' || c == b'-')

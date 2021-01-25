@@ -11,7 +11,7 @@ impl<'a> WLITA<'a> {
     /// Also ignores all digits
     ///
     /// callback: (normalized, orig) called for every sentence
-    pub fn new<I: AsRef<str>>(variables: impl Iterator<Item=I>, callback: &'a mut dyn for<'r, 's> FnMut(&'r str, &'s str)) -> Self {
+    pub fn new<I: AsRef<str>>(variables: impl Iterator<Item = I>, callback: &'a mut dyn for<'r, 's> FnMut(&'r str, &'s str)) -> Self {
         let mut pattern = String::with_capacity(256);
         for v in variables.map(|v| regex::escape(v.as_ref())) {
             pattern.push_str("\\b");

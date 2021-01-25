@@ -1,6 +1,4 @@
 #![allow(unused_imports)]
-use std::time::Duration;
-use kitchen_sink::ArcRichCrateVersion;
 use crate::Page;
 use categories::Category;
 use categories::CategoryMap;
@@ -8,6 +6,7 @@ use categories::CATEGORIES;
 use failure;
 use futures::prelude::*;
 use kitchen_sink::stopped;
+use kitchen_sink::ArcRichCrateVersion;
 use kitchen_sink::CrateAuthor;
 use kitchen_sink::KitchenSink;
 use locale::Numeric;
@@ -19,6 +18,7 @@ use std::collections::HashSet;
 use std::future::Future;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::time::timeout;
 
 /// The list on the homepage looks flat, but it's actually a tree.

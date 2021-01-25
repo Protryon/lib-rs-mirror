@@ -1,11 +1,11 @@
-use kitchen_sink::ArcRichCrateVersion;
-use chrono::prelude::*;
-use crate::Page;
 use crate::templates;
 use crate::url_domain;
+use crate::Page;
+use chrono::prelude::*;
 use futures::stream::StreamExt;
-use kitchen_sink::CrateOwnerRow;
+use kitchen_sink::ArcRichCrateVersion;
 use kitchen_sink::CResult;
+use kitchen_sink::CrateOwnerRow;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::Org;
 use kitchen_sink::OwnerKind;
@@ -17,7 +17,6 @@ use render_readme::Renderer;
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
-
 
 pub struct OtherOwner {
     github_id: u32,
@@ -60,10 +59,10 @@ impl<'a> AuthorPage<'a> {
         let (mut founder, mut member): (Vec<_>, Vec<_>) = rows.into_iter().partition(|c| c.invited_by_github_id.is_none());
         let founder_total = founder.len();
         let member_total = member.len();
-        founder.sort_by(|a,b| b.latest_release.cmp(&a.latest_release));
+        founder.sort_by(|a, b| b.latest_release.cmp(&a.latest_release));
         founder.truncate(200);
 
-        member.sort_by(|a,b| b.crate_ranking.partial_cmp(&a.crate_ranking).unwrap_or(Ordering::Equal));
+        member.sort_by(|a, b| b.crate_ranking.partial_cmp(&a.crate_ranking).unwrap_or(Ordering::Equal));
         member.truncate(200);
 
         let founder_crates = Self::look_up(kitchen_sink, founder).await;
@@ -77,13 +76,13 @@ impl<'a> AuthorPage<'a> {
         for (c, _, row, all_owners) in founder_crates.iter().chain(member_crates.iter()) {
             for (i, k) in c.keywords().iter().enumerate() {
                 // take first(-ish) keyword from each crate to avoid one crate taking most
-                *keywords.entry(k).or_insert(0.) += (row.crate_ranking + 0.5) / (i+2) as f32;
+                *keywords.entry(k).or_insert(0.) += (row.crate_ranking + 0.5) / (i + 2) as f32;
             }
 
             if let Some(own) = all_owners.iter().find(|o| o.github_id == aut.github.id) {
                 let oldest = all_owners.iter().map(|o| o.invited_at).min().unwrap();
                 // max discounts young crates
-                let max_days = now.signed_duration_since(oldest).num_days().max(30*6) as f32;
+                let max_days = now.signed_duration_since(oldest).num_days().max(30 * 6) as f32;
                 let own_days = now.signed_duration_since(own.invited_at).num_days();
                 for o in all_owners {
                     if o.github_id == aut.github.id || o.kind != OwnerKind::User {
@@ -97,7 +96,7 @@ impl<'a> AuthorPage<'a> {
                 }
             }
         }
-        let num_keywords = (1 + founder_total/2 + member_total/3).max(2).min(7);
+        let num_keywords = (1 + founder_total / 2 + member_total / 3).max(2).min(7);
         let mut keywords: Vec<_> = keywords.into_iter().collect();
         keywords.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
         let keywords: Vec<_> = keywords.into_iter().take(num_keywords).map(|(k, _)| k.to_owned()).collect();
@@ -150,21 +149,21 @@ impl<'a> AuthorPage<'a> {
 
     pub fn twitter_link(&self) -> Option<(String, &str)> {
         eprintln!("tw link {:?}", self.rustacean);
-        self.rustacean.as_ref().and_then(|r| r.twitter.as_deref())
-        .map(|t| t.trim_start_matches('@'))
-        .filter(|t| !t.is_empty())
-        .map(|t| {
-            (format!("https://twitter.com/{}", t), t)
-        })
+        self.rustacean
+            .as_ref()
+            .and_then(|r| r.twitter.as_deref())
+            .map(|t| t.trim_start_matches('@'))
+            .filter(|t| !t.is_empty())
+            .map(|t| (format!("https://twitter.com/{}", t), t))
     }
 
     pub fn forum_link(&self) -> Option<(String, &str)> {
-        self.rustacean.as_ref().and_then(|r| r.discourse.as_deref())
-        .map(|t| t.trim_start_matches('@'))
-        .filter(|t| !t.is_empty())
-        .map(|t| {
-            (format!("https://users.rust-lang.org/u/{}", t), t)
-        })
+        self.rustacean
+            .as_ref()
+            .and_then(|r| r.discourse.as_deref())
+            .map(|t| t.trim_start_matches('@'))
+            .filter(|t| !t.is_empty())
+            .map(|t| (format!("https://users.rust-lang.org/u/{}", t), t))
     }
 
     /// `(url, label)`

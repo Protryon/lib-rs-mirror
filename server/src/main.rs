@@ -1,16 +1,16 @@
+use crate::writer::*;
 use actix_web::body::Body;
 use actix_web::dev::Url;
 use actix_web::http::header::HeaderValue;
 use actix_web::http::StatusCode;
-use actix_web::HttpResponse;
 use actix_web::middleware;
+use actix_web::HttpResponse;
 use actix_web::{web, App, HttpRequest, HttpServer};
 use arc_swap::ArcSwap;
 use cap::Cap;
-use categories::CATEGORIES;
 use categories::Category;
+use categories::CATEGORIES;
 use chrono::prelude::*;
-use crate::writer::*;
 use failure::ResultExt;
 use futures::future::Future;
 use futures::future::FutureExt;
@@ -25,8 +25,8 @@ use std::convert::TryInto;
 use std::env;
 use std::path::PathBuf;
 use std::pin::Pin;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 use tokio::runtime::Handle;
 use urlencoding::decode;
@@ -89,12 +89,8 @@ fn main() {
 }
 
 async fn run_server(rt: Handle) -> Result<(), failure::Error> {
-    unsafe {
-        signal_hook::low_level::register(signal_hook::consts::SIGHUP, || HUP_SIGNAL.store(1, Ordering::SeqCst))
-    }?;
-    unsafe {
-        signal_hook::low_level::register(signal_hook::consts::SIGUSR1, || HUP_SIGNAL.store(1, Ordering::SeqCst))
-    }?;
+    unsafe { signal_hook::low_level::register(signal_hook::consts::SIGHUP, || HUP_SIGNAL.store(1, Ordering::SeqCst)) }?;
+    unsafe { signal_hook::low_level::register(signal_hook::consts::SIGUSR1, || HUP_SIGNAL.store(1, Ordering::SeqCst)) }?;
 
     kitchen_sink::dont_hijack_ctrlc();
 
@@ -150,7 +146,7 @@ async fn run_server(rt: Handle) -> Result<(), failure::Error> {
                 let should_reload = if 1 == HUP_SIGNAL.swap(0, Ordering::SeqCst) {
                     info!("HUP!");
                     true
-                } else if last_reload.elapsed() > Duration::from_secs(30*60) {
+                } else if last_reload.elapsed() > Duration::from_secs(30 * 60) {
                     info!("Reloading state on a timer");
                     true
                 } else {
@@ -636,7 +632,7 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
             let timestamp = u32::from_le_bytes(page_cached.get(trailer_pos..).unwrap().try_into().unwrap());
             page_cached.truncate(trailer_pos);
 
-            let last_mod = if timestamp > 0 {Some(DateTime::from_utc(NaiveDateTime::from_timestamp(timestamp as _, 0), FixedOffset::east(0)))} else {None};
+            let last_mod = if timestamp > 0 { Some(DateTime::from_utc(NaiveDateTime::from_timestamp(timestamp as _, 0), FixedOffset::east(0))) } else { None };
             let cache_time_remaining = cache_time.saturating_sub(age_secs);
 
             debug!("Using cached page {} {}s fresh={:?} acc={:?}", cache_file.display(), cache_time_remaining, is_fresh, is_acceptable);
@@ -751,7 +747,7 @@ fn serve_cached((page, cache_time, refresh, last_modified): (Vec<u8>, u32, bool,
 
     // last-modified is ambiguous, because it's modification of the content, not the whole state
     let mut hasher = blake3::Hasher::new();
-    hasher.update(if refresh {b"1"} else {b"0"});
+    hasher.update(if refresh { b"1" } else { b"0" });
     hasher.update(&page);
     let etag = format!("\"{:.16}\"", base64::encode(hasher.finalize().as_bytes()));
 
@@ -759,7 +755,7 @@ fn serve_cached((page, cache_time, refresh, last_modified): (Vec<u8>, u32, bool,
         .content_type("text/html;charset=UTF-8")
         .header("etag", etag)
         .if_true(!refresh, |h| {
-            h.header("Cache-Control", format!("public, max-age={}, stale-while-revalidate={}, stale-if-error={}", cache_time, cache_time*3, err_max));
+            h.header("Cache-Control", format!("public, max-age={}, stale-while-revalidate={}, stale-if-error={}", cache_time, cache_time * 3, err_max));
         })
         .if_true(refresh, |h| {
             h.header("Refresh", "5");
@@ -788,7 +784,7 @@ fn is_alnum_dot(q: &str) -> bool {
 }
 
 async fn handle_search(req: HttpRequest) -> Result<HttpResponse, ServerError> {
-    let qs = req.query_string().replace('+',"%20");
+    let qs = req.query_string().replace('+', "%20");
     let qs = qstring::QString::from(qs.as_str());
     match qs.get("q").unwrap_or("") {
         q if !q.trim_start().is_empty() => {
@@ -844,10 +840,10 @@ async fn handle_feed(req: HttpRequest) -> Result<HttpResponse, ServerError> {
         Ok::<_, failure::Error>(page)
     }).await?;
     Ok(HttpResponse::Ok()
-    .content_type("application/atom+xml;charset=UTF-8")
-    .header("Cache-Control", "public, max-age=10800, stale-while-revalidate=259200, stale-if-error=72000")
-    .no_chunking(page.len() as u64)
-    .body(page))
+        .content_type("application/atom+xml;charset=UTF-8")
+        .header("Cache-Control", "public, max-age=10800, stale-while-revalidate=259200, stale-if-error=72000")
+        .no_chunking(page.len() as u64)
+        .body(page))
 }
 
 fn run_timeout<R, T: 'static + Send>(secs: u64, fut: R) -> Pin<Box<dyn Future<Output=Result<T, failure::Error>> + Send>> where R: 'static + Send + Future<Output=Result<T, failure::Error>> {
@@ -875,8 +871,8 @@ impl ServerError {
             }
         }
         Self { err }
-        }
     }
+}
 
 impl From<failure::Error> for ServerError {
     fn from(err: failure::Error) -> Self {

@@ -44,15 +44,9 @@ impl Urler {
     /// Summary of all dependencies
     pub fn deps(&self, krate: &RichCrateVersion) -> Option<String> {
         match krate.origin() {
-            Origin::CratesIo(_) => {
-                None
-            },
-            Origin::GitHub {repo, ..} => {
-                Some(format!("https://deps.rs/repo/github/{}/{}", encode(&repo.owner), encode(&repo.repo)))
-            },
-            Origin::GitLab {repo, ..} => {
-                Some(format!("https://deps.rs/repo/gitlab/{}/{}", encode(&repo.owner), encode(&repo.repo)))
-            },
+            Origin::CratesIo(_) => None,
+            Origin::GitHub { repo, .. } => Some(format!("https://deps.rs/repo/github/{}/{}", encode(&repo.owner), encode(&repo.repo))),
+            Origin::GitLab { repo, .. } => Some(format!("https://deps.rs/repo/gitlab/{}/{}", encode(&repo.owner), encode(&repo.repo))),
         }
     }
 
@@ -60,11 +54,11 @@ impl Urler {
         match origin {
             Origin::CratesIo(lowercase_name) => {
                 format!("/install/{}", encode(lowercase_name))
-            },
-            Origin::GitHub {repo, package} | Origin::GitLab {repo, package} => {
-                let host = if let Origin::GitHub {..} = origin {"gh"} else {"lab"};
+            }
+            Origin::GitHub { repo, package } | Origin::GitLab { repo, package } => {
+                let host = if let Origin::GitHub { .. } = origin { "gh" } else { "lab" };
                 format!("/install/{}/{}/{}/{}", host, encode(&repo.owner), encode(&repo.repo), encode(package))
-            },
+            }
         }
     }
 
@@ -112,13 +106,13 @@ impl Urler {
         match o {
             Origin::CratesIo(lowercase_name) => {
                 format!("/crates/{}", encode(lowercase_name))
-            },
-            Origin::GitHub {repo, package} => {
+            }
+            Origin::GitHub { repo, package } => {
                 format!("/gh/{}/{}/{}", encode(&repo.owner), encode(&repo.repo), encode(package))
-            },
-            Origin::GitLab {repo, package} => {
+            }
+            Origin::GitLab { repo, package } => {
                 format!("/lab/{}/{}/{}", encode(&repo.owner), encode(&repo.repo), encode(package))
-            },
+            }
         }
     }
 

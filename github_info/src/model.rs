@@ -191,7 +191,6 @@ pub struct UserOrg {
     pub login: String, // "github",
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Org {
     id: u32,

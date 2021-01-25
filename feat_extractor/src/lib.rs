@@ -1,9 +1,9 @@
-use rich_crate::RichCrateVersion;
-use std::collections::HashSet;
-use rich_crate::ManifestExt;
 use rich_crate::MaintenanceStatus;
 use rich_crate::Manifest;
+use rich_crate::ManifestExt;
+use rich_crate::RichCrateVersion;
 use semver::VersionReq;
+use std::collections::HashSet;
 
 pub mod wlita;
 
@@ -106,7 +106,6 @@ fn chop3words(s: &str) -> &str {
     }
     s
 }
-
 
 pub fn is_deprecated(k: &RichCrateVersion) -> bool {
     if k.version().contains("deprecated") || k.version() == "0.0.0" || k.version() == "0.0.1" {

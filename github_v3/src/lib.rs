@@ -102,7 +102,7 @@ impl Builder {
     pub fn query(mut self, query_string: &str) -> Self {
         debug_assert!(!query_string.starts_with('?'));
         debug_assert!(!query_string.starts_with('&'));
-        self.url.push(if self.query_string_started {'&'} else {'?'});
+        self.url.push(if self.query_string_started { '&' } else { '?' });
         self.url.push_str(query_string);
         self.query_string_started = true;
         self

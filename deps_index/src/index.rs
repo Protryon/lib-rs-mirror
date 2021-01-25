@@ -1,10 +1,10 @@
-pub use crates_index::DependencyKind;
-pub use crates_index::Version;
 use crate::deps_stats::DepsStats;
-use crate::DepsErr;
 use crate::git_crates_index::*;
+use crate::DepsErr;
 use crates_index::Crate;
 use crates_index::Dependency;
+pub use crates_index::DependencyKind;
+pub use crates_index::Version;
 use double_checked_cell_async::DoubleCheckedCell;
 use parking_lot::Mutex;
 use parking_lot::RwLock;
@@ -18,11 +18,11 @@ use serde_derive::*;
 use std::iter;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use string_interner::StringInterner;
 use string_interner::symbol::SymbolU32 as Sym;
+use string_interner::StringInterner;
 
-use triomphe::Arc;
 use feat_extractor::is_deprecated_requirement;
+use triomphe::Arc;
 
 type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 type FxHashSet<V> = std::collections::HashSet<V, ahash::RandomState>;
@@ -198,7 +198,8 @@ impl Index {
     }
 
     pub async fn deps_stats(&self) -> Result<&DepsStats, DepsErr> {
-        Ok(tokio::time::timeout(Duration::from_secs(30), self.deps_stats.get_or_init(async {self.get_deps_stats()})).await
+        Ok(tokio::time::timeout(Duration::from_secs(30), self.deps_stats.get_or_init(async { self.get_deps_stats() }))
+            .await
             .map_err(|_| DepsErr::DepsNotAvailable)?)
     }
 
@@ -526,8 +527,8 @@ pub struct DepQuery {
 
 #[test]
 fn stable_hash() {
-    use std::hash::Hasher;
     use ahash::AHasher;
+    use std::hash::Hasher;
 
     let mut hasher = AHasher::new_with_keys(1234, 5678);
 

@@ -171,7 +171,7 @@ impl GitHub {
     where
         P: FnOnce(B) -> R,
         F: FnOnce(&github_v3::Client) -> A,
-        A: Future<Output=Result<github_v3::Response, github_v3::GHError>>,
+        A: Future<Output = Result<github_v3::Response, github_v3::GHError>>,
         B: for<'de> serde::Deserialize<'de> + serde::Serialize + Clone + Send + 'static,
         R: for<'de> serde::Deserialize<'de> + serde::Serialize + Clone + Send + 'static,
     {

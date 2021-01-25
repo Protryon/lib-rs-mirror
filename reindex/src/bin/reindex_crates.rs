@@ -1,10 +1,10 @@
-use std::convert::TryInto;
-use simple_cache::TempCache;
-use futures::Future;
+use debcargo_list::DebcargoList;
 use failure;
-use futures::future::FutureExt;
+use feat_extractor::*;
 use futures::future::join_all;
+use futures::future::FutureExt;
 use futures::stream::StreamExt;
+use futures::Future;
 use kitchen_sink::ArcRichCrateVersion;
 use kitchen_sink::RichCrate;
 use kitchen_sink::{self, stop, stopped, KitchenSink, Origin, RichCrateVersion};
@@ -16,13 +16,13 @@ use ranking::OverallScoreInputs;
 use render_readme::Links;
 use render_readme::Renderer;
 use search_index::*;
+use simple_cache::TempCache;
 use std::collections::HashSet;
+use std::convert::TryInto;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use triomphe::Arc;
 use udedokei::LanguageExt;
-use feat_extractor::*;
-use debcargo_list::DebcargoList;
 
 struct Reindexer {
     crates: KitchenSink,
@@ -52,10 +52,7 @@ fn main() {
     if everything {
         deblist.update().expect("debcargo"); // it needs to be updated sometime, but not frequently
     }
-    let r = Arc::new(Reindexer {
-        crates,
-        deblist,
-    });
+    let r = Arc::new(Reindexer { crates, deblist });
     let mut indexer = Indexer::new(CrateSearchIndex::new(r.crates.main_cache_dir()).expect("init search")).expect("init search indexer");
     let lines = TempCache::new(r.crates.main_cache_dir().join("search-uniq-lines.dat")).expect("init lines cache");
     let (tx, mut rx) = mpsc::channel::<(Arc<_>, _, _)>(64);
@@ -84,7 +81,7 @@ fn main() {
         }
     });
 
-    let c: Box<dyn Iterator<Item=Origin> + Send> = if everything {
+    let c: Box<dyn Iterator<Item = Origin> + Send> = if everything {
         let mut c: Vec<_> = r.crates.all_crates().collect::<Vec<_>>();
         c.shuffle(&mut thread_rng());
         Box::new(c.into_iter())
@@ -368,15 +365,14 @@ fn print_res<T>(res: Result<T, failure::Error>) {
     }
 }
 
-fn run_timeout<'a, T>(secs: u64, fut: impl Future<Output=Result<T, failure::Error>> + 'a) -> impl Future<Output=Result<T, failure::Error>> + 'a {
+fn run_timeout<'a, T>(secs: u64, fut: impl Future<Output = Result<T, failure::Error>> + 'a) -> impl Future<Output = Result<T, failure::Error>> + 'a {
     tokio::time::timeout(Duration::from_secs(secs), fut).map(move |r| r.map_err(|_| failure::format_err!("timed out {}", secs)).and_then(|x| x))
 }
 
-
 #[test]
 fn stable_hash() {
-    use std::hash::Hasher;
     use ahash::AHasher;
+    use std::hash::Hasher;
 
     let mut hasher = AHasher::new_with_keys(1234, 5678);
 

@@ -1,12 +1,12 @@
 #![allow(unused)]
-use std::sync::RwLock;
-use std::collections::HashSet;
-use quick_error::quick_error;
-use git2::RepositoryInitOptions;
 use git2::Repository;
-use std::path::{Path, PathBuf};
+use git2::RepositoryInitOptions;
+use quick_error::quick_error;
+use std::collections::HashSet;
 use std::io;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::RwLock;
 
 const DEBCARGO_CONF_REPO_URL: &str = "https://salsa.debian.org/rust-team/debcargo-conf.git";
 
@@ -33,7 +33,6 @@ pub struct DebcargoList {
 unsafe impl Sync for DebcargoList {}
 unsafe impl Send for DebcargoList {}
 
-
 impl DebcargoList {
     pub fn new(cache_dir: &Path) -> Result<Self, Error> {
         let repo_path = cache_dir.join("debcargo-conf");
@@ -45,12 +44,9 @@ impl DebcargoList {
                 opts.external_template(false);
                 opts.bare(true);
                 (true, Repository::init_opts(&repo_path, &opts)?)
-            },
+            }
         };
-        let list = Self {
-            repo,
-            list: RwLock::new(HashSet::new()),
-        };
+        let list = Self { repo, list: RwLock::new(HashSet::new()) };
         if needs_update {
             list.update()?;
         }

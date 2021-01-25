@@ -8,6 +8,7 @@
 mod author_page;
 mod cat_page;
 mod crate_page;
+mod crev;
 mod download_graph;
 mod home_page;
 mod install_page;
@@ -16,7 +17,6 @@ mod not_found_page;
 mod reverse_dependencies;
 mod search_page;
 mod urler;
-mod crev;
 pub use crate::not_found_page::*;
 pub use crate::search_page::*;
 use futures::future::try_join_all;
@@ -29,9 +29,9 @@ use chrono::prelude::*;
 use failure;
 use failure::ResultExt;
 use kitchen_sink::Compat;
+use kitchen_sink::KitchenSink;
 use kitchen_sink::Review;
 use kitchen_sink::RichAuthor;
-use kitchen_sink::KitchenSink;
 use kitchen_sink::{stopped, KitchenSinkErr};
 use render_readme::Links;
 use render_readme::Markup;
@@ -354,7 +354,6 @@ pub(crate) fn render_markdown_str(s: &str, markup: &Renderer) -> templates::Html
     templates::Html(markup.markdown_str(s, false, None))
 }
 
-
 /// Nicely rounded number of downloads
 ///
 /// To show that these numbers are just approximate.
@@ -368,7 +367,6 @@ pub(crate) fn format_downloads(num: u32) -> (String, &'static str) {
         a => (format!("{}.{}", a / 1_000_000, a % 1_000_000 / 100_000), "M"),
     }
 }
-
 
 pub(crate) fn url_domain(url: &str) -> Option<Cow<'static, str>> {
     Url::parse(url).ok().and_then(|url| {

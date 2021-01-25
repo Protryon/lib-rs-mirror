@@ -74,7 +74,6 @@ pub struct CrateTemporalInputs<'a> {
 
     /// Whether Debian has packaged this crate
     pub is_in_debian: bool,
-
     // most recent commit
     // avg time issues are left unanswered?
     // pub crate_score_context_free: f64,

@@ -1,17 +1,17 @@
 #![allow(unused)]
 #![allow(dead_code)]
-use std::collections::HashSet;
 use chrono::prelude::*;
-use rayon::prelude::*;
 use kitchen_sink::CrateOwner;
-use kitchen_sink::KitchenSink;
-use kitchen_sink::Origin;
-use kitchen_sink::MiniDate;
 use kitchen_sink::DependerChanges;
+use kitchen_sink::KitchenSink;
+use kitchen_sink::MiniDate;
+use kitchen_sink::Origin;
 use kitchen_sink::OwnerKind;
 use libflate::gzip::Decoder;
+use rayon::prelude::*;
 use serde_derive::Deserialize;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::convert::TryInto;
 use std::fs::File;
 use std::io::BufReader;
@@ -193,13 +193,13 @@ fn index_dependencies(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDe
                     let junk = version_str.as_str() == "0.1.0";
                     let unstable = version_str.starts_with("0.");
                     let days_fresh = if junk {
-                        30*2
+                        30 * 2
                     } else if unstable && releases_from_oldest.len() < 3 {
-                        30*6
+                        30 * 6
                     } else if unstable {
                         365
                     } else {
-                        365*2
+                        365 * 2
                     };
                     release_date.days_later(days_fresh)
                 };
@@ -226,11 +226,11 @@ fn index_dependencies(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDe
     for (crate_id, uses) in deps_changes {
         let name = crates.get(&crate_id).expect("bork crate");
         let today = MiniDate::new(Utc::today());
-        let mut by_day = HashMap::with_capacity(uses.len()*2);
+        let mut by_day = HashMap::with_capacity(uses.len() * 2);
         for (start_date, end_date, expired) in uses {
-            by_day.entry(start_date).or_insert(DependerChanges {at: start_date, added:0, removed:0, expired: 0}).added += 1;
+            by_day.entry(start_date).or_insert(DependerChanges { at: start_date, added: 0, removed: 0, expired: 0 }).added += 1;
             if end_date <= today {
-                let e = by_day.entry(end_date).or_insert(DependerChanges {at: end_date, added:0, removed:0, expired: 0});
+                let e = by_day.entry(end_date).or_insert(DependerChanges { at: end_date, added: 0, removed: 0, expired: 0 });
                 if expired {
                     e.expired += 1;
                 } else {
@@ -435,7 +435,7 @@ fn parse_version_downloads(mut file: impl Read) -> Result<VersionDownloads, BoxE
         let date = date_from_str(r.next().ok_or("no date")?)?;
         let downloads = r.next().and_then(|s| s.parse().ok()).ok_or("bad dl")?;
         let version_id = r.next().and_then(|s| s.parse().ok()).ok_or("bad dl")?;
-        out.entry(version_id).or_insert_with(|| Vec::with_capacity(365*4)).push((date, downloads));
+        out.entry(version_id).or_insert_with(|| Vec::with_capacity(365 * 4)).push((date, downloads));
     }
     Ok(out)
 }

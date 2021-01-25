@@ -1,17 +1,17 @@
-use std::borrow::Cow;
-use kitchen_sink::Origin;
 use crate::templates;
 use crate::Page;
 use kitchen_sink::KitchenSink;
+use kitchen_sink::Level;
+use kitchen_sink::Origin;
+use kitchen_sink::Rating;
 use kitchen_sink::Review;
 use kitchen_sink::SemVer;
-use kitchen_sink::Rating;
-use kitchen_sink::Level;
 use render_readme::Links;
-use render_readme::Renderer;
 use render_readme::Markup;
-use std::collections::HashSet;
+use render_readme::Renderer;
 use rich_crate::RichCrateVersion;
+use std::borrow::Cow;
+use std::collections::HashSet;
 
 pub struct ReviewsPage<'a> {
     pub(crate) ver: &'a RichCrateVersion,
@@ -109,7 +109,7 @@ impl<'a> ReviewsPage<'a> {
 
     pub fn page(&self) -> Page {
         Page {
-            title: format!("Review{} of the {} crate", if self.reviews.len() == 1 {""} else {"s"}, self.ver.capitalized_name()),
+            title: format!("Review{} of the {} crate", if self.reviews.len() == 1 { "" } else { "s" }, self.ver.capitalized_name()),
             item_name: Some(self.ver.short_name().to_string()),
             item_description: self.ver.description().map(|d| d.to_string()),
             noindex: self.reviews.is_empty(),

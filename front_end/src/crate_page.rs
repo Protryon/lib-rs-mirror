@@ -1,7 +1,6 @@
-use kitchen_sink::ArcRichCrateVersion;
-use kitchen_sink::RevDependencies;
 use crate::download_graph::DownloadsGraph;
 use crate::templates;
+use crate::url_domain;
 use crate::urler::Urler;
 use crate::Page;
 use categories::Category;
@@ -10,9 +9,11 @@ use chrono::prelude::*;
 use chrono::Duration;
 use futures::future::Future;
 use futures::stream::StreamExt;
+use kitchen_sink::ArcRichCrateVersion;
 use kitchen_sink::CResult;
 use kitchen_sink::CrateAuthor;
 use kitchen_sink::DepInfMap;
+use kitchen_sink::RevDependencies;
 use kitchen_sink::{DepTy, KitchenSink, Origin};
 use locale::Numeric;
 use log::warn;
@@ -35,7 +36,6 @@ use std::hash::Hash;
 use tokio::runtime::Handle;
 use udedokei::LanguageExt;
 use udedokei::{Language, Lines, Stats};
-use crate::url_domain;
 
 pub struct CrateLicense {
     pub origin: Origin,

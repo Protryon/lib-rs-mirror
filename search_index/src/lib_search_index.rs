@@ -102,7 +102,7 @@ impl CrateSearchIndex {
 
         let reader = self.tantivy_index.reader()?;
         let searcher = reader.searcher();
-        let top_docs = searcher.search(&*query, &TopDocs::with_limit((limit+50+limit/2).max(250)))?; // 250 is a hack for https://github.com/tantivy-search/tantivy/issues/700
+        let top_docs = searcher.search(&*query, &TopDocs::with_limit((limit + 50 + limit / 2).max(250)))?; // 250 is a hack for https://github.com/tantivy-search/tantivy/issues/700
 
         let mut docs = top_docs.into_iter().map(|(relevance_score, doc_address)| {
             let retrieved_doc = searcher.doc(doc_address)?;

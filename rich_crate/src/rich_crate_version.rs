@@ -401,7 +401,7 @@ impl ManifestExt for Manifest {
             .map(|d| d.iter().collect::<HashSet<_>>())
             .unwrap_or_default();
 
-        for (for_feature, wants) in self.features.iter().filter(|(n,_)| *n != "default") {
+        for (for_feature, wants) in self.features.iter().filter(|(n, _)| *n != "default") {
             for depstr in wants {
                 let mut depstr = depstr.splitn(2, '/');
                 let name = depstr.next().expect("name should be there");
@@ -455,8 +455,8 @@ pub struct RichDep {
 }
 
 impl RichDep {
-    pub fn for_features(&self) -> impl Iterator<Item=(&str, bool)> + '_ {
-        self.only_for_features.iter().map(|(k,v)| (&**k, *v))
+    pub fn for_features(&self) -> impl Iterator<Item = (&str, bool)> + '_ {
+        self.only_for_features.iter().map(|(k, v)| (&**k, *v))
     }
 
     pub fn is_optional(&self) -> bool {

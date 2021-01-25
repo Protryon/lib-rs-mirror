@@ -7,6 +7,7 @@ extern crate serde_derive;
 extern crate log;
 
 mod yearly;
+use tokio::task::spawn_blocking;
 pub use crate::yearly::*;
 pub use deps_index::*;
 pub mod filter;
@@ -656,10 +657,14 @@ impl KitchenSink {
         }
         let _f = self.throttle.acquire().await;
         info!("Need to scan repo {:?}", repo);
-        tokio::task::block_in_place(|| {
-            let checkout = crate_git_checkout::checkout(repo, &self.git_checkout_path)?;
+        let git_checkout_path = self.git_checkout_path.clone();
+        let origin = origin.clone();
+        let repo = repo.clone();
+        let package = package.clone();
+        spawn_blocking(move || {
+            let checkout = crate_git_checkout::checkout(&repo, &git_checkout_path)?;
             let mut pkg_ver = crate_git_checkout::find_versions(&checkout)?;
-            if let Some(v) = pkg_ver.remove(&**package) {
+            if let Some(v) = pkg_ver.remove(&*package) {
                 let versions: Vec<_> = v.into_iter().map(|(num, timestamp)| {
                     let date = Utc.timestamp(timestamp, 0).to_rfc3339();
                     CrateVersion {
@@ -674,7 +679,7 @@ impl KitchenSink {
                 }
             }
             Err(KitchenSinkErr::CrateNotFound(origin.clone())).context("missing releases, even tags")?
-        })
+        }).await?
     }
 
     #[inline]
@@ -891,10 +896,13 @@ impl KitchenSink {
         let crates_io_krate = crates_io_meta?.krate;
         let crate_tarball = crate_tarball?;
         let crate_compressed_size = crate_tarball.len();
-        let mut meta = tokio::task::block_in_place(|| {
-            crate::tarball::read_archive(&crate_tarball[..], name, ver)
-        })?;
-        drop(crate_tarball);
+        let mut meta = spawn_blocking({
+            let name = name.to_owned();
+            let ver = ver.to_owned();
+            move || {
+                crate::tarball::read_archive(&crate_tarball[..], &name, &ver)
+            }
+        }).await??;
 
         let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
 
@@ -1640,9 +1648,12 @@ impl KitchenSink {
     pub async fn index_repo(&self, repo: &Repo, as_of_version: &str) -> CResult<()> {
         let _f = self.throttle.acquire().await;
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
-        let url = repo.canonical_git_url();
-        let (checkout, manif) = tokio::task::block_in_place(|| {
-            let checkout = crate_git_checkout::checkout(repo, &self.git_checkout_path)?;
+        let (checkout, manif) = tokio::task::spawn_blocking({
+            let git_checkout_path = self.git_checkout_path.clone();
+            let repo = repo.clone();
+            move || {
+            let url = repo.canonical_git_url();
+            let checkout = crate_git_checkout::checkout(&repo, &git_checkout_path)?;
 
             let (manif, warnings) = crate_git_checkout::find_manifests(&checkout)
                 .with_context(|_| format!("find manifests in {}", url))?;
@@ -1652,7 +1663,7 @@ impl KitchenSink {
             Ok::<_, CError>((checkout, manif.into_iter().filter_map(|(subpath, _, manifest)| {
                 manifest.package.map(|p| (subpath, p.name))
             })))
-        })?;
+        }}).await??;
         self.crate_db.index_repo_crates(repo, manif).await.context("index rev repo")?;
         let mut changes = Vec::new();
 

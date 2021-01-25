@@ -14,6 +14,8 @@ pub mod filter;
 
 mod ctrlcbreak;
 pub use crate::ctrlcbreak::*;
+mod nonblock;
+pub use crate::nonblock::*;
 mod tarball;
 
 pub use crate_db::builddb::Compat;
@@ -371,7 +373,7 @@ impl KitchenSink {
         }
         top.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
 
-        type_erase(self.knock_duplicates(&mut top)).await;
+        watch("knock_duplicates", self.knock_duplicates(&mut top)).await;
         top.truncate(top_n);
         top
     }
@@ -579,10 +581,10 @@ impl KitchenSink {
                 Ok(RichCrate::new(origin.clone(), owners, meta.krate.name, versions))
             },
             Origin::GitHub { repo, package } => {
-                type_erase(self.rich_crate_gh(origin, repo, package)).await
+                watch("repocrate", self.rich_crate_gh(origin, repo, package)).await
             },
             Origin::GitLab { repo, package } => {
-                type_erase(self.rich_crate_gitlab(origin, repo, package)).await
+                watch("repocrate2", self.rich_crate_gitlab(origin, repo, package)).await
             },
         }
     }
@@ -729,7 +731,8 @@ impl KitchenSink {
         let mut meta = meta.ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?;
         if !meta.versions.iter().any(|v| v.num == latest_in_index) {
             warn!("Crate data missing latest version {}@{}", name, latest_in_index);
-            meta = type_erase(self.crates_io.crate_meta(name, &format!("{}-try-again", latest_in_index))).await?
+            meta = watch("meta-retry", self.crates_io.crate_meta(name, &format!("{}-try-again", latest_in_index)))
+                .await?
                 .ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?;
             if !meta.versions.iter().any(|v| v.num == latest_in_index) {
                 error!("Error: crate data is borked {}@{}. Has only: {:?}", name, latest_in_index, meta.versions.iter().map(|v| &v.num).collect::<Vec<_>>());
@@ -743,13 +746,13 @@ impl KitchenSink {
     /// This function is quite slow, as it reads everything about the crate.
     ///
     /// There's no support for getting anything else than the latest version.
-    pub fn rich_crate_version_async<'a>(&'a self, origin: &'a Origin) -> Pin<Box<dyn Future<Output=CResult<ArcRichCrateVersion>> + Send + 'a>> {
-        type_erase(self.rich_crate_version_async_opt(origin, false))
+    pub fn rich_crate_version_async<'a>(&'a self, origin: &'a Origin) -> Pin<Box<dyn Future<Output = CResult<ArcRichCrateVersion>> + Send + 'a>> {
+        watch("rcv-1", self.rich_crate_version_async_opt(origin, false))
     }
 
     /// Same as rich_crate_version_async, but it won't try to refresh the data. Just fails if there's no cached data.
-    pub fn rich_crate_version_stale_is_ok<'a>(&'a self, origin: &'a Origin) -> Pin<Box<dyn Future<Output=CResult<ArcRichCrateVersion>> + Send + 'a>> {
-        type_erase(self.rich_crate_version_async_opt(origin, true))
+    pub fn rich_crate_version_stale_is_ok<'a>(&'a self, origin: &'a Origin) -> Pin<Box<dyn Future<Output = CResult<ArcRichCrateVersion>> + Send + 'a>> {
+        watch("rcv-2", self.rich_crate_version_async_opt(origin, true))
     }
 
     async fn rich_crate_version_async_opt(&self, origin: &Origin, allow_stale: bool) -> CResult<ArcRichCrateVersion> {
@@ -791,13 +794,16 @@ impl KitchenSink {
                 debug!("Getting/indexing {:?}: {}", origin, e);
                 let _th = timeout(Duration::from_secs(30), self.auto_indexing_throttle.acquire()).await?;
                 let reindex = timeout(Duration::from_secs(60), self.index_crate_highest_version(origin));
-                type_erase(reindex).await.map_err(|_| KitchenSinkErr::DataTimedOut)?
-                    .with_context(|_| format!("reindexing {:?}", origin))?; // Pin to lower stack usage
+                watch("reindex", reindex).await.map_err(|_| KitchenSinkErr::DataTimedOut)?.with_context(|_| format!("reindexing {:?}", origin))?; // Pin to lower stack usage
                 let get_data = timeout(Duration::from_secs(10), self.crate_db.rich_crate_version_data(origin));
-                match type_erase(get_data).await.map_err(|_|  {
-                    warn!("rich_crate_version_data timeout");
-                    KitchenSinkErr::DerivedDataTimedOut
-                }).context("getting data after reindex")? {
+                match watch("get_data", get_data)
+                    .await
+                    .map_err(|_| {
+                        warn!("rich_crate_version_data timeout");
+                        KitchenSinkErr::DerivedDataTimedOut
+                    })
+                    .context("getting data after reindex")?
+                {
                     Ok(v) => v,
                     Err(e) => return Err(e),
                 }
@@ -927,7 +933,7 @@ impl KitchenSink {
             }
             // readmes in form of readme="../foo.md" are lost in packaging,
             // and the only copy exists in crates.io own api
-            type_erase(self.add_readme_from_crates_io(&mut meta, name, ver)).await;
+            watch("readme", self.add_readme_from_crates_io(&mut meta, name, ver)).await;
             let has_readme = meta.readme.is_some();
             if !has_readme {
                 warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()));
@@ -1288,7 +1294,7 @@ impl KitchenSink {
         if let Ok(Some(res)) = self.url_check_cache.get(url) {
             return res;
         }
-        type_erase(async {
+        watch("urlchk", async {
             debug!("CHK: {}", url);
             let req = reqwest::Client::builder().build().unwrap();
             let res = req.get(url).send().await.map(|res| {
@@ -1310,7 +1316,7 @@ impl KitchenSink {
         if !origin.is_crates_io() {
             return false;
         }
-        type_erase(self.docs_rs.builds(name, ver)).await.unwrap_or(true) // fail open
+        watch("builds", self.docs_rs.builds(name, ver)).await.unwrap_or(true) // fail open
     }
 
     fn is_same_url<A: AsRef<str> + std::fmt::Debug>(a: Option<A>, b: Option<&String>) -> bool {
@@ -1510,14 +1516,14 @@ impl KitchenSink {
             Origin::CratesIo(ref name) => {
                 let cache_key = self.index.cache_key_for_crate(name)?;
                 let ver = self.index.crate_highest_version(name, false).context("rich_crate_version2")?;
-                let res = type_erase(self.rich_crate_version_data_from_crates_io(ver)).await.context("rich_crate_version_data_from_crates_io")?;
+                let res = watch("rcv-3", self.rich_crate_version_data_from_crates_io(ver)).await.context("rich_crate_version_data_from_crates_io")?;
                 (res, cache_key)
             },
             Origin::GitHub { .. } | Origin::GitLab { .. } => {
                 if !self.crate_exists(origin) {
                     Err(KitchenSinkErr::GitCrateNotAllowed(origin.to_owned()))?
                 }
-                let res = type_erase(self.rich_crate_version_from_repo(&origin)).await?;
+                let res = watch("rcv-4", self.rich_crate_version_from_repo(&origin)).await?;
                 (res, 0)
             },
         };
@@ -1665,7 +1671,7 @@ impl KitchenSink {
         self.crate_db.index_repo_crates(repo, manif).await.context("index rev repo")?;
 
         if let Repo { host: RepoHost::GitHub(ref repo), .. } = repo {
-            if let Some(commits) = type_erase(self.repo_commits(repo, as_of_version)).await? {
+            if let Some(commits) = watch("commits", self.repo_commits(repo, as_of_version)).await? {
                 for c in commits {
                     if let Some(a) = c.author {
                         self.index_user_m(&a, &c.commit.author).await?;
@@ -1881,7 +1887,7 @@ impl KitchenSink {
         let (hit_max_contributor_count, mut contributors_by_login) = match krate.repository().as_ref() {
             // Only get contributors from github if the crate has been found in the repo,
             // otherwise someone else's repo URL can be used to get fake contributor numbers
-            Some(crate_repo) => type_erase(self.contributors_from_repo(crate_repo, &owners, krate.has_path_in_repo())).await?,
+            Some(crate_repo) => watch("contrib", self.contributors_from_repo(crate_repo, &owners, krate.has_path_in_repo())).await?,
             None => (false, HashMap::new()),
         };
 
@@ -2240,7 +2246,7 @@ impl KitchenSink {
         };
 
         let res = cell.get_or_try_init(async {
-            type_erase(async {
+            watch("topcc", async {
                 let total_count = self.category_crate_count(slug).await?;
                 let wanted_num = ((total_count / 2 + 25) / 50 * 50).max(100);
 
@@ -2606,6 +2612,6 @@ fn is_alnum(q: &str) -> bool {
 }
 
 #[inline(always)]
-fn type_erase<'a, T>(f: impl Future<Output=T> + Send + 'a) -> Pin<Box<dyn Future<Output=T> + Send + 'a>> {
-    Box::pin(f)
+fn watch<'a, T>(label: &'static str, f: impl Future<Output = T> + Send + 'a) -> Pin<Box<dyn Future<Output = T> + Send + 'a>> {
+    Box::pin(NonBlock::new(label, f))
 }

@@ -72,8 +72,6 @@ fn main() {
     let rt = tokio::runtime::Builder::new()
         .threaded_scheduler()
         .enable_all()
-        .core_threads(2)
-        .max_threads(8)
         .thread_name("server-bg")
         .build()
         .unwrap();
@@ -663,7 +661,7 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
                             },
                         }
                     } else {
-                        info!("Skipped refresh of {}", cache_file.display());
+                        info!("Too busy to refresh {}", cache_file.display());
                     }
                 }});
             }

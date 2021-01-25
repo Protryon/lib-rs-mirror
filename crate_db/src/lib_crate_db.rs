@@ -115,8 +115,9 @@ impl CrateDb {
 
     #[inline]
     async fn with_write<F, T>(&self, context: &'static str, cb: F) -> FResult<T> where F: FnOnce(&Connection) -> FResult<T> {
-        let mut _sqlite_sucks = self.concurrency_control.write().await;
+        tokio::task::yield_now().await; // maybe there are read ops to do first?
 
+        let mut _sqlite_sucks = self.concurrency_control.write().await;
         let mut conn = self.exclusive_conn.lock().await;
         tokio::task::block_in_place(|| {
             let conn = conn.get_or_insert_with(|| self.connect().expect("db setup"));

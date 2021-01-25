@@ -518,6 +518,7 @@ impl KitchenSink {
 
     pub async fn crates_to_reindex(&self) -> CResult<Vec<RichCrate>> {
         let min_timestamp = self.crate_db.latest_crate_update_timestamp().await?.unwrap_or(0);
+        tokio::task::yield_now().await;
         let all = tokio::task::block_in_place(|| {
             self.index.crates_io_crates() // too slow to scan all GH crates
         });
@@ -837,6 +838,7 @@ impl KitchenSink {
             _ => unreachable!()
         };
 
+        tokio::task::yield_now().await;
         let _f = self.throttle.acquire().await;
         tokio::task::block_in_place(|| {
             let checkout = crate_git_checkout::checkout(&repo, &self.git_checkout_path)?;
@@ -1665,7 +1667,6 @@ impl KitchenSink {
             })))
         }}).await??;
         self.crate_db.index_repo_crates(repo, manif).await.context("index rev repo")?;
-        let mut changes = Vec::new();
 
         if let Repo { host: RepoHost::GitHub(ref repo), .. } = repo {
             if let Some(commits) = type_erase(self.repo_commits(repo, as_of_version)).await? {
@@ -1682,7 +1683,10 @@ impl KitchenSink {
 
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
 
+        let mut changes = Vec::new();
+        tokio::task::yield_now().await;
         tokio::task::block_in_place(|| {
+            let url = repo.canonical_git_url();
             crate_git_checkout::find_dependency_changes(&checkout, |added, removed, age| {
                 if removed.is_empty() {
                     if added.len() > 1 {

@@ -311,7 +311,7 @@ async fn default_handler(req: HttpRequest) -> Result<HttpResponse, ServerError> 
 
     let name = path.trim_matches('/').to_owned();
     let crates = state.crates.load();
-    let (found_crate, found_keyword) = rt_run_timeout(&state.rt, 10, async move {
+    let (found_crate, found_keyword) = rt_run_timeout(&state.rt, "findcrate", 10, async move {
         let crate_maybe = match Origin::try_from_crates_io_name(&name) {
             Some(o) => Box::pin(crates.rich_crate_async(&o)).await.ok(),
             _ => None,
@@ -369,16 +369,19 @@ async fn handle_category(req: HttpRequest, cat: &'static Category) -> Result<Htt
     let state: &AServerState = req.app_data().expect("appdata");
     let crates = state.crates.load();
     let cache_file = state.page_cache_dir.join(format!("_{}.html", cat.slug));
-    Ok(serve_cached(with_file_cache(state, cache_file, 1800, {
-        let state = state.clone();
-        run_timeout(30, async move {
-            let mut page: Vec<u8> = Vec::with_capacity(150000);
-            front_end::render_category(&mut page, cat, &crates, &state.markup).await?;
-            minify_html(&mut page);
-            mark_server_still_alive(&state);
-            Ok::<_, failure::Error>((page, None))
+    Ok(serve_cached(
+        with_file_cache(state, cache_file, 1800, {
+            let state = state.clone();
+            run_timeout("catrender", 30, async move {
+                let mut page: Vec<u8> = Vec::with_capacity(150000);
+                front_end::render_category(&mut page, cat, &crates, &state.markup).await?;
+                minify_html(&mut page);
+                mark_server_still_alive(&state);
+                Ok::<_, failure::Error>((page, None))
+            })
         })
-    }).await?))
+        .await?,
+    ))
 }
 
 async fn handle_home(req: HttpRequest) -> Result<HttpResponse, ServerError> {
@@ -390,17 +393,20 @@ async fn handle_home(req: HttpRequest) -> Result<HttpResponse, ServerError> {
 
     let state: &AServerState = req.app_data().expect("appdata");
     let cache_file = state.page_cache_dir.join("_.html");
-    Ok(serve_cached(with_file_cache(&state, cache_file, 3600, {
-        let state = state.clone();
-        run_timeout(300, async move {
-            let crates = state.crates.load();
-            let mut page: Vec<u8> = Vec::with_capacity(32000);
-            front_end::render_homepage(&mut page, &crates).await?;
-            minify_html(&mut page);
-            mark_server_still_alive(&state);
-            Ok::<_, failure::Error>((page, Some(Utc::now().into())))
+    Ok(serve_cached(
+        with_file_cache(&state, cache_file, 3600, {
+            let state = state.clone();
+            run_timeout("homepage", 300, async move {
+                let crates = state.crates.load();
+                let mut page: Vec<u8> = Vec::with_capacity(32000);
+                front_end::render_homepage(&mut page, &crates).await?;
+                minify_html(&mut page);
+                mark_server_still_alive(&state);
+                Ok::<_, failure::Error>((page, Some(Utc::now().into())))
+            })
         })
-    }).await?))
+        .await?,
+    ))
 }
 
 async fn handle_github_crate(req: HttpRequest) -> Result<HttpResponse, ServerError> {
@@ -485,9 +491,7 @@ async fn handle_debug(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let state: &AServerState = req.app_data().expect("appdata");
     let crates = state.crates.load();
     let crates2 = Arc::clone(&crates);
-    let ver = rt_run_timeout(&state.rt, 10, async move {
-        crates2.rich_crate_version_async(&origin).await
-    }).await?;
+    let ver = rt_run_timeout(&state.rt, "dbgcrate", 10, async move { crates2.rich_crate_version_async(&origin).await }).await?;
     let mut page: Vec<u8> = Vec::with_capacity(32000);
     front_end::render_debug_page(&mut page, &ver, &crates)?;
     Ok(HttpResponse::Ok()
@@ -505,7 +509,7 @@ async fn handle_install(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     };
 
     let state = state2.clone();
-    let (page, last_mod) = rt_run_timeout(&state2.rt, 30, async move {
+    let (page, last_mod) = rt_run_timeout(&state2.rt, "instpage", 30, async move {
         let crates = state.crates.load();
         let ver = crates.rich_crate_version_async(&origin).await?;
         let mut page: Vec<u8> = Vec::with_capacity(32000);
@@ -535,7 +539,7 @@ async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     Ok(serve_cached(
         with_file_cache(state, cache_file, 3600, {
             let state = state.clone();
-            run_timeout(60, async move {
+            run_timeout("authorpage", 60, async move {
                 let crates = state.crates.load();
                 let mut page: Vec<u8> = Vec::with_capacity(32000);
                 front_end::render_author_page(&mut page, &aut, &crates, &state.markup).await?;
@@ -585,29 +589,36 @@ async fn handle_crate_reviews(req: HttpRequest) -> Result<HttpResponse, ServerEr
         None => return render_404_page(state, &crate_name, "crate"),
     };
     let state = state.clone();
-    Ok(serve_cached(rt_run_timeout(&state.clone().rt, 30, async move {
-        let crates = state.crates.load();
-        let ver = crates.rich_crate_version_async(&origin).await?;
-        let mut page: Vec<u8> = Vec::with_capacity(32000);
-        let reviews = crates.reviews_for_crate(ver.origin());
-        front_end::render_crate_reviews(&mut page, &reviews, &ver, &crates, &state.markup).await?;
-        minify_html(&mut page);
-        mark_server_still_alive(&state);
-        Ok::<_, failure::Error>((page, 24*3600, false, None))
-    }).await?))
+    Ok(serve_cached(
+        rt_run_timeout(&state.clone().rt, "revpage", 30, async move {
+            let crates = state.crates.load();
+            let ver = crates.rich_crate_version_async(&origin).await?;
+            let mut page: Vec<u8> = Vec::with_capacity(32000);
+            let reviews = crates.reviews_for_crate(ver.origin());
+            front_end::render_crate_reviews(&mut page, &reviews, &ver, &crates, &state.markup).await?;
+            minify_html(&mut page);
+            mark_server_still_alive(&state);
+            Ok::<_, failure::Error>((page, 24 * 3600, false, None))
+        })
+        .await?,
+    ))
 }
 
 async fn handle_new_trending(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let state: &AServerState = req.app_data().expect("appdata");
-    Ok(serve_cached(with_file_cache(state, state.page_cache_dir.join("_new_.html"), 600, {
-        let state = state.clone();
-        run_timeout(60, async move {
-            let crates = state.crates.load();
-            let mut page: Vec<u8> = Vec::with_capacity(32000);
-            front_end::render_trending_crates(&mut page, &crates, &state.markup).await?;
-            minify_html(&mut page);
-            Ok::<_, failure::Error>((page, None))
-    })}).await?))
+    Ok(serve_cached(
+        with_file_cache(state, state.page_cache_dir.join("_new_.html"), 600, {
+            let state = state.clone();
+            run_timeout("trendpage", 60, async move {
+                let crates = state.crates.load();
+                let mut page: Vec<u8> = Vec::with_capacity(32000);
+                front_end::render_trending_crates(&mut page, &crates, &state.markup).await?;
+                minify_html(&mut page);
+                Ok::<_, failure::Error>((page, None))
+            })
+        })
+        .await?,
+    ))
 }
 
 /// takes path to storage, freshness in seconds, and a function to call on cache miss
@@ -638,28 +649,30 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
             debug!("Using cached page {} {}s fresh={:?} acc={:?}", cache_file.display(), cache_time_remaining, is_fresh, is_acceptable);
 
             if !is_fresh {
-                let _ = state.rt.spawn({
+                let _ = rt_run_timeout(&state.rt, "refreshbg", 300, {
                     let state = state.clone();
                     async move {
-                    if let Ok(_s) = state.background_job.try_acquire() {
-                        match generate.await {
-                            Ok((mut page, last_mod)) => {
-                                debug!("Done refresh of {}", cache_file.display());
-                                let timestamp = last_mod.map(|a| a.timestamp() as u32).unwrap_or(0);
-                                page.extend_from_slice(&timestamp.to_le_bytes()); // The worst data format :)
+                        if let Ok(_s) = state.background_job.try_acquire() {
+                            match generate.await {
+                                Ok((mut page, last_mod)) => {
+                                    debug!("Done refresh of {}", cache_file.display());
+                                    let timestamp = last_mod.map(|a| a.timestamp() as u32).unwrap_or(0);
+                                    page.extend_from_slice(&timestamp.to_le_bytes()); // The worst data format :)
 
-                                if let Err(e) = std::fs::write(&cache_file, &page) {
-                                    error!("warning: Failed writing to {}: {}", cache_file.display(), e);
+                                    if let Err(e) = std::fs::write(&cache_file, &page) {
+                                        error!("warning: Failed writing to {}: {}", cache_file.display(), e);
+                                    }
                                 }
-                            },
-                            Err(e) => {
-                                error!("Refresh err: {} {}", e.iter_chain().map(|e| e.to_string()).collect::<Vec<_>>().join("; "), cache_file.display());
-                            },
+                                Err(e) => {
+                                    error!("Refresh err: {} {}", e.iter_chain().map(|e| e.to_string()).collect::<Vec<_>>().join("; "), cache_file.display());
+                                }
+                            }
+                        } else {
+                            info!("Too busy to refresh {}", cache_file.display());
                         }
-                    } else {
-                        info!("Too busy to refresh {}", cache_file.display());
+                        Ok(())
                     }
-                }});
+                });
             }
             return Ok((page_cached, if !is_fresh { cache_time_remaining / 4 } else { cache_time_remaining }.max(2), !is_acceptable, last_mod));
         }
@@ -682,7 +695,7 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
 }
 
 fn render_crate_page(state: AServerState, origin: Origin) -> impl Future<Output = Result<(Vec<u8>, Option<DateTime<FixedOffset>>), failure::Error>> + 'static {
-    run_timeout(30, async move {
+    run_timeout("cratepage", 30, async move {
         let crates = state.crates.load();
         let (all, ver) = futures::try_join!(crates.rich_crate_async(&origin), crates.rich_crate_version_async(&origin))?;
         let mut page: Vec<u8> = Vec::with_capacity(32000);
@@ -695,7 +708,7 @@ fn render_crate_page(state: AServerState, origin: Origin) -> impl Future<Output 
 
 async fn render_crate_reverse_dependencies(state: AServerState, origin: Origin) -> Result<(Vec<u8>, u32, bool, Option<DateTime<FixedOffset>>), failure::Error> {
     let s = state.clone();
-    rt_run_timeout(&s.rt, 30, async move {
+    rt_run_timeout(&s.rt, "revpage2", 30, async move {
         let crates = state.crates.load();
         let ver = crates.rich_crate_version_async(&origin).await?;
         let mut page: Vec<u8> = Vec::with_capacity(32000);
@@ -715,7 +728,7 @@ async fn handle_keyword(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let query = q.to_owned();
     let state: &AServerState = req.app_data().expect("appdata");
     let state2 = state.clone();
-    let (query, page) = rt_run_timeout(&state.rt, 15, async move {
+    let (query, page) = tokio::task::spawn_blocking(move || {
         if !is_alnum(&query) {
             return Ok::<_, failure::Error>((query, None));
         }
@@ -833,7 +846,7 @@ async fn handle_sitemap(req: HttpRequest) -> Result<HttpResponse, ServerError> {
 async fn handle_feed(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let state: &AServerState = req.app_data().expect("appdata");
     let state2 = state.clone();
-    let page = rt_run_timeout(&state.rt, 60, async move {
+    let page = rt_run_timeout(&state.rt, "feed", 60, async move {
         let crates = state2.crates.load();
         let mut page: Vec<u8> = Vec::with_capacity(32000);
         front_end::render_feed(&mut page, &crates).await?;
@@ -846,12 +859,23 @@ async fn handle_feed(req: HttpRequest) -> Result<HttpResponse, ServerError> {
         .body(page))
 }
 
-fn run_timeout<R, T: 'static + Send>(secs: u64, fut: R) -> Pin<Box<dyn Future<Output=Result<T, failure::Error>> + Send>> where R: 'static + Send + Future<Output=Result<T, failure::Error>> {
-    Box::pin(tokio::time::timeout(Duration::from_secs(secs), fut).map(|res| res?))
+fn run_timeout<R, T: 'static + Send>(label: &'static str, secs: u64, fut: R) -> Pin<Box<dyn Future<Output = Result<T, failure::Error>> + Send>>
+where
+    R: 'static + Send + Future<Output = Result<T, failure::Error>>,
+{
+    let fut = kitchen_sink::NonBlock::new(label, tokio::time::timeout(Duration::from_secs(secs), fut));
+    let timeout = fut.map(move |res| {
+        res.map_err(|_| failure::format_err!("{} timed out after >{}s", label, secs))?
+    });
+    Box::pin(timeout)
 }
 
-async fn rt_run_timeout<R, T: 'static + Send>(rt: &Handle, secs: u64, fut: R) -> Result<T, failure::Error> where R: 'static + Send + Future<Output=Result<T, failure::Error>> {
-    rt.spawn(tokio::time::timeout(Duration::from_secs(secs), fut)).await??
+async fn rt_run_timeout<R, T: 'static + Send>(rt: &Handle, label: &'static str, secs: u64, fut: R) -> Result<T, failure::Error>
+where
+    R: 'static + Send + Future<Output = Result<T, failure::Error>>,
+{
+    rt.spawn(kitchen_sink::NonBlock::new(label, tokio::time::timeout(Duration::from_secs(secs), fut))).await
+        .map_err(|_| failure::format_err!("{} timed out after >{}s", label, secs))??
 }
 
 struct ServerError {

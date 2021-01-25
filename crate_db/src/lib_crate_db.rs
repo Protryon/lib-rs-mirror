@@ -894,36 +894,36 @@ impl CrateDb {
     }
 
     pub fn keywords_tx(&self, conn: &Connection, origin: &Origin) -> FResult<Vec<String>> {
-            let mut query = conn.prepare_cached(r#"
-                select avg(ck.weight) * srck.weight, k.keyword
-                -- find the crate to categorize
-                from crates
-                -- find its keywords
-                join crate_keywords srck on crates.id = srck.crate_id
-                -- find other crates using these keywords
-                -- ck.weight * srck.weight gives strenght of the connection
-                -- and divided by count(*) for tf-idf for relevance
-                join crate_keywords ck on ck.keyword_id = srck.keyword_id
-                join keywords k on k.id = ck.keyword_id
-                -- ignore keywords equal categories
-                left join categories c on c.slug = k.keyword
-                where crates.origin = ?1
-                and k.visible
-                and c.slug is null
-                group by ck.keyword_id
-                order by 1 desc
-                limit 10
-                "#)?;
-            let res: Vec<(f64, String)> = query.query_map(&[&origin.to_str()], |row| Ok((row.get_unwrap(0), row.get_unwrap(1))))?
-                .collect::<std::result::Result<_,_>>()?;
-            let min_score = res.get(0).map_or(0., |(rel,_)|rel/20.);
-            Ok(res.into_iter().filter_map(|(rel,k)|{
-                if rel >= min_score {
-                    Some(k)
-                } else {
-                    None
-                }
-            }).collect())
+        let mut query = conn.prepare_cached(r#"
+            select avg(ck.weight) * srck.weight, k.keyword
+            -- find the crate to categorize
+            from crates
+            -- find its keywords
+            join crate_keywords srck on crates.id = srck.crate_id
+            -- find other crates using these keywords
+            -- ck.weight * srck.weight gives strenght of the connection
+            -- and divided by count(*) for tf-idf for relevance
+            join crate_keywords ck on ck.keyword_id = srck.keyword_id
+            join keywords k on k.id = ck.keyword_id
+            -- ignore keywords equal categories
+            left join categories c on c.slug = k.keyword
+            where crates.origin = ?1
+            and k.visible
+            and c.slug is null
+            group by ck.keyword_id
+            order by 1 desc
+            limit 10
+            "#)?;
+        let res: Vec<(f64, String)> = query.query_map(&[&origin.to_str()], |row| Ok((row.get_unwrap(0), row.get_unwrap(1))))?
+            .collect::<std::result::Result<_,_>>()?;
+        let min_score = res.get(0).map_or(0., |(rel,_)|rel/20.);
+        Ok(res.into_iter().filter_map(|(rel,k)|{
+            if rel >= min_score {
+                Some(k)
+            } else {
+                None
+            }
+        }).collect())
     }
 
     /// Find most relevant/popular keywords in the category

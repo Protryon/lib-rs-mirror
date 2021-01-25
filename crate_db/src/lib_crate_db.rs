@@ -99,7 +99,15 @@ impl CrateDb {
                 RefCell::new(conn)
             }));
             match conn {
-                Ok(conn) => Ok(cb(&mut *conn.borrow_mut()).context(context)?),
+                Ok(conn) => {
+                    let now = std::time::Instant::now();
+                    let res = cb(&mut *conn.borrow_mut());
+                    let elapsed = now.elapsed();
+                    if elapsed > std::time::Duration::from_secs(3) {
+                        eprintln!("{} write callback took {}s", context, elapsed.as_secs());
+                    }
+                    Ok(res.context(context)?)
+                },
                 Err(err) => bail!("{} (in {})", err, context),
             }
         })
@@ -114,8 +122,13 @@ impl CrateDb {
             let conn = conn.get_or_insert_with(|| self.connect().expect("db setup"));
 
             let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            let now = std::time::Instant::now();
             let res = cb(&tx).context(context)?;
             tx.commit().context(context)?;
+            let elapsed = now.elapsed();
+            if elapsed > std::time::Duration::from_secs(3) {
+                eprintln!("{} write callback took {}s", context, elapsed.as_secs());
+            }
             Ok(res)
         })
     }

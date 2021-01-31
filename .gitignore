@@ -19,3 +19,4 @@ data/docker/
 /category_overrides.txt
 /page
 /git_crates.txt
+/data/debcargo-conf/

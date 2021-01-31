@@ -92,6 +92,10 @@ impl CrateDb {
             CREATE UNIQUE INDEX IF NOT EXISTS categories_idx on categories(crate_id, slug);
             CREATE INDEX IF NOT EXISTS categories_slug_idx on categories(slug);
             COMMIT;"#)?;
+        conn.execute_batch("
+            PRAGMA cache_size = 500000;
+            PRAGMA threads = 4;
+            PRAGMA synchronous = 0;")?;
         Ok(conn)
     }
 }

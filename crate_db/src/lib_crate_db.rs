@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use chrono::prelude::*;
 use failure::*;
 use heck::KebabCase;
@@ -36,7 +37,7 @@ pub struct CrateDb {
     url: String,
     // Sqlite is awful with "database table is locked"
     concurrency_control: RwLock<()>,
-    conn: ThreadLocal<std::result::Result<RefCell<Connection>, rusqlite::Error>>,
+    conn: Arc<ThreadLocal<std::result::Result<RefCell<Connection>, rusqlite::Error>>>,
     exclusive_conn: Mutex<Option<Connection>>,
     tag_synonyms: HashMap<Box<str>, (Box<str>, u8)>,
 }
@@ -83,7 +84,7 @@ impl CrateDb {
         Ok(Self {
             tag_synonyms,
             url: format!("file:{}?cache=shared", path.display()),
-            conn: ThreadLocal::new(),
+            conn: Arc::new(ThreadLocal::new()),
             concurrency_control: RwLock::new(()),
             exclusive_conn: Mutex::new(None),
         })
@@ -114,6 +115,31 @@ impl CrateDb {
     }
 
     #[inline]
+    async fn with_read_spawn<F: 'static +  Send, T: 'static +  Send>(&self, context: &'static str, cb: F) -> FResult<T> where F: Send + Sync + FnOnce(&mut Connection) -> FResult<T> {
+        let mut _sqlite_sucks = self.concurrency_control.read().await;
+        let c = self.conn.clone();
+        let url = self.url.clone();
+        tokio::task::spawn_blocking(move || {
+            let conn = c.get_or(|| Self::db(&url).map(|conn| {
+                let _ = conn.busy_timeout(std::time::Duration::from_secs(4));
+                RefCell::new(conn)
+            }));
+            match conn {
+                Ok(conn) => {
+                    let now = std::time::Instant::now();
+                    let res = cb(&mut *conn.borrow_mut());
+                    let elapsed = now.elapsed();
+                    if elapsed > std::time::Duration::from_secs(3) {
+                        eprintln!("{} write callback took {}s", context, elapsed.as_secs());
+                    }
+                    Ok(res.context(context)?)
+                },
+                Err(err) => bail!("{} (in {})", err, context),
+            }
+        }).await?
+    }
+
+    #[inline]
     async fn with_write<F, T>(&self, context: &'static str, cb: F) -> FResult<T> where F: FnOnce(&Connection) -> FResult<T> {
         tokio::task::yield_now().await; // maybe there are read ops to do first?
 
@@ -135,12 +161,7 @@ impl CrateDb {
     }
 
     fn connect(&self) -> std::result::Result<Connection, rusqlite::Error> {
-        let db = Self::db(&self.url)?;
-        db.execute_batch("
-            PRAGMA cache_size = 500000;
-            PRAGMA threads = 4;
-            PRAGMA synchronous = 0;")?;
-        Ok(db)
+        Ok(Self::db(&self.url)?)
     }
 
     pub async fn rich_crate_version_data(&self, origin: &Origin) -> FResult<CachedCrate> {
@@ -157,7 +178,9 @@ impl CrateDb {
             has_code_of_conduct: bool,
             cache_key: u64,
         }
-        self.with_read("rich_crate_version_data", |conn| {
+        let origin = origin.clone();
+        self.with_read_spawn("rich_crate_version_data", move |conn| {
+            let origin = &origin;
             let args: &[&dyn ToSql] = &[&origin.to_str()];
             let (manifest, readme, row, language_stats): (Manifest, _, Row, _) = conn.query_row("SELECT * FROM crates c JOIN crate_derived d ON (c.id = d.crate_id)
                 WHERE origin = ?1", args, |row| {
@@ -204,18 +227,18 @@ impl CrateDb {
             let name = &package.name;
             let maybe_repo = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
             let path_in_repo = match maybe_repo.as_ref() {
-                Some(repo) => self.path_in_repo_tx(conn, repo, name)?,
+                Some(repo) => Self::path_in_repo_tx(conn, repo, name)?,
                 None => None,
             };
 
             let keywords = if row.keywords.is_empty() {
-                self.keywords_tx(conn, &origin).context("keywordsdb2")?
+                Self::keywords_tx(conn, &origin).context("keywordsdb2")?
             } else {
                 row.keywords
             };
             let categories = if row.categories.is_empty() {
                 let keywords = keywords.iter().cloned().collect();
-                self.crate_categories_tx(conn, &origin, &keywords, 0.1).context("catdb")?
+                Self::crate_categories_tx(conn, &origin, &keywords, 0.1).context("catdb")?
                     .into_iter().map(|(_, c)| c).collect()
             } else {
                 row.categories
@@ -440,7 +463,7 @@ impl CrateDb {
 
             let mut keywords: Vec<_> = package.keywords.iter().filter(|k| !k.is_empty()).map(|s| s.to_kebab_case()).collect();
             if keywords.is_empty() {
-                keywords = self.keywords_tx(tx, &c.origin).context("keywordsdb2")?;
+                keywords = Self::keywords_tx(tx, &c.origin).context("keywordsdb2")?;
             }
 
             let named_args: &[(&str, &dyn ToSql)] = &[
@@ -500,7 +523,7 @@ impl CrateDb {
             categories::adjusted_relevance(candidates, &keywords_collected, 0.01, 15)
         } else {
             let cat_w = 0.2 + 0.2 * c.manifest.package().keywords.len() as f64;
-            self.guess_crate_categories_tx(conn, &c.origin, &keywords_collected, if is_important_ish {0.1} else {0.25})?.into_iter()
+            Self::guess_crate_categories_tx(conn, &c.origin, &keywords_collected, if is_important_ish {0.1} else {0.25})?.into_iter()
             .map(|(w, slug)| {
                 ((w * cat_w).min(0.99), slug)
             }).collect()
@@ -648,10 +671,10 @@ impl CrateDb {
     }
 
     pub async fn path_in_repo(&self, repo: &Repo, crate_name: &str) -> FResult<Option<String>> {
-        self.with_read("path_in_repo", |conn| self.path_in_repo_tx(conn, repo, crate_name)).await
+        self.with_read("path_in_repo", |conn| Self::path_in_repo_tx(conn, repo, crate_name)).await
     }
 
-    pub fn path_in_repo_tx(&self, conn: &Connection, repo: &Repo, crate_name: &str) -> FResult<Option<String>> {
+    pub fn path_in_repo_tx(conn: &Connection, repo: &Repo, crate_name: &str) -> FResult<Option<String>> {
         let repo = repo.canonical_git_url();
         let mut get_path = conn.prepare_cached("SELECT path FROM repo_crates WHERE repo = ?1 AND crate_name = ?2")?;
         let args: &[&dyn ToSql] = &[&repo, &crate_name];
@@ -745,17 +768,17 @@ impl CrateDb {
     /// Fetch or guess categories for a crate
     ///
     /// Returns category slugs
-    fn crate_categories_tx(&self, conn: &Connection, origin: &Origin, kebab_keywords: &HashSet<String>, threshold: f64) -> FResult<Vec<(f64, String)>> {
-        let assigned = self.assigned_crate_categories_tx(conn, origin)?;
+    fn crate_categories_tx(conn: &Connection, origin: &Origin, kebab_keywords: &HashSet<String>, threshold: f64) -> FResult<Vec<(f64, String)>> {
+        let assigned = Self::assigned_crate_categories_tx(conn, origin)?;
         if !assigned.is_empty() {
             Ok(assigned)
         } else {
-            self.guess_crate_categories_tx(&conn, origin, kebab_keywords, threshold)
+            Self::guess_crate_categories_tx(&conn, origin, kebab_keywords, threshold)
         }
     }
 
     /// Assigned categories with their weights
-    fn assigned_crate_categories_tx(&self, conn: &Connection, origin: &Origin) -> FResult<Vec<(f64, String)>> {
+    fn assigned_crate_categories_tx(conn: &Connection, origin: &Origin) -> FResult<Vec<(f64, String)>> {
             let mut query = conn.prepare_cached(r#"
                 SELECT c.relevance_weight, c.slug
                 FROM crates k
@@ -767,7 +790,7 @@ impl CrateDb {
             Ok(res.collect::<std::result::Result<_,_>>()?)
     }
 
-    fn guess_crate_categories_tx(&self, conn: &Connection, origin: &Origin, kebab_keywords: &HashSet<String>, threshold: f64) -> FResult<Vec<(f64, String)>> {
+    fn guess_crate_categories_tx(conn: &Connection, origin: &Origin, kebab_keywords: &HashSet<String>, threshold: f64) -> FResult<Vec<(f64, String)>> {
         let mut query = conn.prepare_cached(r#"
         select cc.slug, sum(cc.relevance_weight * ck.weight * relk.relevance)/(8+count(*)) as w
         from (
@@ -899,12 +922,13 @@ impl CrateDb {
     /// Find keywords that may be most relevant to the crate
     #[inline]
     pub async fn keywords(&self, origin: &Origin) -> FResult<Vec<String>> {
-        self.with_read("keywords", |conn| {
-            self.keywords_tx(conn, origin)
+        let origin = origin.clone();
+        self.with_read_spawn("keywords", move |conn| {
+            Self::keywords_tx(conn, &origin)
         }).await
     }
 
-    pub fn keywords_tx(&self, conn: &Connection, origin: &Origin) -> FResult<Vec<String>> {
+    pub fn keywords_tx(conn: &Connection, origin: &Origin) -> FResult<Vec<String>> {
         let mut query = conn.prepare_cached(r#"
             select avg(ck.weight) * srck.weight, k.keyword
             -- find the crate to categorize

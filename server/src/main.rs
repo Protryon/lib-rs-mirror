@@ -638,7 +638,7 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
         let now = SystemTime::now();
         // rebuild in debug always
         let is_fresh = !cfg!(debug_assertions) && modified > (now - Duration::from_secs((cache_time / 20 + 5).into()));
-        let is_acceptable = modified > (now - Duration::from_secs((3600 * 24 * 7 + cache_time * 5).into()));
+        let is_acceptable = modified > (now - Duration::from_secs((3600 * 24 * 4 + cache_time * 5).into()));
 
         let age_secs = now.duration_since(modified).ok().map(|age| age.as_secs() as u32).unwrap_or(0);
 
@@ -661,10 +661,11 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
                 let _ = rt_run_timeout(&state.rt, "refreshbg", 300, {
                     let state = state.clone();
                     async move {
+                        debug!("Bg refresh of {}", cache_file.display());
                         if let Ok(_s) = state.background_job.try_acquire() {
                             match generate.await {
                                 Ok((mut page, last_mod)) => {
-                                    debug!("Done refresh of {}", cache_file.display());
+                                    info!("Done refresh of {}", cache_file.display());
                                     let timestamp = last_mod.map(|a| a.timestamp() as u32).unwrap_or(0);
                                     page.extend_from_slice(&timestamp.to_le_bytes()); // The worst data format :)
 

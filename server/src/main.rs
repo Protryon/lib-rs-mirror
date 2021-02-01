@@ -38,7 +38,7 @@ extern crate log;
 mod writer;
 
 #[global_allocator]
-static ALLOCATOR: Cap<std::alloc::System> = Cap::new(std::alloc::System, 1 * 1024 * 1024 * 1024);
+static ALLOCATOR: Cap<std::alloc::System> = Cap::new(std::alloc::System, 4 * 1024 * 1024 * 1024);
 
 static HUP_SIGNAL: AtomicU32 = AtomicU32::new(0);
 

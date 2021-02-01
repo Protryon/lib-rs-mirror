@@ -35,6 +35,7 @@ debug = true
 
 [profile.release]
 debug = true
+lto = true
 
 [profile.dev.package.miniz_oxide]
 opt-level = 3

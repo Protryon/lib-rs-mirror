@@ -74,6 +74,7 @@ use rich_crate::CrateVersionSourceData;
 use rich_crate::Readme;
 use semver::VersionReq;
 use simple_cache::TempCache;
+use smol_str::SmolStr;
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::hash_map::Entry::*;
@@ -319,7 +320,7 @@ impl KitchenSink {
     ///
     /// It returns only identifiers,
     /// so `rich_crate`/`rich_crate_version` is needed to do more.
-    pub fn all_crates_io_crates(&self) -> &FxHashMap<Box<str>, CratesIndexCrate> {
+    pub fn all_crates_io_crates(&self) -> &FxHashMap<SmolStr, CratesIndexCrate> {
         self.index.crates_io_crates()
     }
 
@@ -347,7 +348,7 @@ impl KitchenSink {
         if let Ok(stats) = self.index.deps_stats().await {
             for (o, score) in &mut top {
                 if let Origin::CratesIo(name) = o {
-                    if let Some(s) = stats.counts.get(name) {
+                    if let Some(s) = stats.counts.get(&**name) {
                         // if it's a dependency of another top crate, its not trending, it's riding that crate
                         if s.rev_dep_names.iter().any(|parent| crates_present.contains(parent)) {
                             *score = 0.;
@@ -1358,7 +1359,7 @@ impl KitchenSink {
     #[inline]
     pub async fn crates_io_dependents_stats_of(&self, origin: &Origin) -> Result<Option<&RevDependencies>, KitchenSinkErr> {
         match origin {
-            Origin::CratesIo(crate_name) => Ok(self.index.deps_stats().await.map_err(KitchenSinkErr::Deps)?.counts.get(crate_name)),
+            Origin::CratesIo(crate_name) => Ok(self.index.deps_stats().await.map_err(KitchenSinkErr::Deps)?.counts.get(&**crate_name)),
             _ => Ok(None),
         }
     }
@@ -1537,7 +1538,7 @@ impl KitchenSink {
         // runtime and (lesser) build-time deps
         for (deps, overall_weight) in all_deps.iter() {
             for dep in deps {
-                if let Some(rev) = raw_deps_stats.counts.get(&dep.package) {
+                if let Some(rev) = raw_deps_stats.counts.get(&*dep.package) {
                     let right_popularity = rev.direct.all() > 1 && rev.direct.all() < 150 && rev.runtime.def < 500 && rev.runtime.opt < 800;
                     if Self::dep_interesting_for_index(&dep.package).unwrap_or(right_popularity) {
                         let weight = overall_weight / (1 + rev.direct.all()) as f32;

@@ -20,6 +20,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use string_interner::symbol::SymbolU32 as Sym;
 use string_interner::StringInterner;
+use smol_str::SmolStr;
 
 use feat_extractor::is_deprecated_requirement;
 use triomphe::Arc;
@@ -82,22 +83,22 @@ impl IVersion for Version {
 
 pub trait ICrate {
     type Ver: IVersion;
-    fn latest_version_with_features(&self, all_optional: bool) -> (&Self::Ver, Box<[Box<str>]>);
+    fn latest_version_with_features(&self, all_optional: bool) -> (&Self::Ver, Box<[SmolStr]>);
 }
 
 impl ICrate for Crate {
     type Ver = Version;
-    fn latest_version_with_features(&self, all_optional: bool) -> (&Self::Ver, Box<[Box<str>]>) {
+    fn latest_version_with_features(&self, all_optional: bool) -> (&Self::Ver, Box<[SmolStr]>) {
         let latest = Index::highest_crates_io_version(self, true);
         let mut features = Vec::with_capacity(if all_optional {
             latest.features().len() + latest.dependencies().iter().filter(|d| d.is_optional()).count()
         } else { 0 });
         if all_optional {
-            features.extend(latest.features().iter().filter(|(_, v)| !v.is_empty()).map(|(c, _)| c.to_string().into_boxed_str()));
+            features.extend(latest.features().iter().filter(|(_, v)| !v.is_empty()).map(|(c, _)| c.into()));
             // optional dependencis make implicit features
-            features.extend(latest.dependencies().iter().filter(|d| d.is_optional()).map(|d| d.name().to_string().into_boxed_str()));
+            features.extend(latest.dependencies().iter().filter(|d| d.is_optional()).map(|d| d.name().into()));
         };
-        let features = features.into_boxed_slice();
+        let features = features.into();
         (latest, features)
     }
 }
@@ -118,23 +119,23 @@ impl IVersion for RichCrateVersion {
 
 impl ICrate for RichCrateVersion {
     type Ver = RichCrateVersion;
-    fn latest_version_with_features(&self, all_optional: bool) -> (&Self::Ver, Box<[Box<str>]>) {
+    fn latest_version_with_features(&self, all_optional: bool) -> (&Self::Ver, Box<[SmolStr]>) {
         let mut features = Vec::with_capacity(if all_optional { self.features().len() } else { 0 });
         if all_optional {
-            features.extend(self.features().iter().filter(|(_, v)| !v.is_empty()).map(|(c, _)| c.to_string().into_boxed_str()));
+            features.extend(self.features().iter().filter(|(_, v)| !v.is_empty()).map(|(c, _)| c.into()));
         };
-        let features = features.into_boxed_slice();
+        let features = features.into();
         (self, features)
     }
 }
 
 pub struct Index {
-    indexed_crates: FxHashMap<Box<str>, Crate>,
+    indexed_crates: FxHashMap<SmolStr, Crate>,
     pub crates_index_path: PathBuf,
     git_index: GitIndex,
 
     pub inter: RwLock<StringInterner<Sym, string_interner::backend::StringBackend<Sym>>>,
-    pub cache: RwLock<FxHashMap<(Box<str>, Features), ArcDepSet>>,
+    pub cache: RwLock<FxHashMap<(SmolStr, Features), ArcDepSet>>,
     deps_stats: DoubleCheckedCell<DepsStats>,
 }
 
@@ -154,7 +155,7 @@ impl Index {
                     Some((name.into(), c))
                 })
                 .collect();
-        if indexed_crates.len() < 37000 {
+        if indexed_crates.len() < 45000 {
             return Err(DepsErr::IndexBroken);
         }
         Ok(Self {
@@ -180,7 +181,7 @@ impl Index {
     ///
     /// It returns only a thin and mostly useless data from the index itself,
     /// so `rich_crate`/`rich_crate_version` is needed to do more.
-    pub fn crates_io_crates(&self) -> &FxHashMap<Box<str>, Crate> {
+    pub fn crates_io_crates(&self) -> &FxHashMap<SmolStr, Crate> {
         &self.indexed_crates
     }
 
@@ -249,7 +250,7 @@ impl Index {
         self.deps_of_crate_int(latest, features, query)
     }
 
-    fn deps_of_crate_int(&self, latest: &impl IVersion, features: Box<[Box<str>]>, DepQuery { default, all_optional, dev }: DepQuery) -> Result<Dep, DepsErr> {
+    fn deps_of_crate_int(&self, latest: &impl IVersion, features: Box<[SmolStr]>, DepQuery { default, all_optional, dev }: DepQuery) -> Result<Dep, DepsErr> {
         Ok(Dep {
             semver: semver_parse(latest.version()).into(),
             runtime: self.deps_of_ver(latest, Features {
@@ -505,7 +506,7 @@ pub struct Features {
     pub default: bool,
     pub build: bool,
     pub dev: bool,
-    pub features: Box<[Box<str>]>,
+    pub features: Box<[SmolStr]>,
 }
 
 pub type DepName = (Sym, Sym);

@@ -54,4 +54,4 @@ double-checked-cell-async = "2.0.2"
 triomphe = "0.1.1"
 env_logger = "0.8"
 log = "0.4.11"
-
+smol_str = "0.1.16"

@@ -2,17 +2,18 @@ use crate::index::*;
 use crate::DepsErr;
 use crate::Origin;
 use parking_lot::Mutex;
+use smol_str::SmolStr;
 use rayon::prelude::*;
 use string_interner::symbol::SymbolU32 as Sym;
 
 type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 type FxHashSet<V> = std::collections::HashSet<V, ahash::RandomState>;
 
-pub type DepInfMap = FxHashMap<Box<str>, (DepInf, MiniVer)>;
+pub type DepInfMap = FxHashMap<SmolStr, (DepInf, MiniVer)>;
 
 pub struct DepsStats {
     pub total: usize,
-    pub counts: FxHashMap<Box<str>, RevDependencies>,
+    pub counts: FxHashMap<SmolStr, RevDependencies>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -158,7 +159,7 @@ impl Index {
 
     pub(crate) fn get_deps_stats(&self) -> DepsStats {
         let crates = self.crates_io_crates();
-        let crates: Vec<(Box<str>, FxHashMap<_,_>)> = crates
+        let crates: Vec<(SmolStr, FxHashMap<_,_>)> = crates
         .par_iter()
         .filter_map(|(_, c)| {
             self.all_dependencies_flattened(c)

@@ -638,7 +638,7 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
         let now = SystemTime::now();
         // rebuild in debug always
         let is_fresh = !cfg!(debug_assertions) && modified > (now - Duration::from_secs((cache_time / 20 + 5).into()));
-        let is_acceptable = modified > (now - Duration::from_secs((3600 * 24 * 4 + cache_time * 5).into()));
+        let is_acceptable = modified > (now - Duration::from_secs((3600 * 24 * 2 + cache_time * 8).into()));
 
         let age_secs = now.duration_since(modified).ok().map(|age| age.as_secs() as u32).unwrap_or(0);
 

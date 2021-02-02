@@ -878,12 +878,14 @@ where
     Box::pin(timeout)
 }
 
-async fn rt_run_timeout<R, T: 'static + Send>(rt: &Handle, label: &'static str, secs: u64, fut: R) -> Result<T, failure::Error>
+fn rt_run_timeout<R, T: 'static + Send>(rt: &Handle, label: &'static str, secs: u64, fut: R) -> impl Future<Output=Result<T, failure::Error>> + 'static + Send
 where
     R: 'static + Send + Future<Output = Result<T, failure::Error>>,
 {
-    rt.spawn(kitchen_sink::NonBlock::new(label, tokio::time::timeout(Duration::from_secs(secs), fut))).await
-        .map_err(|_| failure::format_err!("{} timed out after >{}s", label, secs))??
+    rt.spawn(kitchen_sink::NonBlock::new(label, tokio::time::timeout(Duration::from_secs(secs), fut)))
+    .map(move |res| -> Result<T, failure::Error> {
+        res?.map_err(|_| failure::format_err!("{} timed out after >{}s", label, secs))?
+    })
 }
 
 struct ServerError {

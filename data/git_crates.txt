@@ -9,6 +9,8 @@ github:advancedresearch/path_semantics/scomb
 github:aleshaleksey/azdice/azdice
 github:aleshaleksey/tgwm/q-moose
 github:alex/rust-asn1/asn1
+github:alibaba/graphscope/maxgraph
+github:alibaba/graphscope/maxgraph-server
 github:amar-laksh/workstation/workstation
 github:amethyst/evoli/evolution-island
 github:amethyst/space-menace/space-menace
@@ -58,6 +60,8 @@ github:deislabs/akri/udev-video-broker
 github:deislabs/krustlet/krustlet
 github:deniskolodin/rust-app-engine/rust-app-engine
 github:dessalines/lemmy/lemmy_server
+github:diem/diem/diem-client
+github:diem/diem/diemdb
 github:eirproject/eir/libeir_diagnostics
 github:eirproject/eir/libeir_hir
 github:eirproject/eir/libeir_intern
@@ -69,6 +73,10 @@ github:eirproject/eir/libeir_syntax_core
 github:eirproject/eir/libeir_syntax_erl
 github:eirproject/eir/libeir_tests
 github:electric-capital/crypto-ecosystems/crypto-ecosystems
+github:embarkstudios/rust-gpu/rustc_codegen_spirv
+github:embarkstudios/rust-gpu/spirv-builder
+github:embarkstudios/rust-gpu/spirv-std
+github:embarkstudios/rust-gpu/spirv-std-macros
 github:emu-rs/rustual-boy/rustual-boy-cli
 github:emu-rs/rustual-boy/rustual-boy-core
 github:facebook/hhvm/hh_codegen
@@ -127,6 +135,8 @@ github:icepuma/rust-action/rust-action
 github:imazen/imageflow/imageflow_core
 github:imazen/imageflow/imageflow_server
 github:imjacobclark/herd/herd
+github:influxdata/influxdb_iox/influxdb2_client
+github:influxdata/influxdb_iox/influxdb_iox
 github:input-output-hk/cardano-cli/cardano-cli
 github:input-output-hk/jormungandr/jcli
 github:input-output-hk/jormungandr/jormungandr
@@ -215,6 +225,7 @@ github:microsoft/onefuzz/onefuzz-supervisor
 github:millardjn/rusty_sr/rusty_sr
 github:mmstick/concurr/concurr
 github:mohanson/gameboy/gameboy
+github:morganamilo/paru/paru
 github:mosuka/bayard/bayard
 github:mozilla/application-services/fxa-client
 github:mozilla/application-services/jwcrypto
@@ -352,6 +363,7 @@ github:rust-lang/rustlings/rustlings
 github:rust-secure-code/mem-markers/mem-markers
 github:s3bk/vector/vector
 github:sandstorm-io/collections-app/sandstorm-collections-app
+github:saschanaz/jxl-rs/libjxl-sys
 github:schulke-214/connect-four/connect-four
 github:schulke-214/rsnake/rsnake
 github:scipr-lab/zexe/dpc
@@ -455,6 +467,7 @@ github:vmware/haret/haret
 github:vmware/haret/haret-admin
 github:vmware/haret/haret-cli-client
 github:vmware/haret/haret-server
+github:volta-cli/volta/volta
 github:wasm-network/tweek-rust/tweek
 github:willdady/emosaic/emosaic
 github:wireapp/proteus/proteus

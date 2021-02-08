@@ -26,6 +26,7 @@ pub struct CrateVersionInputs<'a> {
     pub has_documentation_link: bool,
     pub has_homepage_link: bool,
     pub has_repository_link: bool,
+    pub has_verified_repository_link: bool,
     pub has_keywords: bool,
     pub has_categories: bool,
     pub has_features: bool,
@@ -107,7 +108,8 @@ fn cargo_toml_score(cr: &CrateVersionInputs<'_>) -> Score {
     s.has("has_homepage_link", 30, cr.has_homepage_link);
 
     // we care about being able to analyze
-    s.has("has_repository_link", 20, cr.has_repository_link);
+    s.has("has_repository_link", 10, cr.has_repository_link);
+    s.has("has_verified_repository_link", 10, cr.has_verified_repository_link);
 
     // helps lib.rs show crate in the right place
     s.has("has_keywords", 10, cr.has_keywords);

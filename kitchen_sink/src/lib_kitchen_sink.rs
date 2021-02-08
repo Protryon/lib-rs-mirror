@@ -834,18 +834,17 @@ impl KitchenSink {
         None
     }
 
-    async fn rich_crate_version_from_repo(&self, origin: &Origin) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
-        let (repo, package) = match origin {
-            Origin::GitHub { repo, package } => (RepoHost::GitHub(repo.clone()).try_into().expect("repohost"), &**package),
-            Origin::GitLab { repo, package } => (RepoHost::GitLab(repo.clone()).try_into().expect("repohost"), &**package),
+    async fn package_in_repo_host(&self, origin: Origin) -> CResult<(CrateFile, String)> {
+        let (repo, package): (Repo, _) = match &origin {
+            Origin::GitHub { repo, package } => (RepoHost::GitHub(repo.clone()).try_into().expect("repohost"), package.clone()),
+            Origin::GitLab { repo, package } => (RepoHost::GitLab(repo.clone()).try_into().expect("repohost"), package.clone()),
             _ => unreachable!(),
         };
+        let git_checkout_path = self.git_checkout_path.clone();
 
-        tokio::task::yield_now().await;
-        let _f = self.throttle.acquire().await;
-        tokio::task::block_in_place(|| {
-            let checkout = crate_git_checkout::checkout(&repo, &self.git_checkout_path)?;
-            let (path_in_repo, tree_id, manifest) = crate_git_checkout::path_in_repo(&checkout, package)?
+        tokio::task::spawn(timeout(Duration::from_secs(600), async move {
+            let checkout = crate_git_checkout::checkout(&repo, &git_checkout_path)?;
+            let (path_in_repo, tree_id, manifest) = crate_git_checkout::path_in_repo(&checkout, &package)?
                 .ok_or_else(|| {
                     let (has, err) = crate_git_checkout::find_manifests(&checkout).unwrap_or_default();
                     for e in err {
@@ -857,24 +856,32 @@ impl KitchenSink {
                     KitchenSinkErr::CrateNotFoundInRepo(package.to_string(), repo.canonical_git_url().into_owned())
                 })?;
 
-            let mut warnings = HashSet::new();
 
             let mut meta = tarball::read_repo(&checkout, tree_id)?;
             debug_assert_eq!(meta.manifest.package, manifest.package);
-            let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
+            let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin))?;
 
             // Allowing any other URL would allow spoofing
             package.repository = Some(repo.canonical_git_url().into_owned());
+            Ok::<_, CError>((meta, path_in_repo))
+        })).await?.map_err(|_| KitchenSinkErr::GitCheckoutFailed)?
+    }
 
-            let has_readme = meta.readme.is_some();
-            if !has_readme {
-                let maybe_repo = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
-                warnings.insert(Warning::NoReadmeProperty);
-                warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()));
-            }
+    async fn rich_crate_version_from_repo(&self, origin: &Origin) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
 
-            Ok::<_, CError>(self.rich_crate_version_data_common(origin.clone(), meta, 0, false, path_in_repo, warnings))
-        })?.await
+        tokio::task::yield_now().await;
+        let _f = self.throttle.acquire().await;
+        let (mut meta, path_in_repo) = self.package_in_repo_host(origin.clone()).await?;
+
+        let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
+        let mut warnings = HashSet::new();
+        let has_readme = meta.readme.is_some();
+        if !has_readme {
+            let maybe_repo = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
+            warnings.insert(Warning::NoReadmeProperty);
+            warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()));
+        }
+        self.rich_crate_version_data_common(origin.clone(), meta, 0, false, path_in_repo, warnings).await
     }
 
     async fn tarball(&self, name: &str, ver: &str) -> CResult<Vec<u8>> {

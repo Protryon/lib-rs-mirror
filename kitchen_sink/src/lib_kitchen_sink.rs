@@ -918,15 +918,26 @@ impl KitchenSink {
 
         let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
 
-        // it may contain data from nowhere! https://github.com/rust-lang/crates.io/issues/1624
+        // it may contain data from "nowhere"! https://github.com/rust-lang/crates.io/issues/1624
         if package.homepage.is_none() {
-            if let Some(repo) = crates_io_krate.homepage {
-                package.homepage = Some(repo);
+            if let Some(url) = crates_io_krate.homepage {
+                package.homepage = Some(url);
             }
         }
         if package.documentation.is_none() {
-            if let Some(repo) = crates_io_krate.documentation {
-                package.documentation = Some(repo);
+            if let Some(url) = crates_io_krate.documentation {
+                package.documentation = Some(url);
+            }
+        }
+
+        // Guess repo URL if none was specified; must be done before getting stuff from the repo
+        if package.repository.is_none() {
+            warnings.insert(Warning::NoRepositoryProperty);
+            // it may contain data from nowhere! https://github.com/rust-lang/crates.io/issues/1624
+            if let Some(repo) = crates_io_krate.repository {
+                package.repository = Some(repo);
+            } else if package.homepage.as_ref().map_or(false, |h| Repo::looks_like_repo_url(h)) {
+                package.repository = package.homepage.take();
             }
         }
 
@@ -945,19 +956,6 @@ impl KitchenSink {
             let has_readme = meta.readme.is_some();
             if !has_readme {
                 warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()));
-            }
-        }
-
-        let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
-
-        // Guess repo URL if none was specified; must be done before getting stuff from the repo
-        if package.repository.is_none() {
-            warnings.insert(Warning::NoRepositoryProperty);
-            // it may contain data from nowhere! https://github.com/rust-lang/crates.io/issues/1624
-            if let Some(repo) = crates_io_krate.repository {
-                package.repository = Some(repo);
-            } else if package.homepage.as_ref().map_or(false, |h| Repo::looks_like_repo_url(h)) {
-                package.repository = package.homepage.take();
             }
         }
 

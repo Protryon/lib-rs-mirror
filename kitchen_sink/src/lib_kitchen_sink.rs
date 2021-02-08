@@ -1223,7 +1223,12 @@ impl KitchenSink {
                 .map_err(From::from)
                 .and_then(|checkout| crate_git_checkout::find_readme(&checkout, package));
             match res {
-                Ok(Some(readme)) => {
+                Ok(Some(mut readme)) => {
+                    // Make the path absolute, because the readme is now absolute relative to repo root,
+                    // rather than relative to crate's dir within the repo
+                    if !readme.0.starts_with('/') {
+                        readme.0.insert(0, '/');
+                    }
                     meta.readme = Some(readme);
                 },
                 Ok(None) => {

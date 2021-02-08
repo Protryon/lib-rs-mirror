@@ -667,7 +667,13 @@ impl<'a> CratePage<'a> {
         if let Some((repo, url)) = self.ver.repository_http_url() {
             let label_prefix = repo.site_link_label();
             let label = match repo.host() {
-                RepoHost::GitHub(ref host) | RepoHost::GitLab(ref host) | RepoHost::BitBucket(ref host) => format!("{} ({})", label_prefix, host.owner),
+                RepoHost::GitHub(ref host) | RepoHost::GitLab(ref host) | RepoHost::BitBucket(ref host) => {
+                    if self.ver.has_path_in_repo() {
+                        format!("{} ({})", label_prefix, host.owner)
+                    } else {
+                        "Repository".to_owned()
+                    }
+                },
                 RepoHost::Other => url_domain(&url).map(|host| format!("{} ({})", label_prefix, host)).unwrap_or_else(|| label_prefix.to_string()),
             };
             Some((url, label))

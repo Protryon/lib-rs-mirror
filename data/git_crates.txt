@@ -60,6 +60,15 @@ github:deislabs/akri/udev-video-broker
 github:deislabs/krustlet/krustlet
 github:deniskolodin/rust-app-engine/rust-app-engine
 github:dessalines/lemmy/lemmy_server
+github:dgreid/crosvm/acpi_tables
+github:dgreid/crosvm/crosvm
+github:dgreid/crosvm/kvm_sys
+github:dgreid/crosvm/power_monitor
+github:dgreid/crosvm/rutabaga_gfx
+github:dgreid/crosvm/tpm2
+github:dgreid/crosvm/tpm2-sys
+github:dgreid/crosvm/virtio_sys
+github:dgreid/crosvm/vm_memory
 github:diem/diem/diem-client
 github:diem/diem/diemdb
 github:eirproject/eir/libeir_diagnostics

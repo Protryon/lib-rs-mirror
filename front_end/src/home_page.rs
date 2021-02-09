@@ -21,6 +21,38 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::timeout;
 
+/// Editorialize the category list a little
+const CATEGORY_RANK_ADJUST: [(&str, f64); 28] = [
+    ("asynchronous", 1.1),
+    ("command-line-utilities", 1.4), // app downloads are naturally smaller
+    ("concurrency", 1.2),
+    ("cryptocurrencies", 0.1),
+    ("cryptography::cryptocurrencies", 0.1),
+    ("database", 1.25),
+    ("database-implementations", 1.2),
+    ("date-and-time", 0.9),
+    ("development-tools::cargo-plugins", 1.3), // app downloads are naturally smaller
+    ("development-tools::procedural-macro-helpers", 0.1),
+    ("development-tools::profiling", 0.9),
+    ("embedded", 1.1),
+    ("game-development", 1.1),
+    ("gui", 1.1),
+    ("memory-management", 1.1),
+    ("multimedia", 1.15),
+    ("no-std", 0.8),
+    ("science", 0.9),
+    ("science::math", 0.9),
+    ("science::robotics", 0.5),
+    ("simulation", 1.1),
+    ("template-engine", 0.8),
+    ("text-editors", 0.8),
+    ("text-processing", 0.85),
+    ("value-formatting", 0.7),
+    ("wasm", 0.9),
+    ("web-programming", 1.1),
+    ("web-programming::websocket", 0.2),
+];
+
 /// The list on the homepage looks flat, but it's actually a tree.
 ///
 /// Each category contains list of top/most relevant crates in it.
@@ -161,6 +193,12 @@ impl<'a> HomePage<'a> {
             // move cryptocurrencies out of cryptography for the homepage, so that cryptocurrencies are sorted by their own popularity
             if let Some(cryptocurrencies) = ranked.get_mut("cryptography").and_then(|(_, c)| c.sub.pop()) {
                 ranked.insert(cryptocurrencies.cat.slug.as_str(), (cryptocurrencies.dl * cryptocurrencies.pop, cryptocurrencies));
+            }
+
+            for &(slug, adjust) in CATEGORY_RANK_ADJUST.iter() {
+                if let Some(c) = ranked.get_mut(slug) {
+                    c.0 = (c.0 as f64 * adjust) as usize;
+                }
             }
 
             // these categories are easily confusable, so keep them together

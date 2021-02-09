@@ -115,6 +115,11 @@ github:gamozolabs/chocolate_milk/server
 github:garkimasera/rusted-ruins/rusted-ruins
 github:gekkio/mooneye-gb/mooneye-gb
 github:getzola/zola/zola
+github:google/opensk/ctap2
+github:google/opensk/heapviz
+github:google/opensk/libtock_drivers
+github:google/opensk/nrf52840_dongle_dfu
+github:google/opensk/nrf52840_mdk_dfu
 github:google/rust-shell/shell
 github:graphprotocol/graph-node/graph-graphql
 github:graphprotocol/graph-node/graph-store-postgres
@@ -184,6 +189,10 @@ github:librespot-org/librespot/librespot-connect
 github:lifthrasiir/angolmois-rust/angolmois
 github:limeth/ethaddrgen/ethaddrgen
 github:limeth/euclider/euclider
+github:linebender/piet-gpu/piet-gpu
+github:linebender/piet-gpu/piet-gpu-derive
+github:linebender/piet-gpu/piet-gpu-hal
+github:linebender/piet-gpu/piet-gpu-types
 github:lizhuohua/linux-kernel-module-rust/linux-kernel-module
 github:lizhuohua/linux-kernel-module-rust/simple_sysctl
 github:lizhuohua/linux-kernel-module-rust/smsc9512

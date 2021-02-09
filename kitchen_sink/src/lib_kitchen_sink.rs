@@ -1781,6 +1781,9 @@ impl KitchenSink {
     /// The relationship is based on directory layout of monorepos.
     #[inline]
     pub async fn parent_crate(&self, child: &RichCrateVersion) -> Option<Origin> {
+        if !child.has_path_in_repo() {
+            return None;
+        }
         let repo = child.repository()?;
         self.crate_db.parent_crate(repo, child.short_name()).await.ok()?
     }

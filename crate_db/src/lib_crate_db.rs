@@ -336,7 +336,7 @@ impl CrateDb {
         }
 
         let mut out = String::with_capacity(200);
-        write!(&mut out, "{}: ", origin)?;
+        write!(&mut out, "https://lib.rs/{} ", if c.origin.is_crates_io() { c.origin.short_crate_name() } else { &origin })?;
 
         let next_timestamp = (Utc::now().timestamp() + 3600 * 24 * 31) as u32;
 
@@ -345,6 +345,7 @@ impl CrateDb {
             let mut mark_updated = tx.prepare_cached("UPDATE crates SET next_update = ?2 WHERE id = ?1")?;
             let mut insert_repo = tx.prepare_cached("INSERT OR REPLACE INTO crate_repos (crate_id, repo) VALUES (?1, ?2)")?;
             let mut delete_repo = tx.prepare_cached("DELETE FROM crate_repos WHERE crate_id = ?1")?;
+            let mut prev_categories = tx.prepare_cached("SELECT slug FROM categories WHERE crate_id = ?1")?;
             let mut clear_categories = tx.prepare_cached("DELETE FROM categories WHERE crate_id = ?1")?;
             let mut insert_category = tx.prepare_cached("INSERT OR IGNORE INTO categories (crate_id, slug, rank_weight, relevance_weight) VALUES (?1, ?2, ?3, ?4)")?;
             let mut get_crate_id = tx.prepare_cached("SELECT id, recent_downloads FROM crates WHERE origin = ?1")?;
@@ -383,6 +384,7 @@ impl CrateDb {
                 delete_repo.execute(&[&crate_id]).context("del repo")?;
             }
 
+            let prev_c = prev_categories.query_map(&[&crate_id], |row| row.get(0))?.collect::<Result<Vec<String>,_>>()?;
             clear_categories.execute(&[&crate_id]).context("clear cat")?;
             insert_keyword.pre_commit(&tx, crate_id).context("clear kw")?;
 
@@ -398,13 +400,17 @@ impl CrateDb {
             }
 
             if categories.is_empty() {
-                write!(&mut out, "[no categories!] ")?;
+                write!(&mut out, "[no categories] {:?}", prev_c)?;
             }
             if !had_explicit_categories && !categories.is_empty() {
-                write!(&mut out, "[guessed categories]: ")?;
+                write!(&mut out, "[guessed]: ")?;
             }
             for (rank, rel, slug) in &categories {
-                write!(&mut out, ">{}, ", slug)?;
+                if !prev_c.contains(&slug) {
+                    write!(&mut out, ">NEW {}, ", slug)?;
+                } else {
+                    write!(&mut out, ">{}, ", slug)?;
+                }
                 let args: &[&dyn ToSql] = &[&crate_id, slug, rank, rel];
                 insert_category.execute(args).context("insert cat")?;
                 if had_explicit_categories {
@@ -412,8 +418,13 @@ impl CrateDb {
                 }
             }
 
+            for slug in &prev_c {
+                if !categories.iter().any(|(_,_,old)| old == slug) {
+                    write!(&mut out, ">LOST {}", slug)?;
+                }
+            }
+
             for (i, k) in c.authors.iter().filter_map(|a| a.email.as_ref().or(a.name.as_ref())).enumerate() {
-                write!(&mut out, "by:{}, ", k)?;
                 let w: f64 = 50. / (100 + i) as f64;
                 insert_keyword.add(&k, w, false);
             }

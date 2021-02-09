@@ -130,7 +130,6 @@ pub fn is_deprecated(k: &RichCrateVersion) -> bool {
             desc.contains("this crate is abandoned") ||
             desc.contains("this crate has been abandoned") ||
             desc.contains("do not use") ||
-            desc.contains("this crate is a placeholder") ||
             desc.contains("this is a dummy package") ||
             desc.starts_with("an empty crate") ||
             desc.starts_with("discontinued") ||
@@ -148,7 +147,7 @@ pub fn is_deprecated(k: &RichCrateVersion) -> bool {
             return true;
         }
     }
-    false
+    is_squatspam(k)
 }
 
 pub fn is_deprecated_requirement(name: &str, requirement: &VersionReq) -> bool {
@@ -190,10 +189,13 @@ pub fn is_squatspam(k: &RichCrateVersion) -> bool {
             desc.contains("this crate has been retired") ||
             desc.contains("want to use this name") ||
             desc.contains("this is a dummy package") ||
+            desc.starts_with("a reserved crate ") ||
+            desc.contains("this crate is reserved ") ||
             desc == "reserved" ||
             desc.starts_with("reserved for future use") ||
             desc.starts_with("placeholder") ||
             desc.ends_with(" placeholder") ||
+            desc.starts_with("dummy crate") ||
             desc.starts_with("a placeholder") ||
             desc.starts_with("empty crate") ||
             desc.starts_with("an empty crate") ||

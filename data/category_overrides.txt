@@ -3,6 +3,7 @@ ace: command-line-interface, parser-implementations
 ackorelic: development-tools::debugging, network-programming
 acm: science::math
 actions-core: web-programming
+actix-auth: authentication
 actix_derive: asynchronous
 advancedresearch-higher_order_core: rust-patterns
 aemo_mdff: parser-implementations
@@ -30,6 +31,7 @@ alphaid: encoding
 alphavantage: web-programming
 amath: parser-implementations
 anes: parser-implementations, command-line-interface
+systemstat: os
 anitomy-sys: parser-implementations
 anitomy: parser-implementations
 anybar_rs: os::macos-apis
@@ -51,7 +53,7 @@ arthas: database-implementations
 artichoke-core: development-tools
 ascon: cryptography
 askii: command-line-utilities, command-line-interface
-asn1rs-macros : parser-implementations
+asn1rs-macros: parser-implementations
 asn1rs-model: parser-implementations
 asn1rs: parser-implementations, encoding
 ass-rs: web-programming
@@ -61,6 +63,11 @@ async-codec: asynchronous
 async_command: asynchronous
 atelier_core: web-programming
 atomicring: concurrency, data-structures
+cuticula: science::ml
+rweb: web-programming::http-server
+cssparser: parser-implementations, web-programming
+servo_arc: rust-patterns
+soundcloud-fs: filesystem, web-programming
 atomsh: command-line-utilities
 audit-filter: development-tools::testing
 augr-core: command-line-utilities
@@ -144,7 +151,7 @@ captcha: web-programming
 capture-logger: development-tools::testing
 carapax: web-programming
 card-validate: value-formatting, parser-implementations
-cargo-contract : cryptography::cryptocurrencies
+cargo-contract: cryptography::cryptocurrencies
 cargo-watch: development-tools::cargo-plugins
 cargo-xbuild: development-tools::build-tools, development-tools::cargo-plugins
 cargocleaner: development-tools::cargo-plugins
@@ -174,6 +181,7 @@ chillup: web-programming
 chrobry-core: template-engines
 chromatica: multimedia::images
 cht: concurrency, data-structures
+cid: network-programming
 cini: parser-implementations, configuration
 circle_boundary: science, multimedia::images
 cita_trie: data-structures
@@ -293,7 +301,7 @@ dia-args: command-line-interface
 diceware-rs: command-line-utilities, authentication
 diceware: command-line-utilities, authentication
 dicom-core: multimedia::images
-diesel-derive-newtype : databases
+diesel-derive-newtype: databases
 diesel: databases
 diesel_mate_derive: databases
 diff: text-processing, algorithms
@@ -350,7 +358,7 @@ emerald-vault-core: cryptography::cryptocurrencies
 emlop: parser-implementations
 emmett: parser-implementations
 encoji: encoding, text-processing
-endf_format : parser-implementations
+endf_format: parser-implementations
 endian-hasher: algorithms
 endicon: algorithms
 eng-pwasm-abi: cryptography::cryptocurrencies, wasm
@@ -408,7 +416,7 @@ fastcdc: algorithms
 fastcgi-client: asynchronous, web-programming::http-client
 fastdl: caching
 favy: multimedia::images
-fawkes-crypto-phase2 : cryptography, wasm
+fawkes-crypto-phase2: cryptography, wasm
 fcm: web-programming
 fddf: command-line-utilities, filesystem
 fdfast: filesystem
@@ -446,7 +454,7 @@ flats: data-structures
 flexpolyline: data-structures, compression
 flightmath: command-line-utilities, science
 float-ord: rust-patterns
-fluent-template-helper : internationalization, template-engines
+fluent-template-helper: internationalization, template-engines
 fluminurs: development-tools, web-programming
 fluxer: command-line-utilities, multimedia::images
 fm: text-processing, algorithms
@@ -509,7 +517,7 @@ gitmodules: development-tools, parser-implementations
 glitchup: multimedia
 global_counter: concurrency, development-tools::debugging
 glsl-quasiquote: parser-implementations
-glsl-tree : parser-implementations, rendering::graphics-api
+glsl-tree: parser-implementations, rendering::graphics-api
 glsl: rendering, parser-implementations
 glsmrs: rendering::graphics-api, wasm
 glutin_cocoa: os::macos-apis
@@ -800,6 +808,7 @@ minifier: web-programming, compression
 minimad: text-processing, parser-implementations
 miniquad: gui
 mio-aio: filesystem, asynchronous
+miow: asynchronous, filesystem
 mksvg: multimedia::images
 mktoc: text-processing, command-line-utilities
 mlc: command-line-utilities, text-processing
@@ -866,7 +875,7 @@ nessus: development-tools, network-programming
 nestools: game-development, emulators
 netdb: network-programming, database-implementations
 netdevice: os, network-programming
-netlink-packet-core : network-programming, os::unix-apis
+netlink-packet-core: network-programming, os::unix-apis
 netrc-rs: parser-implementations
 new-ordered-float: rust-patterns
 newbee: database-implementations
@@ -875,7 +884,7 @@ newrelic_plugin: web-programming
 newt: command-line-interface
 ninja-metrics: development-tools::build-tools
 nite2-sys: science::machine-learning
-nix-db : databases, os::unix-apis
+nix-db: databases, os::unix-apis
 nloq: parser-implementations
 nmea-parser: parser-implementations, science
 nokiahealth: databases
@@ -1098,8 +1107,8 @@ romodoro: command-line-utilities
 romy-core: game-development
 romy-wasmer: game-development
 romy: game-development
-root-io : simulation, parser-implementations
-root-ls : science, command-line-utilities
+root-io: simulation, parser-implementations
+root-ls: science, command-line-utilities
 rosalind: algorithms, science
 rosy: development-tools::ffi
 roulette-wheel: science::machine-learning, algorithms
@@ -1153,7 +1162,7 @@ rxrust: asynchronous
 salad: command-line-utilities, authentication
 saml2aws-auto: authentication
 sample_planning: science::machine-learning, algorithms
-san-rs : game-development
+san-rs: game-development
 sass-sys: web-programming
 scan4df: command-line-utilities, filesystem
 scannit-core-ffi: development-tools::ffi
@@ -1197,8 +1206,8 @@ single_source: text-processing, command-line-utilities
 sip-codec: network-programming
 sitemap: parser-implementations
 sitewriter: web-programming
-sled-native : database-implementations
-sled-search : database-implementations
+sled-native: database-implementations
+sled-search: database-implementations
 slot: memory-management
 smalltree: data-structures
 smileypyramid: command-line-utilities
@@ -1223,6 +1232,7 @@ sp-std: cryptography::cryptocurrencies
 spade: data-structures
 specs_sprite: game-development
 speculo: development-tools
+spellcheck_toy: text-processing
 spinning_top: concurrency
 splinter: cryptography::cryptocurrencies
 sqa-ffmpeg: multimedia::video
@@ -1238,9 +1248,9 @@ stats_utils: science::math
 statsd-parser: parser-implementations
 statsrelay: development-tools::debugging
 stemjail: os::unix-apis
-stork-search : database-implementations, wasm
-streamson-extra-matchers : parser-implementations
-streamson-lib : encoding
+stork-search: database-implementations, wasm
+streamson-extra-matchers: parser-implementations
+streamson-lib: encoding
 streamson-lib: encoding
 stringlit: rust-patterns
 substrate-deps: cryptography::cryptocurrencies
@@ -1353,6 +1363,7 @@ tsukurou_core: development-tools
 tt-call: rust-patterns
 ttmap: data-structures
 ttt: command-line-utilities
+ttv-auth: authentication
 ttyaskpass: command-line-interface, authentication
 turtle-syntax: parser-implementations
 tv-renamer: gui, filesystem

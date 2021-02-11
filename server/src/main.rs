@@ -518,7 +518,7 @@ async fn handle_install(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     };
 
     let state = state2.clone();
-    let (page, last_mod) = rt_run_timeout(&state2.rt, "instpage", 30, async move {
+    let (page, last_modified) = rt_run_timeout(&state2.rt, "instpage", 30, async move {
         let crates = state.crates.load();
         let ver = crates.rich_crate_version_async(&origin).await?;
         let mut page: Vec<u8> = Vec::with_capacity(32000);
@@ -527,7 +527,7 @@ async fn handle_install(req: HttpRequest) -> Result<HttpResponse, ServerError> {
         mark_server_still_alive(&state);
         Ok::<_, failure::Error>((page, None))
     }).await?;
-    Ok(serve_cached((page, 7200, false, last_mod)))
+    Ok(serve_cached(Rendered {page, cache_time: 7200, refresh: false, last_modified}))
 }
 
 async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
@@ -607,7 +607,7 @@ async fn handle_crate_reviews(req: HttpRequest) -> Result<HttpResponse, ServerEr
             front_end::render_crate_reviews(&mut page, &reviews, &ver, &crates, &state.markup).await?;
             minify_html(&mut page);
             mark_server_still_alive(&state);
-            Ok::<_, failure::Error>((page, 24 * 3600, false, None))
+            Ok::<_, failure::Error>(Rendered {page, cache_time: 24 * 3600, refresh: false, last_modified: None})
         })
         .await?,
     ))
@@ -632,7 +632,7 @@ async fn handle_new_trending(req: HttpRequest) -> Result<HttpResponse, ServerErr
 
 /// takes path to storage, freshness in seconds, and a function to call on cache miss
 /// returns (page, fresh in seconds)
-async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cache_time: u32, generate: F) -> Result<(Vec<u8>, u32, bool, Option<DateTime<FixedOffset>>), failure::Error>
+async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cache_time: u32, generate: F) -> Result<Rendered, failure::Error>
     where F: Future<Output=Result<(Vec<u8>, Option<DateTime<FixedOffset>>), failure::Error>> + 'static {
     if let Ok(modified) = std::fs::metadata(&cache_file).and_then(|m| m.modified()) {
         let now = SystemTime::now();
@@ -652,7 +652,7 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
             let timestamp = u32::from_le_bytes(page_cached.get(trailer_pos..).unwrap().try_into().unwrap());
             page_cached.truncate(trailer_pos);
 
-            let last_mod = if timestamp > 0 { Some(DateTime::from_utc(NaiveDateTime::from_timestamp(timestamp as _, 0), FixedOffset::east(0))) } else { None };
+            let last_modified = if timestamp > 0 { Some(DateTime::from_utc(NaiveDateTime::from_timestamp(timestamp as _, 0), FixedOffset::east(0))) } else { None };
             let cache_time_remaining = cache_time.saturating_sub(age_secs);
 
             debug!("Using cached page {} {}s fresh={:?} acc={:?}", cache_file.display(), cache_time_remaining, is_fresh, is_acceptable);
@@ -684,7 +684,12 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
                     }
                 });
             }
-            return Ok((page_cached, if !is_fresh { cache_time_remaining / 4 } else { cache_time_remaining }.max(2), !is_acceptable, last_mod));
+            return Ok(Rendered {
+                page: page_cached,
+                cache_time: if !is_fresh { cache_time_remaining / 4 } else { cache_time_remaining }.max(2),
+                refresh: !is_acceptable,
+                last_modified,
+            });
         }
 
         debug!("Cache miss {} {}", cache_file.display(), age_secs);
@@ -692,7 +697,7 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
         debug!("Cache miss {} no file", cache_file.display());
     }
 
-    let (page, last_mod) = state.rt.spawn({
+    let (page, last_modified) = state.rt.spawn({
         let state = state.clone();
         async move {
             let _s = tokio::time::timeout(Duration::from_secs(10), state.foreground_job.acquire()).await?;
@@ -701,7 +706,7 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
     if let Err(e) = std::fs::write(&cache_file, &page) {
         error!("warning: Failed writing to {}: {}", cache_file.display(), e);
     }
-    Ok((page, cache_time, false, last_mod))
+    Ok(Rendered {page, cache_time, refresh: false, last_modified})
 }
 
 fn render_crate_page(state: AServerState, origin: Origin) -> impl Future<Output = Result<(Vec<u8>, Option<DateTime<FixedOffset>>), failure::Error>> + 'static {
@@ -716,7 +721,7 @@ fn render_crate_page(state: AServerState, origin: Origin) -> impl Future<Output 
     })
 }
 
-async fn render_crate_reverse_dependencies(state: AServerState, origin: Origin) -> Result<(Vec<u8>, u32, bool, Option<DateTime<FixedOffset>>), failure::Error> {
+async fn render_crate_reverse_dependencies(state: AServerState, origin: Origin) -> Result<Rendered, failure::Error> {
     let s = state.clone();
     rt_run_timeout(&s.rt, "revpage2", 30, async move {
         let crates = state.crates.load();
@@ -725,7 +730,7 @@ async fn render_crate_reverse_dependencies(state: AServerState, origin: Origin) 
         front_end::render_crate_reverse_dependencies(&mut page, &ver, &crates, &state.markup).await?;
         minify_html(&mut page);
         mark_server_still_alive(&state);
-        Ok::<_, failure::Error>((page, 24*3600, false, None))
+        Ok::<_, failure::Error>(Rendered {page, cache_time: 24*3600, refresh: false, last_modified: None})
     }).await
 }
 
@@ -765,7 +770,16 @@ async fn handle_keyword(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     })
 }
 
-fn serve_cached((page, cache_time, refresh, last_modified): (Vec<u8>, u32, bool, Option<DateTime<FixedOffset>>)) -> HttpResponse {
+#[derive(Debug)]
+struct Rendered {
+    page: Vec<u8>,
+    // s
+    cache_time: u32,
+    refresh: bool,
+    last_modified: Option<DateTime<FixedOffset>>,
+}
+
+fn serve_cached(Rendered {page, cache_time, refresh, last_modified}: Rendered) -> HttpResponse {
     let err_max = (cache_time * 10).max(3600 * 24 * 2);
 
     // last-modified is ambiguous, because it's modification of the content, not the whole state
@@ -821,7 +835,7 @@ async fn handle_search(req: HttpRequest) -> Result<HttpResponse, ServerError> {
                     let mut page = Vec::with_capacity(32000);
                     front_end::render_serp_page(&mut page, &query, &results, &state.markup)?;
                     minify_html(&mut page);
-                    Ok::<_, failure::Error>((page, 600u32, false, None))
+                    Ok::<_, failure::Error>(Rendered {page, cache_time: 600, refresh: false, last_modified: None})
                 }
             }).await??;
             Ok(serve_cached(page))

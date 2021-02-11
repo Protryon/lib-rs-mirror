@@ -1232,8 +1232,8 @@ pub fn adjusted_relevance(mut candidates: HashMap<String, f64>, keywords: &HashS
         if matched_times > 0 {
             let match_relevance = (matched_times as f64).sqrt();
             for &(slug, mul, add) in actions.iter() {
-                assert!(CATEGORIES.from_slug(slug).1, slug);
-                assert!(mul >= 1.0 || add < 0.0000001, slug);
+                assert!(CATEGORIES.from_slug(slug).1, "{}", slug);
+                assert!(mul >= 1.0 || add < 0.0000001, "{}", slug);
                 let score = candidates.entry(slug.to_string()).or_insert(0.);
                 *score *= mul.powf(match_relevance);
                 *score += add * match_relevance + 0.000001;

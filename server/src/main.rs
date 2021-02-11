@@ -774,6 +774,7 @@ fn serve_cached((page, cache_time, refresh, last_modified): (Vec<u8>, u32, bool,
     hasher.update(&page);
     let etag = format!("\"{:.16}\"", base64::encode(hasher.finalize().as_bytes()));
 
+    #[allow(deprecated)]
     HttpResponse::Ok()
         .content_type("text/html;charset=UTF-8")
         .header("etag", etag)

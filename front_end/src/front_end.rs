@@ -131,8 +131,7 @@ pub async fn render_sitemap(sitemap: &mut impl Write, crates: &KitchenSink) -> R
             freq = match age {
                 x if x > 3600 * 24 * 30 * 18 => "yearly",
                 x if x > 3600 * 24 * 60 => "monthly",
-                x if x > 3600 * 24 * 7 => "weekly",
-                _ => "daily",
+                _ => "weekly",
             },
         )?;
     }

@@ -782,6 +782,11 @@ struct Rendered {
 fn serve_cached(Rendered {page, cache_time, refresh, last_modified}: Rendered) -> HttpResponse {
     let err_max = (cache_time * 10).max(3600 * 24 * 2);
 
+    let last_modified_secs = last_modified.map(|l| Utc::now().signed_duration_since(l).num_seconds() as u32).unwrap_or(0);
+    // if no updates for a year, don't expect more, and keep old page cached for longer
+    let extra_time = if last_modified_secs < 3600*24*365 { last_modified_secs / 300 } else { last_modified_secs / 40 };
+    let cache_time = cache_time.max(extra_time);
+
     // last-modified is ambiguous, because it's modification of the content, not the whole state
     let mut hasher = blake3::Hasher::new();
     hasher.update(if refresh { b"1" } else { b"0" });

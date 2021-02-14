@@ -2002,6 +2002,17 @@ impl KitchenSink {
             }).contribution += contribution;
         }
 
+        for author in authors.values_mut() {
+            if let Some(ref mut gh) = author.github {
+                if gh.name.is_none() {
+                    let res = self.user_by_github_login(&gh.login).await;
+                    if let Ok(Some(new_gh)) = res {
+                        *gh = new_gh
+                    }
+                }
+            }
+        }
+
         let mut authors_by_name = HashMap::<String, CrateAuthor<'_>>::new();
         for (_, a) in authors {
             let mut lc_ascii_name = deunicode::deunicode(a.name());
@@ -2055,17 +2066,6 @@ impl KitchenSink {
                 a.nth_author.is_some() || a.contribution > 0.
             });
 
-
-        for author in &mut authors {
-            if let Some(ref mut gh) = author.github {
-                if gh.name.is_none() {
-                    let res = self.user_by_github_login(&gh.login).await;
-                    if let Ok(Some(new_gh)) = res {
-                        *gh = new_gh
-                    }
-                }
-            }
-        }
 
         authors.sort_by(|a, b| {
             fn score(a: &CrateAuthor<'_>) -> f64 {

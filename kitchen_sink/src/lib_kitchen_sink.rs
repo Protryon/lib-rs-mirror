@@ -2078,7 +2078,7 @@ impl KitchenSink {
 
         // this is probably author from contribs + author from authors field, which means it's a dupe.
         // this needs to undo previous merge for the next check
-        if authors.len() == 2 && authors.iter().any(|a| !a.owner) {
+        if authors.len() == 2 && authors.iter().any(|a| !a.owner) && owners.is_empty() {
             if let Some(index) = authors.iter().position(|a| a.owner) {
                 owners.push(authors.remove(index));
             }
@@ -2626,7 +2626,7 @@ async fn index_test() {
     let stats = idx.deps_stats().await.unwrap();
     assert!(stats.total > 13800);
     let lode = stats.counts.get("lodepng").unwrap();
-    assert_eq!(13, lode.runtime.def);
+    assert!(lode.runtime.def >= 15 && lode.runtime.def < 100);
 }
 
 fn is_alnum(q: &str) -> bool {

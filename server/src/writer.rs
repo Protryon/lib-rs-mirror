@@ -22,7 +22,8 @@ where E: Send + Sync + 'static
     fn write(&mut self, d: &[u8]) -> io::Result<usize> {
         let len = d.len();
         let sent = self.sender.send(Ok(Bytes::copy_from_slice(d)));
-        self.rt.enter(|| futures::executor::block_on(sent))
+        let _g = self.rt.enter();
+        futures::executor::block_on(sent)
             .map_err(|e| {
                 eprintln!("write failed: {}", e);
                 io::Error::new(io::ErrorKind::BrokenPipe, e)
@@ -36,12 +37,12 @@ where E: Send + Sync + 'static
 
     fn flush(&mut self) -> io::Result<()> {
         let flushed = self.sender.flush();
-        self.rt.enter(|| futures::executor::block_on(flushed))
+        let _g = self.rt.enter();
+        futures::executor::block_on(flushed)
             .map_err(|e| {
                 eprintln!("flush failed: {}", e);
                 io::Error::new(io::ErrorKind::BrokenPipe, e)
-            })?;
-        Ok(())
+            })
     }
 }
 

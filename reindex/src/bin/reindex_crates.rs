@@ -40,8 +40,7 @@ fn main() {
     };
     let repos = !everything;
 
-    let mut rt = tokio::runtime::Builder::new()
-        .threaded_scheduler()
+    let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .thread_name("reindex")
         .build()

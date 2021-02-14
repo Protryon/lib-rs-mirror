@@ -180,7 +180,7 @@ impl ClientInner {
             let wait_sec = self.wait_sec.load(SeqCst);
             if wait_sec > 0 {
                 // This has poor behavior with concurrency. It should be pacing all requests.
-                tokio::time::delay_for(Duration::from_secs(wait_sec.into())).await;
+                tokio::time::sleep(Duration::from_secs(wait_sec.into())).await;
             }
 
             let res = self.client.get(url).send().await?;
@@ -201,7 +201,7 @@ impl ClientInner {
 
             let should_wait_for_content = status == StatusCode::ACCEPTED;
             if should_wait_for_content && retries > 0 {
-                tokio::time::delay_for(Duration::from_secs(retry_delay)).await;
+                tokio::time::sleep(Duration::from_secs(retry_delay)).await;
                 retry_delay *= 2;
                 retries -= 1;
                 continue;

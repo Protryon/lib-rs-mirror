@@ -18,7 +18,7 @@ feat_extractor = { path = "../feat_extractor" }
 ranking = { path = "../ranking" }
 parking_lot = "0.11"
 udedokei = { path = "../udedokei" }
-tokio = { version = "0.2.11", features = ["rt-threaded", "macros", "sync", "blocking"] }
+tokio = { version = "1.2.0", features = ["rt-multi-thread", "macros", "sync"] }
 futures = "0.3.4"
 triomphe = "0.1.1"
 simple_cache = { path = "../simple_cache", version = "0.7.0" }

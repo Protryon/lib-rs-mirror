@@ -2601,7 +2601,7 @@ pub struct DependerChanges {
 
 #[test]
 fn is_build_or_dev_test() {
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(rt.spawn(async move {
         let c = KitchenSink::new_default().await.expect("uhg");
         assert_eq!((false, false), c.is_build_or_dev(&Origin::from_crates_io_name("semver")).await.unwrap());
@@ -2612,7 +2612,7 @@ fn is_build_or_dev_test() {
 
 #[test]
 fn fetch_uppercase_name() {
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(rt.spawn(async move {
         let k = KitchenSink::new_default().await.expect("Test if configured");
         let _ = k.rich_crate_async(&Origin::from_crates_io_name("Inflector")).await.unwrap();

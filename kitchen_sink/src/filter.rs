@@ -48,22 +48,21 @@ impl ImageFilter for ImageOptimAPIFilter {
     fn image_size(&self, image_url: &str) -> Option<(u32, u32)> {
         let image_url = image_url.trim_start_matches(&self.img_prefix).trim_start_matches(&self.img2x_prefix);
         let api_url = format!("{}{}", self.meta_prefix, image_url);
-        self.handle.enter(|| futures::executor::block_on(self.cache.get_json(image_url, api_url, |f| f)))
+        let rt = self.handle.enter();
+        let ImageOptimImageMeta { mut width, mut height } = futures::executor::block_on(self.cache.get_json(image_url, api_url, |f| f))
             .map_err(|e| {
                 eprintln!("warning: image req to meta of {} failed: {}", image_url, e);
             })
-            .ok()
-            .and_then(|f| f)
-            .map(|ImageOptimImageMeta { mut width, mut height }| {
-                if height > 1000 {
-                    width /= 2;
-                    height /= 2;
-                }
-                if width > 1000 {
-                    width /= 2;
-                    height /= 2;
-                }
-                (width, height)
-            })
+            .ok()??;
+        drop(rt);
+        if height > 1000 {
+            width /= 2;
+            height /= 2;
+        }
+        if width > 1000 {
+            width /= 2;
+            height /= 2;
+        }
+        Some((width, height))
     }
 }

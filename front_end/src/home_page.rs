@@ -261,7 +261,8 @@ impl<'a> HomePage<'a> {
     }
 
     fn block<O>(&self, f: impl Future<Output = O>) -> O {
-        self.handle.enter(|| futures::executor::block_on(f))
+        let _g = self.handle.enter();
+        futures::executor::block_on(f)
     }
 
     pub fn page(&self) -> Page {

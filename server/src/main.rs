@@ -67,10 +67,9 @@ fn main() {
     }
     b.init();
 
-    let mut sys = actix_web::rt::System::new("actix-server");
+    let sys = actix_web::rt::System::new();
 
-    let rt = tokio::runtime::Builder::new()
-        .threaded_scheduler()
+    let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .thread_name("server-bg")
         .build()
@@ -140,7 +139,7 @@ async fn run_server(rt: Handle) -> Result<(), failure::Error> {
             let mut last_reload = Instant::now();
             state.crates.load().prewarm().await;
             loop {
-                tokio::time::delay_for(Duration::from_secs(1)).await;
+                tokio::time::sleep(Duration::from_secs(1)).await;
                 let elapsed = state.start_time.elapsed().as_secs() as u32;
                 timestamp.store(elapsed, Ordering::SeqCst);
                 let should_reload = if 1 == HUP_SIGNAL.swap(0, Ordering::SeqCst) {
@@ -186,7 +185,6 @@ async fn run_server(rt: Handle) -> Result<(), failure::Error> {
             std::thread::sleep(Duration::from_secs(1));
             let expected = state.start_time.elapsed().as_secs() as u32;
             let rt_timestamp = timestamp.load(Ordering::SeqCst);
-            let response_timestamp = state.last_ok_response.load(Ordering::SeqCst);
             if rt_timestamp + 5 < expected {
                 warn!("Update loop is {}s behind", expected - rt_timestamp);
                 if rt_timestamp + 60 < expected {
@@ -194,6 +192,7 @@ async fn run_server(rt: Handle) -> Result<(), failure::Error> {
                     std::process::exit(1);
                 }
             }
+            let response_timestamp = state.last_ok_response.load(Ordering::SeqCst);
             if response_timestamp + 60*5 < expected {
                 warn!("no requests for 5 minutes? probably a deadlock");
                 std::process::exit(2);
@@ -286,7 +285,7 @@ fn handle_static_page(state: &ServerState, path: &str) -> Result<Option<HttpResp
     mark_server_still_alive(&state);
     Ok(Some(HttpResponse::Ok()
         .content_type("text/html;charset=UTF-8")
-        .header("Cache-Control", "public, max-age=7200, stale-while-revalidate=604800, stale-if-error=86400")
+        .set_header("Cache-Control", "public, max-age=7200, stale-while-revalidate=604800, stale-if-error=86400")
         .no_chunking(page.len() as u64)
         .body(page)))
 }
@@ -296,7 +295,7 @@ async fn default_handler(req: HttpRequest) -> Result<HttpResponse, ServerError> 
     let path = req.uri().path();
     assert!(path.starts_with('/'));
     if path.ends_with('/') {
-        return Ok(HttpResponse::PermanentRedirect().header("Location", path.trim_end_matches('/')).body(""));
+        return Ok(HttpResponse::PermanentRedirect().set_header("Location", path.trim_end_matches('/')).body(""));
     }
 
     if let Some(cat) = find_category(path.split('/').skip(1)) {
@@ -339,10 +338,10 @@ async fn default_handler(req: HttpRequest) -> Result<HttpResponse, ServerError> 
     }).await?;
 
     if let Some(k) = found_crate {
-        return Ok(HttpResponse::PermanentRedirect().header("Location", format!("/crates/{}", encode(k.name()))).body(""));
+        return Ok(HttpResponse::PermanentRedirect().set_header("Location", format!("/crates/{}", encode(k.name()))).body(""));
     }
     if let Some(keyword) = found_keyword {
-        return Ok(HttpResponse::TemporaryRedirect().header("Location", format!("/keywords/{}", encode(&keyword))).body(""));
+        return Ok(HttpResponse::TemporaryRedirect().set_header("Location", format!("/keywords/{}", encode(&keyword))).body(""));
     }
 
     render_404_page(state, path, "crate or category").await
@@ -367,7 +366,7 @@ fn render_404_page(state: &AServerState, path: &str, item_name: &str) -> impl Fu
             HttpResponse::NotFound()
                 .content_type("text/html;charset=UTF-8")
                 .no_chunking(page.len() as u64)
-                .header("Cache-Control", "public, max-age=60, stale-while-revalidate=3600, stale-if-error=3600")
+                .set_header("Cache-Control", "public, max-age=60, stale-while-revalidate=3600, stale-if-error=3600")
                 .body(page)
         })
     })
@@ -396,7 +395,7 @@ async fn handle_home(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     debug!("home route");
     let query = req.query_string().trim_start_matches('?');
     if !query.is_empty() && query.find('=').is_none() {
-        return Ok(HttpResponse::TemporaryRedirect().header("Location", format!("/search?q={}", query)).finish());
+        return Ok(HttpResponse::TemporaryRedirect().set_header("Location", format!("/search?q={}", query)).finish());
     }
 
     let state: &AServerState = req.app_data().expect("appdata");
@@ -427,23 +426,23 @@ async fn handle_gitlab_crate(req: HttpRequest) -> Result<HttpResponse, ServerErr
 async fn handle_redirect(req: HttpRequest) -> HttpResponse {
     let inf = req.match_info();
     let rest = inf.query("rest");
-    HttpResponse::PermanentRedirect().header("Location", format!("/{}", rest)).body("")
+    HttpResponse::PermanentRedirect().set_header("Location", format!("/{}", rest)).body("")
 }
 
 async fn handle_crate_reverse_dependencies_redir(req: HttpRequest) -> HttpResponse {
     let inf = req.match_info();
     let rest = inf.query("crate");
-    HttpResponse::PermanentRedirect().header("Location", format!("/crates/{}/rev", rest)).body("")
+    HttpResponse::PermanentRedirect().set_header("Location", format!("/crates/{}/rev", rest)).body("")
 }
 
 async fn handle_author_redirect(req: HttpRequest) -> HttpResponse {
     let inf = req.match_info();
     let rest = inf.query("author");
-    HttpResponse::PermanentRedirect().header("Location", format!("/~{}", rest)).body("")
+    HttpResponse::PermanentRedirect().set_header("Location", format!("/~{}", rest)).body("")
 }
 
 async fn handle_game_redirect(_: HttpRequest) -> HttpResponse {
-    HttpResponse::PermanentRedirect().header("Location", "/game-development").body("")
+    HttpResponse::PermanentRedirect().set_header("Location", "/game-development").body("")
 }
 
 async fn handle_git_crate(req: HttpRequest, slug: &'static str) -> Result<HttpResponse, ServerError> {
@@ -465,7 +464,7 @@ async fn handle_git_crate(req: HttpRequest, slug: &'static str) -> Result<HttpRe
     if !state.crates.load().crate_exists(&origin) {
         let (repo, _) = origin.into_repo().expect("repohost");
         let url = repo.canonical_http_url("").expect("repohost");
-        return Ok(HttpResponse::TemporaryRedirect().header("Location", url.into_owned()).finish());
+        return Ok(HttpResponse::TemporaryRedirect().set_header("Location", url.into_owned()).finish());
     }
 
     Ok(serve_cached(with_file_cache(&state, cache_file, 86400, {
@@ -504,7 +503,7 @@ async fn handle_debug(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     front_end::render_debug_page(&mut page, &ver, &crates)?;
     Ok(HttpResponse::Ok()
         .content_type("text/html;charset=UTF-8")
-        .header("Cache-Control", "no-cache")
+        .set_header("Cache-Control", "no-cache")
         .no_chunking(page.len() as u64)
         .body(page))
 }
@@ -542,7 +541,7 @@ async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
         }
     };
     if aut.github.login != login {
-        return Ok(HttpResponse::PermanentRedirect().header("Location", format!("/~{}", encode(&aut.github.login))).body(""));
+        return Ok(HttpResponse::PermanentRedirect().set_header("Location", format!("/~{}", encode(&aut.github.login))).body(""));
     }
     let cache_file = state.page_cache_dir.join(format!("@{}.html", login));
     Ok(serve_cached(
@@ -737,7 +736,7 @@ async fn render_crate_reverse_dependencies(state: AServerState, origin: Origin) 
 async fn handle_keyword(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let q = req.match_info().query("keyword");
     if q.is_empty() {
-        return Ok(HttpResponse::TemporaryRedirect().header("Location", "/").finish());
+        return Ok(HttpResponse::TemporaryRedirect().set_header("Location", "/").finish());
     }
 
     let query = q.to_owned();
@@ -762,11 +761,11 @@ async fn handle_keyword(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     Ok(if let Some(page) = page {
         HttpResponse::Ok()
             .content_type("text/html;charset=UTF-8")
-            .header("Cache-Control", "public, max-age=172800, stale-while-revalidate=604800, stale-if-error=86400")
+            .set_header("Cache-Control", "public, max-age=172800, stale-while-revalidate=604800, stale-if-error=86400")
             .no_chunking(page.len() as u64)
             .body(page)
     } else {
-        HttpResponse::TemporaryRedirect().header("Location", format!("/search?q={}", urlencoding::encode(&query))).finish()
+        HttpResponse::TemporaryRedirect().set_header("Location", format!("/search?q={}", urlencoding::encode(&query))).finish()
     })
 }
 
@@ -796,18 +795,18 @@ fn serve_cached(Rendered {page, cache_time, refresh, last_modified}: Rendered) -
     #[allow(deprecated)]
     HttpResponse::Ok()
         .content_type("text/html;charset=UTF-8")
-        .header("etag", etag)
+        .set_header("etag", etag)
         .if_true(!refresh, |h| {
-            h.header("Cache-Control", format!("public, max-age={}, stale-while-revalidate={}, stale-if-error={}", cache_time, cache_time * 3, err_max));
+            h.set_header("Cache-Control", format!("public, max-age={}, stale-while-revalidate={}, stale-if-error={}", cache_time, cache_time * 3, err_max));
         })
         .if_true(refresh, |h| {
-            h.header("Refresh", "5");
-            h.header("Cache-Control", "no-cache, s-maxage=4, must-revalidate");
+            h.set_header("Refresh", "5");
+            h.set_header("Cache-Control", "no-cache, s-maxage=4, must-revalidate");
         })
         .if_some(last_modified, |l, h| {
             // can't give validator, because then 304 leaves refresh
             if !refresh {
-                h.header("Last-Modified", l.to_rfc2822());
+                h.set_header("Last-Modified", l.to_rfc2822());
             }
         })
         .no_chunking(page.len() as u64)
@@ -845,7 +844,7 @@ async fn handle_search(req: HttpRequest) -> Result<HttpResponse, ServerError> {
             }).await??;
             Ok(serve_cached(page))
         },
-        _ => Ok(HttpResponse::PermanentRedirect().header("Location", "/").finish()),
+        _ => Ok(HttpResponse::PermanentRedirect().set_header("Location", "/").finish()),
     }
 }
 
@@ -867,7 +866,7 @@ async fn handle_sitemap(req: HttpRequest) -> Result<HttpResponse, ServerError> {
 
     Ok(HttpResponse::Ok()
         .content_type("application/xml;charset=UTF-8")
-        .header("Cache-Control", "public, max-age=259200, stale-while-revalidate=72000, stale-if-error=72000")
+        .set_header("Cache-Control", "public, max-age=259200, stale-while-revalidate=72000, stale-if-error=72000")
         .streaming(page))
 }
 
@@ -882,7 +881,7 @@ async fn handle_feed(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     }).await?;
     Ok(HttpResponse::Ok()
         .content_type("application/atom+xml;charset=UTF-8")
-        .header("Cache-Control", "public, max-age=10800, stale-while-revalidate=259200, stale-if-error=72000")
+        .set_header("Cache-Control", "public, max-age=10800, stale-while-revalidate=259200, stale-if-error=72000")
         .no_chunking(page.len() as u64)
         .body(page))
 }

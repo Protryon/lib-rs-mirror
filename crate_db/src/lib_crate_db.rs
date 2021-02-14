@@ -1231,7 +1231,7 @@ fn none_rows<T>(res: std::result::Result<T, rusqlite::Error>) -> std::result::Re
 
 #[test]
 fn try_indexing() {
-    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let rt = tokio::runtime::Runtime::new().unwrap();
     let f = rt.spawn(async move {
     let t = tempfile::NamedTempFile::new().unwrap();
 

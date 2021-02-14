@@ -2510,7 +2510,7 @@ pub struct CrateAuthor<'a> {
 impl<'a> CrateAuthor<'a> {
     pub fn likely_a_team(&self) -> bool {
         let unattributed_name = self.github.is_none() && self.info.as_ref().map_or(true, |a| a.email.is_none() && a.url.is_none());
-        unattributed_name || self.name().ends_with(" Developers") || self.name().ends_with(" contributors")
+        unattributed_name && (self.name().ends_with(" Developers") || self.name().ends_with(" contributors"))
     }
 
     pub fn name(&self) -> &str {

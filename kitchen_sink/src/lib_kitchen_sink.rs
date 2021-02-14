@@ -2075,6 +2075,14 @@ impl KitchenSink {
             score(b).partial_cmp(&score(a)).unwrap_or(Ordering::Equal)
         });
 
+
+        // this is probably author from contribs + author from authors field, which means it's a dupe.
+        // this needs to undo previous merge for the next check
+        if authors.len() == 2 && authors.iter().any(|a| !a.owner) {
+            if let Some(index) = authors.iter().position(|a| a.owner) {
+                owners.push(authors.remove(index));
+            }
+        }
         // That's a guess
         if authors.len() == 1 && owners.len() == 1 && authors[0].github.is_none() {
             let author_is_team = authors[0].likely_a_team();

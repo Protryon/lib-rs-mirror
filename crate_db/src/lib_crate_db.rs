@@ -1012,7 +1012,7 @@ impl CrateDb {
                     join crate_versions v using (crate_id)
                     join crates k on v.crate_id = k.id
                     where c.slug = ?1
-                        and k.ranking > 0.3 -- skip spam
+                        and k.ranking > 0.33 -- skip spam
                     group by v.crate_id
                     having count(*) > 1 -- so these are updates, not new releases
                     order by 1 desc
@@ -1067,7 +1067,7 @@ impl CrateDb {
                 SELECT origin, ranking, max(created) as last_update
                 FROM crates c
                 JOIN crate_versions v ON c.id = v.crate_id
-                WHERE ranking > 0.2
+                WHERE ranking > 0.25
                 GROUP BY c.id
             "#)?;
             let q = q.query_map(NO_PARAMS, |row| -> Result<(Origin, f64, i64)> {

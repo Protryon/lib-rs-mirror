@@ -115,9 +115,6 @@ pub fn is_deprecated(k: &RichCrateVersion) -> bool {
         return true;
     }
     if let Some(orig_desc) = k.description() {
-        if orig_desc == "..." { // spam by mahkoh
-            return true;
-        }
         let orig_desc = orig_desc.trim_matches(|c: char| !c.is_ascii_alphabetic());
         let desc = orig_desc.to_ascii_lowercase();
         return orig_desc.starts_with("WIP") || orig_desc.ends_with("WIP") ||
@@ -181,7 +178,13 @@ pub fn is_squatspam(k: &RichCrateVersion) -> bool {
     if k.version().contains("reserved") || k.version().contains("placeholder") {
         return true;
     }
+    if k.authors().len() == 1 && k.authors()[0].name.as_deref() == Some("...") {
+        return true; // spam by mahkoh
+    }
     if let Some(desc) = k.description() {
+        if desc == "..." { // spam by mahkoh
+            return true;
+        }
         let desc = desc.trim_matches(|c: char| !c.is_ascii_alphabetic()).to_ascii_lowercase();
         return desc.contains("this crate is a placeholder") ||
             desc.contains("reserving this crate") ||

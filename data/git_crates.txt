@@ -17,6 +17,7 @@ github:amethyst/space-menace/space-menace
 github:amethyst/space_shooter_rs/space_shooter
 github:andars/pebble.rs/pebble
 github:andschwa/rust-genetic-algorithm/rust-genetic-algorithm
+github:arkworks-rs/pcd/ark-pcd
 github:arthrp/consoletimer/consoletimer
 github:arthrp/quick-skeleton/quickskeleton
 github:atom-archive/xray/xray_cli
@@ -69,7 +70,9 @@ github:dgreid/crosvm/tpm2
 github:dgreid/crosvm/tpm2-sys
 github:dgreid/crosvm/virtio_sys
 github:dgreid/crosvm/vm_memory
+github:diem/diem/bounded-executor
 github:diem/diem/diem-client
+github:diem/diem/diem-crypto
 github:diem/diem/diemdb
 github:eirproject/eir/libeir_diagnostics
 github:eirproject/eir/libeir_hir
@@ -88,6 +91,8 @@ github:embarkstudios/rust-gpu/spirv-std
 github:embarkstudios/rust-gpu/spirv-std-macros
 github:emu-rs/rustual-boy/rustual-boy-cli
 github:emu-rs/rustual-boy/rustual-boy-core
+github:eycorsican/leaf/leaf-bin
+github:eycorsican/leaf/leaf-mobile
 github:facebook/hhvm/hh_codegen
 github:facebook/hhvm/oxidized
 github:facebookexperimental/eden/allocation_tracing
@@ -164,6 +169,7 @@ github:ioncodes/snesutilities/snesutils
 github:ixy-languages/ixy.rs/ixy
 github:jedisct1/flowgger/flowgger
 github:jharrilim/pong-amethyst/pong-amethyst
+github:joaoh82/rust_sqlite/rust_sqlite
 github:johalun/echo/module
 github:joyent/rust-cueball/cueball
 github:joystream/substrate-runtime-joystream/joystream-node-runtime
@@ -225,7 +231,10 @@ github:makepad/makepad/ttf_parser
 github:maps4print/azul/azul-core
 github:maps4print/azul/azul-css
 github:maringa-gamedev/rust-igmc-2018/rust-igmc-2018
+github:materializeinc/materialize/materialized
+github:materializeinc/materialize/sql-parser
 github:mathall/rim/rim
+github:mbround18/valheim-docker/odin
 github:mdreem/dreetris/dreetris
 github:meilisearch/meilisearch/meilisearch-core
 github:meilisearch/meilisearch/meilisearch-http
@@ -292,6 +301,7 @@ github:nokia/memory-profiler/memory-profiler-cli
 github:nokia/not-perf/nperf
 github:nokia/not-perf/nwind
 github:non-binary/http-cache-semantics/http-cache-semantics
+github:notriddle/rust-unified-diff/unified-diff
 github:oakes/solidoak/solidoak
 github:oam-dev/rudr/healthscope
 github:oam-dev/rudr/rudr
@@ -416,7 +426,9 @@ github:snowplow/factotum/factotum
 github:sorpaas/rux/kernel
 github:spejss/image-processing-cli-in-rust/ipcli
 github:spotifyd/spotifyd/spotifyd
+github:stencillogic/db-core/db-core
 github:subzerocloud/pg-amqp-bridge/pg-amqp-bridge
+github:synerise/cleora/cleora
 github:tailhook/marafet/marafet
 github:tailhook/marafet/marafet_css
 github:tailhook/vagga/vagga
@@ -493,6 +505,7 @@ github:withoutboats/notty/notty
 github:withoutboats/notty/notty-cairo
 github:xing/recrep/recrep
 github:xiph/rav1e/rav1e
+github:xou816/spot/spot
 github:y2z/monolith/monolith
 github:yaa110/rubigo/rubigo
 github:yoric/yaiouom/yaiouom-checker

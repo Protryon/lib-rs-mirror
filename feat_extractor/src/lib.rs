@@ -164,8 +164,12 @@ pub fn is_deprecated_requirement(name: &str, requirement: &VersionReq) -> bool {
         "str-concat" => true,
         // uses old winapi
         "user32-sys" | "shell32-sys" | "advapi32-sys" | "gdi32-sys" | "ole32-sys" | "ws2_32-sys" | "kernel32-sys" | "userenv-sys" => true,
+        // uses the newest windows api, still deprecated :)
+        "winrt" => true,
         // renamed
         "hdrsample" => true,
+        // in stdlib
+        "insideout" | "file" | "ref_slice" => true,
         _ => false,
     }
 }

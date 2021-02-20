@@ -226,7 +226,7 @@ fn index_search(indexer: &mut Indexer, lines: &TempCache<(String, f64), [u8; 16]
 impl Reindexer {
 async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) -> (usize, f64) {
     let crates = &self.crates;
-    let contrib_info = crates.all_contributors(&k).await.map_err(|e| eprintln!("{}", e)).ok();
+    let contrib_info = crates.all_contributors(&k).await.map_err(|e| log::error!("{}", e)).ok();
     let contributors_count = if let Some((authors, _owner_only, _, extra_contributors)) = &contrib_info {
         (authors.len() + extra_contributors) as u32
     } else {
@@ -281,7 +281,10 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
             }
             let req = richdep.dep.req().parse().ok()?;
             Some(async move {
-                (richdep.is_optional(), crates.version_popularity(&richdep.package, &req).await.expect("ver1pop").expect("ver2pop"))
+                let pop = crates.version_popularity(&richdep.package, &req)
+                    .await
+                    .map_err(|e| log::error!("ver1pop {}", e)).unwrap_or(None);
+                (richdep.is_optional(), pop.unwrap_or((false, 0.)))
             })
         }))
         .await
@@ -294,7 +297,7 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
         .collect()
     };
 
-    let is_in_debian = self.deblist.has(k.short_name()).map_err(|e| eprintln!("debcargo check: {}", e)).unwrap_or(false);
+    let is_in_debian = self.deblist.has(k.short_name()).map_err(|e| log::error!("debcargo check: {}", e)).unwrap_or(false);
 
     let mut temp_inp = CrateTemporalInputs {
         versions: all.versions(),
@@ -351,15 +354,15 @@ fn print_res<T>(res: Result<T, failure::Error>) {
         let s = e.to_string();
         if s.starts_with("Too many open files") {
             stop();
-            panic!(s);
+            panic!("{}", s);
         }
-        eprintln!("••• Error: {}", s);
+        log::error!("••• Error: {}", s);
         for c in e.iter_chain().skip(1) {
             let s = c.to_string();
-            eprintln!("•   error: -- {}", s);
+            log::error!("•   error: -- {}", s);
             if s.starts_with("Too many open files") {
                 stop();
-                panic!(s);
+                panic!("{}", s);
             }
         }
     }

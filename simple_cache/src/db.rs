@@ -1,5 +1,6 @@
+use std::sync::Arc;
 use crate::error::Error;
-use reqwest;
+use fetcher::Fetcher;
 use rusqlite;
 use rusqlite::types::ToSql;
 use rusqlite::Connection;
@@ -17,17 +18,17 @@ use thread_local::ThreadLocal;
 pub struct SimpleCache {
     url: String,
     conn: ThreadLocal<Result<Connection, rusqlite::Error>>,
+    fetcher: Arc<Fetcher>,
     pub cache_only: bool,
-    sem: tokio::sync::Semaphore,
 }
 
 impl SimpleCache {
-    pub fn new(db_path: impl AsRef<Path>) -> Result<Self, Error> {
+    pub fn new(db_path: impl AsRef<Path>, fetcher: Arc<Fetcher>) -> Result<Self, Error> {
         Ok(Self {
             url: format!("file:{}?cache=shared", db_path.as_ref().display()),
             conn: ThreadLocal::new(),
+            fetcher,
             cache_only: false,
-            sem: tokio::sync::Semaphore::new(32),
         })
     }
 
@@ -100,8 +101,7 @@ impl SimpleCache {
         } else if self.cache_only {
             None
         } else {
-            let _s = self.sem.acquire().await;
-            let data = Box::pin(Self::fetch(url.as_ref())).await?;
+            let data = Box::pin(self.fetcher.fetch(url.as_ref())).await?;
             self.set(key, &data)?;
             Some(data)
         })
@@ -126,15 +126,5 @@ impl SimpleCache {
             q.execute(arr)?;
             Ok(())
         })
-    }
-
-    pub(crate) async fn fetch(url: &str) -> Result<Vec<u8>, Error> {
-        println!("REQ {}", url);
-        let client = reqwest::Client::builder().build()?;
-        let res = client.get(url).header(reqwest::header::USER_AGENT, "lib.rs/1.0").send().await?;
-        if res.status() != reqwest::StatusCode::OK {
-            Err(res.status())?;
-        }
-        Ok(res.bytes().await?.to_vec())
     }
 }

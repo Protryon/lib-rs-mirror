@@ -1,0 +1,15 @@
+[package]
+name = "fetcher"
+description = "Wraps reqwest adding throttling and custom user-agent"
+version = "0.1.0"
+authors = ["Kornel <kornel@geekhood.net>"]
+edition = "2018"
+publish = false
+
+[lib]
+path = "src/lib_fetcher.rs"
+
+[dependencies]
+reqwest = "0.11.1"
+tokio = "1.2.0"
+log = "0.4.14"

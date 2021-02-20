@@ -1,5 +1,6 @@
+use std::sync::Arc;
 use crate::error::Error;
-use crate::SimpleCache;
+use fetcher::Fetcher;
 use flate2::read::DeflateDecoder;
 use flate2::write::DeflateEncoder;
 use flate2::Compression;
@@ -28,16 +29,29 @@ struct Inner<K> {
     next_autosave: usize,
 }
 
+pub struct TempCacheJson<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeOwned + Clone + Send + Eq + Hash = Box<str>> {
+    cache: TempCache<T, K>,
+    fetcher: Arc<Fetcher>,
+}
+
 pub struct TempCache<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeOwned + Clone + Send + Eq + Hash = Box<str>> {
     path: PathBuf,
     data: RwLock<Inner<K>>,
     _ty: PhantomData<T>,
     pub cache_only: bool,
-    sem: tokio::sync::Semaphore,
+}
+
+impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeOwned + Clone + Send + Eq + Hash> TempCacheJson<T, K> {
+    pub fn new(path: impl Into<PathBuf>, fetcher: Arc<Fetcher>) -> Result<Self, Error> {
+        Ok(Self {
+            fetcher,
+            cache: TempCache::new(path)?,
+        })
+    }
 }
 
 impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeOwned + Clone + Send + Eq + Hash> TempCache<T, K> {
-    pub fn new(path: impl Into<PathBuf>) -> Result<Self, Error> {
+    pub fn new(path: impl Into<PathBuf>,) -> Result<Self, Error> {
         let path = path.into().with_extension("rmpz");
         let data = if path.exists() {
             None
@@ -54,7 +68,6 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
             }),
             _ty: PhantomData,
             cache_only: false,
-            sem: tokio::sync::Semaphore::new(32),
         })
     }
 
@@ -163,25 +176,55 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
         }
         Ok(())
     }
+}
 
-    #[inline]
+impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeOwned + Clone + Send + Eq + Hash> TempCacheJson<T, K> {
+    #[inline(always)]
+    pub fn cache_only(&self) -> bool {
+        self.cache.cache_only
+    }
+
+    #[inline(always)]
+    pub fn set_cache_only(&mut self, b: bool) {
+        self.cache.cache_only = b;
+    }
+
+    #[inline(always)]
+    pub fn get<Q>(&self, key: &Q) -> Result<Option<T>, Error> where K: Borrow<Q>, Q: Eq + Hash + std::fmt::Debug + ?Sized {
+        self.cache.get(key)
+    }
+
+    #[inline(always)]
+    pub fn set(&self, key: impl Into<K>, value: impl Borrow<T>) -> Result<(), Error> {
+        self.cache.set(key, value)
+    }
+
+    #[inline(always)]
+    pub fn delete<Q>(&self, key: &Q) -> Result<(), Error> where K: Borrow<Q>, Q: Eq + Hash + ?Sized {
+        self.cache.delete(key)
+    }
+
+    #[inline(always)]
+    pub fn save(&self) -> Result<(), Error> {
+        self.cache.save()
+    }
+
     pub async fn get_json<Q, B>(&self, key: &Q, url: impl AsRef<str>, on_miss: impl FnOnce(B) -> Option<T>) -> Result<Option<T>, Error>
     where B: for<'a> Deserialize<'a>, K: Borrow<Q> + for<'a> From<&'a Q>, Q: Eq + Hash + std::fmt::Debug + ?Sized {
-        if let Some(res) = self.get(key)? {
+        if let Some(res) = self.cache.get(key)? {
             return Ok(Some(res));
         }
 
-        if self.cache_only {
+        if self.cache.cache_only {
             return Ok(None);
         }
 
-        let _s = self.sem.acquire().await;
-        let data = Box::pin(SimpleCache::fetch(url.as_ref())).await?;
+        let data = Box::pin(self.fetcher.fetch(url.as_ref())).await?;
         match serde_json::from_slice(&data) {
             Ok(res) => {
                 let res = on_miss(res);
                 if let Some(ref res) = res {
-                    self.set(key, res)?
+                    self.cache.set(key, res)?
                 }
                 Ok(res)
             },

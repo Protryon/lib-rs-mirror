@@ -9,6 +9,7 @@ members = [
 "creviews",
 "datadump",
 "docs_rs_client",
+"fetcher",
 "front_end",
 "github_info",
 "kitchen_sink",

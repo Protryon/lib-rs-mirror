@@ -1,10 +1,12 @@
-use serde_derive::*;
 pub use simple_cache::Error;
-use simple_cache::TempCache;
+use fetcher::Fetcher;
+use serde_derive::*;
+use simple_cache::TempCacheJson;
 use std::path::Path;
+use std::sync::Arc;
 
 pub struct DocsRsClient {
-    cache: TempCache<Option<Vec<BuildStatus>>>,
+    cache: TempCacheJson<Option<Vec<BuildStatus>>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -17,7 +19,7 @@ pub struct BuildStatus {
 impl DocsRsClient {
     pub fn new(cache_path: impl AsRef<Path>) -> Result<Self, Error> {
         Ok(Self {
-            cache: TempCache::new(cache_path.as_ref())?,
+            cache: TempCacheJson::new(cache_path.as_ref(), Arc::new(Fetcher::new(8)))?,
         })
     }
 

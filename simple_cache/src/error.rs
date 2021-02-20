@@ -9,7 +9,7 @@ quick_error! {
             display("Simple cache error: {}", err)
             source(err)
         }
-        Net(err: reqwest::Error) {
+        Net(err: fetcher::Error) {
             from()
             display("{}", err)
             source(err)
@@ -30,10 +30,6 @@ quick_error! {
         }
         KvPoison {}
         NotInCache {}
-        Status(code: reqwest::StatusCode) {
-            from()
-            display("Request error {}", code)
-        }
         Parse(err: serde_json::Error, data: Vec<u8>) {
             display("{}\n{}", err, String::from_utf8_lossy(data))
             source(err)

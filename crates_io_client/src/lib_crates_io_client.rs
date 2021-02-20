@@ -1,8 +1,10 @@
+use std::sync::Arc;
 pub use simple_cache::Error;
 
 use serde_derive::*;
 use simple_cache::SimpleCache;
-use simple_cache::TempCache;
+use simple_cache::TempCacheJson;
+use fetcher::Fetcher;
 
 use std::path::Path;
 use urlencoding::encode;
@@ -14,7 +16,7 @@ pub use crate::crate_meta::*;
 pub use crate::crate_owners::*;
 
 pub struct CratesIoClient {
-    cache: TempCache<(String, Payload)>,
+    cache: TempCacheJson<(String, Payload)>,
     crates: SimpleCache,
     sem: tokio::sync::Semaphore,
 }
@@ -30,9 +32,10 @@ macro_rules! cioopt {
 
 impl CratesIoClient {
     pub fn new(cache_base_path: &Path) -> Result<Self, Error> {
+        let fe = Arc::new(Fetcher::new(4));
         Ok(Self {
-            cache: TempCache::new(&cache_base_path.join("cratesio.bin"))?,
-            crates: SimpleCache::new(&cache_base_path.join("crates.db"))?,
+            cache: TempCacheJson::new(&cache_base_path.join("cratesio.bin"), fe.clone())?,
+            crates: SimpleCache::new(&cache_base_path.join("crates.db"), fe.clone())?,
             sem: tokio::sync::Semaphore::new(2),
         })
     }
@@ -42,7 +45,7 @@ impl CratesIoClient {
     }
 
     pub fn cache_only(&mut self, no_net: bool) -> &mut Self {
-        self.cache.cache_only = no_net;
+        self.cache.set_cache_only(no_net);
         self.crates.cache_only = no_net;
         self
     }
@@ -88,7 +91,7 @@ impl CratesIoClient {
         where B: for<'a> serde::Deserialize<'a> + Payloadable
     {
         if let Some((ver, res)) = self.cache.get(key.0)? {
-            if self.cache.cache_only || ver == key.1 {
+            if self.cache.cache_only() || ver == key.1 {
                 return Ok(Some(B::from(res)));
             }
             let wants = semver::Version::parse(key.1);
@@ -98,7 +101,7 @@ impl CratesIoClient {
             }
         }
 
-        if self.cache.cache_only {
+        if self.cache.cache_only() {
             return Err(Error::NotInCache);
         }
 

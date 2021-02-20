@@ -1,5 +1,7 @@
+use fetcher::Fetcher;
+use std::sync::Arc;
 use render_readme::ImageFilter;
-use simple_cache::{Error, TempCache};
+use simple_cache::{Error, TempCacheJson};
 use std::borrow::Cow;
 use std::path::PathBuf;
 
@@ -15,7 +17,7 @@ pub struct ImageOptimAPIFilter {
     img_prefix: String,
     img2x_prefix: String,
     meta_prefix: String,
-    cache: TempCache<ImageOptimImageMeta>,
+    cache: TempCacheJson<ImageOptimImageMeta>,
     handle: tokio::runtime::Handle,
 }
 
@@ -25,7 +27,7 @@ impl ImageOptimAPIFilter {
             img_prefix: format!("https://img.gs/{}/full/", api_id),
             img2x_prefix: format!("https://img.gs/{}/full,2x/", api_id),
             meta_prefix: format!("https://img.gs/{}/meta,timeout=90/", api_id),
-            cache: TempCache::new(cache_path)?,
+            cache: TempCacheJson::new(cache_path, Arc::new(Fetcher::new(8)))?,
             handle: tokio::runtime::Handle::current(),
         })
     }

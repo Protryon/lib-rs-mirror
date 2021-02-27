@@ -18,6 +18,7 @@ pub use crate::crate_owners::*;
 pub struct CratesIoClient {
     cache: TempCacheJson<(String, Payload)>,
     crates: SimpleCache,
+    readmes: SimpleCache,
     sem: tokio::sync::Semaphore,
 }
 
@@ -36,6 +37,7 @@ impl CratesIoClient {
         Ok(Self {
             cache: TempCacheJson::new(&cache_base_path.join("cratesio.bin"), fe.clone())?,
             crates: SimpleCache::new(&cache_base_path.join("crates.db"), fe.clone())?,
+            readmes: SimpleCache::new(&cache_base_path.join("readmes.db"), fe.clone())?,
             sem: tokio::sync::Semaphore::new(2),
         })
     }
@@ -66,7 +68,7 @@ impl CratesIoClient {
     pub async fn readme(&self, crate_name: &str, version: &str) -> Result<Option<Vec<u8>>, Error> {
         let key = format!("{}.html", crate_name);
         let url = format!("https://crates.io/api/v1/crates/{}/{}/readme", encode(crate_name), encode(version));
-        self.crates.get_cached((&key, version), &url).await
+        self.readmes.get_cached((&key, version), &url).await
     }
 
     pub async fn crate_meta(&self, crate_name: &str, as_of_version: &str) -> Result<Option<CrateMetaFile>, Error> {

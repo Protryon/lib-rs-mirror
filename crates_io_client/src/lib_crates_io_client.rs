@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::Arc;
 pub use simple_cache::Error;
 
@@ -16,10 +17,10 @@ pub use crate::crate_meta::*;
 pub use crate::crate_owners::*;
 
 pub struct CratesIoClient {
+    fetcher: Arc<Fetcher>,
     cache: TempCacheJson<(String, Payload)>,
-    crates: SimpleCache,
+    tarballs_path: PathBuf,
     readmes: SimpleCache,
-    sem: tokio::sync::Semaphore,
 }
 
 macro_rules! cioopt {
@@ -33,12 +34,12 @@ macro_rules! cioopt {
 
 impl CratesIoClient {
     pub fn new(cache_base_path: &Path) -> Result<Self, Error> {
-        let fe = Arc::new(Fetcher::new(4));
+        let fetcher = Arc::new(Fetcher::new(4));
         Ok(Self {
-            cache: TempCacheJson::new(&cache_base_path.join("cratesio.bin"), fe.clone())?,
-            crates: SimpleCache::new(&cache_base_path.join("crates.db"), fe.clone())?,
-            readmes: SimpleCache::new(&cache_base_path.join("readmes.db"), fe.clone())?,
-            sem: tokio::sync::Semaphore::new(2),
+            cache: TempCacheJson::new(&cache_base_path.join("cratesio.bin"), fetcher.clone())?,
+            readmes: SimpleCache::new(&cache_base_path.join("readmes.db"), fetcher.clone())?,
+            tarballs_path: cache_base_path.join("tarballs"),
+            fetcher,
         })
     }
 
@@ -48,21 +49,25 @@ impl CratesIoClient {
 
     pub fn cache_only(&mut self, no_net: bool) -> &mut Self {
         self.cache.set_cache_only(no_net);
-        self.crates.cache_only = no_net;
+        self.readmes.cache_only = no_net;
         self
     }
 
-    pub async fn crate_data(&self, crate_name: &str, version: &str) -> Result<Option<Vec<u8>>, Error> {
-        let newkey = format!("{}.crate", crate_name);
+    pub async fn crate_data(&self, crate_name: &str, version: &str) -> Result<Vec<u8>, Error> {
+        let tarball_path = self.tarballs_path.join(format!("{}/{}", crate_name, version));
+        if let Ok(data) = std::fs::read(&tarball_path) {
+            return Ok(data);
+        }
+
         // it really uses unencoded names, e.g. + is accepted, %2B is not!
         let url = format!("https://static.crates.io/crates/{name}/{name}-{version}.crate", name = crate_name, version = version);
-        let res = self.crates.get_cached((&newkey, version), &url).await?;
-        if let Some(data) = &res {
-            if data.len() < 10 || data[0] != 31 || data[1] != 139 {
-                return Err(Error::Other(format!("Not tarball: {}", url)));
-            }
+        let data = self.fetcher.fetch(&url).await?;
+        if data.len() < 10 || data[0] != 31 || data[1] != 139 {
+            return Err(Error::Other(format!("Not tarball: {}", url)));
         }
-        Ok(res)
+        let _ = std::fs::create_dir_all(tarball_path.parent().unwrap());
+        std::fs::write(&tarball_path, &data)?;
+        Ok(data)
     }
 
     pub async fn readme(&self, crate_name: &str, version: &str) -> Result<Option<Vec<u8>>, Error> {
@@ -109,8 +114,6 @@ impl CratesIoClient {
 
         self.cache.delete(key.0)?; // out of date
 
-        let _s = self.sem.acquire().await;
-
         let url = format!("https://crates.io/api/v1/crates/{}", path.as_ref());
         let res = Box::pin(self.cache.get_json(key.0, url, |raw: B| {
             Some((key.1.to_string(), raw.to()))
@@ -153,8 +156,5 @@ async fn cratesioclient() {
     client.crate_meta("capi", "0.0.1").await.expect("cargo-deb");
     let owners = client.crate_owners("cargo-deb", "1.10.0").await.expect("crate_owners").expect("found some");
     assert_eq!(3, owners.len(), "that will fail when metadata updates");
-    match CratesIoClient::new(Path::new("../data")).expect("new").cache_only(true).crate_data("fail404", "999").await.unwrap() {
-        None => {},
-        Some(e) => panic!("{:?}", e),
-    }
+    CratesIoClient::new(Path::new("../data")).expect("new").cache_only(true).crate_data("fail404", "999").await.unwrap();
 }

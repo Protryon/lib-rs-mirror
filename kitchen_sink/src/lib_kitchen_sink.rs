@@ -884,11 +884,9 @@ impl KitchenSink {
         self.rich_crate_version_data_common(origin.clone(), meta, 0, false, path_in_repo, warnings).await
     }
 
-    async fn tarball(&self, name: &str, ver: &str) -> CResult<Vec<u8>> {
-        let tarball = self.crates_io.crate_data(name, ver).await
-            .context("crate_file")?
-            .ok_or_else(|| KitchenSinkErr::DataNotFound(format!("{}-{}", name, ver)))?;
-        Ok(tarball)
+    async fn tarball(&self, name: &str, ver: &str) -> Result<Vec<u8>, KitchenSinkErr> {
+        self.crates_io.crate_data(name, ver).await
+            .map_err(|e| KitchenSinkErr::DataNotFound(format!("{}-{}: {}", name, ver, e)))
     }
 
     async fn rich_crate_version_data_from_crates_io(&self, latest: &CratesIndexVersion) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {

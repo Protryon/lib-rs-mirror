@@ -16,6 +16,7 @@ mod iter;
 mod not_found_page;
 mod reverse_dependencies;
 mod search_page;
+mod all_versions;
 mod urler;
 pub use crate::not_found_page::*;
 pub use crate::search_page::*;
@@ -183,6 +184,17 @@ pub async fn render_install_page(out: &mut impl Write, ver: &RichCrateVersion, k
     let urler = Urler::new(None); // Don't set self-crate, because we want to link back to crate page
     let c = crate::install_page::InstallPage::new(ver, kitchen_sink, renderer).await;
     templates::install(out, &urler, &c).context("install page io")?;
+    Ok(())
+}
+
+/// See `all_versions.rs.html`
+pub async fn render_all_versions_page(out: &mut impl Write, all: &RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink) -> Result<(), failure::Error> {
+    if stopped() {
+        Err(KitchenSinkErr::Stopped)?;
+    }
+    let urler = Urler::new(None); // Don't set self-crate, because we want to link back to crate page
+    let c = crate::all_versions::AllVersions::new(all, ver, kitchen_sink).await?;
+    templates::all_versions(out, &urler, &c).context("all_versions page io")?;
     Ok(())
 }
 

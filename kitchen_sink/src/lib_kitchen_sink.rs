@@ -1352,6 +1352,34 @@ impl KitchenSink {
         }
     }
 
+    pub fn all_crates_io_versions(&self, origin: &Origin) -> Result<Vec<CratesIndexVersion>, KitchenSinkErr> {
+        match origin {
+            Origin::CratesIo(name) => {
+                Ok(self.index.crates_io_crate_by_lowercase_name(name).map_err(KitchenSinkErr::Deps)?.versions().to_vec())
+            },
+            _ => Err(KitchenSinkErr::NoVersions),
+        }
+    }
+
+    pub fn crates_io_version_matching_requirement_by_lowercase_name(&self, crate_name: &str, req: &str) -> Result<(SemVer, CratesIndexVersion), KitchenSinkErr> {
+        assert!(crate_name.as_bytes().iter().all(|c| !c.is_ascii_uppercase()));
+
+        let req = VersionReq::parse(req).map_err(|_| KitchenSinkErr::NoVersions)?;
+
+        self.index.crates_io_crate_by_lowercase_name(crate_name).map_err(KitchenSinkErr::Deps)?
+            .versions()
+            .iter()
+            .filter_map(|v| {
+                let semver = v.version().parse().ok()?;
+                if req.matches(&semver) {
+                    Some((semver, v))
+                } else {None}
+            })
+            .max_by(|(a, _), (b, _)| b.cmp(a))
+            .map(|(s, v)| (s, v.clone()))
+            .ok_or(KitchenSinkErr::NoVersions)
+    }
+
     #[inline]
     pub async fn prewarm(&self) {
         let _ = self.index.deps_stats().await;

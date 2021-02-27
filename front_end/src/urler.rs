@@ -62,6 +62,18 @@ impl Urler {
         }
     }
 
+    pub fn all_versions(&self, origin: &Origin) -> String {
+        match origin {
+            Origin::CratesIo(lowercase_name) => {
+                format!("/crates/{}/versions", encode(lowercase_name))
+            }
+            Origin::GitHub { repo, package } | Origin::GitLab { repo, package } => {
+                let host = if let Origin::GitHub { .. } = origin { "gh" } else { "lab" };
+                format!("/crates/{}/{}/{}/{}/versions", host, encode(&repo.owner), encode(&repo.repo), encode(package))
+            }
+        }
+    }
+
     pub fn reviews(&self, origin: &Origin) -> String {
         match origin {
             Origin::CratesIo(lowercase_name) => {
@@ -81,6 +93,13 @@ impl Urler {
     pub fn crates_io_crate(&self, origin: &Origin) -> Option<String> {
         match origin {
             Origin::CratesIo(lowercase_name) => Some(self.crates_io_crate_by_lowercase_name(lowercase_name)),
+            _ => None,
+        }
+    }
+
+    pub fn crates_io_crate_at_version(&self, origin: &Origin, version: &str) -> Option<String> {
+        match origin {
+            Origin::CratesIo(lowercase_name) => Some(format!("https://crates.io/crates/{}/{}", encode(lowercase_name), encode(version))),
             _ => None,
         }
     }

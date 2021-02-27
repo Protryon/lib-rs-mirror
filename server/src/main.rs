@@ -215,6 +215,7 @@ async fn run_server(rt: Handle) -> Result<(), failure::Error> {
             .route("/new", web::get().to(handle_new_trending))
             .route("/keywords/{keyword}", web::get().to(handle_keyword))
             .route("/crates/{crate}", web::get().to(handle_crate))
+            .route("/crates/{crate}/versions", web::get().to(handle_crate_all_versions))
             .route("/crates/{crate}/rev", web::get().to(handle_crate_reverse_dependencies))
             .route("/crates/{crate}/reverse_dependencies", web::get().to(handle_crate_reverse_dependencies_redir))
             .route("/crates/{crate}/crev", web::get().to(handle_crate_reviews))
@@ -576,6 +577,18 @@ async fn handle_crate(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     }).await?))
 }
 
+async fn handle_crate_all_versions(req: HttpRequest) -> Result<HttpResponse, ServerError> {
+    let crate_name = req.match_info().query("crate");
+    debug!("allver for {:?}", crate_name);
+    let state: &AServerState = req.app_data().expect("appdata");
+    let crates = state.crates.load();
+    let origin = match Origin::try_from_crates_io_name(&crate_name).filter(|o| crates.crate_exists(o)) {
+        Some(o) => o,
+        None => return render_404_page(state, &crate_name, "crate").await,
+    };
+    Ok(serve_cached(render_crate_all_versions(state.clone(), origin).await?))
+}
+
 async fn handle_crate_reverse_dependencies(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let crate_name = req.match_info().query("crate");
     debug!("rev deps for {:?}", crate_name);
@@ -719,6 +732,19 @@ fn render_crate_page(state: AServerState, origin: Origin) -> impl Future<Output 
         mark_server_still_alive(&state);
         Ok::<_, failure::Error>((page, last_mod))
     })
+}
+
+async fn render_crate_all_versions(state: AServerState, origin: Origin) -> Result<Rendered, failure::Error> {
+    let s = state.clone();
+    rt_run_timeout(&s.rt, "allver", 60, async move {
+        let crates = state.crates.load();
+        let (all, ver) = futures::try_join!(crates.rich_crate_async(&origin), crates.rich_crate_version_async(&origin))?;
+        let mut page: Vec<u8> = Vec::with_capacity(60000);
+        front_end::render_all_versions_page(&mut page, &all, &ver, &crates).await?;
+        minify_html(&mut page);
+        mark_server_still_alive(&state);
+        Ok::<_, failure::Error>(Rendered {page, cache_time: 3*24*3600, refresh: false, last_modified: None})
+    }).await
 }
 
 async fn render_crate_reverse_dependencies(state: AServerState, origin: Origin) -> Result<Rendered, failure::Error> {

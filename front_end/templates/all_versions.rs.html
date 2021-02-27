@@ -1,0 +1,105 @@
+@use crate::templates::base;
+@use crate::all_versions::AllVersions;
+@use crate::Urler;
+
+@(url: &Urler, c: &AllVersions)
+
+@:base(&c.page(), {
+  <header id="package" @if c.all.is_yanked() {class="yanked"}>
+    <div class="inner-col">
+    <div class="breadcrumbs">
+    <h1>
+      <a href="/"><span>Lib</span>.rs</a>
+    </h1>
+     › <a href="@url.crate_by_origin(c.all.origin())" rel="up">@c.capitalized_name</a>
+     › Versions
+    </div>
+    <nav><ul>
+      <li><a href="@url.crate_by_origin(c.all.origin())">Latest version</a></li>
+      <li class=active>All Versions</li>
+      @if let Some(url) = &c.changelog_url {
+        <li><a href="@url">Changelog</a></li>
+      }
+      @if let Some(url) = url.reverse_deps(c.all.origin()) {
+        <li><a href="@url">Reverse dependencies</a></li>
+      }
+    </ul></nav>
+    </div>
+  </header>
+  <main>
+    <div class="inner-col">
+      <table class="all-versions">
+        <tr><th class="ver">Version</th><th class="date">Release date</th>
+          @if c.has_deps_changes {
+            <th class="deps">Dependency changes</th>
+          }
+          @if c.has_feat_changes {
+            <th>Features</th>
+          }
+          <th class="dl">Downloads/<abbr title="month">mo</abbr></th></tr>
+      @for v in c.version_history.iter().rev() {
+        <tr class="@if v.yanked {yanked} @if v.is_semver_major_change {break}">
+          <th class="ver">
+            @if !v.yanked {
+              @if let Some(url) = url.crates_io_crate_at_version(c.all.origin(), &v.version.to_string()) {
+                <a href="@url">@v.version</a>
+              } else {
+                @v.version
+              }
+            } else {
+              <del>@v.version</del>
+            }
+          </th>
+          <td class="date">@v.release_date</td>
+          @if c.has_deps_changes {
+          <td class="deps">
+            @if !v.deps_added.is_empty() || !v.deps_upgraded.is_empty() || !v.deps_removed.is_empty() {
+              <ul>
+                @for dep in &v.deps_added {
+                  <li class="add"><ins>@dep</ins></li>
+                }
+                @for (dep,ver) in &v.deps_upgraded {
+                  <li class="up">@dep <ins>@ver</ins></li>
+                }
+                @for dep in &v.deps_removed {
+                  <li class="rm"><del>@dep</del></li>
+                }
+              </ul>
+            }
+          </td>
+          }
+          @if c.has_feat_changes {
+          <td class="feat">
+            @if !v.feat_added.is_empty() || !v.feat_removed.is_empty() {
+              <ul>
+                @for f in &v.feat_added {
+                  <li class="add"><ins>@f</ins></li>
+                }
+                @for f in &v.feat_removed {
+                  <li class="rm"><del>@f</del></li>
+                }
+              </ul>
+            }
+          </td>
+          }
+          <td class="dl">
+            @if v.dl.num >= 100 || v.dl.perc > 0.0125 {
+              @if v.dl.perc > 0.0125 {
+                <span style="width:@v.dl.perc%">@if v.dl.perc > v.dl.num_width {@v.dl.str.0<b>@v.dl.str.1</b>}</span>
+              }
+              @if v.dl.perc <= 0.0125 || v.dl.perc <= v.dl.num_width {@v.dl.str.0<b>@v.dl.str.1</b>}
+            }
+          </td>
+          </td>
+        </tr>
+      }
+      </table>
+    </div>
+  </main>
+
+  <footer>
+    <div class="inner-col">
+        <p>Back to <a href="@url.crate_by_origin(c.all.origin())" rel="up">@c.capitalized_name</a>.</p>
+    </div>
+  </footer>
+})

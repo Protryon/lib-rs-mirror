@@ -68,11 +68,11 @@ pub struct CratePage<'a> {
     api_reference_url: Option<String>,
     former_glory: Option<(f64, u32)>,
     dependents_stats: Option<&'a RevDependencies>,
-    changelog_url: Option<String>,
     related_crates: Option<Vec<Origin>>,
     keywords_populated: Vec<(String, bool)>,
     parent_crate: Option<ArcRichCrateVersion>,
     downloads_per_month_or_equivalent: Option<usize>,
+    pub(crate) top_versions: Vec<VersionGroup<'a>>,
     pub has_reviews: bool,
 }
 
@@ -115,10 +115,9 @@ pub(crate) struct Contributors<'a> {
 
 impl<'a> CratePage<'a> {
     pub async fn new(all: &'a RichCrate, ver: &'a RichCrateVersion, kitchen_sink: &'a KitchenSink, markup: &'a Renderer) -> CResult<CratePage<'a>> {
-        let (top_category, parent_crate, changelog_url, keywords_populated, (related_crates, downloads_per_month_or_equivalent)) = futures::join!(
+        let (top_category, parent_crate, keywords_populated, (related_crates, downloads_per_month_or_equivalent)) = futures::join!(
             kitchen_sink.top_category(ver),
             kitchen_sink.parent_crate(ver),
-            kitchen_sink.changelog_url(ver),
             kitchen_sink.keywords_populated(ver),
             async {
                 let downloads_per_month_or_equivalent = kitchen_sink.downloads_per_month_or_equivalent(ver.origin()).await.ok().and_then(|x| x);
@@ -170,13 +169,14 @@ impl<'a> CratePage<'a> {
             api_reference_url,
             former_glory,
             dependents_stats,
-            changelog_url,
             related_crates,
             keywords_populated,
             parent_crate,
             downloads_per_month_or_equivalent,
             has_reviews,
+            top_versions: Vec::new(),
         };
+        page.top_versions = page.make_top_versions();
         let (sizes, lang_stats, viral_license) = page.crate_size_and_viral_license(deps?).await?;
         page.sizes = Some(sizes);
         page.viral_license = viral_license;
@@ -235,10 +235,6 @@ impl<'a> CratePage<'a> {
         } else {
             format!("{} — {}", name_capital, kind)
         }
-    }
-
-    pub fn changelog_url(&self) -> Option<&str> {
-        self.changelog_url.as_deref()
     }
 
     pub fn is_build_or_dev(&self) -> (bool, bool) {
@@ -485,15 +481,6 @@ impl<'a> CratePage<'a> {
         reqstr.to_string()
     }
 
-    pub fn top_versions(&self) -> impl Iterator<Item = VersionGroup<'a>> {
-        let mut top = self.make_top_versions(self.all_versions());
-        if top.len() > 5 {
-            top.swap_remove(4); // move last to 5th pos, so that first release is always seen
-            top.truncate(5);
-        }
-        top.into_iter()
-    }
-
     pub fn is_version_new(&self, ver: &Version<'_>, nth: usize) -> bool {
         nth == 0 /*latest*/ && ver.created_at.with_timezone(&Utc) > Utc::now() - Duration::weeks(1)
     }
@@ -529,8 +516,8 @@ impl<'a> CratePage<'a> {
         grouped
     }
 
-    fn make_top_versions<I>(&self, all: I) -> Vec<VersionGroup<'a>>
-    where I: Iterator<Item = Version<'a>> {
+    fn make_top_versions(&self) -> Vec<VersionGroup<'a>> {
+        let all = self.all_versions();
         let grouped1 = Self::group_versions(
             0,
             all.map(|ver| {
@@ -568,11 +555,16 @@ impl<'a> CratePage<'a> {
             grouped1
         };
 
-        if grouped2.len() > 8 {
+        let mut top = if grouped2.len() > 8 {
             Self::group_versions(2, grouped2.into_iter().map(|v| ((v.ver.created_at.year(), v.ver.created_at.month() / 4, v.ver.semver.major), v)))
         } else {
             grouped2
+        };
+        if top.len() > 5 {
+            top.swap_remove(4); // move last to 5th pos, so that first release is always seen
+            top.truncate(5);
         }
+        top
     }
 
     /// String describing how often breaking changes are made

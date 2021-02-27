@@ -154,8 +154,8 @@
             <section id="versions">
               @if let Some(parts) = c.version_stats_summary() {
                 <h3>
-                  @if let Some(url) = c.changelog_url() {
-                    <a href="@url">@parts.0</a>
+                  @if c.top_versions.len() > 1 {
+                    <a href="@url.all_versions(c.ver.origin())">@parts.0</a>
                   } else {
                     @parts.0
                   }
@@ -166,7 +166,7 @@
                 <p class="edition-2018">Uses old Rust 2015</p>
               }
               <table>
-                @for (i,gr) in c.top_versions().enumerate() {
+                @for (i,gr) in c.top_versions.iter().enumerate() {
                   <tr><th content="@gr.ver.num" property="@if i == 0 {softwareVersion}">
                     @if c.is_version_new(&gr.ver, i) {
                       <span class=new vocab="" property="">new</span>

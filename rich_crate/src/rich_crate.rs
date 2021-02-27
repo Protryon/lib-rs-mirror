@@ -44,6 +44,10 @@ impl RichCrate {
     pub fn versions(&self) -> &[CrateVersion] {
         &self.versions
     }
+
+    pub fn is_yanked(&self) -> bool {
+        self.versions.iter().all(|v| v.yanked)
+    }
 }
 
 /// Rev dependencies added/removed given month

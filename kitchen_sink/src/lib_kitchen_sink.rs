@@ -122,7 +122,7 @@ pub enum Warning {
 pub enum KitchenSinkErr {
     #[fail(display = "git checkout meh")]
     GitCheckoutFailed,
-    #[fail(display = "category not found: {}", _0)]
+    #[fail(display = "category count not found in crates db: {}", _0)]
     CategoryNotFound(String),
     #[fail(display = "category query failed")]
     CategoryQueryFailed,
@@ -1112,7 +1112,7 @@ impl KitchenSink {
         let eq = |a: &str, b: &str| -> bool { a.eq_ignore_ascii_case(b) };
 
         for cat in &mut package.categories {
-            if cat.as_bytes().iter().any(|c| !c.is_ascii_lowercase()) {
+            if cat.as_bytes().iter().any(|c| c.is_ascii_uppercase()) {
                 *cat = cat.to_lowercase();
             }
             if cat == "development-tools" || (cat == "command-line-utilities" && has_cargo_bin) {

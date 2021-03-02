@@ -441,11 +441,14 @@ impl KitchenSink {
     }
 
     // Monthly downloads, sampled from last few days or weeks
-    pub async fn recent_downloads_by_version(&self, k: &RichCrateVersion) -> CResult<HashMap<MiniVer, u32>> {
+    pub async fn recent_downloads_by_version(&self, origin: &Origin) -> CResult<HashMap<MiniVer, u32>> {
 
         let now = Utc::today();
         let curr_year = now.year() as u16;
-        let curr_year_data = self.yearly.get_crate_year(k.name(), curr_year)?.unwrap_or_default();
+        let curr_year_data = match origin {
+            Origin::CratesIo(name) => self.yearly.get_crate_year(name, curr_year)?.unwrap_or_default(),
+            _ => return Ok(HashMap::new()),
+        };
 
         let mut out = HashMap::new();
         let mut total = 0;
@@ -469,7 +472,7 @@ impl KitchenSink {
         }
 
         // normalize data sample to be proportional to montly downloads
-        let actual_downloads_per_month = self.downloads_per_month(k.origin()).await?.unwrap_or(total as usize * 30 / days as usize);
+        let actual_downloads_per_month = self.downloads_per_month(origin).await?.unwrap_or(total as usize * 30 / days as usize);
         Ok(out.into_iter().map(|(k,v)|
             (k.clone(), (v as usize * actual_downloads_per_month / total as usize) as u32)
         ).collect())
@@ -1345,9 +1348,7 @@ impl KitchenSink {
             Origin::CratesIo(name) => {
                 self.index.all_dependencies_flattened(self.index.crates_io_crate_by_lowercase_name(name).map_err(KitchenSinkErr::Deps)?).map_err(KitchenSinkErr::Deps)
             },
-            _ => {
-                self.index.all_dependencies_flattened(krate).map_err(KitchenSinkErr::Deps)
-            }
+            _ => self.index.all_dependencies_flattened(krate).map_err(KitchenSinkErr::Deps),
         }
     }
 

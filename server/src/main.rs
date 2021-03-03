@@ -62,6 +62,7 @@ fn main() {
     b.filter_module("html5ever", log::LevelFilter::Error);
     b.filter_module("tokei", log::LevelFilter::Error);
     b.filter_module("hyper", log::LevelFilter::Warn);
+    b.filter_module("tantivy", log::LevelFilter::Error);
     if cfg!(debug_assertions) {
         b.filter_level(log::LevelFilter::Debug);
     }

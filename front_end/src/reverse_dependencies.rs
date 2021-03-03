@@ -23,9 +23,17 @@ pub struct CratePageRevDeps<'a> {
     changes: Vec<DependerChangesMonthly>,
 }
 
+#[derive(Debug, Default)]
+pub(crate) struct DownloadsBar {
+    pub num: u32,
+    pub str: (String, &'static str),
+    pub perc: f32,
+    pub num_width: f32,
+}
+
 pub struct RevDepInf<'a> {
     pub origin: Origin,
-    pub downloads: usize,
+    pub downloads: u32,
     pub depender: &'a kitchen_sink::Version,
     pub is_optional: bool,
     pub matches_latest: bool,
@@ -34,16 +42,14 @@ pub struct RevDepInf<'a> {
     pub rev_dep_count: u32,
 }
 
-pub struct DlRow {
+pub(crate) struct DlRow {
     pub ver: SemVer,
     pub num: u16,
     pub num_str: String,
     pub perc: f32,
     pub num_width: f32,
-    pub dl: u32,
-    pub dl_str: (String, &'static str),
-    pub dl_perc: f32,
-    pub dl_num_width: f32,
+
+    pub dl: DownloadsBar,
 }
 
 pub struct ChangesEntry {
@@ -74,7 +80,7 @@ impl<'a> CratePageRevDeps<'a> {
         let mut deps: Vec<_> = match stats {
             Some(s) => futures::future::join_all(s.rev_dep_names.iter().map(|rev_dep| async move {
                 let origin = Origin::from_crates_io_name(rev_dep);
-                let downloads = kitchen_sink.downloads_per_month(&origin).await.ok().and_then(|x| x).unwrap_or(0);
+                let downloads = kitchen_sink.downloads_per_month(&origin).await.ok().and_then(|x| x).unwrap_or(0) as u32;
                 let depender = kitchen_sink.index.crate_highest_version(&rev_dep.to_ascii_lowercase(), true).expect("rev dep integrity");
                 let (is_optional, req, kind) = depender.dependencies().iter().find(|d| {
                     own_name.eq_ignore_ascii_case(d.crate_name())
@@ -132,15 +138,8 @@ impl<'a> CratePageRevDeps<'a> {
     /// Nicely rounded number of downloads
     ///
     /// To show that these numbers are just approximate.
-    pub fn downloads(&self, num: usize) -> (String, &'static str) {
-        match num {
-            a @ 0..=99 => (format!("{}", a), ""),
-            a @ 0..=500 => (format!("{}", a / 10 * 10), ""),
-            a @ 0..=999 => (format!("{}", a / 50 * 50), ""),
-            a @ 0..=9999 => (format!("{}.{}", a / 1000, a % 1000 / 100), "K"),
-            a @ 0..=999_999 => (format!("{}", a / 1000), "K"),
-            a => (format!("{}.{}", a / 1_000_000, a % 1_000_000 / 100_000), "M"),
-        }
+    pub fn downloads(&self, num: u32) -> (String, &'static str) {
+        crate::format_downloads(num as _)
     }
 
     pub fn format_number(&self, num: impl Display) -> String {
@@ -148,7 +147,7 @@ impl<'a> CratePageRevDeps<'a> {
     }
 
     // version, deps, normalized popularity 0..100
-    pub fn version_breakdown(&self) -> Vec<DlRow> {
+    pub(crate) fn version_breakdown(&self) -> Vec<DlRow> {
         let stats = match self.stats {
             None => return Vec::new(),
             Some(s) => s,
@@ -160,11 +159,8 @@ impl<'a> CratePageRevDeps<'a> {
                 num: *v,
                 perc: 0.,
                 num_width: 0.,
-                dl: 0,
-                dl_perc: 0.,
-                dl_num_width: 0.,
                 num_str: String::new(),
-                dl_str: (String::new(),""),
+                dl: DownloadsBar::default(),
             }
         }).collect();
 
@@ -176,11 +172,8 @@ impl<'a> CratePageRevDeps<'a> {
                 num: 0,
                 perc: 0.,
                 num_width: 0.,
-                dl: 0,
-                dl_perc: 0.,
-                dl_num_width: 0.,
                 num_str: String::new(),
-                dl_str: (String::new(), ""),
+                dl: DownloadsBar::default(),
             });
         }
 
@@ -193,11 +186,8 @@ impl<'a> CratePageRevDeps<'a> {
                     num: 0,
                     perc: 0.,
                     num_width: 0.,
-                    dl: 0,
-                    dl_perc: 0.,
-                    dl_num_width: 0.,
                     num_str: String::new(),
-                    dl_str: (String::new(), ""),
+                    dl: DownloadsBar::default(),
                 });
             }
         }
@@ -217,19 +207,19 @@ impl<'a> CratePageRevDeps<'a> {
                 }
                 dl_vers.next();
             }
-            curr.dl = sum;
+            curr.dl.num = sum;
         }
 
         let max = ver.iter().map(|v| v.num).max().unwrap_or(1) as f32;
-        let dl_max = ver.iter().map(|v| v.dl).max().unwrap_or(1) as f32;
+        let dl_max = ver.iter().map(|v| v.dl.num).max().unwrap_or(1) as f32;
         for i in ver.iter_mut() {
             i.perc = i.num as f32 / max * 100.0;
             i.num_str = self.format_number(i.num);
             i.num_width = 4. + 7. * i.num_str.len() as f32; // approx visual width of the number
 
-            i.dl_perc = i.dl as f32 / dl_max * 100.0;
-            i.dl_str = self.downloads(i.dl as usize);
-            i.dl_num_width = 4. + 7. * (i.dl_str.0.len() + i.dl_str.1.len()) as f32; // approx visual width of the number
+            i.dl.perc = i.dl.num as f32 / dl_max * 100.0;
+            i.dl.str = self.downloads(i.dl.num as u32);
+            i.dl.num_width = 4. + 7. * (i.dl.str.0.len() + i.dl.str.1.len()) as f32; // approx visual width of the number
         }
         ver
     }

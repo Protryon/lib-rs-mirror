@@ -74,11 +74,12 @@
                 <td class="rv">@if x.num == 0 || x.perc <= x.num_width {@x.num_str} @if x.num > 0 {<span style="width:@x.perc%">@if x.perc > x.num_width {@x.num_str}</span>}</td>
                 <th>@x.ver</th>
                 <td class="dl">
-                  @if x.dl > 0 {
-                    <span style="width:@x.dl_perc%">@if x.dl_perc > x.dl_num_width {@x.dl_str.0<b>@x.dl_str.1</b>}</span>
+                  @if x.dl.num > 0 {
+                    <span style="width:@x.dl.perc%">@if x.dl.perc > x.dl.num_width {@x.dl.str.0<b>@x.dl.str.1</b>}</span>
                   }
-                  @if x.dl == 0 || x.dl_perc <= x.dl_num_width {@x.dl_str.0<b>@x.dl_str.1</b>}
+                  @if x.dl.num == 0 || x.dl.perc <= x.dl.num_width {@x.dl.str.0<b>@x.dl.str.1</b>}
                 </td>
+              </tr>
             }
           </table>
         }

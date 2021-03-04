@@ -184,7 +184,8 @@ impl<'a> AllVersions<'a> {
             }
         }).collect();
 
-        let dl_max = version_history.iter().map(|v| v.dl.num).max().unwrap_or(0).max(1) as f32;
+        // make max artificially higher, so that small number of downloads looks small
+        let dl_max = version_history.iter().map(|v| v.dl.num).max().unwrap_or(0).max(100) as f32 + 100.0;
         for i in &mut version_history {
             i.dl.perc = i.dl.num as f32 / dl_max * 100.0;
             i.dl.str = crate::format_downloads(i.dl.num);

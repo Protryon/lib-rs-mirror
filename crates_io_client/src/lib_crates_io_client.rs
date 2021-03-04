@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::path::PathBuf;
 use std::sync::Arc;
 pub use simple_cache::Error;
@@ -54,7 +55,7 @@ impl CratesIoClient {
     }
 
     pub async fn crate_data(&self, crate_name: &str, version: &str) -> Result<Vec<u8>, Error> {
-        let tarball_path = self.tarballs_path.join(format!("{}/{}", crate_name, version));
+        let tarball_path = self.tarballs_path.join(format!("{}/{}.crate", fs_safe(crate_name), fs_safe(version)));
         if let Ok(data) = std::fs::read(&tarball_path) {
             return Ok(data);
         }
@@ -119,6 +120,14 @@ impl CratesIoClient {
             Some((key.1.to_string(), raw.to()))
         })).await?;
         Ok(res.map(|(_, res)| B::from(res)))
+    }
+}
+
+fn fs_safe(name: &str) -> Cow<str> {
+    if name.as_bytes().iter().all(|&c| c >= b' ' && c != b'/' && c != b'\\' && c < 0x7f) {
+        return name.into();
+    } else {
+        name.as_bytes().iter().map(|b| format!("{:02x}", b)).collect::<String>().into()
     }
 }
 

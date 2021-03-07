@@ -46,14 +46,16 @@ impl<'a> AuthorPage<'a> {
 
         let rustacean = kitchen_sink.rustacean_for_github_login(&aut.github.login);
 
-        let orgs = kitchen_sink.user_github_orgs(&aut.github.login).await?.unwrap_or_default();
-        let orgs = futures::stream::iter(orgs).filter_map(|org| async move {
+        let (rows, orgs) = futures::try_join!(
+            kitchen_sink.crates_of_author(aut),
+            kitchen_sink.user_github_orgs(&aut.github.login),
+        )?;
+        let orgs = futures::stream::iter(orgs.unwrap_or_default()).filter_map(|org| async move {
             kitchen_sink.github_org(&org.login).await
                 .map_err(|e| eprintln!("org: {} {}", &org.login, e))
                 .ok().and_then(|x| x)
         })
         .collect().await;
-        let rows = kitchen_sink.crates_of_author(aut).await?;
         let joined = rows.iter().filter_map(|row| row.invited_at).min();
 
         let (mut founder, mut member): (Vec<_>, Vec<_>) = rows.into_iter().partition(|c| c.invited_by_github_id.is_none());
@@ -65,8 +67,10 @@ impl<'a> AuthorPage<'a> {
         member.sort_by(|a, b| b.crate_ranking.partial_cmp(&a.crate_ranking).unwrap_or(Ordering::Equal));
         member.truncate(200);
 
-        let founder_crates = Self::look_up(kitchen_sink, founder).await;
-        let member_crates = Self::look_up(kitchen_sink, member).await;
+        let (founder_crates, member_crates) = futures::join!(
+            Self::look_up(kitchen_sink, founder),
+            Self::look_up(kitchen_sink, member),
+        );
 
         // Most common keywords
         let mut keywords = HashMap::new();
@@ -122,7 +126,7 @@ impl<'a> AuthorPage<'a> {
 
     async fn look_up(kitchen_sink: &KitchenSink, rows: Vec<CrateOwnerRow>) -> Vec<(ArcRichCrateVersion, u32, CrateOwnerRow, Vec<OtherOwner>)> {
         futures::stream::iter(rows.into_iter())
-            .filter_map(|row| async move {
+            .map(|row| async move {
                 let c = kitchen_sink.rich_crate_version_async(&row.origin).await.map_err(|e| eprintln!("{}", e)).ok()?;
                 let dl = kitchen_sink.downloads_per_month(&row.origin).await.map_err(|e| eprintln!("{}", e)).ok()?.unwrap_or(0) as u32;
                 let owners = kitchen_sink.crate_owners(&row.origin).await.map_err(|e| eprintln!("o: {}", e)).ok()?.into_iter().filter_map(|o| {
@@ -136,6 +140,8 @@ impl<'a> AuthorPage<'a> {
                 }).collect();
                 Some((c, dl, row, owners))
             })
+            .buffered(8)
+            .filter_map(|f| async move {f})
             .collect().await
     }
 

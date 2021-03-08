@@ -1,14 +1,14 @@
 #![allow(unused_imports)]
-use crate::Page;
+use categories::CATEGORIES;
 use categories::Category;
 use categories::CategoryMap;
-use categories::CATEGORIES;
+use crate::Page;
 use failure;
 use futures::prelude::*;
-use kitchen_sink::stopped;
 use kitchen_sink::ArcRichCrateVersion;
 use kitchen_sink::CrateAuthor;
 use kitchen_sink::KitchenSink;
+use kitchen_sink::stopped;
 use locale::Numeric;
 use rich_crate::Origin;
 use rich_crate::RichCrate;
@@ -19,7 +19,9 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::time::Instant;
 use tokio::time::timeout;
+use tokio::time::timeout_at;
 
 /// Editorialize the category list a little
 const CATEGORY_RANK_ADJUST: [(&str, f64); 28] = [
@@ -92,6 +94,7 @@ impl<'a> HomePage<'a> {
 
     /// Add most recently updated crates to the list of top crates in each category
     fn add_updated_to_all_categories<'z, 's: 'z>(&'s self, cats: &'z mut [HomeCategory], seen: &'z mut HashSet<Origin>) -> std::pin::Pin<Box<dyn 'z + Send + Future<Output=()>>> {
+        let deadline = Instant::now() + Duration::from_secs(5);
         Box::pin(async move {
         // it's not the same order as before, but that's fine, it adds more variety
         for cat in cats {
@@ -105,7 +108,7 @@ impl<'a> HomePage<'a> {
             let mut text_length = cat.top.iter().map(|c| c.short_name().len() as u32 + 1).sum::<u32>();
             for c in recently_updated.expect("recently_updated_crates_in_category") {
                 if seen.insert(c.clone()) {
-                    if let Ok(Ok(c)) = timeout(Duration::from_secs(5), self.crates.rich_crate_version_async(&c)).await {
+                    if let Ok(Ok(c)) = timeout_at(deadline, self.crates.rich_crate_version_async(&c)).await {
                         text_length += c.short_name().len() as u32 + 1;
                         cat.top.push(c);
                         if text_length >= 140 {
@@ -120,6 +123,7 @@ impl<'a> HomePage<'a> {
     /// A crate can be in multiple categories, so `seen` ensures every crate is shown only once
     /// across all categories.
     fn make_all_categories<'z, 's: 'z>(&'s self, root: &'static CategoryMap, seen: &'z mut HashSet<Origin>) -> std::pin::Pin<Box<dyn 'z + Send + Future<Output=Vec<HomeCategory>>>> {
+        let deadline = Instant::now() + Duration::from_secs(24);
         Box::pin(async move {
             if root.is_empty() {
                 return Vec::new();
@@ -171,7 +175,7 @@ impl<'a> HomePage<'a> {
                     top.into_iter()
                     .filter(|c| seen.insert(c.clone()))
                     .map(|c| async move {
-                        Ok::<_, failure::Error>(timeout(Duration::from_secs(29), self.crates.rich_crate_version_async(&c)).await??)
+                        Ok::<_, failure::Error>(timeout_at(deadline, self.crates.rich_crate_version_async(&c)).await??)
                     })).await;
 
                 for c in top_resolved {

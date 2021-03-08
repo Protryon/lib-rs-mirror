@@ -7,6 +7,7 @@ extern crate serde_derive;
 extern crate log;
 
 mod yearly;
+use tokio::time::Instant;
 use futures::FutureExt;
 pub use crate::yearly::*;
 pub use deps_index::*;
@@ -2331,7 +2332,7 @@ impl KitchenSink {
                 } else {
                     self.crate_db.top_crates_in_category_partially_ranked(slug, wanted_num + 50).await?
                 };
-                let _ = timeout("dupes", 10, self.knock_duplicates(&mut crates).map(|_| Ok::<_, KitchenSinkErr>(()))).await;
+                let _ = watch("dupes", self.knock_duplicates(&mut crates)).await;
                 let crates: Vec<_> = crates.into_iter().map(|(o, _)| o).take(wanted_num as usize).collect();
                 Ok::<_, failure::Error>(Arc::new(crates))
             }).await
@@ -2341,9 +2342,10 @@ impl KitchenSink {
 
     /// To make categories more varied, lower score of crates by same authors, with same keywords
     async fn knock_duplicates(&self, crates: &mut Vec<(Origin, f64)>) {
+        let deadline = Instant::now() + Duration::from_secs(4);
         let with_owners = futures::stream::iter(crates.drain(..))
         .map(|(o, score)| async move {
-            let get_crate = tokio::time::timeout(Duration::from_secs(1), self.rich_crate_version_stale_is_ok(&o));
+            let get_crate = tokio::time::timeout_at(deadline, self.rich_crate_version_stale_is_ok(&o));
             let (k, owners) = futures::join!(get_crate, self.crate_owners(&o, false));
             let keywords = match k {
                 Ok(Ok(c)) => {

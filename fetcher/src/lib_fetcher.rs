@@ -1,4 +1,5 @@
 use tokio::time::error::Elapsed;
+use tokio::time::timeout;
 use std::time::Duration;
 
 #[derive(Debug)]
@@ -42,16 +43,16 @@ impl Fetcher {
             },
             Err(_) => {
                 log::info!("REQ (waiting up to {}s) {}", self.sem_timeout, url);
-                let s = tokio::time::timeout(Duration::from_secs(self.sem_timeout.into()), self.sem.acquire()).await?.expect("reqsem");
+                let s = timeout(Duration::from_secs(self.sem_timeout.into()), self.sem.acquire()).await?.expect("reqsem");
                 log::debug!("REQ now starts {}", url);
                 s
             },
         };
 
-        let res = tokio::time::timeout(Duration::from_secs(20), self.client.get(url)
+        let res = timeout(Duration::from_secs(20), self.client.get(url)
             .header(reqwest::header::USER_AGENT, "lib.rs/1.1")
             .send()).await??
             .error_for_status()?;
-        Ok(tokio::time::timeout(Duration::from_secs(60), res.bytes()).await??.to_vec())
+        Ok(timeout(Duration::from_secs(60), res.bytes()).await??.to_vec())
     }
 }

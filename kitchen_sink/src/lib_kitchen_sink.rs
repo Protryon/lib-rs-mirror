@@ -7,6 +7,7 @@ extern crate serde_derive;
 extern crate log;
 
 mod yearly;
+use futures::FutureExt;
 pub use crate::yearly::*;
 pub use deps_index::*;
 use tokio::task::spawn_blocking;
@@ -87,7 +88,6 @@ use std::pin::Pin;
 use std::sync::Mutex;
 use std::time::Duration;
 use std::time::SystemTime;
-use tokio::time::timeout;
 use triomphe::Arc;
 
 pub type ArcRichCrateVersion = Arc<RichCrateVersion>;
@@ -152,6 +152,8 @@ pub enum KitchenSinkErr {
     DepsNotAvailable,
     #[fail(display = "Crate data timeout")]
     DataTimedOut,
+    #[fail(display = "{} timed out after {}s", _0, _1)]
+    TimedOut(&'static str, u16),
     #[fail(display = "Crate derived cache timeout")]
     DerivedDataTimedOut,
     #[fail(display = "Missing github login for crate owner")]
@@ -730,7 +732,7 @@ impl KitchenSink {
             self.index.crates_io_crate_by_lowercase_name(name).context("rich_crate")
         })?;
         let latest_in_index = krate.latest_version().version(); // most recently published version
-        let meta = self.crates_io.crate_meta(name, latest_in_index).await
+        let meta = timeout("meta request", 10, self.crates_io.crate_meta(name, latest_in_index).map(|r| r.map_err(CError::from))).await
             .with_context(|_| format!("crates.io meta for {} {}", name, latest_in_index))?;
         let mut meta = meta.ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?;
         if !meta.versions.iter().any(|v| v.num == latest_in_index) {
@@ -768,7 +770,7 @@ impl KitchenSink {
         }
         trace!("rich_crate_version_async MISS {:?}", origin);
 
-        let mut maybe_data = timeout(Duration::from_secs(3), self.crate_db.rich_crate_version_data(origin))
+        let mut maybe_data = tokio::time::timeout(Duration::from_secs(3), self.crate_db.rich_crate_version_data(origin))
             .await.map_err(|_| {
                 warn!("db data fetch for {:?} timed out", origin);
                 KitchenSinkErr::DerivedDataTimedOut
@@ -796,21 +798,10 @@ impl KitchenSink {
                     return Err(e);
                 }
                 debug!("Getting/indexing {:?}: {}", origin, e);
-                let _th = timeout(Duration::from_secs(30), self.auto_indexing_throttle.acquire()).await?;
-                let reindex = timeout(Duration::from_secs(60), self.index_crate_highest_version(origin));
-                watch("reindex", reindex).await.map_err(|_| KitchenSinkErr::DataTimedOut)?.with_context(|_| format!("reindexing {:?}", origin))?; // Pin to lower stack usage
-                let get_data = timeout(Duration::from_secs(10), self.crate_db.rich_crate_version_data(origin));
-                match watch("get_data", get_data)
-                    .await
-                    .map_err(|_| {
-                        warn!("rich_crate_version_data timeout");
-                        KitchenSinkErr::DerivedDataTimedOut
-                    })
-                    .context("getting data after reindex")?
-                {
-                    Ok(v) => v,
-                    Err(e) => return Err(e),
-                }
+                let _th = timeout("autoindex", 30, self.auto_indexing_throttle.acquire().map(|e| e.map_err(CError::from))).await?;
+                let reindex = timeout("reindex", 60, self.index_crate_highest_version(origin));
+                watch("reindex", reindex).await.with_context(|_| format!("reindexing {:?}", origin))?; // Pin to lower stack usage
+                timeout("reindexed data", 10, self.crate_db.rich_crate_version_data(origin)).await?
             },
         };
 
@@ -845,7 +836,7 @@ impl KitchenSink {
         };
         let git_checkout_path = self.git_checkout_path.clone();
 
-        tokio::task::spawn(timeout(Duration::from_secs(600), async move {
+        tokio::task::spawn(timeout("checkout", 600, async move {
             let checkout = crate_git_checkout::checkout(&repo, &git_checkout_path)?;
             let (path_in_repo, tree_id, manifest) = crate_git_checkout::path_in_repo(&checkout, &package)?
                 .ok_or_else(|| {
@@ -867,7 +858,7 @@ impl KitchenSink {
             // Allowing any other URL would allow spoofing
             package.repository = Some(repo.canonical_git_url().into_owned());
             Ok::<_, CError>((meta, path_in_repo))
-        })).await?.map_err(|_| KitchenSinkErr::GitCheckoutFailed)?
+        })).await?
     }
 
     async fn rich_crate_version_from_repo(&self, origin: &Origin) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
@@ -1451,7 +1442,7 @@ impl KitchenSink {
     pub async fn top_category(&self, krate: &RichCrateVersion) -> Option<(u32, String)> {
         let crate_origin = krate.origin();
         let cats = join_all(krate.category_slugs().map(|slug| slug.into_owned()).map(|slug| async move {
-            let c = timeout(Duration::from_secs(6), self.top_crates_in_category(&slug)).await??;
+            let c = timeout("top category", 6, self.top_crates_in_category(&slug)).await?;
             Ok::<_, CError>((c, slug))
         })).await;
         cats.into_iter().filter_map(|cats| cats.ok()).filter_map(|(cat, slug)| {
@@ -1882,7 +1873,7 @@ impl KitchenSink {
                 // so pick one of them and track just that one version
                 let cachebust = self.cachebust_string_for_repo(crate_repo).await.context("contrib")?;
                 debug!("getting contributors for {:?}", repo);
-                let contributors = match timeout(Duration::from_secs(10), self.gh.contributors(repo, &cachebust)).await {
+                let contributors = match tokio::time::timeout(Duration::from_secs(10), self.gh.contributors(repo, &cachebust)).await {
                     Ok(c) => c.context("contributors")?.unwrap_or_default(),
                     Err(_timeout) => vec![],
                 };
@@ -2316,8 +2307,8 @@ impl KitchenSink {
     async fn knock_duplicates(&self, crates: &mut Vec<(Origin, f64)>) {
         let with_owners = futures::stream::iter(crates.drain(..))
         .map(|(o, score)| async move {
-            let get_crate = timeout(Duration::from_secs(1), self.rich_crate_version_stale_is_ok(&o));
             let (k, owners) = futures::join!(get_crate, self.crate_owners(&o));
+            let get_crate = tokio::time::timeout(Duration::from_secs(1), self.rich_crate_version_stale_is_ok(&o));
             let keywords = match k {
                 Ok(Ok(c)) => {
                     if c.is_yanked() {
@@ -2663,4 +2654,10 @@ fn is_alnum(q: &str) -> bool {
 #[inline(always)]
 fn watch<'a, T>(label: &'static str, f: impl Future<Output = T> + Send + 'a) -> Pin<Box<dyn Future<Output = T> + Send + 'a>> {
     Box::pin(NonBlock::new(label, f))
+}
+
+#[inline(always)]
+fn timeout<'a, T, E: From<KitchenSinkErr>>(label: &'static str, time: u16, f: impl Future<Output = Result<T, E>> + Send + 'a) -> Pin<Box<dyn Future<Output = Result<T, E>> + Send + 'a>> {
+    let f = tokio::time::timeout(Duration::from_secs(time.into()), f);
+    watch(label, f.map(move |r| r.map_err(|_| E::from(KitchenSinkErr::TimedOut(label, time))).and_then(|x| x)))
 }

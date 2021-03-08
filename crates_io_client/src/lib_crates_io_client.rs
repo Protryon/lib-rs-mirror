@@ -78,7 +78,7 @@ impl CratesIoClient {
     }
 
     pub async fn crate_meta(&self, crate_name: &str, as_of_version: &str) -> Result<Option<CrateMetaFile>, Error> {
-        self.get_json((crate_name, as_of_version), encode(crate_name)).await
+        self.get_json((as_of_version, crate_name), encode(crate_name)).await
     }
 
     pub async fn crate_owners(&self, crate_name: &str, as_of_version: &str) -> Result<Option<Vec<CrateOwner>>, Error> {
@@ -162,7 +162,7 @@ impl Payloadable for CrateTeamsFile {
 async fn cratesioclient() {
     let client = CratesIoClient::new(Path::new("../data")).expect("new");
 
-    client.crate_meta("capi", "0.0.1").await.expect("cargo-deb");
+    client.crate_meta("capi", "0.0.1").await.unwrap();
     let owners = client.crate_owners("cargo-deb", "1.10.0").await.expect("crate_owners").expect("found some");
     assert_eq!(3, owners.len(), "that will fail when metadata updates");
     CratesIoClient::new(Path::new("../data")).expect("new").cache_only(true).crate_data("fail404", "999").await.unwrap();

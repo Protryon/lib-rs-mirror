@@ -69,6 +69,24 @@ pub struct CrateMetaVersion {
     pub features: HashMap<String, Vec<String>>,
     pub yanked: bool,            // false,
     pub license: Option<String>, // "MIT",
+    #[serde(default)]
+    pub audit_actions: Vec<AuditAction>,
+
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CrateMetaUser {
+    pub id: usize, // crates-io ID, not GitHub
+    pub login: String,
+    pub name: Option<String>,
+    pub avatar: Option<String>, // leaks GitHub ID
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuditAction {
+    pub action: String,
+    pub user: CrateMetaUser,
+    pub time: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

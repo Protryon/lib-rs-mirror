@@ -29,14 +29,16 @@
   <main>
     <div class="inner-col">
       <table class="all-versions">
-        <tr><th class="ver">Version</th><th class="date">Release date</th>
+        <tr><th class="ver">Version</th><th class="date">Released</th><th>By</th>
           @if c.has_deps_changes {
             <th class="deps">Dependency changes</th>
           }
           @if c.has_feat_changes {
             <th>Features</th>
           }
-          <th class="dl">Downloads/<abbr title="month">mo</abbr></th></tr>
+          <th class="dl">Downloads/<abbr title="month">mo</abbr></th>
+          <th>Publisher</th>
+        </tr>
       @for v in c.version_history.iter().rev() {
         <tr class="@if v.yanked {yanked} @if v.is_semver_major_change {break}">
           <th class="ver">
@@ -50,7 +52,22 @@
               <del>@v.version</del>
             }
           </th>
-          <td class="date">@v.release_date</td>
+          <td class="date">
+            @if v.yanked { <del> }
+            @v.release_date
+            @if v.yanked { <del> }
+          </td>
+          <td>@if let Some((login, name)) = &v.published_by {
+              @if v.yanked && v.yanked_by != v.published_by { <del> }
+              <a href="@url.crates_io_user_by_github_login(login)">@name.as_deref().unwrap_or(login)</a>
+              @if v.yanked && v.yanked_by != v.published_by { </del> }
+            }
+            @if v.yanked && v.yanked_by != v.published_by {
+              @if let Some((login, name)) = &v.yanked_by {
+                <div class="yanked" title="yanked by"><a href="@url.crates_io_user_by_github_login(login)">@name.as_deref().unwrap_or(login)</a></div>
+              }
+            }
+          </td>
           @if c.has_deps_changes {
           <td class="deps">
             @if !v.deps_added.is_empty() || !v.deps_upgraded.is_empty() || !v.deps_removed.is_empty() {

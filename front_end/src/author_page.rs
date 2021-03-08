@@ -129,7 +129,7 @@ impl<'a> AuthorPage<'a> {
             .map(|row| async move {
                 let c = kitchen_sink.rich_crate_version_async(&row.origin).await.map_err(|e| eprintln!("{}", e)).ok()?;
                 let dl = kitchen_sink.downloads_per_month(&row.origin).await.map_err(|e| eprintln!("{}", e)).ok()?.unwrap_or(0) as u32;
-                let owners = kitchen_sink.crate_owners(&row.origin).await.map_err(|e| eprintln!("o: {}", e)).ok()?.into_iter().filter_map(|o| {
+                let owners = kitchen_sink.crate_owners(&row.origin, true).await.map_err(|e| eprintln!("o: {}", e)).ok()?.into_iter().filter_map(|o| {
                     Some(OtherOwner {
                         invited_at: o.invited_at()?,
                         github_id: o.github_id?,

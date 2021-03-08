@@ -5,6 +5,7 @@ use std::collections::HashSet;
 use crate::Page;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::KitchenSinkErr;
+use kitchen_sink::Origin;
 
 use rich_crate::{RichCrate, RichCrateVersion};
 use semver::Version as SemVer;
@@ -33,13 +34,31 @@ pub(crate) struct VerRow {
     pub feat_added: Vec<String>,
     pub feat_removed: Vec<String>,
     pub dl: DownloadsBar,
+    pub published_by: Option<(String, Option<String>)>,
+    pub yanked_by: Option<(String, Option<String>)>,
 }
 
 impl<'a> AllVersions<'a> {
     pub(crate) async fn new(all: &'a RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink) -> Result<AllVersions<'a>, KitchenSinkErr> {
-
-        let changelog_url = kitchen_sink.changelog_url(ver).await;
-        let downloads = kitchen_sink.recent_downloads_by_version(ver.origin()).await.map_err(|e| log::error!("d/l: {}", e)).unwrap_or_default();
+        let (changelog_url, downloads, release_meta) = futures::join!(
+            kitchen_sink.changelog_url(ver),
+            kitchen_sink.recent_downloads_by_version(ver.origin()),
+            async {
+                match all.origin() {
+                    Origin::CratesIo(name) => {
+                        kitchen_sink.crates_io_meta(name).await
+                            .map_err(|e| log::error!("{}", e))
+                            .map(|m| m.versions)
+                            .unwrap_or_default()
+                    },
+                    _ => Vec::new(),
+                }
+            }
+        );
+        let mut release_meta: HashMap<_, _> = release_meta.into_iter()
+            .map(|v| (v.num, v.audit_actions))
+            .collect();
+        let downloads = downloads.map_err(|e| log::error!("d/l: {}", e)).unwrap_or_default();
         let capitalized_name = ver.capitalized_name().to_string();
 
         let ver_dates = all.versions();
@@ -50,9 +69,10 @@ impl<'a> AllVersions<'a> {
             Err(e) => return Err(e),
         };
 
-        let mut combined_meta: Vec<(SemVer, _, _, _)> = ver.into_iter().filter_map(|version_meta| {
+        let mut combined_meta: Vec<_> = ver.into_iter().filter_map(|version_meta| {
             let num = version_meta.version();
-            let sem = num.parse().ok()?;
+            let sem: SemVer = num.parse().ok()?;
+            let audit = release_meta.remove(num)?;
             let release_date = DateTime::parse_from_rfc3339(&ver_dates.get(num)?.created_at)
                 .map_err(|e| log::error!("bad date {}: {}", all.name(), e)).ok()?;
 
@@ -78,14 +98,14 @@ impl<'a> AllVersions<'a> {
                 r_dep.insert(map_to_major(&actual_version), actual_version);
             }
 
-            Some((sem, version_meta, release_date, required_deps))
+            Some((sem, version_meta, release_date, required_deps, audit))
         }).collect();
         combined_meta.sort_by(|(a, ..), (b, ..)| a.cmp(b));
 
         let mut prev_required_deps = None::<HashMap<String, HashMap<_, _>>>;
         let mut prev_features = None::<HashSet<_>>;
         let mut prev_semver = None::<SemVer>;
-        let mut version_history: Vec<_> = combined_meta.into_iter().map(|(version, version_meta, release_date, required_deps)| {
+        let mut version_history: Vec<_> = combined_meta.into_iter().map(|(version, version_meta, release_date, required_deps, mut audit)| {
             let yanked = version_meta.is_yanked();
             let release_date = release_date.format("%b %e, %Y").to_string();
 
@@ -112,6 +132,14 @@ impl<'a> AllVersions<'a> {
             };
             prev_semver = Some(version.clone());
 
+            let yanked_by = if let Some(pos) = audit.iter().position(|a| a.action == "yank") {
+                Some(audit.remove(pos).user)
+            } else { None }.map(|u| (u.login, u.name));
+
+            let published_by = if let Some(pos) = audit.iter().position(|a| a.action == "publish") {
+                Some(audit.remove(pos).user)
+            } else { None }.map(|u| (u.login, u.name));
+
             if yanked {
                 // everything intentionally left empty, don't update prev deps, so
                 // that only stable compares with stable
@@ -127,6 +155,8 @@ impl<'a> AllVersions<'a> {
                     feat_added,
                     feat_removed,
                     dl,
+                    yanked_by,
+                    published_by,
                 }
             }
 
@@ -181,6 +211,8 @@ impl<'a> AllVersions<'a> {
                 feat_added,
                 feat_removed,
                 dl,
+                yanked_by,
+                published_by,
             }
         }).collect();
 

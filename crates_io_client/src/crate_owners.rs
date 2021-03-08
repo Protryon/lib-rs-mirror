@@ -36,6 +36,9 @@ pub struct CrateOwner {
 
     #[serde(default)]
     pub invited_by_github_id: Option<u32>,
+
+    #[serde(default)]
+    pub last_seen_at: Option<String>,
 }
 
 impl CrateOwner {

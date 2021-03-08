@@ -45,6 +45,10 @@ impl RichCrate {
         &self.versions
     }
 
+    pub fn most_recent_release_date_str(&self) -> &str {
+        self.versions.iter().map(|v| v.created_at.as_str()).max().unwrap()
+    }
+
     pub fn is_yanked(&self) -> bool {
         self.versions.iter().all(|v| v.yanked)
     }

@@ -274,6 +274,7 @@ fn process_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users:
                             avatar: None,
                             url: None,
                             kind: OwnerKind::User,
+                            last_seen_at: None,
                         }
                     },
                     1 => {
@@ -293,6 +294,7 @@ fn process_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users:
                             avatar: None,
                             url: None,
                             kind: OwnerKind::Team,
+                            last_seen_at: None,
                         }
                     },
                     _ => panic!("bad owner type"),

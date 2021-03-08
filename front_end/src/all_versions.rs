@@ -16,6 +16,7 @@ pub struct AllVersions<'a> {
     pub(crate) version_history: Vec<VerRow>,
     pub(crate) changelog_url: Option<String>,
     pub(crate) capitalized_name: String,
+    pub(crate) has_authors: bool,
     pub(crate) has_feat_changes: bool,
     pub(crate) has_deps_changes: bool,
 }
@@ -40,9 +41,10 @@ pub(crate) struct VerRow {
 
 impl<'a> AllVersions<'a> {
     pub(crate) async fn new(all: &'a RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink) -> Result<AllVersions<'a>, KitchenSinkErr> {
-        let (changelog_url, downloads, release_meta) = futures::join!(
+        let (changelog_url, downloads, all_owners, release_meta) = futures::join!(
             kitchen_sink.changelog_url(ver),
             kitchen_sink.recent_downloads_by_version(ver.origin()),
+            kitchen_sink.crate_owners(ver.origin(), true),
             async {
                 match all.origin() {
                     Origin::CratesIo(name) => {
@@ -55,6 +57,8 @@ impl<'a> AllVersions<'a> {
                 }
             }
         );
+        let mut all_owners = all_owners.unwrap_or_default();
+        let only_owner = if all_owners.len() == 1 { all_owners.pop() } else { None };
         let mut release_meta: HashMap<_, _> = release_meta.into_iter()
             .map(|v| (v.num, v.audit_actions))
             .collect();
@@ -216,6 +220,11 @@ impl<'a> AllVersions<'a> {
             }
         }).collect();
 
+        // Add license changes. Take from datadump to avoid tarballs?
+        // Add owner changes. Already have data based on dates.
+        // Add publishers. needs api scraping
+        // Add cargo audit and crev
+
         // make max artificially higher, so that small number of downloads looks small
         let dl_max = version_history.iter().map(|v| v.dl.num).max().unwrap_or(0).max(100) as f32 + 100.0;
         for i in &mut version_history {
@@ -224,7 +233,16 @@ impl<'a> AllVersions<'a> {
             i.dl.num_width = 4. + 7. * (i.dl.str.0.len() + i.dl.str.1.len()) as f32; // approx visual width of the number
         }
 
+        // don't show authors only if there's only one owner, and all publishes/yanks are by them
+        let has_authors = only_owner.map_or(true, |only_owner| {
+            version_history.iter()
+            .flat_map(|v| v.published_by.iter().map(|(l, _)| l).chain(v.yanked_by.iter().map(|(l, _)| l)))
+            .any(|login| login != &only_owner.login)
+        });
+
+
         Ok(Self {
+            has_authors,
             has_feat_changes: version_history.iter().any(|v| !v.feat_added.is_empty() || !v.feat_removed.is_empty()),
             has_deps_changes: version_history.iter().any(|v| !v.deps_added.is_empty() || !v.deps_removed.is_empty() || !v.deps_upgraded.is_empty()),
             changelog_url,

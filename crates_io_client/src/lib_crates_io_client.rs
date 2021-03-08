@@ -1,3 +1,5 @@
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 use std::borrow::Cow;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -20,6 +22,7 @@ pub use crate::crate_owners::*;
 pub struct CratesIoClient {
     fetcher: Arc<Fetcher>,
     cache: TempCacheJson<(String, Payload)>,
+    metacache: TempCacheJson<(String, CrateMetaFile)>,
     tarballs_path: PathBuf,
     readmes: SimpleCache,
 }
@@ -38,6 +41,7 @@ impl CratesIoClient {
         let fetcher = Arc::new(Fetcher::new(4));
         Ok(Self {
             cache: TempCacheJson::new(&cache_base_path.join("cratesio.bin"), fetcher.clone())?,
+            metacache: TempCacheJson::new(&cache_base_path.join("cratesiometa.bin"), fetcher.clone())?,
             readmes: SimpleCache::new(&cache_base_path.join("readmes.db"), fetcher.clone())?,
             tarballs_path: cache_base_path.join("tarballs"),
             fetcher,
@@ -46,10 +50,12 @@ impl CratesIoClient {
 
     pub fn cleanup(&self) {
         let _ = self.cache.save();
+        let _ = self.metacache.save();
     }
 
     pub fn cache_only(&mut self, no_net: bool) -> &mut Self {
         self.cache.set_cache_only(no_net);
+        self.metacache.set_cache_only(no_net);
         self.readmes.cache_only = no_net;
         self
     }
@@ -78,7 +84,8 @@ impl CratesIoClient {
     }
 
     pub async fn crate_meta(&self, crate_name: &str, as_of_version: &str) -> Result<Option<CrateMetaFile>, Error> {
-        self.get_json((as_of_version, crate_name), encode(crate_name)).await
+        let encoded_name = encode(crate_name);
+        self.get_json_from(&self.metacache, (&encoded_name, as_of_version), &encoded_name).await
     }
 
     pub async fn crate_owners(&self, crate_name: &str, as_of_version: &str) -> Result<Option<Vec<CrateOwner>>, Error> {
@@ -99,13 +106,8 @@ impl CratesIoClient {
         where B: for<'a> serde::Deserialize<'a> + Payloadable
     {
         if let Some((ver, res)) = self.cache.get(key.0)? {
-            if self.cache.cache_only() || ver == key.1 {
+            if ver == key.1 || self.cache.cache_only() {
                 return Ok(Some(B::from(res)));
-            }
-            let wants = semver::Version::parse(key.1);
-            let has = semver::Version::parse(&ver);
-            if wants.and_then(|wants| has.map(|has| (wants, has))).ok().map_or(false, |(wants, has)| has > wants) {
-                eprintln!("Cache regression: {}@{} vs {}", key.0, ver, key.1);
             }
         }
 
@@ -120,6 +122,24 @@ impl CratesIoClient {
             Some((key.1.to_string(), raw.to()))
         })).await?;
         Ok(res.map(|(_, res)| B::from(res)))
+    }
+
+    async fn get_json_from<B: Serialize + DeserializeOwned + Clone + Send>(&self, from_cache: &TempCacheJson<(String, B)>, key: (&str, &str), path: impl AsRef<str>) -> Result<Option<B>, Error> {
+        if let Some((ver, res)) = from_cache.get(key.0)? {
+            if ver == key.1 || from_cache.cache_only() {
+                return Ok(Some(res));
+            }
+        }
+
+        if from_cache.cache_only() {
+            return Err(Error::NotInCache);
+        }
+
+        from_cache.delete(key.0)?; // out of date
+
+        let url = format!("https://crates.io/api/v1/crates/{}", path.as_ref());
+        let res = from_cache.get_json(key.0, url, |raw: B| Some((key.1.to_string(), raw))).await?;
+        Ok(res.map(|(_, res)| res))
     }
 }
 

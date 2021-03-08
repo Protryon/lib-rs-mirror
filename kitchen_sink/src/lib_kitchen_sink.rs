@@ -885,6 +885,8 @@ impl KitchenSink {
     }
 
     async fn rich_crate_version_data_from_crates_io(&self, latest: &CratesIndexVersion) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
+        debug!("Building whole crate {}", latest.name());
+
         let _f = self.throttle.acquire().await;
 
         let mut warnings = HashSet::new();
@@ -1538,7 +1540,7 @@ impl KitchenSink {
 
     pub async fn index_crate_highest_version(&self, origin: &Origin) -> CResult<()> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
-        debug!("Indexing {:?}", origin);
+        info!("Indexing {:?}", origin);
 
         self.crate_db.before_index_latest(origin).await?;
 
@@ -2137,7 +2139,7 @@ impl KitchenSink {
                 let current_owners = async {
                     Ok(match self.crates_io_owners_cache.get(name)? {
                         Some(o) => o,
-                        None => Box::pin(self.crates_io.crate_owners(name, "fallback")).await?.unwrap_or_default(),
+                        None => timeout("owners-fallback", 5, self.crates_io.crate_owners(name, "fallback").map(|r| r.map_err(CError::from))).await?.unwrap_or_default(),
                     })
                 };
                 let (mut current_owners, meta) = futures::try_join!(current_owners, self.crates_io_meta(name))?;
@@ -2329,7 +2331,7 @@ impl KitchenSink {
                 } else {
                     self.crate_db.top_crates_in_category_partially_ranked(slug, wanted_num + 50).await?
                 };
-                self.knock_duplicates(&mut crates).await;
+                let _ = timeout("dupes", 10, self.knock_duplicates(&mut crates).map(|_| Ok::<_, KitchenSinkErr>(()))).await;
                 let crates: Vec<_> = crates.into_iter().map(|(o, _)| o).take(wanted_num as usize).collect();
                 Ok::<_, failure::Error>(Arc::new(crates))
             }).await
@@ -2685,13 +2687,31 @@ fn is_alnum(q: &str) -> bool {
     q.as_bytes().iter().copied().all(|c| c.is_ascii_alphanumeric() || c == b'_' || c == b'-')
 }
 
+struct DropWatch(bool, &'static str);
+impl Drop for DropWatch {
+    fn drop(&mut self) {
+        if !self.0 {
+            log::warn!("Aborted: {}", self.1);
+        }
+    }
+}
+
 #[inline(always)]
 fn watch<'a, T>(label: &'static str, f: impl Future<Output = T> + Send + 'a) -> Pin<Box<dyn Future<Output = T> + Send + 'a>> {
-    Box::pin(NonBlock::new(label, f))
+    debug!("starting: {}", label);
+    Box::pin(NonBlock::new(label, async move {
+        let mut is_ok = DropWatch(false, label); // await dropping will run this
+        let res = f.await;
+        is_ok.0 = true;
+        res
+    }))
 }
 
 #[inline(always)]
 fn timeout<'a, T, E: From<KitchenSinkErr>>(label: &'static str, time: u16, f: impl Future<Output = Result<T, E>> + Send + 'a) -> Pin<Box<dyn Future<Output = Result<T, E>> + Send + 'a>> {
     let f = tokio::time::timeout(Duration::from_secs(time.into()), f);
-    watch(label, f.map(move |r| r.map_err(|_| E::from(KitchenSinkErr::TimedOut(label, time))).and_then(|x| x)))
+    watch(label, f.map(move |r| r.map_err(|_| {
+        info!("Timed out: {} {}", label, time);
+        E::from(KitchenSinkErr::TimedOut(label, time))
+    }).and_then(|x| x)))
 }

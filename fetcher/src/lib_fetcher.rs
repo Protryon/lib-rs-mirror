@@ -3,6 +3,7 @@ use std::time::Duration;
 
 #[derive(Debug)]
 pub struct Fetcher {
+    client: reqwest::Client,
     sem: tokio::sync::Semaphore,
     sem_timeout: u16,
 }
@@ -25,7 +26,9 @@ quick_error! {
 
 impl Fetcher {
     pub fn new(max_concurrent: u16) -> Self {
+        let client = reqwest::Client::builder().build().unwrap();
         Self {
+            client,
             sem_timeout: (max_concurrent + 3).max(5),
             sem: tokio::sync::Semaphore::new(max_concurrent.into()),
         }
@@ -45,8 +48,7 @@ impl Fetcher {
             },
         };
 
-        let client = reqwest::Client::builder().build()?;
-        let res = tokio::time::timeout(Duration::from_secs(20), client.get(url)
+        let res = tokio::time::timeout(Duration::from_secs(20), self.client.get(url)
             .header(reqwest::header::USER_AGENT, "lib.rs/1.1")
             .send()).await??
             .error_for_status()?;

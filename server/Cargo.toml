@@ -1,10 +1,11 @@
 [package]
 name = "crates-server"
-version = "1.2.0"
+version = "1.2.1"
 authors = ["Kornel <kornel@geekhood.net>"]
 edition = "2018"
 description = "Crates.rs web server"
 readme = "README.md"
+publish = false
 
 [package.metadata.deb]
 assets = [

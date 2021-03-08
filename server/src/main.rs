@@ -17,6 +17,7 @@ use futures::future::FutureExt;
 use kitchen_sink::filter::ImageOptimAPIFilter;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::Origin;
+use kitchen_sink::RichCrate;
 use locale::Numeric;
 use render_readme::{Highlighter, Markup, Renderer};
 use repo_url::SimpleRepo;
@@ -528,7 +529,7 @@ async fn handle_install(req: HttpRequest) -> Result<HttpResponse, ServerError> {
         mark_server_still_alive(&state);
         Ok::<_, failure::Error>((page, None))
     }).await?;
-    Ok(serve_cached(Rendered {page, cache_time: 7200, refresh: false, last_modified}))
+    Ok(serve_cached(Rendered {page, cache_time: 24 * 3600, refresh: false, last_modified}))
 }
 
 async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
@@ -739,11 +740,12 @@ async fn render_crate_all_versions(state: AServerState, origin: Origin) -> Resul
     rt_run_timeout(&s.rt, "allver", 60, async move {
         let crates = state.crates.load();
         let (all, ver) = futures::try_join!(crates.rich_crate_async(&origin), crates.rich_crate_version_async(&origin))?;
+        let last_modified = Some(get_last_modified(&all));
         let mut page: Vec<u8> = Vec::with_capacity(60000);
         front_end::render_all_versions_page(&mut page, &all, &ver, &crates).await?;
         minify_html(&mut page);
         mark_server_still_alive(&state);
-        Ok::<_, failure::Error>(Rendered {page, cache_time: 3*24*3600, refresh: false, last_modified: None})
+        Ok::<_, failure::Error>(Rendered {page, cache_time: 3*24*3600, refresh: false, last_modified})
     }).await
 }
 
@@ -1007,4 +1009,8 @@ fn minify_html(page: &mut Vec<u8>) {
         page.clear();
         page.extend_from_slice(out);
     }
+}
+
+fn get_last_modified(c: &RichCrate) -> DateTime<FixedOffset> {
+    DateTime::parse_from_rfc3339(c.most_recent_release_date_str()).unwrap()
 }

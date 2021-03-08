@@ -45,6 +45,12 @@ github:chyyuu/os_kernel_lab/os
 github:citybound/citybound/citybound
 github:cjbassi/ytop/package-publisher
 github:cjbassi/ytop/ytop
+github:comprakt/comprakt/compiler-cli
+github:comprakt/comprakt/compiler-lib
+github:comprakt/comprakt/compiler-shared
+github:comprakt/comprakt/lowering
+github:comprakt/comprakt/mjrt
+github:comprakt/comprakt/type-checking
 github:cormac-obrien/richter/richter
 github:cristicbz/rust-doom/rs_doom
 github:curlpipe/ox/ox
@@ -74,6 +80,8 @@ github:diem/diem/bounded-executor
 github:diem/diem/diem-client
 github:diem/diem/diem-crypto
 github:diem/diem/diemdb
+github:dns2utf8/input_to_args/input_to_args
+github:droundy/sad-monte-carlo/sad-monte-carlo
 github:eirproject/eir/libeir_diagnostics
 github:eirproject/eir/libeir_hir
 github:eirproject/eir/libeir_intern
@@ -222,6 +230,7 @@ github:lumen/lumen/liblumen_core
 github:lumen/lumen/lumen
 github:lumen/lumen/lumen_runtime
 github:lunatic-lang/lunatic/lunatic-vm
+github:lunatic-solutions/lunatic/lunatic-runtime
 github:luqmana/rust-opencl/opencl
 github:m4b/dryad/dryad
 github:maikklein/rlsl/rlsl
@@ -235,7 +244,6 @@ github:materializeinc/materialize/materialized
 github:materializeinc/materialize/sql-parser
 github:mathall/rim/rim
 github:mbround18/valheim-docker/odin
-github:mdreem/dreetris/dreetris
 github:meilisearch/meilisearch/meilisearch-core
 github:meilisearch/meilisearch/meilisearch-http
 github:meilisearch/meilisearch/meilisearch-schema
@@ -479,6 +487,8 @@ github:udoprog/oxidizebot/oxidize-web
 github:ul/kak-lsp/kak-lsp
 github:ultrasaurus/rust-uri-comparison/rust-uris
 github:unrust/unrust/unrust
+github:uriopass/egregoria/egregoria
+github:uriopass/egregoria/wgpu_engine
 github:uutils/coreutils/uu_chgrp
 github:uutils/coreutils/uu_chmod
 github:uutils/coreutils/uu_chown
@@ -504,7 +514,9 @@ github:wireapp/proteus/proteus
 github:withoutboats/notty/notty
 github:withoutboats/notty/notty-cairo
 github:xing/recrep/recrep
-github:xiph/rav1e/rav1e
+github:xldenis/creusot/creusot
+github:xldenis/creusot/creusot-contracts
+github:xldenis/creusot/pearlite
 github:xou816/spot/spot
 github:y2z/monolith/monolith
 github:yaa110/rubigo/rubigo

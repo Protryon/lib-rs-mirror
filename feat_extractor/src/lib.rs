@@ -159,7 +159,7 @@ pub fn is_deprecated_requirement(name: &str, requirement: &VersionReq) -> bool {
         "glsl-to-spirv" => true,
         // futures 0.1
         "futures-preview" | "futures-core-preview" | "tokio-io" | "tokio-timer" | "tokio-codec" |
-        "tokio-executor" | "tokio-reactor" | "tokio-core" | "futures-cpupool" => true,
+        "tokio-executor" | "tokio-reactor" | "tokio-core" | "futures-cpupool" | "tokio-threadpool" | "tokio-tcp" => true,
         // fundamentally unsound
         "str-concat" => true,
         // uses old winapi

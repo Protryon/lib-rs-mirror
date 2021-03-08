@@ -32,8 +32,8 @@ impl<'a> CatPage<'a> {
             keywords: keywords?,
             related: related?,
             crates: futures::stream::iter(crates
-                .top_crates_in_category(&cat.slug).await?.iter())
-                .filter_map(|o| async move {
+                .top_crates_in_category(&cat.slug).await?.iter().cloned())
+                .map(|o| async move {
                     let c = match crates.rich_crate_version_async(&o).await {
                         Ok(c) => c,
                         Err(e) => {
@@ -53,6 +53,8 @@ impl<'a> CatPage<'a> {
                     };
                     Some((c, d))
                 })
+                .buffered(8)
+                .filter_map(|c| async move {c})
                 .collect::<Vec<_>>().await,
             cat,
             markup,

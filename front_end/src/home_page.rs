@@ -255,7 +255,7 @@ impl<'a> HomePage<'a> {
                     futures::try_join!(self.crates.rich_crate_async(&o), self.crates.rich_crate_version_async(&o)).ok()
                 })
                 .buffer_unordered(8)
-                .filter_map(|x| async {x})
+                .filter_map(|x| async move {x})
                 .collect::<Vec<_>>().await
             })
     }

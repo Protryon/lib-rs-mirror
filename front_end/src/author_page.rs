@@ -50,11 +50,13 @@ impl<'a> AuthorPage<'a> {
             kitchen_sink.crates_of_author(aut),
             kitchen_sink.user_github_orgs(&aut.github.login),
         )?;
-        let orgs = futures::stream::iter(orgs.unwrap_or_default()).filter_map(|org| async move {
+        let orgs = futures::stream::iter(orgs.unwrap_or_default()).map(|org| async move {
             kitchen_sink.github_org(&org.login).await
                 .map_err(|e| eprintln!("org: {} {}", &org.login, e))
                 .ok().and_then(|x| x)
         })
+        .buffered(8)
+        .filter_map(|c| async move {c})
         .collect().await;
         let joined = rows.iter().filter_map(|row| row.invited_at).min();
 

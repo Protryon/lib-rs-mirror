@@ -87,7 +87,8 @@ impl<'a> HomePage<'a> {
     /// List of all categories, sorted, with their most popular and newest crates.
     pub async fn all_categories(&self) -> Vec<HomeCategory> {
         let seen = &mut HashSet::with_capacity(5000);
-        let mut all = self.make_all_categories(&CATEGORIES.root, seen).await;
+        let deadline = Instant::now() + Duration::from_secs(48);
+        let mut all = self.make_all_categories(&CATEGORIES.root, seen, deadline).await;
         self.add_updated_to_all_categories(&mut all, seen).await;
         all
     }
@@ -122,8 +123,7 @@ impl<'a> HomePage<'a> {
 
     /// A crate can be in multiple categories, so `seen` ensures every crate is shown only once
     /// across all categories.
-    fn make_all_categories<'z, 's: 'z>(&'s self, root: &'static CategoryMap, seen: &'z mut HashSet<Origin>) -> std::pin::Pin<Box<dyn 'z + Send + Future<Output=Vec<HomeCategory>>>> {
-        let deadline = Instant::now() + Duration::from_secs(24);
+    fn make_all_categories<'z, 's: 'z>(&'s self, root: &'static CategoryMap, seen: &'z mut HashSet<Origin>, deadline: Instant) -> std::pin::Pin<Box<dyn 'z + Send + Future<Output=Vec<HomeCategory>>>> {
         Box::pin(async move {
             if root.is_empty() {
                 return Vec::new();
@@ -134,7 +134,7 @@ impl<'a> HomePage<'a> {
                 if stopped() { return Vec::new(); }
                 // depth first - important!
                 let (sub, own_pop) = futures::join!(
-                        self.make_all_categories(&cat.sub, seen),
+                        self.make_all_categories(&cat.sub, seen, deadline),
                         self.crates.category_crate_count(&cat.slug));
                 let own_pop = own_pop.unwrap_or(0) as usize;
 

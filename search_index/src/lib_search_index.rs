@@ -31,6 +31,8 @@ pub struct CrateFound {
     pub description: String,
     pub keywords: String,
     pub score: f32,
+    pub relevance_score: f32,
+    pub crate_base_score: f32,
     pub version: String,
     pub monthly_downloads: u64,
 }
@@ -42,7 +44,7 @@ pub struct Indexer {
 
 impl CrateSearchIndex {
     pub fn new(index_dir: impl AsRef<Path>) -> tantivy::Result<Self> {
-        let index_dir = index_dir.as_ref().join("tantivy13");
+        let index_dir = index_dir.as_ref().join("tantivy14");
         if !index_dir.exists() {
             return Self::reset_db_to_empty(&index_dir);
         }
@@ -107,19 +109,13 @@ impl CrateSearchIndex {
         let mut docs = top_docs.into_iter().map(|(relevance_score, doc_address)| {
             let retrieved_doc = searcher.doc(doc_address)?;
             let mut doc = self.tantivy_index.schema().to_named_doc(&retrieved_doc).0;
-            let mut crate_base_score = take_int(doc.get("crate_score")) as f64;
+            let crate_base_score = take_int(doc.get("crate_score")) as f64 / CRATE_SCORE_MAX;
             let crate_name = take_string(doc.remove("crate_name"));
             let origin = Origin::from_str(take_string(doc.remove("origin")));
             Ok(CrateFound {
-                score: if sort_by_query_relevance {
-                    // bonus for exact match
-                    if crate_name == query_text {
-                        crate_base_score += CRATE_SCORE_MAX / 8.;
-                    }
-                    (relevance_score as f64 * crate_base_score) as f32
-                } else {
-                    crate_base_score as f32
-                },
+                crate_base_score: crate_base_score as f32,
+                relevance_score: relevance_score as f32,
+                score: 0.,
                 crate_name,
                 description: take_string(doc.remove("description")),
                 keywords: take_string(doc.remove("keywords")),
@@ -129,6 +125,21 @@ impl CrateSearchIndex {
             })
         })
         .collect::<tantivy::Result<Vec<_>>>()?;
+
+        let max_relevance = docs.iter().map(|v| v.relevance_score).max_by(|a,b| a.partial_cmp(b).unwrap()).unwrap_or(0.);
+        for doc in &mut docs {
+            doc.score = if sort_by_query_relevance {
+                // bonus for exact match
+                doc.crate_base_score * if doc.crate_name == query_text {
+                    eprintln!("got exact match with relevance {}. max is {}. crate is {}", doc.relevance_score, max_relevance, doc.crate_base_score);
+                    max_relevance * 1.10
+                } else {
+                    doc.relevance_score
+                }
+            } else {
+                doc.crate_base_score
+            };
+        }
 
         // workaround for bug or corrupted index that caused dupes
         docs.dedup_by(|a, b| a.crate_name == b.crate_name);

@@ -42,6 +42,7 @@ github:cch123/asm-cli-rust/asm-cli-rust
 github:chainx-org/chainx/chainx
 github:changlan/kytan/kytan
 github:chyyuu/os_kernel_lab/os
+github:chyyuu/os_kernel_lab/user_lib
 github:citybound/citybound/citybound
 github:cjbassi/ytop/package-publisher
 github:cjbassi/ytop/ytop
@@ -80,10 +81,8 @@ github:diem/diem/bounded-executor
 github:diem/diem/diem-client
 github:diem/diem/diem-crypto
 github:diem/diem/diemdb
-github:dns2utf8/input_to_args/input_to_args
 github:droundy/sad-monte-carlo/sad-monte-carlo
 github:eirproject/eir/libeir_diagnostics
-github:eirproject/eir/libeir_hir
 github:eirproject/eir/libeir_intern
 github:eirproject/eir/libeir_interpreter
 github:eirproject/eir/libeir_ir
@@ -93,6 +92,7 @@ github:eirproject/eir/libeir_syntax_core
 github:eirproject/eir/libeir_syntax_erl
 github:eirproject/eir/libeir_tests
 github:electric-capital/crypto-ecosystems/crypto-ecosystems
+github:elkowar/eww/eww
 github:embarkstudios/rust-gpu/rustc_codegen_spirv
 github:embarkstudios/rust-gpu/spirv-builder
 github:embarkstudios/rust-gpu/spirv-std
@@ -162,6 +162,7 @@ github:icepuma/rust-action/rust-action
 github:imazen/imageflow/imageflow_core
 github:imazen/imageflow/imageflow_server
 github:imjacobclark/herd/herd
+github:indygreg/pyoxidizer/tugger-apple-codesign
 github:influxdata/influxdb_iox/influxdb2_client
 github:influxdata/influxdb_iox/influxdb_iox
 github:input-output-hk/cardano-cli/cardano-cli
@@ -236,7 +237,6 @@ github:m4b/dryad/dryad
 github:maikklein/rlsl/rlsl
 github:makepad/makepad/makepad
 github:makepad/makepad/makepad_wasm
-github:makepad/makepad/ttf_parser
 github:maps4print/azul/azul-core
 github:maps4print/azul/azul-css
 github:maringa-gamedev/rust-igmc-2018/rust-igmc-2018
@@ -259,6 +259,10 @@ github:microsoft/onefuzz/onefuzz-agent
 github:microsoft/onefuzz/onefuzz-supervisor
 github:millardjn/rusty_sr/rusty_sr
 github:mmstick/concurr/concurr
+github:mobilecoinfoundation/mobilecoin/mc-attest-ake
+github:mobilecoinfoundation/mobilecoin/mc-attest-core
+github:mobilecoinfoundation/mobilecoin/mc-sgx-epid-sys
+github:mobilecoinfoundation/mobilecoin/mc-sgx-types
 github:mohanson/gameboy/gameboy
 github:morganamilo/paru/paru
 github:mosuka/bayard/bayard
@@ -459,7 +463,6 @@ github:timberio/vector/tracing-limit
 github:timberio/vector/vector
 github:tock/tock/acd52832
 github:tock/tock/arty_e21
-github:tock/tock/cc26x2
 github:tock/tock/cortexm
 github:tock/tock/cortexm0
 github:tock/tock/cortexm3
@@ -478,7 +481,6 @@ github:tock/tock/sam4l
 github:tock/tock/sifive
 github:tock/tock/stm32f4xx
 github:tock/tock/tock-cells
-github:tock/tock/tock_rt0
 github:totorigolo/fuite-rs/fuite
 github:twinklebear/tray_rust/tray_rust
 github:twitter/rezolus/rezolus
@@ -514,6 +516,8 @@ github:wireapp/proteus/proteus
 github:withoutboats/notty/notty
 github:withoutboats/notty/notty-cairo
 github:xing/recrep/recrep
+github:xixixao/shader-roy/rust_to_metal_sl
+github:xixixao/shader-roy/shader_roy
 github:xldenis/creusot/creusot
 github:xldenis/creusot/creusot-contracts
 github:xldenis/creusot/pearlite

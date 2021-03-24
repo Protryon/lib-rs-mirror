@@ -143,6 +143,7 @@ c_mcai_worker_sdk: asynchronous
 ca-rules: parser-implementations
 cage: development-tools, command-line-utilities
 calx: os::macos-apis, multimedia::audio
+canarywatcher: command-line-utilities, filesystem
 cansi: parser-implementations
 capstone-sys: development-tools::debugging
 capstone3: development-tools::debugging
@@ -260,6 +261,7 @@ cryptonote-wallet: cryptography::cryptocurrencies
 crystal_packing: algorithms, science
 csound: multimedia::audio
 css-color: parser-implementations, web-programming
+css3: web-programming
 cssifier: parser-implementations, web-programming
 cssparser: parser-implementations, web-programming
 csvsc: text-processing
@@ -322,6 +324,7 @@ ditto: concurrency, data-structures
 dlopen: os
 dmg: os::macos-apis, filesystem
 dockerfile-parser: parser-implementations
+dockerfile: development-tools, encoding
 docstrings: parser-implementations
 docx: parser-implementations, text-processing
 dogstatsd: development-tools::profiling
@@ -470,6 +473,7 @@ fluminurs: development-tools, web-programming
 fluxer: command-line-utilities, multimedia::images
 fm: text-processing, algorithms
 fma: rust-patterns, hardware-support
+fnm: development-tools, web-programming
 follow: command-line-utilities
 ForceFeedback-sys: os::macos-apis,hardware-support
 foreignc_derive: development-tools::procedural-macro-helpers
@@ -525,6 +529,7 @@ girage: cryptography, gui
 github-rs: web-programming
 gitlab-ci-validate: development-tools
 gitmodules: development-tools, parser-implementations
+gitui: command-line-utilities, development-tools
 glitchup: multimedia
 global_counter: concurrency, development-tools::debugging
 glsl-quasiquote: parser-implementations
@@ -573,6 +578,7 @@ gtrans: command-line-utilities, internationalization
 gtsa: development-tools::debugging
 gurufocus_api: science::math, web-programming
 gwasm-dispatcher: wasm
+habitica-cli: command-line-utilities
 hamlrs: template-engines, parser-implementations
 hash-db: rust-patterns, databases, no-std
 hash256-std-hasher: rust-patterns, no-std
@@ -623,6 +629,7 @@ ihex: embedded, development-tools
 ilibipt: hardware-support
 image-capture-core: os::macos-apis
 image-interlacer: multimedia::images, command-line-utilities
+imap-proto: email
 imdb-index: web-programming
 imdb: web-programming
 imperator-save: game-development
@@ -865,6 +872,7 @@ mysql_macros: databases
 nan-preserving-float: rust-patterns
 napi: development-tools::ffi
 nat_traversal: network-programming
+natls: command-line-utilities
 naturalize: value-formatting
 nazar: science, web-programming
 nd: web-programming, command-line-utilities
@@ -1065,6 +1073,8 @@ qni-core-rs: web-programming::websocket
 qualinvest: science::math
 qualinvest_cli: command-line-utilities, science::math
 quaternion_averager: science::math
+quest: command-line-interface
+quest: command-line-interface
 quick-protobuf: parser-implementations
 quicksort: algorithms
 quoted_printable: parser-implementations
@@ -1305,6 +1315,7 @@ stork-search: database-implementations, wasm
 streamson-extra-matchers: parser-implementations
 streamson-lib: encoding
 stringlit: rust-patterns
+strong-xml: encoding
 substrate-deps: cryptography::cryptocurrencies
 substrs: rust-patterns, text-processing
 sulfur: development-tools::testing
@@ -1364,6 +1375,7 @@ teloc: rust-patterns
 teloxide: web-programming
 tempus_fugit: development-tools::profiling
 termcodes: command-line-interface, no-std
+terminal_colour: command-line-interface
 terminated: development-tools::ffi, no-std
 termplay: multimedia::images, multimedia::video
 termplay: multimedia::video, command-line-utilities

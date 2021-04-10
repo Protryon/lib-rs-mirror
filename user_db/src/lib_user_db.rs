@@ -51,7 +51,7 @@ impl UserDb {
                 html_url: row.get_unwrap(5),
                 blog: None,
                 created_at: None,
-                user_type: match row.get_raw(6).as_str().unwrap() {
+                user_type: match row.get_ref_unwrap(6).as_str().unwrap() {
                     "org" => UserType::Org,
                     "bot" => UserType::Bot,
                     _ => UserType::User,
@@ -88,7 +88,7 @@ impl UserDb {
                 html_url: row.get_unwrap(5),
                 blog: None,
                 created_at: None,
-                user_type: match row.get_raw(6).as_str().unwrap() {
+                user_type: match row.get_ref_unwrap(6).as_str().unwrap() {
                     "org" => UserType::Org,
                     "bot" => UserType::Bot,
                     _ => UserType::User,

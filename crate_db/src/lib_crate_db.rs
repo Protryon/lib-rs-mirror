@@ -13,7 +13,6 @@ use rich_crate::Readme;
 use rich_crate::Repo;
 use rich_crate::RichCrate;
 use rusqlite::types::ToSql;
-use rusqlite::NO_PARAMS;
 use rusqlite::*;
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -184,7 +183,7 @@ impl CrateDb {
             let args: &[&dyn ToSql] = &[&origin.to_str()];
             let (manifest, readme, row, language_stats): (Manifest, _, Row, _) = conn.query_row("SELECT * FROM crates c JOIN crate_derived d ON (c.id = d.crate_id)
                 WHERE origin = ?1", args, |row| {
-                    let readme = match row.get_raw("readme_format").as_str() {
+                    let readme = match row.get_ref_unwrap("readme_format").as_str() {
                         Err(_) => None,
                         Ok(ty) => {
                             let txt: String = row.get("readme")?;
@@ -201,11 +200,11 @@ impl CrateDb {
                         },
                     };
 
-                    let manifest = row.get_raw("manifest").as_blob()?;
-                    let keywords = row.get_raw("keywords").as_str()?.split(',').filter(|s| s.len() > 0).map(String::from).collect::<Vec<_>>();
-                    let categories = row.get_raw("categories").as_str()?.split(',').filter(|s| s.len() > 0).map(String::from).collect::<Vec<_>>();
+                    let manifest = row.get_ref_unwrap("manifest").as_blob()?;
+                    let keywords = row.get_ref_unwrap("keywords").as_str()?.split(',').filter(|s| s.len() > 0).map(String::from).collect::<Vec<_>>();
+                    let categories = row.get_ref_unwrap("categories").as_str()?.split(',').filter(|s| s.len() > 0).map(String::from).collect::<Vec<_>>();
                     let manifest = rmp_serde::from_slice(manifest).map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
-                    let language_stats = row.get_raw("language_stats").as_blob()?;
+                    let language_stats = row.get_ref_unwrap("language_stats").as_blob()?;
                     let language_stats = rmp_serde::from_slice(language_stats).map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
                     let cache_key: i64 = row.get("cache_key")?; // sqlite makes it signed :/
                     Ok((manifest, readme, Row {
@@ -268,15 +267,14 @@ impl CrateDb {
     #[inline]
     pub async fn latest_crate_update_timestamp(&self) -> FResult<Option<u32>> {
         self.with_read("latest_crate_update_timestamp", |conn| {
-            let nope: [u8; 0] = [];
-            Ok(none_rows(conn.query_row("SELECT max(created) FROM crate_versions", nope.iter(), |row| row.get(0)))?)
+            Ok(none_rows(conn.query_row("SELECT max(created) FROM crate_versions", [], |row| row.get(0)))?)
         }).await
     }
 
     pub async fn crate_versions(&self, origin: &Origin) -> FResult<Vec<(String, u32)>> {
         self.with_read("crate_versions", |conn| {
             let mut q = conn.prepare("SELECT v.version, v.created FROM crates c JOIN crate_versions v ON v.crate_id = c.id WHERE c.origin = ?1")?;
-            let res = q.query_map(&[&origin.to_str()][..], |row| {
+            let res = q.query_map(&[&origin.to_str()], |row| {
                 Ok((row.get(0)?, row.get(1)?))
             })?;
             Ok(res.collect::<Result<Vec<(String, u32)>>>()?)
@@ -486,7 +484,7 @@ impl CrateDb {
                 (":language_stats", &language_stats),
                 (":cache_key", &cache_key),
             ];
-            insert_derived.execute_named(named_args).context("insert_derived")?;
+            insert_derived.execute(named_args).context("insert_derived")?;
 
             mark_updated.execute(&[&crate_id, &next_timestamp]).context("mark updated crate")?;
             println!("{}", out);
@@ -587,7 +585,7 @@ impl CrateDb {
                 ORDER BY path, crate_name LIMIT 10
             ")?;
             let q = q.query_map(&[&repo.canonical_git_url()], |r| {
-                let s = r.get_raw(0).as_str()?;
+                let s = r.get_ref_unwrap(0).as_str()?;
                 crates_io_name(s)
             })?.filter_map(|r| r.ok());
             Ok(q.collect())
@@ -711,7 +709,7 @@ impl CrateDb {
             let mut get_crate_id = tx.prepare_cached("SELECT id FROM crates WHERE origin = ?1")?;
             let mut insert = tx.prepare_cached("INSERT INTO author_crates(github_id, crate_id, invited_by_github_id, invited_at) VALUES(?1, ?2, ?3, ?4)")?;
             let mut wipe = tx.prepare_cached("DELETE FROM author_crates")?;
-            wipe.execute(NO_PARAMS)?;
+            wipe.execute([])?;
 
             for (origin, owners) in all_owners {
                 let crate_id: u32 = match get_crate_id.query_row(&[&origin.to_str()], |row| row.get(0)) {
@@ -745,9 +743,9 @@ impl CrateDb {
                 LIMIT 2000
             "#)?;
             let q = query.query_map(&[&github_id], |row| {
-                let origin = Origin::from_str(row.get_raw(0).as_str()?);
+                let origin = Origin::from_str(row.get_ref_unwrap(0).as_str()?);
                 let invited_by_github_id: Option<u32> = row.get_unwrap(1);
-                let invited_at = row.get_raw(2).as_str().ok().map(|d| match Utc.datetime_from_str(d, "%Y-%m-%d %H:%M:%S") {
+                let invited_at = row.get_ref_unwrap(2).as_str().ok().map(|d| match Utc.datetime_from_str(d, "%Y-%m-%d %H:%M:%S") {
                     Ok(d) => d,
                     Err(e) => panic!("Can't parse {}, because {}", d, e),
                 });
@@ -888,7 +886,7 @@ impl CrateDb {
                 LIMIT 4
             "#)?;
             let res = query.query_map(&[&crate_name], |row| {
-                let s = row.get_raw(1).as_str()?;
+                let s = row.get_ref_unwrap(1).as_str()?;
                 crates_io_name(s)
             }).context("replacement_crates")?;
             Ok(res.collect::<std::result::Result<_,_>>()?)
@@ -913,7 +911,7 @@ impl CrateDb {
             "#)?;
             let args: &[&dyn ToSql] = &[&origin.to_str(), &min_recent_downloads];
             let res = query.query_map(args, |row| {
-                Ok(Origin::from_str(row.get_raw(1).as_str()?))
+                Ok(Origin::from_str(row.get_ref_unwrap(1).as_str()?))
             }).context("related_crates")?;
             Ok(res.collect::<std::result::Result<_,_>>()?)
         }).await
@@ -996,7 +994,7 @@ impl CrateDb {
             )?;
             let args: &[&dyn ToSql] = &[&slug, &limit];
             let q = query.query_map(args, |row| {
-                Ok((Origin::from_str(row.get_raw(0).as_str()?), row.get_unwrap(1)))
+                Ok((Origin::from_str(row.get_ref_unwrap(0).as_str()?), row.get_unwrap(1)))
             })?;
             let q = q.filter_map(|r| r.ok());
             Ok(q.collect())
@@ -1017,7 +1015,7 @@ impl CrateDb {
             )?;
             let args: &[&dyn ToSql] = &[&limit];
             let q = query.query_map(args, |row| {
-                Ok((Origin::from_str(row.get_raw(0).as_str()?), row.get_unwrap(1)))
+                Ok((Origin::from_str(row.get_ref_unwrap(0).as_str()?), row.get_unwrap(1)))
             })?;
             let q = q.filter_map(|r| r.ok());
             Ok(q.collect())
@@ -1043,7 +1041,7 @@ impl CrateDb {
                     limit 20
             "#)?;
             let q = query.query_map(&[&slug], |row| {
-                Ok(Origin::from_str(row.get_raw(1).as_str()?))
+                Ok(Origin::from_str(row.get_ref_unwrap(1).as_str()?))
             })?;
             let q = q.filter_map(|r| r.ok());
             Ok(q.collect())
@@ -1067,7 +1065,7 @@ impl CrateDb {
                     limit ?1
             "#)?;
             let q = query.query_map(&[&limit], |row| {
-                let origin = Origin::from_str(row.get_raw(2).as_str()?);
+                let origin = Origin::from_str(row.get_ref_unwrap(2).as_str()?);
                 Ok((origin, row.get(1)?))
             })?;
             let q = q.filter_map(|r| r.ok());
@@ -1094,8 +1092,8 @@ impl CrateDb {
                 WHERE ranking > 0.25
                 GROUP BY c.id
             "#)?;
-            let q = q.query_map(NO_PARAMS, |row| -> Result<(Origin, f64, i64)> {
-                Ok((Origin::from_str(row.get_raw(0).as_str()?), row.get_unwrap(1), row.get_unwrap(2)))
+            let q = q.query_map([], |row| -> Result<(Origin, f64, i64)> {
+                Ok((Origin::from_str(row.get_ref_unwrap(0).as_str()?), row.get_unwrap(1), row.get_unwrap(2)))
             }).context("sitemap")?.filter_map(|r| r.ok());
             Ok(q.collect())
         }).await
@@ -1107,7 +1105,7 @@ impl CrateDb {
             let mut q = conn.prepare(r#"
                 select c.slug, count(*) as cnt from categories c group by c.slug
             "#)?;
-            let q = q.query_map(NO_PARAMS, |row| -> Result<(String, u32)> {
+            let q = q.query_map([], |row| -> Result<(String, u32)> {
                 Ok((row.get_unwrap(0), row.get_unwrap(1)))
             }).context("counts")?.filter_map(|r| r.ok());
             Ok(q.collect())
@@ -1120,7 +1118,7 @@ impl CrateDb {
             let mut q = conn.prepare("SELECT origin FROM crates WHERE next_update < ?1 LIMIT 1000")?;
             let timestamp = Utc::now().timestamp() as u32;
             let q = q.query_map(&[&timestamp], |r| {
-                let s = r.get_raw(0).as_str()?;
+                let s = r.get_ref_unwrap(0).as_str()?;
                 Ok(Origin::from_str(s))
             })?.filter_map(|r| r.ok());
             Ok(q.collect())

@@ -83,10 +83,11 @@ impl BuildDb {
             CREATE TABLE IF NOT EXISTS raw_builds (
                 origin TEXT NOT NULL,
                 version TEXT NOT NULL,
+                tool TEXT NOT NULL,
                 stdout TEXT NOT NULL,
                 stderr TEXT NOT NULL
             );
-            CREATE UNIQUE INDEX IF NOT EXISTS builds_ver on raw_builds(origin, version);
+            CREATE UNIQUE INDEX IF NOT EXISTS raw_builds_ver on raw_builds(origin, version, tool);
             CREATE UNIQUE INDEX IF NOT EXISTS build_results_ver on build_results(origin, version, rustc_version);
             ")?;
         Ok(Self {
@@ -111,7 +112,7 @@ impl BuildDb {
         let max_ver: SemVer = "999.999.999".parse().unwrap();
         let min_ver: SemVer = "0.0.0".parse().unwrap();
 
-        for row in get.query_map(NO_PARAMS, |row| Ok((Origin::from_str(row.get_raw(3).as_str().unwrap()), Self::compat_row(row)?)))? {
+        for row in get.query_map([], |row| Ok((Origin::from_str(row.get_ref_unwrap(3).as_str().unwrap()), Self::compat_row(row)?)))? {
             let (origin, compat) = row?;
             let by_ver = by_crate.entry(origin).or_insert_with(BTreeMap::default);
             let t = by_ver.entry(compat.crate_version).or_insert_with(|| CompatRange {
@@ -184,10 +185,10 @@ impl BuildDb {
     }
 
     fn compat_row(row: &Row) -> Result<CompatibilityInfo> {
-        let compat = Compat::from_str(row.get_raw(2).as_str().expect("strtype"));
+        let compat = Compat::from_str(row.get_ref_unwrap(2).as_str().expect("strtype"));
         Ok(CompatibilityInfo {
-            rustc_version: SemVer::parse(row.get_raw(0).as_str().unwrap()).expect("semver"),
-            crate_version: SemVer::parse(row.get_raw(1).as_str().unwrap()).expect("semver"),
+            rustc_version: SemVer::parse(row.get_ref_unwrap(0).as_str().unwrap()).expect("semver"),
+            crate_version: SemVer::parse(row.get_ref_unwrap(1).as_str().unwrap()).expect("semver"),
             compat,
         })
     }

@@ -66,6 +66,10 @@ impl CratesIoClient {
             return Ok(data);
         }
 
+        if self.cache.cache_only() {
+            return Err(Error::NotInCache);
+        }
+
         // it really uses unencoded names, e.g. + is accepted, %2B is not!
         let url = format!("https://static.crates.io/crates/{name}/{name}-{version}.crate", name = crate_name, version = version);
         let data = self.fetcher.fetch(&url).await?;
@@ -185,5 +189,5 @@ async fn cratesioclient() {
     client.crate_meta("capi", "0.0.1").await.unwrap();
     let owners = client.crate_owners("cargo-deb", "1.10.0").await.expect("crate_owners").expect("found some");
     assert_eq!(3, owners.len(), "that will fail when metadata updates");
-    CratesIoClient::new(Path::new("../data")).expect("new").cache_only(true).crate_data("fail404", "999").await.unwrap();
+    assert!(CratesIoClient::new(Path::new("../data")).expect("new").cache_only(true).crate_data("fail404", "999").await.is_err());
 }

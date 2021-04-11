@@ -1,21 +1,14 @@
-FROM rust:latest
-WORKDIR /crate
-RUN mkdir -p /usr/local/cargo/registry/cache/github.com-1ecc6299db9ec823/hey-crate-cache-is-here
-RUN apt-get update && apt-get install -y time pkg-config git cmake build-essential
-RUN git config --global user.email "lts@lib.rs"
-RUN git config --global user.name "LTS"
-RUN rustup component add clippy
-RUN rustup toolchain add 1.24.1 && rm -rf ~/.rustup/toolchains/*/share/doc/
-RUN rustup toolchain add 1.34.2 && rm -rf ~/.rustup/toolchains/*/share/doc/
-RUN rustup toolchain add nightly
+FROM rustops/crates-build-env
+RUN useradd -u 4321 --create-home --user-group -s /bin/bash rustyuser
+RUN chown -R 4321:4321 /home/rustyuser
+USER rustyuser
+WORKDIR /home/rustyuser
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.51.0 --verbose # wat
+ENV PATH="$PATH:/home/rustyuser/.cargo/bin"
+RUN rustup set profile minimal
+RUN rustup toolchain add 1.29.2
+RUN rustup toolchain add 1.36.0
+RUN rustup toolchain add 1.41.1
+RUN rustup toolchain add 1.51.0
 RUN rustup toolchain list
-RUN cargo install -f lts # 1.5
-RUN mkdir -p /tmp/cargo-target-dir /tmp/cargo-prewarm
-COPY prewarm_Cargo.toml /tmp/cargo-prewarm/Cargo.toml
-ENV CARGO_TARGET_DIR=/tmp/cargo-target-dir
-RUN cargo lts "https://github.com/kornelski/crates.io-index"
-RUN cargo fetch --manifest-path=/tmp/cargo-prewarm/Cargo.toml
-ENV CARGO_MANIFEST_DIR=/crate
-COPY run.sh /tmp/run-crate-tests.sh
-RUN chmod 0550 /tmp/run-crate-tests.sh
 

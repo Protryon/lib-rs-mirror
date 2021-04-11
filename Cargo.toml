@@ -1,6 +1,7 @@
 
 [workspace]
 members = [
+"builder",
 "cargo_author",
 "cargo_toml",
 "categories",

@@ -193,10 +193,10 @@ impl BuildDb {
         })
     }
 
-    pub fn set_compat(&self, origin: &Origin, ver: &str, rustc_version: &str, compat: Compat, certain: bool) -> Result<()> {
+    pub fn set_compat(&self, origin: &Origin, ver: &str, rustc_version: &str, compat: Compat) -> Result<()> {
         let conn = self.conn.lock();
         // these are weak info, so don't replace good info with them
-        let mut ins = conn.prepare_cached(if !certain && compat != Compat::VerifiedWorks {
+        let mut ins = conn.prepare_cached(if compat != Compat::VerifiedWorks {
             r"INSERT OR IGNORE INTO build_results(origin, version, rustc_version, compat) VALUES(?1, ?2, ?3, ?4)"
         } else {
             "INSERT OR REPLACE INTO build_results(origin, version, rustc_version, compat) VALUES(?1, ?2, ?3, ?4)"
@@ -207,22 +207,22 @@ impl BuildDb {
         Ok(())
     }
 
-    pub fn set_raw_build_info(&self, origin: &Origin, ver: &str, stdout: &str, stderr: &str) -> Result<()> {
+    pub fn set_raw_build_info(&self, origin: &Origin, ver: &str, tool: &str, stdout: &str, stderr: &str) -> Result<()> {
         let conn = self.conn.lock();
-        let mut ins = conn.prepare_cached(r"INSERT OR REPLACE INTO raw_builds(origin, version, stdout, stderr) VALUES(?1, ?2, ?3, ?4)")?;
+        let mut ins = conn.prepare_cached(r"INSERT OR REPLACE INTO raw_builds(origin, version, tool, stdout, stderr) VALUES(?1, ?2, ?3, ?4, ?5)")?;
         let origin_str = origin.to_str();
-        ins.execute(&[origin_str.as_str(), ver, stdout, stderr])?;
+        ins.execute(&[origin_str.as_str(), ver, tool, stdout, stderr])?;
         Ok(())
     }
 
-    pub fn get_raw_build_info(&self, origin: &Origin, ver: &str) -> Result<Option<(String, String)>> {
+    /// tool, stdout, stderr
+    pub fn get_raw_build_info(&self, origin: &Origin, ver: &str) -> Result<Vec<(String, String, String)>> {
         let conn = self.conn.lock();
-        let mut get = conn.prepare_cached(r"SELECT stdout, stderr FROM raw_builds WHERE origin = ?1 AND version = ?2")?;
+        let mut get = conn.prepare_cached(r"SELECT tool, stdout, stderr FROM raw_builds WHERE origin = ?1 AND version = ?2")?;
         let origin_str = origin.to_str();
         let res = get.query_map(&[origin_str.as_str(), ver], |row| {
-            Ok((row.get(0)?, row.get(1)?))
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
         })?;
-        let mut res = res.collect::<Result<Vec<(String, String)>>>()?;
-        Ok(res.pop())
+        Ok(res.collect::<Result<Vec<(String, String, String)>>>()?)
     }
 }

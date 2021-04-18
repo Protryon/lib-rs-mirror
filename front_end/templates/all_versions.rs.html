@@ -40,6 +40,7 @@
             <th>Features</th>
           }
           <th class="dl">Downloads/<abbr title="month">mo</abbr></th>
+          <th class="msrv"><abbr title="minimum supported rust version">MSRV</abbr></th>
         </tr>
       @for v in c.version_history.iter().rev() {
         <tr class="@if v.yanked {yanked} @if v.is_semver_major_change {break}">
@@ -111,9 +112,19 @@
               @if v.dl.perc <= 0.0125 || v.dl.perc <= v.dl.num_width {@v.dl.str.0<b>@v.dl.str.1</b>}
             }
           </td>
+          <td class="msrv">
+            @if let Some((min, max, checked)) = v.msrv {
+              @if min == max {
+                @if !checked && max > 1 {1.@max~1.0} else {1.@max}
+              } else {
+                1.@max~1.@min
+              }
+            }
+          </td>
         </tr>
       }
       </table>
+      <p>Minimum Supported Rust Version (<abbr>MSRV</abbr>) is only approximate. A range of two versions means "oldest rustc verified to work ~ oldest rustc that might work", and the actual MSRV is somewhere between them. The data is based on the latest stable Rust version available at the time the crate has been published, and in some cases additionally checked with <code>cargo check</code> on Linux/x86.</p>
     </div>
   </main>
 

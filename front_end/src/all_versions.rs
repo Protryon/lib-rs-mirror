@@ -37,10 +37,13 @@ pub(crate) struct VerRow {
     pub dl: DownloadsBar,
     pub published_by: Option<(String, Option<String>)>,
     pub yanked_by: Option<(String, Option<String>)>,
+    pub msrv: Option<(u16, u16, bool)>, // min version, max version, both are rustc minor v; true if certain
 }
 
 impl<'a> AllVersions<'a> {
     pub(crate) async fn new(all: &'a RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink) -> Result<AllVersions<'a>, KitchenSinkErr> {
+        let compat = kitchen_sink.rustc_compatibility(all).await?;
+
         let (changelog_url, downloads, all_owners, release_meta) = futures::join!(
             kitchen_sink.changelog_url(ver),
             kitchen_sink.recent_downloads_by_version(ver.origin()),
@@ -89,7 +92,7 @@ impl<'a> AllVersions<'a> {
 
                 let dep_name = req.crate_name().to_ascii_lowercase();
                 let ver_req = req.requirement();
-                let (actual_version, _) = match kitchen_sink.crates_io_version_matching_requirement_by_lowercase_name(&dep_name, ver_req) {
+                let (actual_version, _) = match kitchen_sink.newest_crates_io_version_matching_requirement_by_lowercase_name(&dep_name, ver_req) {
                     Ok(d) => d,
                     Err(e) => {
                         log::warn!("{} requires broken {} {}: {}", all.name(), dep_name, ver_req, e);
@@ -161,6 +164,7 @@ impl<'a> AllVersions<'a> {
                     dl,
                     yanked_by,
                     published_by,
+                    msrv: None,
                 }
             }
 
@@ -203,6 +207,13 @@ impl<'a> AllVersions<'a> {
             feat_added.sort();
             feat_removed.sort();
 
+            let msrv = compat.get(&version).and_then(|c| {
+                c.oldest_ok.map(|oldest_ok| {
+                    let exact = c.newest_bad.is_some();
+                    (c.newest_bad.map(|n| n + 1).unwrap_or(oldest_ok), oldest_ok, exact)
+                })
+            });
+
             VerRow {
                 yanked,
                 version,
@@ -217,6 +228,7 @@ impl<'a> AllVersions<'a> {
                 dl,
                 yanked_by,
                 published_by,
+                msrv,
             }
         }).collect();
 
@@ -239,7 +251,6 @@ impl<'a> AllVersions<'a> {
             .flat_map(|v| v.published_by.iter().map(|(l, _)| l).chain(v.yanked_by.iter().map(|(l, _)| l)))
             .any(|login| login != &only_owner.login)
         });
-
 
         Ok(Self {
             has_authors,

@@ -29,7 +29,6 @@ use categories::Category;
 use chrono::prelude::*;
 use failure;
 use failure::ResultExt;
-use kitchen_sink::Compat;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::Review;
 use kitchen_sink::RichAuthor;
@@ -39,9 +38,8 @@ use render_readme::Markup;
 use render_readme::Renderer;
 use rich_crate::RichCrate;
 use rich_crate::RichCrateVersion;
-use semver::Version as SemVer;
 use std::borrow::Cow;
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::HashSet;
 use std::io::Write;
 use url::Url;
 
@@ -209,11 +207,6 @@ pub async fn render_crate_reviews(out: &mut impl Write, reviews: &[Review], ver:
     Ok(())
 }
 
-pub struct CompatRange {
-    oldest_ok: SemVer,
-    newest_bad: SemVer,
-}
-
 pub async fn render_trending_crates(out: &mut impl Write, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
     let (top, upd) = futures::join!(kitchen_sink.trending_crates(55), Box::pin(kitchen_sink.notable_recently_updated_crates(70)));
     let upd = upd?;
@@ -259,34 +252,19 @@ pub async fn render_trending_crates(out: &mut impl Write, kitchen_sink: &Kitchen
     Ok(())
 }
 
-pub fn render_debug_page(out: &mut impl Write, ver: &RichCrateVersion, kitchen_sink: &KitchenSink) -> Result<(), failure::Error> {
-    let mut by_crate_ver = BTreeMap::new();
-    let mut rustc_versions = BTreeSet::new();
+pub async fn render_debug_page(out: &mut impl Write, all: &RichCrate, kitchen_sink: &KitchenSink) -> Result<(), failure::Error> {
+    let mut rustc_versions = HashSet::new();
 
-    let compat = kitchen_sink.rustc_compatibility(ver.origin())?;
+    let by_crate_ver = kitchen_sink.rustc_compatibility(all).await?;
 
-    for c in &compat {
-        rustc_versions.insert(c.rustc_version.clone());
-
-        let t = by_crate_ver.entry(&c.crate_version).or_insert_with(|| CompatRange {
-            oldest_ok: "999.999.999".parse().unwrap(),
-            newest_bad: "0.0.0".parse().unwrap(),
-        });
-        match c.compat {
-            Compat::VerifiedWorks | Compat::ProbablyWorks => {
-                if t.oldest_ok > c.rustc_version {
-                    t.oldest_ok = c.rustc_version.clone();
-                }
-            },
-            Compat::Incompatible | Compat::BrokenDeps => {
-                if t.newest_bad < c.rustc_version {
-                    t.newest_bad = c.rustc_version.clone();
-                }
-            },
-        }
+    for c in by_crate_ver.values() {
+        if let Some(v) = c.oldest_ok { rustc_versions.insert(v); }
+        if let Some(v) = c.newest_ok { rustc_versions.insert(v); }
+        if let Some(v) = c.newest_bad { rustc_versions.insert(v); }
     }
 
-    let rustc_versions = rustc_versions.into_iter().rev().collect::<Vec<_>>();
+    let mut rustc_versions = rustc_versions.into_iter().collect::<Vec<u16>>();
+    rustc_versions.sort();
     templates::debug(out, (rustc_versions, by_crate_ver))?;
     Ok(())
 }

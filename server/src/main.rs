@@ -197,7 +197,10 @@ async fn run_server(rt: Handle) -> Result<(), failure::Error> {
             let response_timestamp = state.last_ok_response.load(Ordering::SeqCst);
             if response_timestamp + 60*5 < expected {
                 warn!("no requests for 5 minutes? probably a deadlock");
-                std::process::exit(2);
+                // don't exit in debug mode, because it's legitimately idling
+                if !cfg!(debug_assertions) {
+                    std::process::exit(2);
+                }
             }
         }
     }});
@@ -223,7 +226,7 @@ async fn run_server(rt: Handle) -> Result<(), failure::Error> {
             .route("/~{author}", web::get().to(handle_author))
             .route("/users/{author}", web::get().to(handle_author_redirect))
             .route("/install/{crate:.*}", web::get().to(handle_install))
-            .route("/debug/{crate:.*}", web::get().to(handle_debug))
+            .route("/compat/{crate:.*}", web::get().to(handle_compat))
             .route("/gh/{owner}/{repo}/{crate}", web::get().to(handle_github_crate))
             .route("/lab/{owner}/{repo}/{crate}", web::get().to(handle_gitlab_crate))
             .route("/atom.xml", web::get().to(handle_feed))
@@ -493,17 +496,19 @@ fn get_origin_from_subpath(q: &actix_web::dev::Path<Url>) -> Option<Origin> {
     }
 }
 
-async fn handle_debug(req: HttpRequest) -> Result<HttpResponse, ServerError> {
-    if !cfg!(debug_assertions) {
-        Err(failure::err_msg("off"))?
-    }
+async fn handle_compat(req: HttpRequest) -> Result<HttpResponse, ServerError> {
+    // if !cfg!(debug_assertions) {
+    //     Err(failure::err_msg("off"))?
+    // }
     let origin = get_origin_from_subpath(req.match_info()).ok_or(failure::format_err!("boo"))?;
     let state: &AServerState = req.app_data().expect("appdata");
     let crates = state.crates.load();
-    let crates2 = Arc::clone(&crates);
-    let ver = rt_run_timeout(&state.rt, "dbgcrate", 10, async move { crates2.rich_crate_version_async(&origin).await }).await?;
-    let mut page: Vec<u8> = Vec::with_capacity(32000);
-    front_end::render_debug_page(&mut page, &ver, &crates)?;
+    let page = rt_run_timeout(&state.rt, "dbgcrate", 60, async move {
+        let all = crates.rich_crate_async(&origin).await?;
+        let mut page: Vec<u8> = Vec::with_capacity(32000);
+        front_end::render_debug_page(&mut page, &all, &crates).await?;
+        Ok(page)
+    }).await?;
     Ok(HttpResponse::Ok()
         .content_type("text/html;charset=UTF-8")
         .insert_header(("Cache-Control", "no-cache"))

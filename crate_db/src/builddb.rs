@@ -11,20 +11,24 @@ pub struct BuildDb {
     pub(crate) conn: Mutex<Connection>,
 }
 
+pub type RustcMinorVersion = u16;
+
 #[derive(Debug, Clone)]
 pub struct CompatibilityInfo {
-    pub rustc_version: SemVer,
+    pub rustc_version: RustcMinorVersion, // 1.x.0
     pub crate_version: SemVer,
     pub compat: Compat,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Default)]
 pub struct CompatRange {
     // rustc version
-    pub oldest_ok: SemVer,
-    pub newest_bad: SemVer,
-    pub newest_ok: SemVer,
+    pub oldest_ok: Option<RustcMinorVersion>,
+    pub newest_bad: Option<RustcMinorVersion>,
+    pub newest_ok: Option<RustcMinorVersion>,
 }
+
+pub type CompatByCrateVersion = BTreeMap<SemVer, CompatRange>;
 
 #[derive(Debug)]
 pub struct RustcCompatRange {
@@ -37,7 +41,7 @@ pub struct RustcCompatRange {
 #[derive(Debug)]
 pub struct CrateCompatInfo {
     pub origin: Origin,
-    pub rustc_versions: Vec<(SemVer, RustcCompatRange)>,
+    pub rustc_versions: Vec<(RustcMinorVersion, RustcCompatRange)>,
     pub old_crates_broken_up_to: Option<SemVer>,
 }
 
@@ -95,7 +99,7 @@ impl BuildDb {
         })
     }
 
-    pub fn get_compat(&self, origin: &Origin) -> Result<Vec<CompatibilityInfo>> {
+    pub fn get_compat_raw(&self, origin: &Origin) -> Result<Vec<CompatibilityInfo>> {
         let conn = self.conn.lock();
         let mut get = conn.prepare_cached(r"SELECT rustc_version, version, compat FROM build_results WHERE origin = ?1")?;
         let origin_str = origin.to_str();
@@ -103,39 +107,137 @@ impl BuildDb {
         res.collect()
     }
 
-    pub fn get_all_compat(&self) -> Result<Vec<CrateCompatInfo>> {
+    pub fn get_compat(&self, origin: &Origin) -> Result<CompatByCrateVersion> {
+        let conn = self.conn.lock();
+        let mut get = conn.prepare_cached(r"SELECT rustc_version, version, compat FROM build_results WHERE origin = ?1")?;
+        let origin_str = origin.to_str();
+        let mut rows = get.query(&[origin_str.as_str()])?;
+        let mut compat = CompatByCrateVersion::new();
+        while let Some(row) = rows.next()? {
+            Self::append_compat(&mut compat, Self::compat_row(row)?);
+        }
+
+        // some crates used 2018 edition without using 2018 features,
+        // allowing very old edition-unaware Rust to compile it.
+        for v in compat.values_mut() {
+            if let (Some(oldest_ok), Some(newest_bad)) = (v.oldest_ok, v.newest_bad) {
+                if oldest_ok <= newest_bad {
+                    if oldest_ok < 29 {
+                        v.oldest_ok = Some(newest_bad + 1);
+                    } else {
+                        v.newest_bad = Some(oldest_ok - 1);
+                    }
+                }
+            }
+        }
+        // Remove broken data
+        for c in compat.values_mut() {
+            // if it never built, it may be garbage data
+            if c.oldest_ok.is_none() && c.newest_bad.is_some() {
+                c.newest_bad = None;
+            }
+        }
+        Ok(compat)
+    }
+
+    pub fn postprocess_compat(compat: &mut CompatByCrateVersion) {
+        let mut prev_oldest_ok = None;
+        for c in compat.values_mut().rev() {
+            if let (Some(prev_ok), Some(newest_bad)) = (prev_oldest_ok, c.newest_bad) {
+                // bad data or unexpected change in compatibility?
+                if prev_ok < newest_bad {
+                    prev_oldest_ok = None;
+                }
+            }
+
+            // assume that if the new version built with old rust, then older version will too
+            match (c.oldest_ok, prev_oldest_ok) {
+                (None, _) => { c.oldest_ok = prev_oldest_ok; }
+                (Some(curr), Some(prev)) if prev < curr => { c.oldest_ok = Some(prev); }
+                (Some(curr), _) => { prev_oldest_ok = Some(curr); }
+            }
+        }
+
+        // assume that once support for old Rust is dropped, it's not restored
+        let mut prev_newest_bad = None;
+        for c in compat.values_mut() {
+            // if it never built, it may be garbage data
+            if c.oldest_ok.is_none() {
+                c.newest_bad = None;
+            }
+
+            if let (Some(prev_bad), Some(oldest_ok)) = (prev_newest_bad, c.oldest_ok) {
+                // bad data or unexpected change in compatibility?
+                if prev_bad >= oldest_ok {
+                    prev_newest_bad = None;
+                }
+            }
+
+            match (c.newest_bad, prev_newest_bad) {
+                (None, _) => { c.newest_bad = prev_newest_bad; }
+                (Some(curr), Some(prev)) if prev > curr => { c.newest_bad = Some(prev); }
+                (Some(curr), _) => { prev_newest_bad = Some(curr); }
+            }
+
+            // fix data after all the changes
+            if let (Some(oldest_ok), Some(newest_ok)) = (c.oldest_ok, c.newest_ok) {
+                if newest_ok < oldest_ok {
+                    c.newest_ok = Some(oldest_ok);
+                }
+            }
+        }
+    }
+
+    fn get_all_compat_by_crate(&self) -> Result<HashMap<Origin, CompatByCrateVersion>> {
         let conn = self.conn.lock();
         let mut get = conn.prepare_cached(r"SELECT rustc_version, version, compat, origin FROM build_results")?;
 
-        let mut by_crate = HashMap::with_capacity(10000);
+        let mut by_crate = HashMap::with_capacity(20000);
 
-        let max_ver: SemVer = "999.999.999".parse().unwrap();
-        let min_ver: SemVer = "0.0.0".parse().unwrap();
+        let mut rows = get.query([])?;
+        while let Some(row) = rows.next()? {
+            let compat = Self::compat_row(row)?;
+            let origin = Origin::from_str(row.get_ref(3)?.as_str()?);
 
-        for row in get.query_map([], |row| Ok((Origin::from_str(row.get_ref_unwrap(3).as_str().unwrap()), Self::compat_row(row)?)))? {
-            let (origin, compat) = row?;
-            let by_ver = by_crate.entry(origin).or_insert_with(BTreeMap::default);
-            let t = by_ver.entry(compat.crate_version).or_insert_with(|| CompatRange {
-                oldest_ok: max_ver.clone(),
-                newest_ok: min_ver.clone(),
-                newest_bad: min_ver.clone(),
-            });
-            match compat.compat {
-                Compat::VerifiedWorks | Compat::ProbablyWorks => {
-                    if compat.rustc_version < t.oldest_ok {
-                        t.oldest_ok = compat.rustc_version.clone();
-                    }
-                    if compat.rustc_version > t.newest_ok {
-                        t.newest_ok = compat.rustc_version;
-                    }
-                },
-                Compat::Incompatible | Compat::BrokenDeps => {
-                    if compat.rustc_version > t.newest_bad {
-                        t.newest_bad = compat.rustc_version;
-                    }
-                },
-            }
+            let mut by_ver = by_crate.entry(origin).or_insert_with(BTreeMap::default);
+
+            Self::append_compat(&mut by_ver, compat);
         }
+        Ok(by_crate)
+    }
+
+    fn append_compat(by_ver: &mut CompatByCrateVersion, c: CompatibilityInfo) {
+        let t = by_ver.entry(c.crate_version).or_insert_with(CompatRange::default);
+
+        let rustc_version = c.rustc_version;
+        match c.compat {
+            Compat::VerifiedWorks | Compat::ProbablyWorks => {
+                if t.oldest_ok.as_ref().map_or(true, |v| rustc_version < *v) {
+                    t.oldest_ok = Some(rustc_version);
+                }
+                else if t.newest_ok.as_ref().map_or(true, |v| rustc_version > *v) {
+                    t.newest_ok = Some(rustc_version);
+                }
+            },
+            Compat::Incompatible | Compat::BrokenDeps => {
+                if t.newest_bad.as_ref().map_or(true, |v| rustc_version > *v) {
+                    t.newest_bad = Some(rustc_version);
+                }
+            },
+        }
+    }
+
+    fn compat_row(row: &Row) -> Result<CompatibilityInfo> {
+        Ok(CompatibilityInfo {
+            rustc_version: SemVer::parse(row.get_ref_unwrap(0).as_str()?).expect("semver").minor as RustcMinorVersion,
+            crate_version: SemVer::parse(row.get_ref_unwrap(1).as_str()?).expect("semver"),
+            compat: Compat::from_str(row.get_ref_unwrap(2).as_str()?),
+        })
+    }
+
+    pub fn get_all_compat(&self) -> Result<Vec<CrateCompatInfo>> {
+        let by_crate = self.get_all_compat_by_crate()?;
+
         Ok(by_crate.into_iter().map(|(origin, compat)| {
             let mut rustc_versions = BTreeSet::new();
             let mut old_crates_broken_up_to = None;
@@ -144,32 +246,33 @@ impl BuildDb {
             for (crate_ver, c) in &compat {
                 // there are pre-rust-1.0 crates that are broken in their 1.0 versions
                 if !seen_any_ok_build {
-                    if c.oldest_ok != max_ver || c.newest_ok != min_ver {
+                    if c.oldest_ok.is_some() || c.newest_ok.is_some() {
                         seen_any_ok_build = true;
-                    } else if c.newest_bad != min_ver {
+                    } else if c.newest_bad.is_some() {
                         old_crates_broken_up_to = Some(crate_ver);
                     }
                 }
-                if c.oldest_ok != max_ver {rustc_versions.insert((c.oldest_ok.major, c.oldest_ok.minor));}
-                if c.newest_bad != min_ver {rustc_versions.insert((c.newest_bad.major, c.newest_bad.minor));}
-                if c.newest_ok != min_ver {rustc_versions.insert((c.newest_ok.major, c.newest_ok.minor));}
+                if let Some(v) = c.oldest_ok {rustc_versions.insert(v);}
+                if let Some(v) = c.newest_bad {rustc_versions.insert(v);}
+                if let Some(v) = c.newest_ok {rustc_versions.insert(v);}
             }
             // if everything is broken, we just don't know if it's a pre-1.0 problem or bad crate.
             // assume only 0.x crates are rotten. If someone released 1.x then it should have been usable!
             if !seen_any_ok_build || old_crates_broken_up_to.map_or(false, |v| v.major > 0) {
                 old_crates_broken_up_to = None;
             }
-            let rustc_versions = rustc_versions.into_iter().map(|(rmajor, rminor)| {
-                let rv = SemVer::new(rmajor, rminor, 0);
-                let rv_patch = SemVer::new(rmajor, rminor, 999); // unify 1.24.0 and 1.24.1
+            let rustc_versions = rustc_versions.into_iter().map(|rv| {
                 let crate_oldest_bad = compat.iter()
                     .filter(|(crate_ver, _)| old_crates_broken_up_to.map_or(true, |b| *crate_ver > b))
-                    .filter(|(_, rustc)| rv <= rustc.newest_bad).map(|(crate_ver, _)| crate_ver).min();
+                    .filter(|(_, rustc)| rustc.newest_bad.map_or(true, |v| rv <= v))
+                    .map(|(crate_ver, _)| crate_ver).min();
                 let crate_newest_bad = compat.iter()
-                    .filter(|(_, rustc)| rv <= rustc.newest_bad).map(|(crate_ver, _)| crate_ver).max();
+                    .filter(|(_, rustc)| rustc.newest_bad.map_or(true, |v| rv <= v))
+                    .map(|(crate_ver, _)| crate_ver).max();
                 let crate_newest_ok = compat.iter()
                     .filter(|(crate_ver, _)| old_crates_broken_up_to.map_or(true, |b| *crate_ver > b))
-                    .filter(|(_, rustc)| rv_patch >= rustc.oldest_ok).map(|(crate_ver, _)| crate_ver).max();
+                    .filter(|(_, rustc)| rustc.oldest_ok.map_or(true, |v| rv >= v))
+                    .map(|(crate_ver, _)| crate_ver).max();
                 (rv, RustcCompatRange {
                     crate_newest_bad: crate_newest_bad.cloned(),
                     crate_oldest_bad: crate_oldest_bad.cloned(),
@@ -184,14 +287,6 @@ impl BuildDb {
         }).collect())
     }
 
-    fn compat_row(row: &Row) -> Result<CompatibilityInfo> {
-        let compat = Compat::from_str(row.get_ref_unwrap(2).as_str().expect("strtype"));
-        Ok(CompatibilityInfo {
-            rustc_version: SemVer::parse(row.get_ref_unwrap(0).as_str().unwrap()).expect("semver"),
-            crate_version: SemVer::parse(row.get_ref_unwrap(1).as_str().unwrap()).expect("semver"),
-            compat,
-        })
-    }
 
     pub fn set_compat(&self, origin: &Origin, ver: &str, rustc_version: &str, compat: Compat) -> Result<()> {
         let conn = self.conn.lock();

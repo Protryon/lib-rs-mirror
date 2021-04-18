@@ -21,7 +21,8 @@ pub use crate::nonblock::*;
 mod tarball;
 
 pub use crate_db::builddb::Compat;
-pub use crate_db::builddb::CompatibilityInfo;
+pub use crate_db::builddb::CompatRange;
+pub use crate_db::builddb::CompatByCrateVersion;
 pub use crate_db::CrateOwnerRow;
 pub use crates_io_client::CrateDepKind;
 pub use crates_io_client::CrateDependency;
@@ -167,6 +168,8 @@ pub enum KitchenSinkErr {
     GitCrateNotAllowed(Origin),
     #[fail(display = "Deps err: {}", _0)]
     Deps(DepsErr),
+    #[fail(display = "Bad rustc compat data")]
+    BadRustcCompatData,
 }
 
 #[derive(Debug, Clone)]
@@ -198,7 +201,9 @@ pub struct KitchenSink {
     throttle: tokio::sync::Semaphore,
     auto_indexing_throttle: tokio::sync::Semaphore,
     crev: Arc<Creviews>,
+    crate_rustc_compat_cache: RwLock<HashMap<Origin, CompatByCrateVersion>>,
     data_path: PathBuf,
+
 }
 
 impl KitchenSink {
@@ -249,6 +254,7 @@ impl KitchenSink {
             depender_changes: TempCache::new(&data_path.join("deps-changes2.tmp"))?,
             throttle: tokio::sync::Semaphore::new(40),
             auto_indexing_throttle: tokio::sync::Semaphore::new(4),
+            crate_rustc_compat_cache: RwLock::new(HashMap::new()),
             data_path: data_path.into(),
         })
         })
@@ -1356,21 +1362,26 @@ impl KitchenSink {
         }
     }
 
-    pub fn crates_io_version_matching_requirement_by_lowercase_name(&self, crate_name: &str, req: &str) -> Result<(SemVer, CratesIndexVersion), KitchenSinkErr> {
+    #[inline]
+    fn iter_crates_io_version_matching_requirement_by_lowercase_name(&self, crate_name: &str, req: &str) -> Result<impl Iterator<Item=(SemVer, &CratesIndexVersion)> + '_, KitchenSinkErr> {
         assert!(crate_name.as_bytes().iter().all(|c| !c.is_ascii_uppercase()));
 
         let req = VersionReq::parse(req).map_err(|_| KitchenSinkErr::NoVersions)?;
 
-        self.index.crates_io_crate_by_lowercase_name(crate_name).map_err(KitchenSinkErr::Deps)?
+        Ok(self.index.crates_io_crate_by_lowercase_name(crate_name).map_err(KitchenSinkErr::Deps)?
             .versions()
             .iter()
-            .filter_map(|v| {
+            .filter_map(move |v| {
                 let semver = v.version().parse().ok()?;
                 if req.matches(&semver) {
                     Some((semver, v))
                 } else {None}
-            })
-            .max_by(|(a, _), (b, _)| b.cmp(a))
+            }))
+    }
+
+    pub fn newest_crates_io_version_matching_requirement_by_lowercase_name(&self, crate_name: &str, req: &str) -> Result<(SemVer, CratesIndexVersion), KitchenSinkErr> {
+        self.iter_crates_io_version_matching_requirement_by_lowercase_name(crate_name, req)?
+            .max_by(|(a, _), (b, _)| a.cmp(b))
             .map(|(s, v)| (s, v.clone()))
             .ok_or(KitchenSinkErr::NoVersions)
     }
@@ -1787,9 +1798,134 @@ impl KitchenSink {
         Ok(Box::pin(self.gh.user_by_login(github_login)).await?) // errs on 404
     }
 
-    pub fn rustc_compatibility(&self, origin: &Origin) -> CResult<Vec<CompatibilityInfo>> {
-        let db = BuildDb::new(self.main_cache_dir().join("builds.db"))?;
-        Ok(db.get_compat(origin)?)
+    fn rustc_compatibility_inner_non_recursive(&self, all: &RichCrate, db: &BuildDb) -> Result<CompatByCrateVersion, KitchenSinkErr> {
+        let mut c = db.get_compat(all.origin())
+            .map_err(|e| error!("bad compat: {}", e))
+            .unwrap_or_default();
+
+        // insert versions that aren't in the db, to have the full list.
+        // doing so before postproc will copy data to these.
+        for ver in all.versions().iter().filter(|v| !v.yanked) {
+            let created = DateTime::parse_from_rfc3339(&ver.created_at).map_err(|_| KitchenSinkErr::BadRustcCompatData)?;
+
+            let semver: SemVer = ver.num.parse().map_err(|_| KitchenSinkErr::BadRustcCompatData)?;
+            let c = c.entry(semver).or_insert_with(Default::default);
+
+            let expected_rust = Self::rustc_release_from_date(&created);
+            if c.newest_bad.map_or(false, |bad| bad >= expected_rust) {
+                c.newest_bad = None; // bad data?
+            }
+            // assume it compiled with the latest stable at the time of the release
+            if c.oldest_ok.map_or(true, |n| n > expected_rust) {
+                c.oldest_ok = Some(expected_rust);
+            }
+        }
+        // this is needed to copy build failures from non-matching versions to matching versions
+        BuildDb::postprocess_compat(&mut c);
+        Ok(c)
+    }
+
+    fn crate_rustc_compat_get_cached(&self, origin: &Origin) -> Option<CompatByCrateVersion> {
+        self.crate_rustc_compat_cache.read().get(origin).cloned()
+    }
+
+    fn crate_rustc_compat_set_cached(&self, origin: Origin, val: CompatByCrateVersion) {
+        self.crate_rustc_compat_cache.write().insert(origin, val);
+    }
+
+    pub async fn rustc_compatibility(&self, all: &RichCrate) -> Result<CompatByCrateVersion, KitchenSinkErr> {
+        if let Some(cached) = self.crate_rustc_compat_get_cached(all.origin()) {
+            return Ok(cached);
+        }
+        let db = BuildDb::new(self.main_cache_dir().join("builds.db")).map_err(|_| KitchenSinkErr::BadRustcCompatData)?;
+
+        let mut c = self.rustc_compatibility_inner_non_recursive(all, &db)?;
+
+        // crates most often fail to compile because their dependencies fail
+        if let Ok(vers) = self.all_crates_io_versions(all.origin()) {
+            let vers = vers.iter()
+            .filter_map(|v| {
+                let crate_ver: SemVer = v.version().parse().ok()?;
+                Some((v, crate_ver))
+            })
+            .map(|(v, crate_ver)| {
+                let mut deps_to_check = Vec::with_capacity(v.dependencies().len());
+                for dep in v.dependencies() {
+                    if dep.is_optional() {
+                        continue;
+                    }
+                    if dep.kind() == DependencyKind::Dev {
+                        continue;
+                    }
+                    if let Ok(req) = VersionReq::parse(dep.requirement()) {
+                        let dep_origin = Origin::from_crates_io_name(dep.crate_name());
+                        if &dep_origin == all.origin() {
+                            // recursive check not supported
+                            continue;
+                        }
+                        deps_to_check.push((dep_origin, req));
+                    }
+                }
+                (Arc::new(crate_ver), deps_to_check)
+            });
+
+            // group by origin to avoid requesting rich_crate_async too much
+            let mut by_dep = HashMap::new();
+            for (crate_ver, deps_to_check) in vers {
+                for (origin, req) in deps_to_check {
+                    by_dep.entry(origin).or_insert_with(Vec::new).push((crate_ver.clone(), req));
+                }
+            }
+
+            // fetch crate meta in parallel
+            let db = &db;
+            let deps = futures::future::join_all(by_dep.into_iter().map(|(dep_origin, reqs)| {
+                async move {
+                    let dep_compat = if let Some(cached) = self.crate_rustc_compat_get_cached(&dep_origin) {
+                        cached
+                    } else {
+                        let dep_rich_crate = self.rich_crate_async(&dep_origin).await.ok()?;
+                        self.rustc_compatibility_inner_non_recursive(&dep_rich_crate, db).ok()?
+                    };
+                    Some((dep_compat, dep_origin, reqs))
+                }
+            })).await;
+
+            for (dep_compat, dep_origin, reqs) in deps.into_iter().filter_map(|x| x) {
+                for (crate_ver, req) in reqs {
+                    let c = match c.get_mut(&crate_ver) {
+                        Some(c) => c,
+                        None => {
+                            c.insert((*crate_ver).clone(), Default::default());
+                            c.get_mut(&crate_ver).unwrap()
+                        },
+                    };
+                    let dep_newest_bad = dep_compat.iter()
+                        .filter_map(|(semver, compat)| Some((semver, compat.newest_bad?)))
+                        .filter(|(semver, _)| req.matches(semver))
+                        .map(|(_, n)| n)
+                        .min()
+                        .unwrap_or(0);
+                    if c.newest_bad.unwrap_or(0) < dep_newest_bad && dep_newest_bad < c.oldest_ok.unwrap_or(9999) {
+                        debug!("{} {} MSRV went from {} to {} because of {} {}", all.name(), crate_ver, c.newest_bad.unwrap_or(0), dep_newest_bad, dep_origin.short_crate_name(), req);
+                        c.newest_bad = Some(dep_newest_bad);
+                    }
+                }
+            }
+        }
+        // postprocess (again) to update
+        BuildDb::postprocess_compat(&mut c);
+
+        self.crate_rustc_compat_set_cached(all.origin().clone(), c.clone());
+        Ok(c)
+    }
+
+    fn rustc_release_from_date(date: &DateTime<FixedOffset>) -> u16 {
+        let zero = Utc.ymd(2015,5,15).and_hms(0,0,0);
+        let age = date.signed_duration_since(zero);
+        let weeks = age.num_weeks();
+        if weeks < 0 { return 0; }
+        ((weeks+1)/6) as _
     }
 
     /// List of all notable crates
@@ -2717,3 +2853,85 @@ fn timeout<'a, T, E: From<KitchenSinkErr>>(label: &'static str, time: u16, f: im
         E::from(KitchenSinkErr::TimedOut(label, time))
     }).and_then(|x| x)))
 }
+
+#[test]
+fn rustc_rel_dates() {
+    static RUST_RELEASE_DATES: [(u16,u8,u8, u16); 71] = [
+        (2015,05,15, 0), //.0
+        (2015,06,25, 1), //.0
+        (2015,08,07, 2), //.0
+        (2015,09,17, 3), //.0
+        (2015,10,29, 4), //.0
+        (2015,12,10, 5), //.0
+        (2016,01,21, 6), //.0
+        (2016,03,03, 7), //.0
+        (2016,04,14, 8), //.0
+        (2016,05,26, 9), //.0
+        (2016,07,07, 10), //.0
+        (2016,08,18, 11), //.0
+        (2016,09,29, 12), //.0
+        (2016,10,20, 12), //.1
+        (2016,11,10, 13), //.0
+        (2016,12,22, 14), //.0
+        (2017,02,02, 15), //.0
+        (2017,02,09, 15), //.1
+        (2017,03,16, 16), //.0
+        (2017,04,27, 17), //.0
+        (2017,06,08, 18), //.0
+        (2017,07,20, 19), //.0
+        (2017,08,31, 20), //.0
+        (2017,10,12, 21), //.0
+        (2017,11,22, 22), //.0
+        (2017,11,22, 22), //.1
+        (2018,01,04, 23), //.0
+        (2018,02,15, 24), //.0
+        (2018,03,01, 24), //.1
+        (2018,03,29, 25), //.0
+        (2018,05,10, 26), //.0
+        (2018,05,29, 26), //.1
+        (2018,06,05, 26), //.2
+        (2018,06,21, 27), //.0
+        (2018,07,10, 27), //.1
+        (2018,07,20, 27), //.2
+        (2018,08,02, 28), //.0
+        (2018,09,13, 29), //.0
+        (2018,09,25, 29), //.1
+        (2018,10,11, 29), //.2
+        (2018,10,25, 30), //.0
+        (2018,11,08, 30), //.1
+        (2018,12,06, 31), //.0
+        (2018,12,20, 31), //.1
+        (2019,01,17, 32), //.0
+        (2019,02,28, 33), //.0
+        (2019,04,11, 34), //.0
+        (2019,04,25, 34), //.1
+        (2019,05,14, 34), //.2
+        (2019,05,23, 35), //.0
+        (2019,07,04, 36), //.0
+        (2019,08,15, 37), //.0
+        (2019,09,20, 38), //.0
+        (2019,11,07, 39), //.0
+        (2019,12,19, 40), //.0
+        (2020,01,30, 41), //.0
+        (2020,02,27, 41), //.1
+        (2020,03,12, 42), //.0
+        (2020,04,23, 43), //.0
+        (2020,05,07, 43), //.1
+        (2020,06,04, 44), //.0
+        (2020,06,18, 44), //.1
+        (2020,07,16, 45), //.0
+        (2020,07,30, 45), //.1
+        (2020,08,03, 45), //.2
+        (2020,08,27, 46), //.0
+        (2020,10,08, 47), //.0
+        (2020,11,19, 48), //.0
+        (2020,12,31, 49), //.0
+        (2021,02,11, 50), //.0
+        (2021,03,25, 51), //.0
+    ];
+    for (y,m,d, ver) in RUST_RELEASE_DATES.iter().copied() {
+        let date = FixedOffset::east(0).ymd(y as _,m as _,d as _).and_hms(0, 0, 0);
+        assert_eq!(ver, KitchenSink::rustc_release_from_date(&date));
+    }
+}
+

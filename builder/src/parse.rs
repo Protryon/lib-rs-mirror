@@ -9,6 +9,7 @@ pub const DIVIDER: &str = "---XBdt8MQTMWYwcSsH---";
 #[derive(Deserialize)]
 pub struct CompilerMessageInner {
     level: String,
+    message: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -54,7 +55,8 @@ fn parse_package_id(id: &str) -> Option<(String, String)> {
 }
 
 fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
-    if stdout.trim() == "" {
+    let stdout = stdout.trim();
+    if stdout == "" {
         return None;
     }
 
@@ -62,29 +64,80 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
     let user_time = Regex::new(r"^user\s+(\d+)m(\d+\.\d+)s$").expect("regex");
 
     let mut lines = stdout.split('\n');
-    let mut first_line = lines.next()?.split(' ');
-    if first_line.next().unwrap() != "CHECKING" {
-        eprintln!("----------\nBad first line of:\n{}\nErr:\n{}\n----------", stdout, stderr);
+    let first_line = lines.next()?;
+    let mut fl = first_line.split(' ');
+    if fl.next().unwrap() != "CHECKING" {
+        eprintln!("----------\nBad first line {}", first_line);
         return None;
     }
-    findings.rustc_version = Some(first_line.next()?.to_owned());
+    findings.rustc_version = Some(fl.next()?.to_owned());
 
     for line in lines.filter(|l| l.starts_with('{')) {
+        let line = line
+            .trim_start_matches("unknown line ")
+            .trim_start_matches("failure-note ")
+            .trim_start_matches("compiler-message ");
+
         if let Ok(msg) = serde_json::from_str::<CompilerMessage>(line) {
             if let Some((name, ver)) = parse_package_id(&msg.package_id) {
                 if name == "______" || name == "_____" || name == "build-script-build" {
                     continue;
                 }
                 let level = msg.message.as_ref().map(|m| m.level.as_str()).unwrap_or("");
-                let reason = msg.reason.as_ref().map(|s| s.as_str()).unwrap_or("");
+                let reason = msg.reason.as_deref().unwrap_or("");
                 // not an achievement, ignore
                 if msg.filenames.iter().any(|f| f.contains("/build-script-build")) {
                     continue;
                 }
+
+                let desc = msg.message.as_ref().and_then(|m| m.message.as_deref());
+                if let Some(desc) = desc {
+                    if desc.starts_with("no method named `trim_start`") {
+                        findings.crates.insert((Some("1.29.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                    }
+                    else if desc.starts_with("use of unstable library feature 'matches_macro'") ||
+                        desc.starts_with("cannot find macro `matches!`") ||
+                        desc.starts_with("no associated item named `MAX` found for type `u") {
+                        findings.crates.insert((Some("1.41.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                    }
+                    else if desc.starts_with("no associated item named `MAX` found for type `u") {
+                        findings.crates.insert((Some("1.42.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                    }
+                    else if desc.starts_with("use of unstable library feature 'ptr_cast") ||
+                       desc.starts_with("use of unstable library feature 'duration_float") ||
+                       desc.starts_with("unresolved import `core::any::type_name") ||
+                       desc.starts_with("unresolved import `std::any::type_name") ||
+                       desc.starts_with("use of unstable library feature 'euclidean_division") {
+                        findings.crates.insert((Some("1.37.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                    }
+                    else if desc.starts_with("use of unstable library feature 'option_flattening") ||
+                        desc.starts_with("cannot find function `take` in module `mem") ||
+                        desc.starts_with("subslice patterns are unstable") ||
+                        desc.starts_with("syntax for subslices in slice patterns is not yet stabilized") ||
+                        desc.starts_with("non exhaustive is an experimental feature") {
+                        findings.crates.insert((Some("1.39.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                    }
+                    else if desc.starts_with("cannot bind by-move into a pattern") ||
+                        desc.starts_with("async/await is unstable") ||
+                        desc.starts_with("async blocks are unstable") ||
+                        desc.starts_with("async fn is unstable") {
+                        findings.crates.insert((Some("1.38.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                    }
+                    else if desc.starts_with("use of unstable library feature 'copy_within") ||
+                       desc.starts_with("naming constants with `_` is unstable") ||
+                       desc.starts_with("use of unstable library feature 'option_xor'") ||
+                       desc.starts_with("enum variants on type aliases are experimental") {
+                        findings.crates.insert((Some("1.36.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                    } else {
+                        eprintln!("• err: {}", desc);
+                    }
+                }
+
                 if msg.target.as_ref().and_then(|t| t.edition.as_ref()).map_or(false, |e| e == "2018") {
                     findings.crates.insert((Some("1.30.1"), name.clone(), ver.clone(), Compat::Incompatible));
                 }
                 if level == "error" {
+                    // eprintln!("{}: {}", );
                     findings.crates.insert((None, name, ver, Compat::Incompatible));
                 } else if reason == "compiler-artifact" {
                     findings.crates.insert((None, name, ver, Compat::VerifiedWorks));

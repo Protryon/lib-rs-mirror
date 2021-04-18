@@ -8,6 +8,7 @@ extern crate log;
 
 mod yearly;
 use tokio::time::Instant;
+
 use futures::FutureExt;
 pub use crate::yearly::*;
 pub use deps_index::*;
@@ -66,6 +67,7 @@ use github_info::GitCommitAuthor;
 use github_info::GitHubRepo;
 use github_info::MinimalUser;
 use itertools::Itertools;
+use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 use rayon::prelude::*;
 use repo_url::Repo;
@@ -202,6 +204,7 @@ pub struct KitchenSink {
     auto_indexing_throttle: tokio::sync::Semaphore,
     crev: Arc<Creviews>,
     crate_rustc_compat_cache: RwLock<HashMap<Origin, CompatByCrateVersion>>,
+    crate_rustc_compat_db: OnceCell<BuildDb>,
     data_path: PathBuf,
 
 }
@@ -255,6 +258,7 @@ impl KitchenSink {
             throttle: tokio::sync::Semaphore::new(40),
             auto_indexing_throttle: tokio::sync::Semaphore::new(4),
             crate_rustc_compat_cache: RwLock::new(HashMap::new()),
+            crate_rustc_compat_db: OnceCell::new(),
             data_path: data_path.into(),
         })
         })
@@ -1837,9 +1841,11 @@ impl KitchenSink {
         if let Some(cached) = self.crate_rustc_compat_get_cached(all.origin()) {
             return Ok(cached);
         }
-        let db = BuildDb::new(self.main_cache_dir().join("builds.db")).map_err(|_| KitchenSinkErr::BadRustcCompatData)?;
+        let db = self.crate_rustc_compat_db
+            .get_or_try_init(|| BuildDb::new(self.main_cache_dir().join("builds.db")))
+            .map_err(|_| KitchenSinkErr::BadRustcCompatData)?;
 
-        let mut c = self.rustc_compatibility_inner_non_recursive(all, &db)?;
+        let mut c = self.rustc_compatibility_inner_non_recursive(all, db)?;
 
         // crates most often fail to compile because their dependencies fail
         if let Ok(vers) = self.all_crates_io_versions(all.origin()) {
@@ -1878,7 +1884,6 @@ impl KitchenSink {
             }
 
             // fetch crate meta in parallel
-            let db = &db;
             let deps = futures::future::join_all(by_dep.into_iter().map(|(dep_origin, reqs)| {
                 async move {
                     let dep_compat = if let Some(cached) = self.crate_rustc_compat_get_cached(&dep_origin) {

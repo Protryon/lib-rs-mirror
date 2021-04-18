@@ -1,9 +1,9 @@
-use std::sync::Arc;
 use parking_lot::Mutex;
+use rand::seq::SliceRandom;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Write;
-use std::collections::BTreeMap;
+use std::sync::Arc;
 
 // sudo rm -rf /var/tmp/crates_env/target/*/debug/{.fingerprint,.cargo-lock,incremental}; sudo chown -R 4321:4321 /var/tmp/crates_env/; sudo chmod -R a+rwX /var/tmp/crates_env/
 const DOCKERFILE: &str = r##"
@@ -15,21 +15,29 @@ WORKDIR /home/rustyuser
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.51.0 --verbose # wat
 ENV PATH="$PATH:/home/rustyuser/.cargo/bin"
 RUN rustup set profile minimal
+RUN rustup toolchain add 1.28.0
+RUN rustup toolchain add 1.32.0
+RUN rustup toolchain add 1.34.0
+RUN rustup toolchain add 1.36.0
 RUN rustup toolchain add 1.39.0
-RUN rustup toolchain add 1.43.0
+RUN rustup toolchain add 1.42.0
+RUN rustup toolchain add 1.45.0
+RUN rustup toolchain add 1.47.0
 RUN rustup toolchain add 1.50.0
 RUN rustup toolchain list
-RUN cargo install --git https://gitlab.com/kornelski/LTS lts; cargo lts 2020-01-01
 "##;
 
 const TEMP_JUNK_DIR: &str = "/var/tmp/crates_env";
 
-const RUST_VERSIONS: [&str; 3] = [
-    // "1.29.2",
-    // "1.36.0",
+const RUST_VERSIONS: [&str; 9] = [
+    "1.28.0",
+    "1.32.0",
+    "1.34.0",
+    "1.36.0",
     "1.39.0",
-    "1.43.0",
-    // "1.47.0",
+    "1.42.0",
+    "1.45.0",
+    "1.47.0",
     "1.50.0",
 ];
 
@@ -50,6 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let db = BuildDb::new(crates.main_cache_dir().join("builds.db"))?;
     let docker_root = crates.main_cache_dir().join("docker");
+    eprintln!("starting…");
     prepare_docker(&docker_root)?;
 
     let filter = std::env::args().nth(1);
@@ -67,7 +76,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             continue; // junk?
         }
 
-        if let Err(e) = analyze_crate(&all, &db, &crates, &docker_root) {
+        if let Err(e) = analyze_crate(&all, &db, &crates, &docker_root).await {
             eprintln!("•• {}: {}", all.name(), e);
             continue;
         }
@@ -75,37 +84,42 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn analyze_crate(all: &CratesIndexCrate, db: &BuildDb, crates: &KitchenSink, docker_root: &Path) -> Result<(), Box<dyn std::error::Error>> {
+async fn analyze_crate(all: &CratesIndexCrate, db: &BuildDb, crates: &KitchenSink, docker_root: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let origin = &Origin::from_crates_io_name(all.name());
-
-    let compat_info = db.get_compat(origin)?;
-
     let ver = all.latest_version();
-    for (_, stdout, stderr) in db.get_raw_build_info(origin, ver.version())? {
-        println!("already done {}, but redoing anyway", all.name());
-        for f in parse_analyses(&stdout, &stderr) {
-            if let Some(rustc_version) = f.rustc_version {
-                for (rustc_override, name, version, compat) in f.crates {
-                    let rustc_version = rustc_override.unwrap_or(&rustc_version);
-                    db.set_compat(&Origin::from_crates_io_name(&name), &version, rustc_version, compat)?;
-                }
-            }
-        }
+
+    if !db.get_raw_build_info(origin, ver.version())?.is_empty() {
+        println!("already done {}", all.name());
+        return Ok(())
     }
     println!("checking {}", all.name());
 
-    let mut versions = BTreeMap::new();
-    let tmp: Vec<_> = all.versions().iter().rev().take(30)
+    let mut compat_info = crates.rustc_compatibility(&crates.rich_crate_async(&origin).await?).await.map_err(|_| "rustc_compatibility")?;
+    let mut candidates: Vec<_> = all.versions().iter().rev().take(100)
         .filter(|v| !v.is_yanked())
         .filter_map(|v| SemVer::parse(v.version()).ok())
-        .filter(|v| compat_info.get(v).is_none())
+        .map(|v| {
+            (compat_info.remove(&v).unwrap_or_default(), v)
+        })
+        .filter(|(compat, _)| {
+            // any versions left unchecked?
+            compat.oldest_ok.unwrap_or(999) != compat.newest_bad.unwrap_or(0)+1
+        })
         .collect();
-    for ver in tmp.into_iter().rev() {
-        let unstable = ver.major == 0;
-        let major = if unstable { ver.minor } else { ver.major };
-        versions.insert((unstable, major), ver); // later wins
-    }
-    let versions: Vec<SemVer> = versions.into_iter().rev().map(|(_,v)| v).take(4).rev().collect();
+    // pick versions in random order
+    candidates.shuffle(&mut rand::thread_rng());
+
+    let mut available_rust_versions = RUST_VERSIONS.to_vec();
+    let versions: Vec<_> = candidates.into_iter().filter_map(|(compat, v)| {
+        let max_ver = compat.oldest_ok.unwrap_or(999);
+        let min_ver = compat.newest_bad.unwrap_or(0);
+        let rustc_idx = available_rust_versions.iter().position(|v| {
+            let minor = SemVer::parse(v).unwrap().minor as u16;
+            minor >= min_ver && minor <= max_ver
+        })?;
+        Some((available_rust_versions.swap_remove(rustc_idx), v))
+    }).collect();
+
     if versions.is_empty() {
         return Ok(());
     }
@@ -152,45 +166,39 @@ fn prepare_docker(docker_root: &Path) -> Result<(), Box<dyn std::error::Error>> 
     Ok(())
 }
 
-fn do_builds(_crates: &KitchenSink, all: &CratesIndexCrate, docker_root: &Path, versions: &[SemVer]) -> Result<(String, String), Box<dyn std::error::Error>> {
+// versions is (rustc version, crate version)
+fn do_builds(_crates: &KitchenSink, all: &CratesIndexCrate, docker_root: &Path, versions: &[(&'static str, SemVer)]) -> Result<(String, String), Box<dyn std::error::Error>> {
     let script = format!(r##"
         set -euo pipefail
-        rustup default {rustc_old_version};
-        export CARGO_TARGET_DIR=/home/rustyuser/cargo_target/{rustc_old_version};
-        for libver in {lib_versions}; do
+        function check_crate_with_rustc() {{
+            local rustver="$1"
+            local libver="$2"
+            echo "CHECKING $rustver {crate_name} $libver"
+            mkdir -p "crate-$libver/src";
+            cd "crate-$libver";
+            touch src/lib.rs
+            printf > Cargo.toml '[package]\nname="_____"\nversion="0.0.0"\n[profile.dev]\ndebug=false\n[dependencies]\n{crate_name} = "=%s"\n' "$libver";
+            export CARGO_TARGET_DIR=/home/rustyuser/cargo_target/$rustver;
+            timeout 60 cargo +$rustver fetch;
+            time timeout 200 cargo +$rustver check --locked --message-format=json;
+        }}
+        rustup default {rustc_last_version} >/dev/null;
+        for job in {jobs}; do
             (
-                mkdir -p "crate-$libver"/src;
-                cd "crate-$libver";
-                touch src/lib.rs;
-                printf > Cargo.toml '[package]\nname="_____"\nversion="0.0.0"\n[profile.dev]\ndebug=false\n[dependencies]\n{crate_name} = "=%s"\n' "$libver";
-                timeout 60 cargo fetch;
-            ) &
+                check_crate_with_rustc $job > /tmp/"output-$job" 2>/tmp/"outputerr-$job" && echo "$job done ok" || echo "$job failed"
+            )
         done
         wait
-        for libver in {lib_versions}; do
-            for rustver in {rustc_versions}; do
-                (
-                    cd "crate-$libver";
-                    echo "{divider}"
-                    echo >&2 "{divider}"
-                    echo "CHECKING $rustver {crate_name} $libver"
-                    rustup default $rustver;
-                    export CARGO_TARGET_DIR=/home/rustyuser/cargo_target/$rustver;
-                    time timeout 200 cargo check --locked --message-format=json;
-                ) && {{
-                    if [ "$rustver" = "{rustc_last_version}" ]; then
-                        exit 1; # all rusts failed, give up trying older lib versions
-                    fi
-                    break;
-                }} || true # stop as soon as it succeeds
-            done
+        for job in {jobs}; do
+            echo "{divider}"
+            cat /tmp/"output-$job";
+            echo >&2 "{divider}"
+            cat >&2 /tmp/"outputerr-$job";
         done
     "##,
         divider = parse::DIVIDER,
-        lib_versions = versions.iter().map(|v| format!("\"{}\"", v)).collect::<Vec<_>>().join(" "),
+        jobs = versions.iter().map(|(rust, v)| format!("\"{} {}\"", rust, v)).collect::<Vec<_>>().join(" "),
         crate_name = all.name(),
-        rustc_versions = RUST_VERSIONS.join(" "),
-        rustc_old_version = RUST_VERSIONS[0],
         rustc_last_version = RUST_VERSIONS[RUST_VERSIONS.len()-1],
     );
 

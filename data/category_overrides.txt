@@ -227,6 +227,7 @@ concurrent-hashmap: concurrency, data-structures
 conllx: parser-implementations
 console: command-line-interface
 constany_blank: rust-patterns
+contour_tracing: multimedia::images
 contralog: development-tools::debugging
 conv: rust-patterns
 cookie_store: web-programming

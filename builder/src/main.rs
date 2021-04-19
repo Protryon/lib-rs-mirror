@@ -133,15 +133,18 @@ async fn analyze_crate(all: &CratesIndexCrate, db: &BuildDb, crates: &KitchenSin
     let (stdout, stderr) = do_builds(&crates, &all, &docker_root, &versions)?;
     db.set_raw_build_info(origin, ver.version(), "check", &stdout, &stderr)?;
 
+    let mut to_set = Vec::with_capacity(20);
     for f in parse_analyses(&stdout, &stderr) {
         if let Some(rustc_version) = f.rustc_version {
             for (rustc_override, name, version, compat) in f.crates {
                 let rustc_version = rustc_override.unwrap_or(&rustc_version);
                 eprintln!("https://lib.rs/compat/{} # {}/{} {:?}", name, version, rustc_version, compat);
-                db.set_compat(&Origin::from_crates_io_name(&name), &version, rustc_version, compat)?;
+                to_set.push((Origin::from_crates_io_name(&name), version, rustc_version.to_string(), compat));
             }
         }
     }
+    let tmp = to_set.iter().map(|(o, cv, rv, c)| (o, cv.as_str(), rv.as_str(), *c)).collect::<Vec<(&Origin, &str, &str, Compat)>>();
+    db.set_compat_multi(&tmp)?;
     Ok(())
 }
 

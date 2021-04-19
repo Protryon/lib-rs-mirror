@@ -288,18 +288,27 @@ impl BuildDb {
     }
 
 
-    pub fn set_compat(&self, origin: &Origin, ver: &str, rustc_version: &str, compat: Compat) -> Result<()> {
-        let conn = self.conn.lock();
-        // these are weak info, so don't replace good info with them
-        let mut ins = conn.prepare_cached(if compat != Compat::VerifiedWorks {
-            r"INSERT OR IGNORE INTO build_results(origin, version, rustc_version, compat) VALUES(?1, ?2, ?3, ?4)"
-        } else {
-            "INSERT OR REPLACE INTO build_results(origin, version, rustc_version, compat) VALUES(?1, ?2, ?3, ?4)"
-        })?;
-        let origin_str = origin.to_str();
-        let result_str = compat.as_str();
-        ins.execute(&[origin_str.as_str(), ver, rustc_version, result_str])?;
+    pub fn set_compat_multi(&self, rows: &[(&Origin, &str, &str, Compat)]) -> Result<()> {
+        let mut conn = self.conn.lock();
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        {
+            let mut ins_ignore = tx.prepare_cached(r"INSERT OR IGNORE INTO build_results(origin, version, rustc_version, compat) VALUES(?1, ?2, ?3, ?4)")?;
+            let mut ins_replace = tx.prepare_cached("INSERT OR REPLACE INTO build_results(origin, version, rustc_version, compat) VALUES(?1, ?2, ?3, ?4)")?;
+
+            for (origin, ver, rustc_version, compat) in rows {
+                let origin_str = origin.to_str();
+                let result_str = compat.as_str();
+                // these are weak signals, so don't replace good info with them
+                let ins = if *compat != Compat::VerifiedWorks { &mut ins_ignore } else { &mut ins_replace };
+                ins.execute(&[origin_str.as_str(), ver, rustc_version, result_str])?;
+            }
+        }
+        tx.commit()?;
         Ok(())
+    }
+
+    pub fn set_compat(&self, origin: &Origin, ver: &str, rustc_version: &str, compat: Compat) -> Result<()> {
+        self.set_compat_multi(&[(origin, ver, rustc_version, compat)])
     }
 
     pub fn set_raw_build_info(&self, origin: &Origin, ver: &str, tool: &str, stdout: &str, stderr: &str) -> Result<()> {

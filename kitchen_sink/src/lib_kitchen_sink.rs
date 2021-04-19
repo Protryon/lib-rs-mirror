@@ -1914,6 +1914,7 @@ impl KitchenSink {
                     if c.newest_bad.unwrap_or(0) < dep_newest_bad && dep_newest_bad < c.oldest_ok.unwrap_or(9999) {
                         debug!("{} {} MSRV went from {} to {} because of {} {}", all.name(), crate_ver, c.newest_bad.unwrap_or(0), dep_newest_bad, dep_origin.short_crate_name(), req);
                         c.newest_bad = Some(dep_newest_bad);
+                        let _ = db.set_compat(all.origin(), &crate_ver.to_string(), &format!("1.{}.0", dep_newest_bad), Compat::BrokenDeps);
                     }
                 }
             }

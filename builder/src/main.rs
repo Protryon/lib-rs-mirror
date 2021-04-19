@@ -16,23 +16,29 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --pr
 ENV PATH="$PATH:/home/rustyuser/.cargo/bin"
 RUN rustup set profile minimal
 RUN rustup toolchain add 1.28.0
-RUN rustup toolchain add 1.32.0
-RUN rustup toolchain add 1.34.0
+RUN rustup toolchain add 1.31.0
+RUN rustup toolchain add 1.33.0
 RUN rustup toolchain add 1.36.0
 RUN rustup toolchain add 1.39.0
 RUN rustup toolchain add 1.42.0
 RUN rustup toolchain add 1.45.0
 RUN rustup toolchain add 1.47.0
 RUN rustup toolchain add 1.50.0
+RUN rustup toolchain add 1.24.0
+RUN rustup toolchain add 1.22.0
+RUN rustup toolchain add 1.19.0
 RUN rustup toolchain list
 "##;
 
 const TEMP_JUNK_DIR: &str = "/var/tmp/crates_env";
 
-const RUST_VERSIONS: [&str; 9] = [
+const RUST_VERSIONS: [&str; 12] = [
+    "1.19.0",
+    "1.22.0",
+    "1.24.0",
     "1.28.0",
-    "1.32.0",
-    "1.34.0",
+    "1.31.0",
+    "1.33.0",
     "1.36.0",
     "1.39.0",
     "1.42.0",
@@ -92,7 +98,7 @@ async fn analyze_crate(all: &CratesIndexCrate, db: &BuildDb, crates: &KitchenSin
         println!("already done {}", all.name());
         return Ok(())
     }
-    println!("checking {}", all.name());
+    println!("checking https://lib.rs/compat/{}", all.name());
 
     let mut compat_info = crates.rustc_compatibility(&crates.rich_crate_async(&origin).await?).await.map_err(|_| "rustc_compatibility")?;
     let mut candidates: Vec<_> = all.versions().iter().rev().take(100)
@@ -115,10 +121,10 @@ async fn analyze_crate(all: &CratesIndexCrate, db: &BuildDb, crates: &KitchenSin
         let min_ver = compat.newest_bad.unwrap_or(0);
         let rustc_idx = available_rust_versions.iter().position(|v| {
             let minor = SemVer::parse(v).unwrap().minor as u16;
-            minor >= min_ver && minor <= max_ver
+            minor > min_ver && minor < max_ver
         })?;
         Some((available_rust_versions.swap_remove(rustc_idx), v))
-    }).collect();
+    }).take(4).collect();
 
     if versions.is_empty() {
         return Ok(());
@@ -128,10 +134,10 @@ async fn analyze_crate(all: &CratesIndexCrate, db: &BuildDb, crates: &KitchenSin
     db.set_raw_build_info(origin, ver.version(), "check", &stdout, &stderr)?;
 
     for f in parse_analyses(&stdout, &stderr) {
-        println!("f={:#?}", f);
         if let Some(rustc_version) = f.rustc_version {
             for (rustc_override, name, version, compat) in f.crates {
                 let rustc_version = rustc_override.unwrap_or(&rustc_version);
+                eprintln!("https://lib.rs/compat/{} # {}/{} {:?}", name, version, rustc_version, compat);
                 db.set_compat(&Origin::from_crates_io_name(&name), &version, rustc_version, compat)?;
             }
         }
@@ -153,6 +159,8 @@ fn prepare_docker(docker_root: &Path) -> Result<(), Box<dyn std::error::Error>> 
         .arg("-t").arg("rustesting2")
         .arg("-")
         .stdin(Stdio::piped())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
         .spawn()?;
 
     let mut stdin = child.stdin.take().unwrap();
@@ -179,14 +187,15 @@ fn do_builds(_crates: &KitchenSink, all: &CratesIndexCrate, docker_root: &Path, 
             touch src/lib.rs
             printf > Cargo.toml '[package]\nname="_____"\nversion="0.0.0"\n[profile.dev]\ndebug=false\n[dependencies]\n{crate_name} = "=%s"\n' "$libver";
             export CARGO_TARGET_DIR=/home/rustyuser/cargo_target/$rustver;
-            timeout 60 cargo +$rustver fetch;
-            time timeout 200 cargo +$rustver check --locked --message-format=json;
+            timeout 20 cargo +$rustver fetch;
+            timeout 60 nice cargo +$rustver check --locked --message-format=json;
         }}
+        swapoff -a || true
         rustup default {rustc_last_version} >/dev/null;
         for job in {jobs}; do
             (
-                check_crate_with_rustc $job > /tmp/"output-$job" 2>/tmp/"outputerr-$job" && echo "$job done ok" || echo "$job failed"
-            )
+                check_crate_with_rustc $job > /tmp/"output-$job" 2>/tmp/"outputerr-$job" && echo "# $job {crate_name} done OK" || echo "# $job {crate_name} failed"
+            ) &
         done
         wait
         for job in {jobs}; do
@@ -217,7 +226,9 @@ fn do_builds(_crates: &KitchenSink, all: &CratesIndexCrate, docker_root: &Path, 
         .arg("-e").arg("CC=true")
         .arg("-e").arg("CCXX=true")
         .arg("-e").arg("AR=true")
-        .arg("-m2000m")
+        .arg("-e").arg("CARGO_BUILD_JOBS=2")
+        .arg("-m1700m")
+        .arg("--cpus=3")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

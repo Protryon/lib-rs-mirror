@@ -90,10 +90,55 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                     continue;
                 }
 
+                let mut printed = HashSet::new();
                 let desc = msg.message.as_ref().and_then(|m| m.message.as_deref());
                 if let Some(desc) = desc {
-                    if desc.starts_with("no method named `trim_start`") {
+                    if desc.starts_with("associated constants are experimental") {
+                        findings.crates.insert((Some("1.19.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                    }
+                    else if desc.starts_with("no method named `trim_start`") {
                         findings.crates.insert((Some("1.29.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                    }
+                    else if desc.starts_with("use of unstable library feature 'split_ascii_whitespace") ||
+                        desc.starts_with("unresolved import `core::convert::Infallible`") ||
+                        desc.starts_with("cannot find type `NonZeroI") ||
+                        desc.starts_with("use of unstable library feature 'try_from'") {
+                        findings.crates.insert((Some("1.33.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                    }
+                    else if desc.starts_with("cannot find trait `Unpin` in this scope") ||
+                        desc.starts_with("use of unstable library feature 'transpose_result'") ||
+                        desc.starts_with("use of unstable library feature 'pin'") {
+                        findings.crates.insert((Some("1.32.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                    }
+                    else if desc.starts_with("const fn is unstable") {
+                        findings.crates.insert((Some("1.30.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                    }
+                    else if desc.starts_with("use of unstable library feature 'int_to_from_bytes") ||
+                        desc.starts_with("`core::mem::size_of` is not yet stable as a const fn") {
+                        findings.crates.insert((Some("1.31.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                    }
+                    else if desc.starts_with("unresolved import `std::ops::RangeBounds`") ||
+                        desc.starts_with("unresolved import `std::alloc::Layout") {
+                        findings.crates.insert((Some("1.27.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                    }
+                    else if desc.starts_with("`dyn Trait` syntax is unstable") {
+                        findings.crates.insert((Some("1.26.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                    }
+                    else if desc.starts_with("128-bit type is unstable") ||
+                        desc.starts_with("128-bit integers are not stable") ||
+                        desc.starts_with("`..=` syntax in patterns is experimental") {
+                        findings.crates.insert((Some("1.25.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                    }
+                    else if desc.starts_with("unresolved import `std::ptr::NonNull`") {
+                        findings.crates.insert((Some("1.24.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                    }
+                    else if desc.starts_with("use of unstable library feature 'maybe_uninit'") ||
+                        desc.starts_with("no function or associated item named `uninit` found for type `core::me") ||
+                        desc.starts_with("no function or associated item named `uninit` found for type `std::me") ||
+                        desc.starts_with("cannot find type `IoSliceMut`") ||
+                        desc.starts_with("use of unstable library feature 'futures_api'") ||
+                        desc.starts_with("unresolved import `std::io::IoSlice") {
+                        findings.crates.insert((Some("1.35.0"), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("use of unstable library feature 'matches_macro'") ||
                         desc.starts_with("cannot find macro `matches!`") ||
@@ -103,16 +148,22 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                     else if desc.starts_with("no associated item named `MAX` found for type `u") {
                         findings.crates.insert((Some("1.42.0"), name.clone(), ver.clone(), Compat::Incompatible));
                     }
+                    else if desc.starts_with("the `#[track_caller]` attribute is an experimental") {
+                        findings.crates.insert((Some("1.45.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                    }
                     else if desc.starts_with("use of unstable library feature 'ptr_cast") ||
                        desc.starts_with("use of unstable library feature 'duration_float") ||
                        desc.starts_with("unresolved import `core::any::type_name") ||
                        desc.starts_with("unresolved import `std::any::type_name") ||
+                       desc.starts_with("no method named `cast` found for type `*") ||
                        desc.starts_with("use of unstable library feature 'euclidean_division") {
                         findings.crates.insert((Some("1.37.0"), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("use of unstable library feature 'option_flattening") ||
                         desc.starts_with("cannot find function `take` in module `mem") ||
                         desc.starts_with("subslice patterns are unstable") ||
+                        desc.starts_with("`cfg(doctest)` is experimental and subject to change") ||
+                        desc.starts_with("the `#[non_exhaustive]` attribute is an experimental") ||
                         desc.starts_with("syntax for subslices in slice patterns is not yet stabilized") ||
                         desc.starts_with("non exhaustive is an experimental feature") {
                         findings.crates.insert((Some("1.39.0"), name.clone(), ver.clone(), Compat::Incompatible));
@@ -129,7 +180,9 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                        desc.starts_with("enum variants on type aliases are experimental") {
                         findings.crates.insert((Some("1.36.0"), name.clone(), ver.clone(), Compat::Incompatible));
                     } else {
-                        eprintln!("• err: {}", desc);
+                        if printed.insert(desc) {
+                            eprintln!("• err: {}", desc);
+                        }
                     }
                 }
 

@@ -187,9 +187,9 @@ async fn run_server(rt: Handle) -> Result<(), failure::Error> {
             std::thread::sleep(Duration::from_secs(1));
             let expected = state.start_time.elapsed().as_secs() as u32;
             let rt_timestamp = timestamp.load(Ordering::SeqCst);
-            if rt_timestamp + 5 < expected {
+            if rt_timestamp + 8 < expected {
                 warn!("Update loop is {}s behind", expected - rt_timestamp);
-                if rt_timestamp + 60 < expected {
+                if rt_timestamp + 300 < expected {
                     error!("tokio is dead");
                     std::process::exit(1);
                 }

@@ -102,6 +102,7 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                     else if desc.starts_with("use of unstable library feature 'split_ascii_whitespace") ||
                         desc.starts_with("unresolved import `core::convert::Infallible`") ||
                         desc.starts_with("cannot find type `NonZeroI") ||
+                        desc.starts_with("cannot find trait `TryFrom` in this") ||
                         desc.starts_with("use of unstable library feature 'try_from'") {
                         findings.crates.insert((Some("1.33.0"), name.clone(), ver.clone(), Compat::Incompatible));
                     }
@@ -118,8 +119,12 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                         findings.crates.insert((Some("1.31.0"), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("unresolved import `std::ops::RangeBounds`") ||
+                        desc.starts_with("the `#[repr(transparent)]` attribute is experimental") ||
                         desc.starts_with("unresolved import `std::alloc::Layout") {
                         findings.crates.insert((Some("1.27.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                    }
+                    else if desc.starts_with("no method named `align_to` found for type `&") {
+                        findings.crates.insert((Some("1.29.0"), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("`dyn Trait` syntax is unstable") {
                         findings.crates.insert((Some("1.26.0"), name.clone(), ver.clone(), Compat::Incompatible));

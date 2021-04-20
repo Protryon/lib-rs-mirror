@@ -26,6 +26,8 @@ pub struct CompatRange {
     pub oldest_ok: Option<RustcMinorVersion>,
     pub newest_bad: Option<RustcMinorVersion>,
     pub newest_ok: Option<RustcMinorVersion>,
+    pub oldest_ok_raw: Option<RustcMinorVersion>, // actual test data, no assumptions
+    pub newest_bad_raw: Option<RustcMinorVersion>, // actual test data, no assumptions
 }
 
 pub type CompatByCrateVersion = BTreeMap<SemVer, CompatRange>;
@@ -214,6 +216,9 @@ impl BuildDb {
             Compat::VerifiedWorks | Compat::ProbablyWorks => {
                 if t.oldest_ok.as_ref().map_or(true, |v| rustc_version < *v) {
                     t.oldest_ok = Some(rustc_version);
+                    if c.compat != Compat::ProbablyWorks {
+                        t.oldest_ok_raw = Some(rustc_version);
+                    }
                 }
                 else if t.newest_ok.as_ref().map_or(true, |v| rustc_version > *v) {
                     t.newest_ok = Some(rustc_version);
@@ -222,6 +227,9 @@ impl BuildDb {
             Compat::Incompatible | Compat::BrokenDeps => {
                 if t.newest_bad.as_ref().map_or(true, |v| rustc_version > *v) {
                     t.newest_bad = Some(rustc_version);
+                    if c.compat != Compat::BrokenDeps {
+                        t.newest_bad_raw = Some(rustc_version);
+                    }
                 }
             },
         }

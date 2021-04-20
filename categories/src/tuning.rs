@@ -1266,7 +1266,7 @@ pub fn adjusted_relevance(mut candidates: HashMap<String, f64>, keywords: &HashS
         .filter(|&(ref k, _)| CATEGORIES.from_slug(k).1)
         .map(|(k, v)| (v, k))
         .collect();
-    res.sort_by(|a, b| b.0.partial_cmp(&a.0).expect("nan"));
+    res.sort_unstable_by(|a, b| b.0.partial_cmp(&a.0).expect("nan"));
     res.truncate(max_num_categories);
     res
 }

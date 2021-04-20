@@ -147,7 +147,7 @@ impl<'a> HomePage<'a> {
                     cat,
                 })
             }
-            c.sort_by(|a, b| b.pop.cmp(&a.pop));
+            c.sort_unstable_by(|a, b| b.pop.cmp(&a.pop));
 
             let mut c = futures::future::join_all(c.into_iter().map(|cat| async move {
                 let top = self.crates.top_crates_in_category(&cat.cat.slug).await;
@@ -218,7 +218,7 @@ impl<'a> HomePage<'a> {
             Self::avg_pair(&mut ranked, "command-line-interface", "command-line-utilities");
 
             let mut c = ranked.into_iter().map(|(_, v)| v).collect::<Vec<_>>();
-            c.sort_by(|a, b| b.0.cmp(&a.0));
+            c.sort_unstable_by(|a, b| b.0.cmp(&a.0));
 
             c.into_iter().map(|(_, c)| c).collect()
         })

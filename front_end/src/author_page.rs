@@ -66,7 +66,7 @@ impl<'a> AuthorPage<'a> {
         founder.sort_by(|a, b| b.latest_release.cmp(&a.latest_release));
         founder.truncate(200);
 
-        member.sort_by(|a, b| b.crate_ranking.partial_cmp(&a.crate_ranking).unwrap_or(Ordering::Equal));
+        member.sort_unstable_by(|a, b| b.crate_ranking.partial_cmp(&a.crate_ranking).unwrap_or(Ordering::Equal));
         member.truncate(200);
 
         let (founder_crates, member_crates) = futures::join!(

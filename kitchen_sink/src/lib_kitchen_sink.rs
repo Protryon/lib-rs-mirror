@@ -385,7 +385,7 @@ impl KitchenSink {
         for (origin, score) in &mut top {
             *score *= 0.5 + self.crate_db.crate_rank(origin).await.unwrap_or(0.);
         }
-        top.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
+        top.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
 
         watch("knock_duplicates", self.knock_duplicates(&mut top)).await;
         top.truncate(top_n);
@@ -444,10 +444,10 @@ impl KitchenSink {
             }
         }).collect::<Vec<_>>();
 
-        ratios.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(Ordering::Equal));
+        ratios.sort_unstable_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(Ordering::Equal));
         let len = ratios.len();
         let mut top: Vec<_> = ratios.drain(len.saturating_sub(top_n)..).map(|(o, s, _)| (o, s as f64)).collect();
-        ratios.sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap_or(Ordering::Equal));
+        ratios.sort_unstable_by(|a, b| a.2.partial_cmp(&b.2).unwrap_or(Ordering::Equal));
         let len = ratios.len();
         top.extend(ratios.drain(len.saturating_sub(top_n)..).map(|(o, _, s)| (o, s as f64)).take(top_n));
         top
@@ -2231,7 +2231,7 @@ impl KitchenSink {
             });
 
 
-        authors.sort_by(|a, b| {
+        authors.sort_unstable_by(|a, b| {
             fn score(a: &CrateAuthor<'_>) -> f64 {
                 let o = if a.owner { 200. } else { 1. };
                 o * (a.contribution + 10.) / (1 + a.nth_author.unwrap_or(99)) as f64
@@ -2522,7 +2522,7 @@ impl KitchenSink {
             }
         }
         let mut top_keywords: Vec<_> = top_keywords.into_iter().collect();
-        top_keywords.sort_by(|a, b| b.1.cmp(&a.1));
+        top_keywords.sort_unstable_by(|a, b| b.1.cmp(&a.1));
         let top_keywords: HashSet<_> = top_keywords.iter().copied().take((top_keywords.len() / 10).min(10).max(2)).map(|(k, _)| k.to_string()).collect();
 
         crates.clear();
@@ -2562,7 +2562,7 @@ impl KitchenSink {
             let new_score = score * 0.5 + (score + 7.) / (7. + dupe_points);
             crates.push((origin.to_owned(), new_score));
         }
-        crates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
+        crates.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
     }
 
     pub async fn top_keywords_in_category(&self, cat: &Category) -> CResult<Vec<String>> {

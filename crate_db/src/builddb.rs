@@ -47,7 +47,7 @@ pub struct CrateCompatInfo {
     pub old_crates_broken_up_to: Option<SemVer>,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum Compat {
     VerifiedWorks,
     ProbablyWorks,

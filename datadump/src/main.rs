@@ -170,7 +170,7 @@ fn index_dependencies(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDe
             let mut releases_from_oldest: Vec<_> = vers.iter().filter_map(|v| {
                 date_from_str(&v.created_at).ok().map(|date| (v.id, MiniDate::new(date), &v.num))
             }).collect();
-            releases_from_oldest.sort_by_key(|a| a.0);
+            releases_from_oldest.sort_unstable_by_key(|a| a.0);
 
             let mut over_time = HashMap::new();
             let mut releases = releases_from_oldest.iter().peekable();
@@ -239,7 +239,7 @@ fn index_dependencies(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDe
             }
         }
         let mut by_day: Vec<_> = by_day.values().copied().collect();
-        by_day.sort_by_key(|a| a.at);
+        by_day.sort_unstable_by_key(|a| a.at);
 
         let origin = Origin::from_crates_io_name(name);
         ksink.index_dependers_liveness_ranges(&origin, by_day);

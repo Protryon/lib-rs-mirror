@@ -750,7 +750,7 @@ async fn render_crate_all_versions(state: AServerState, origin: Origin) -> Resul
         front_end::render_all_versions_page(&mut page, &all, &ver, &crates).await?;
         minify_html(&mut page);
         mark_server_still_alive(&state);
-        Ok::<_, failure::Error>(Rendered {page, cache_time: 3*24*3600, refresh: false, last_modified})
+        Ok::<_, failure::Error>(Rendered {page, cache_time: 24*3600, refresh: false, last_modified})
     }).await
 }
 

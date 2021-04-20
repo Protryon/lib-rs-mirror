@@ -75,7 +75,7 @@ impl<'a> CratePageRevDeps<'a> {
         let stats = all_deps_stats.counts.get(own_name.as_str());
 
         let mut downloads_by_ver: Vec<_> = kitchen_sink.recent_downloads_by_version(ver.origin()).await?.into_iter().map(|(v, d)| (v.to_semver(), d)).collect();
-        downloads_by_ver.sort_by(|a, b| b.0.cmp(&a.0));
+        downloads_by_ver.sort_unstable_by(|a, b| b.0.cmp(&a.0));
 
         let mut deps: Vec<_> = match stats {
             Some(s) => futures::future::join_all(s.rev_dep_names.iter().map(|rev_dep| async move {

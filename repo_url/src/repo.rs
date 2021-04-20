@@ -20,7 +20,7 @@ pub enum RepoHost {
     Other,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct SimpleRepo {
     pub owner: Box<str>,
     pub repo: Box<str>,

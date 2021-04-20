@@ -189,7 +189,7 @@ fn index_search(indexer: &mut Indexer, lines: &TempCache<(String, f64), [u8; 16]
     for name in k.authors().iter().filter_map(|a| a.name.as_deref()) {
         variables.push(name);
     }
-    variables.sort_by_key(|a| !a.len()); // longest first
+    variables.sort_unstable_by_key(|a| !a.len()); // longest first
 
     let mut dupe_sentences = HashSet::new();
     let mut unique_text = String::with_capacity(4000);

@@ -145,7 +145,7 @@ impl CrateSearchIndex {
         docs.dedup_by(|a, b| a.crate_name == b.crate_name);
 
         // re-sort using our base score
-        docs.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal));
+        docs.sort_unstable_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal));
         docs.truncate(limit); // search picked a few more results to cut out chaff using crate_score
         Ok(docs)
     }

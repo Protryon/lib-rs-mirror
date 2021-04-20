@@ -15,7 +15,7 @@ pub use repo_url::RepoHost;
 pub use repo_url::SimpleRepo;
 
 /// URL-like identifier of location where crate has been published + normalized crate name
-#[derive(Clone, Eq, PartialEq, Hash)]
+#[derive(Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum Origin {
     CratesIo(Box<str>),
     GitHub { repo: SimpleRepo, package: Box<str> },

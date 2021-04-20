@@ -24,8 +24,8 @@ RUN rustup toolchain add 1.42.0
 RUN rustup toolchain add 1.45.0
 RUN rustup toolchain add 1.47.0
 RUN rustup toolchain add 1.50.0
-RUN rustup toolchain add 1.24.0
-RUN rustup toolchain add 1.22.0
+RUN rustup toolchain add 1.26.0
+RUN rustup toolchain add 1.23.0
 RUN rustup toolchain add 1.19.0
 RUN rustup toolchain list
 "##;
@@ -34,8 +34,8 @@ const TEMP_JUNK_DIR: &str = "/var/tmp/crates_env";
 
 const RUST_VERSIONS: [&str; 12] = [
     "1.19.0",
-    "1.22.0",
-    "1.24.0",
+    "1.23.0",
+    "1.26.0",
     "1.28.0",
     "1.31.0",
     "1.33.0",
@@ -82,7 +82,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             continue; // junk?
         }
 
-        if let Err(e) = analyze_crate(&all, &db, &crates, &docker_root).await {
+        if let Err(e) = analyze_crate(&all, &db, &crates, &docker_root, filter.is_some()).await {
             eprintln!("•• {}: {}", all.name(), e);
             continue;
         }
@@ -90,11 +90,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn analyze_crate(all: &CratesIndexCrate, db: &BuildDb, crates: &KitchenSink, docker_root: &Path) -> Result<(), Box<dyn std::error::Error>> {
+async fn analyze_crate(all: &CratesIndexCrate, db: &BuildDb, crates: &KitchenSink, docker_root: &Path, force: bool) -> Result<(), Box<dyn std::error::Error>> {
     let origin = &Origin::from_crates_io_name(all.name());
     let ver = all.latest_version();
 
-    if !db.get_raw_build_info(origin, ver.version())?.is_empty() {
+    if !force && !db.get_raw_build_info(origin, ver.version())?.is_empty() {
         println!("already done {}", all.name());
         return Ok(())
     }
@@ -124,7 +124,7 @@ async fn analyze_crate(all: &CratesIndexCrate, db: &BuildDb, crates: &KitchenSin
             minor > min_ver && minor < max_ver
         })?;
         Some((available_rust_versions.swap_remove(rustc_idx), v))
-    }).take(4).collect();
+    }).take(8).collect();
 
     if versions.is_empty() {
         return Ok(());
@@ -224,14 +224,14 @@ fn do_builds(_crates: &KitchenSink, all: &CratesIndexCrate, docker_root: &Path, 
         .arg("-v").arg(format!("{}/git:/home/rustyuser/.cargo/git", TEMP_JUNK_DIR))
         .arg("-v").arg(format!("{}/registry:/home/rustyuser/.cargo/registry", TEMP_JUNK_DIR))
         .arg("-v").arg(format!("{}/target:/home/rustyuser/cargo_target", TEMP_JUNK_DIR))
-        .arg("-e").arg("CARGO_INCREMENTAL=0")
+        // .arg("-e").arg("CARGO_INCREMENTAL=0")
         // skip native compilation
-        .arg("-e").arg("CC=true")
-        .arg("-e").arg("CCXX=true")
-        .arg("-e").arg("AR=true")
-        .arg("-e").arg("CARGO_BUILD_JOBS=2")
-        .arg("-m1700m")
-        .arg("--cpus=3")
+        // .arg("-e").arg("CC=true")
+        // .arg("-e").arg("CCXX=true")
+        // .arg("-e").arg("AR=true")
+        .arg("-e").arg("CARGO_BUILD_JOBS=6")
+        .arg("-m2700m")
+        //.arg("--cpus=3")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

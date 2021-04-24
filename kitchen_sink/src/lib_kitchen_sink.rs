@@ -1810,18 +1810,18 @@ impl KitchenSink {
         // insert versions that aren't in the db, to have the full list.
         // doing so before postproc will copy data to these.
         for ver in all.versions().iter().filter(|v| !v.yanked) {
-            let created = DateTime::parse_from_rfc3339(&ver.created_at).map_err(|_| KitchenSinkErr::BadRustcCompatData)?;
-
             let semver: SemVer = ver.num.parse().map_err(|_| KitchenSinkErr::BadRustcCompatData)?;
             let c = c.entry(semver).or_insert_with(Default::default);
 
-            let expected_rust = Self::rustc_release_from_date(&created);
-            if c.newest_bad.map_or(false, |bad| bad >= expected_rust) {
-                c.newest_bad = None; // bad data?
-            }
-            // assume it compiled with the latest stable at the time of the release
-            if c.oldest_ok.map_or(true, |n| n > expected_rust) {
-                c.oldest_ok = Some(expected_rust);
+            let created = DateTime::parse_from_rfc3339(&ver.created_at).map_err(|_| KitchenSinkErr::BadRustcCompatData)?;
+            if let Some(expected_rust) = Self::rustc_release_from_date(&created) {
+                if c.newest_bad.map_or(false, |bad| bad >= expected_rust) {
+                    c.newest_bad = None; // bad data?
+                }
+                // assume it compiled with the latest stable at the time of the release
+                if c.oldest_ok.map_or(true, |n| n > expected_rust) {
+                    c.oldest_ok = Some(expected_rust);
+                }
             }
         }
         // this is needed to copy build failures from non-matching versions to matching versions
@@ -1926,12 +1926,12 @@ impl KitchenSink {
         Ok(c)
     }
 
-    fn rustc_release_from_date(date: &DateTime<FixedOffset>) -> u16 {
+    fn rustc_release_from_date(date: &DateTime<FixedOffset>) -> Option<u16> {
         let zero = Utc.ymd(2015,5,15).and_hms(0,0,0);
         let age = date.signed_duration_since(zero);
         let weeks = age.num_weeks();
-        if weeks < 0 { return 0; }
-        ((weeks+1)/6) as _
+        if weeks < 0 { return None; }
+        Some(((weeks+1)/6) as _)
     }
 
     /// List of all notable crates
@@ -2937,7 +2937,7 @@ fn rustc_rel_dates() {
     ];
     for (y,m,d, ver) in RUST_RELEASE_DATES.iter().copied() {
         let date = FixedOffset::east(0).ymd(y as _,m as _,d as _).and_hms(0, 0, 0);
-        assert_eq!(ver, KitchenSink::rustc_release_from_date(&date));
+        assert_eq!(ver, KitchenSink::rustc_release_from_date(&date).unwrap());
     }
 }
 

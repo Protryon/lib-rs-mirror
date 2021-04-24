@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+use std::collections::HashMap;
 use crate_db::builddb::Compat;
 use regex::Regex;
 use serde_derive::*;
@@ -31,7 +33,7 @@ pub struct CompilerMessage {
 
 #[derive(Default, Debug)]
 pub struct Findings {
-    pub crates: HashSet<(Option<&'static str>, String, String, Compat)>,
+    pub crates: HashSet<(Option<Cow<'static, str>>, String, String, Compat)>,
     pub rustc_version: Option<String>,
     pub check_time: Option<f32>,
 }
@@ -54,11 +56,410 @@ fn parse_package_id(id: &str) -> Option<(String, String)> {
     Some((name, ver))
 }
 
+const RUSTC_FEATURES_STABLE_SINCE: [(u16, &'static str); 392] = [
+// rg  --no-filename -o '\[stable\(feature.*\]' library/ | fgrep 1. | sort -u | sed -E 's/.*feature ?= ?"(.+)", since ?= ?"1\.(..+)\..".*/(\2, "\1"),/' | sort -V | pbcopy
+
+(17, "addr_from_into_ip"),
+(17, "box_default_extra"),
+(17, "box_from_c_str"),
+(17, "box_from_os_str"),
+(17, "box_from_path"),
+(17, "box_from_slice"),
+(17, "btree_range"),
+(17, "collections_bound"),
+(17, "collection_debug"),
+(17, "cow_str_to_string_specialization"),
+(17, "default_box_extra"),
+(17, "default_for_pathbuf"),
+(17, "frombyteswithnulerror_impls"),
+(17, "ip_from_slice"),
+(17, "move_cell"),
+(17, "ordering_chaining"),
+(17, "process_abort"),
+(17, "ptr_eq"),
+(17, "ptr_unaligned"),
+(17, "rc_raw"),
+(17, "result_expect_err"),
+(17, "string_from_iter_by_ref"),
+(17, "string_to_string_specialization"),
+(17, "vec_deque_partial_eq_slice"),
+(18, "binary_heap_peek_mut_pop"),
+(18, "c_string_from_box"),
+(18, "os_string_from_box"),
+(18, "path_buf_from_box"),
+(18, "peek"),
+(18, "process_try_wait"),
+(18, "retain_hash_collection"),
+(18, "string_from_box"),
+(18, "vec_from_box"),
+(19, "boxed_str_conv"),
+(19, "command_envs"),
+(19, "eprint"),
+(19, "herd_cows"),
+(19, "mutexguard"),
+(19, "osstring_shrink_to_fit"),
+(19, "reverse_cmp_key"),
+(19, "thread_id"),
+(19, "vec_from_mut"),
+(20, "as_c_str"),
+(20, "box_from_c_string"),
+(20, "box_from_os_string"),
+(20, "box_from_path_buf"),
+(20, "box_from_str"),
+(20, "box_from_vec"),
+(20, "char_escape_debug"),
+(20, "char_from_str"),
+(20, "compile_error_macro"),
+(20, "float_bits_conv"),
+(20, "into_boxed_c_str"),
+(20, "into_boxed_os_str"),
+(20, "into_boxed_path"),
+(20, "manually_drop"),
+(20, "more_io_inner_methods"),
+(20, "option_entry"),
+(20, "sort_unstable"),
+(20, "stdio_from"),
+(20, "std_guard_impls"),
+(20, "str_box_extras"),
+(20, "str_checked_slicing"),
+(20, "str_mut_extras"),
+(20, "utf8_error_error_len"),
+(21, "asraw_stdio"),
+(21, "compiler_fences"),
+(21, "discriminant_value"),
+(21, "iterator_for_each"),
+(21, "needs_drop"),
+(21, "ord_max_min"),
+(21, "shared_from_slice"),
+(21, "tcpstream_connect_timeout"),
+(21, "vec_splice"),
+(22, "cow_box_error"),
+(22, "indirect_hasher_impl"),
+(22, "op_assign_builtins_by_ref"),
+(23, "ascii_methods_on_intrinsics"),
+(23, "atomic_from"),
+(23, "rwlock_guard_sync"),
+(23, "unit_from_iter"),
+(24, "ascii_ctype_on_intrinsics"),
+(24, "atomic_bool_from"),
+(24, "atomic_pointer"),
+(24, "mpsc_error_conversions"),
+(24, "mutex_from"),
+(24, "refcell_replace"),
+(24, "refcell_swap"),
+(24, "rw_lock_from"),
+(24, "shared_from_slice2"),
+(24, "spin_loop_hint"),
+(25, "cursor_mut_vec"),
+(25, "duration_core"),
+(25, "nonnull"),
+(25, "panic_col"),
+(25, "path_component_asref"),
+(26, "box_leak"),
+(26, "core_ascii"),
+(26, "entry_and_modify"),
+(26, "env_unimpl_send_sync"),
+(26, "from_utf8_error_as_bytes"),
+(26, "fs_read_write"),
+(26, "fs_read_write_bytes"),
+(26, "fused"),
+(26, "getpid"),
+(26, "i128"),
+(26, "i128"),
+(26, "inclusive_range"),
+(26, "lossless_iusize_conv"),
+(26, "panic_hook_display"),
+(26, "pointer_methods"),
+(26, "slice_rotate"),
+(26, "string_retain"),
+(26, "thread_local_try_with"),
+(27, "core_hint"),
+(27, "duration_debug_impl"),
+(27, "duration_extras"),
+(27, "duration_from_micros"),
+(27, "hash_map_remove_entry"),
+(27, "inclusive_range_methods"),
+(27, "iterator_try_fold"),
+(27, "iter_rfind"),
+(27, "iter_rfold"),
+(27, "nonnull_cast"),
+(27, "option_filter"),
+(27, "simd_arch"),
+(27, "simd_x86"),
+(27, "slice_rsplit"),
+(27, "splice"),
+(27, "swap_nonoverlapping"),
+(27, "swap_with_slice"),
+(27, "take_set_limit"),
+(27, "unix_ppid"),
+(27, "unreachable"),
+(28, "alloc_layout"),
+(28, "alloc_module"),
+(28, "alloc_system_type"),
+(28, "any_send_sync_methods"),
+(28, "assoc_unix_epoch"),
+(28, "collections_range"),
+(28, "cow_from_cstr"),
+(28, "cow_from_osstr"),
+(28, "cow_from_pathbuf_ref"),
+(28, "cow_from_string_ref"),
+(28, "cow_from_vec_ref"),
+(28, "cstring_from_cow_cstr"),
+(28, "default_mut_str"),
+(28, "entry_or_default"),
+(28, "extend_for_unit"),
+(28, "fmt_flags_align"),
+(28, "from_bool"),
+(28, "from_ref"),
+(28, "global_allocator"),
+(28, "global_alloc"),
+(28, "iterator_repeat_with"),
+(28, "iterator_step_by"),
+(28, "nonzero"),
+(28, "osstring_from_cow_osstr"),
+(28, "pathbuf_from_cow_path"),
+(28, "path_ancestors"),
+(28, "slice_get_slice"),
+(29, "iterator_flatten"),
+(29, "joinhandle_impl_send_sync"),
+(29, "more_box_slice_clone"),
+(29, "never_hash"),
+(29, "os_str_str_ref_eq"),
+(29, "proc_macro_lib2"),
+(29, "rc_downcast"),
+(30, "core_c_void"),
+(30, "error_source"),
+(30, "ip_constructors"),
+(30, "iterator_find_map"),
+(30, "option_ref_from_ref_option"),
+(30, "slice_align_to"),
+(30, "token_stream_extend"),
+(30, "trim_direction"),
+(31, "chunks_exact"),
+(31, "from_nonzero"),
+(31, "option_replace"),
+(31, "rchunks"),
+(31, "symmetric_u32_duration_mul"),
+(32, "boxed_slice_from_iter"),
+(32, "dbg_macro"),
+(32, "int_to_from_bytes"),
+(32, "path_from_str"),
+(33, "convert_id"),
+(33, "duration_as_u128"),
+(33, "pin"),
+(33, "rw_exact_all_at"),
+(33, "simd_wasm32"),
+(33, "simd_x86_adx"),
+(33, "transpose_result"),
+(33, "vec_resize_with"),
+(34, "convert_infallible"),
+(34, "get_type_id"),
+(34, "integer_atomics_stable"),
+(34, "iter_from_fn"),
+(34, "iter_successors"),
+(34, "no_panic_pow"),
+(34, "process_pre_exec"),
+(34, "signed_nonzero"),
+(34, "slice_sort_by_cached_key"),
+(34, "split_ascii_whitespace"),
+(34, "str_escape"),
+(34, "time_checked_add"),
+(34, "try_from"),
+(35, "asraw_stdio_locks"),
+(35, "boxed_closure_impls"),
+(35, "copied"),
+(35, "copysign"),
+(35, "exact_size_case_mapping_iter"),
+(35, "from_ref_string"),
+(35, "nonzero_parse"),
+(35, "ptr_hash"),
+(35, "range_contains"),
+(35, "refcell_map_split"),
+(35, "refcell_replace_swap"),
+(35, "wasi_ext_doc"),
+(36, "align_offset"),
+(36, "alloc"),
+(36, "core_array"),
+(36, "futures_api"),
+(36, "hashbrown"),
+(36, "iovec"),
+(36, "iter_copied"),
+(36, "maybe_uninit"),
+(36, "string_borrow_mut"),
+(36, "str_as_mut_ptr"),
+(36, "try_from_slice_error"),
+(36, "vecdeque_rotate"),
+(37, "as_cell"),
+(37, "borrow_state"),
+(37, "bufreader_buffer"),
+(37, "copy_within"),
+(37, "iter_arith_traits_option"),
+(37, "iter_nth_back"),
+(37, "option_xor"),
+(37, "reverse_bits"),
+(37, "shared_from_iter"),
+(37, "unreachable_wasm32"),
+(37, "vec_as_ptr"),
+(38, "builtin_macro_prelude"),
+(38, "chars_debug_impl"),
+(38, "double_ended_peek_iterator"),
+(38, "double_ended_step_by_iterator"),
+(38, "double_ended_take_iterator"),
+(38, "duration_float"),
+(38, "euclidean_division"),
+(38, "pin_raw"),
+(38, "ptr_cast"),
+(38, "type_name"),
+(39, "ascii_escape_display"),
+(39, "checked_duration_since"),
+(39, "pin_into_inner"),
+(39, "weak_ptr_eq"),
+(39, "wrapping_ref_ops"),
+(40, "array_value_iter_impls"),
+(40, "float_to_from_bytes"),
+(40, "map_get_key_value"),
+(40, "mem_take"),
+(40, "option_deref"),
+(40, "option_flattening"),
+(40, "repeat_generic_slice"),
+(40, "todo_macro"),
+(40, "udp_peer_addr"),
+(41, "core_panic_info"),
+(41, "maybe_uninit_debug"),
+(41, "nz_int_conv"),
+(41, "pin_trait_impls"),
+(41, "result_map_or"),
+(41, "result_map_or_else"),
+(41, "weak_counts"),
+(42, "debug_map_key_value"),
+(42, "integer_exp_format"),
+(42, "iter_empty_send_sync"),
+(42, "manually_drop_take"),
+(42, "matches_macro"),
+(42, "slice_from_raw_parts"),
+(42, "wait_timeout_until"),
+(42, "wait_until"),
+(43, "assoc_int_consts"),
+(43, "boxed_slice_try_from"),
+(43, "core_primitive"),
+(43, "cstring_from_vec_of_nonzerou8"),
+(43, "extra_log_consts"),
+(43, "iter_once_with"),
+(43, "once_is_completed"),
+(43, "string_as_mut"),
+(44, "alloc_layout_manipulation"),
+(44, "convert_infallible_hash"),
+(44, "float_approx_unchecked_to"),
+(44, "from_mut_str_for_string"),
+(44, "iovec-send-sync"),
+(44, "mut_osstr"),
+(44, "path_buf_capacity"),
+(44, "proc_macro_lexerror_impls"),
+(44, "vec_from_array"),
+(45, "atomic_min_max"),
+(45, "box_from_array"),
+(45, "box_from_cow"),
+(45, "box_str2"),
+(45, "btreemap_remove_entry"),
+(45, "nonzero_bitor"),
+(45, "no_more_cas"),
+(45, "osstring_from_str"),
+(45, "process_set_argv0"),
+(45, "proc_macro_mixed_site"),
+(45, "proc_macro_span_located_at"),
+(45, "proc_macro_span_resolved_at"),
+(45, "proc_macro_token_stream_default"),
+(45, "rc_as_ptr"),
+(45, "saturating_neg"),
+(45, "shared_from_cow"),
+(45, "socketaddr_ordering"),
+(45, "str_strip"),
+(45, "unicode_version"),
+(45, "weak_into_raw"),
+(46, "buffered_io_capacity"),
+(46, "char_to_string_specialization"),
+(46, "from_char_for_string"),
+(46, "leading_trailing_ones"),
+(46, "nzint_try_from_int_conv"),
+(46, "option_zip_option"),
+(46, "partialeq_vec_for_ref_slice"),
+(46, "simd_x86_mm_loadu_si64"),
+(46, "string_u16_to_socket_addrs"),
+(46, "track_caller"),
+(46, "vec_drain_as_slice"),
+(46, "vec_intoiter_as_ref"),
+(47, "cstr_range_from"),
+(47, "inner_deref"),
+(47, "proc_macro_raw_ident"),
+(47, "ptr_offset_from"),
+(47, "range_is_empty"),
+(47, "tau_constant"),
+(47, "vec_leak"),
+(48, "array_try_from_vec"),
+(48, "deque_make_contiguous"),
+(48, "future_readiness_fns"),
+(48, "partialeq_vec_for_slice"),
+(48, "raw_fd_reflexive_traits"),
+(48, "slice_ptr_range"),
+(48, "write_mt"),
+(49, "nzint_try_from_nzint_conv"),
+(49, "renamed_spin_loop"),
+(49, "slice_select_nth_unstable"),
+(50, "alloc_layout_error"),
+(50, "clamp"),
+(50, "index_trait_on_arrays"),
+(50, "lazy_bool_to_option"),
+(50, "or_insert_with_key"),
+(50, "proc_macro_punct_eq"),
+(50, "refcell_take"),
+(50, "slice_fill"),
+(50, "unsafe_cell_get_mut"),
+(51, "arc_mutate_strong_count"),
+(51, "array_value_iter"),
+(51, "as_mut_str_for_str"),
+(51, "box_send_sync_any_downcast"),
+(51, "deque_range"),
+(51, "empty_seek"),
+(51, "error_by_ref"),
+(51, "iterator_fold_self"),
+(51, "more_char_conversions"),
+(51, "nonzero_div"),
+(51, "once_poison"),
+(51, "panic_any"),
+(51, "peekable_next_if"),
+(51, "poll_map"),
+(51, "raw_ref_macros"),
+(51, "seek_convenience"),
+(51, "slice_fill_with"),
+(51, "slice_strip"),
+(51, "split_inclusive"),
+(51, "unsigned_abs"),
+(51, "wake_trait"),
+(52, "arc_error"),
+(52, "assoc_char_consts"),
+(52, "assoc_char_funcs"),
+(52, "fmt_as_str"),
+(52, "osstring_extend"),
+(52, "partition_point"),
+(52, "proc_macro_punct_eq_flipped"),
+(52, "str_split_once"),
+(53, "cmp_min_max_by"),
+(53, "debug_non_exhaustive"),
+(53, "int_bits_const"),
+(53, "osstring_ascii"),
+(53, "peekable_peek_mut"),
+(53, "rc_mutate_strong_count"),
+(53, "slice_iter_mut_as_slice"),
+(53, "split_inclusive"),
+];
+
 fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
     let stdout = stdout.trim();
     if stdout == "" {
         return None;
     }
+
+    let feature_flags: HashMap<_,_> = RUSTC_FEATURES_STABLE_SINCE.iter().map(|&(v, k)| (k, v)).collect();
 
     let mut findings = Findings::default();
     let user_time = Regex::new(r"^user\s+(\d+)m(\d+\.\d+)s$").expect("regex");
@@ -93,136 +494,150 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
 
                 let desc = msg.message.as_ref().and_then(|m| m.message.as_deref());
                 if let Some(desc) = desc {
-                    if desc.starts_with("couldn't read /") {
+                    if desc.starts_with("couldn't read /") ||
+                        desc.starts_with("Current directory is invalid:") ||
+                        desc.starts_with("file not found for module") ||
+                        desc.starts_with("could not parse/generate dep") ||
+                        desc.contains("No such file or directory") ||
+                        desc.starts_with("error: could not parse/generate dep") ||
+                        desc.starts_with("couldn't create a temp dir:") {
                         eprintln!("• err: broken build, ignoring: {}", desc);
                         return None; // oops, our bad
                     }
 
-                    if desc.starts_with("associated constants are experimental") {
-                        findings.crates.insert((Some("1.19.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                    if let Some(feat) = desc.strip_prefix("use of unstable library feature '") {
+                        let feat = feat.splitn(2, '\'').next().unwrap();
+                        if let Some(rustc_min) = feature_flags.get(feat) {
+                            eprintln!("found feature {} >= {} ({} {})", feat, rustc_min, name, ver);
+                            findings.crates.insert((Some(format!("1.{}.0", rustc_min-1).into()), name.clone(), ver.clone(), Compat::Incompatible));
+                        } else {
+                            eprintln!("• err: unknown feature !? {}", feat);
+                        }
+                    }
+                    else if desc.starts_with("associated constants are experimental") {
+                        findings.crates.insert((Some("1.19.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("no method named `trim_start`") ||
                         desc.starts_with("`crate` in paths is experimental") ||
-                        desc.starts_with("use of unstable library feature 'iterator_find_map'") ||
                         desc.starts_with("no method named `trim_start_matches` found for type `std::") {
-                        findings.crates.insert((Some("1.29.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some("1.29.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("use of unstable library feature 'split_ascii_whitespace") ||
                         desc.starts_with("unresolved import `core::convert::Infallible`") ||
                         desc.starts_with("cannot find type `NonZeroI") ||
                         desc.starts_with("cannot find trait `TryFrom` in this") ||
-                        desc.starts_with("use of unstable library feature 'try_from'") {
-                        findings.crates.insert((Some("1.33.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                        desc.starts_with("use of unstable library feature 'const_integer_atomics") {
+                        findings.crates.insert((Some("1.33.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("cannot find trait `Unpin` in this scope") ||
-                        desc.starts_with("use of unstable library feature 'transpose_result'") ||
                         desc.starts_with("use of unstable library feature 'pin'") {
-                        findings.crates.insert((Some("1.32.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some("1.32.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("const fn is unstable") {
-                        findings.crates.insert((Some("1.30.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some("1.30.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("use of unstable library feature 'int_to_from_bytes") ||
-                        desc.starts_with("`core::mem::size_of` is not yet stable as a const fn") {
-                        findings.crates.insert((Some("1.31.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                        desc.starts_with("`core::mem::size_of` is not yet stable as a const fn") ||
+                        desc.contains(">::from_be` is not yet stable as a const fn") ||
+                        desc.contains(">::to_be` is not yet stable as a const fn") ||
+                        desc.contains(">::to_le` is not yet stable as a const fn") ||
+                        desc.contains(">::from_le` is not yet stable as a const fn") {
+                        findings.crates.insert((Some("1.31.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("unresolved import `std::ops::RangeBounds`") ||
                         desc.starts_with("the `#[repr(transparent)]` attribute is experimental") ||
                         desc.starts_with("unresolved import `std::alloc::Layout") {
-                        findings.crates.insert((Some("1.27.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some("1.27.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("no method named `align_to` found for type `&") ||
                         desc.starts_with("no method named `trim_end` found for type `&str`") ||
                         desc.starts_with("scoped attribute `rustfmt::skip` is experimental") {
-                        findings.crates.insert((Some("1.29.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some("1.29.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("`dyn Trait` syntax is unstable") ||
                         desc.starts_with("unresolved import `self::std::hint`") ||
                         desc.starts_with("`cfg(target_feature)` is experimental and subject") {
-                        findings.crates.insert((Some("1.26.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some("1.26.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("128-bit type is unstable") ||
                         desc.starts_with("128-bit integers are not stable") ||
-                        desc.starts_with("use of unstable library feature 'i128'") ||
-                        desc.starts_with("use of unstable library feature 'fs_read_write'") ||
                         desc.starts_with("underscore lifetimes are unstable") ||
                         desc.starts_with("`..=` syntax in patterns is experimental") ||
                         desc.starts_with("inclusive range syntax is experimental") {
-                        findings.crates.insert((Some("1.25.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some("1.25.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("unresolved import `std::ptr::NonNull`") {
-                        findings.crates.insert((Some("1.24.0"), name.clone(), ver.clone(), Compat::Incompatible));
-                    }
-                    else if desc.starts_with("use of unstable library feature 'copied'") {
-                        findings.crates.insert((Some("1.34.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some("1.24.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("use of unstable library feature 'maybe_uninit'") ||
                         desc.starts_with("no function or associated item named `uninit` found for type `core::me") ||
                         desc.starts_with("no function or associated item named `uninit` found for type `std::me") ||
                         desc.starts_with("cannot find type `IoSliceMut`") ||
                         desc.starts_with("failed to resolve: could not find `IoSliceMut` in") ||
-                        desc.starts_with("use of unstable library feature 'futures_api'") ||
                         desc.starts_with("cannot find type `Context` in module `core::task") ||
                         desc.starts_with("unresolved import `core::task::Context`") ||
-                        desc.starts_with("use of unstable library feature 'iovec'") ||
                         desc.starts_with("no method named `assume_init` found for type `core::mem") ||
                         desc.starts_with("no method named `assume_init` found for type `std::mem") ||
-                        desc.starts_with("use of unstable library feature 'alloc': this library") ||
-                        desc.starts_with("use of unstable library feature 'iter_copied'") ||
                         desc.starts_with("unresolved import `std::task::Context`") ||
                         desc.starts_with("unresolved imports `io::IoSlice") ||
                         desc.starts_with("unresolved import `std::io::IoSlice") {
-                        findings.crates.insert((Some("1.35.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some("1.35.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("use of unstable library feature 'matches_macro'") ||
                         desc.starts_with("cannot find macro `matches!`") ||
                         desc.starts_with("cannot find macro `matches` in") ||
-                        desc.starts_with("use of unstable library feature 'slice_from_raw_parts'") ||
-                        desc.starts_with("use of unstable library feature 'manually_drop_take'") ||
                         desc.starts_with("no associated item named `MAX` found for type `u") ||
                         desc.starts_with("no associated item named `MIN` found for type `u") {
-                        findings.crates.insert((Some("1.41.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some("1.41.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("arbitrary `self` types are unstable") ||
                         desc.contains("type of `self` without the `arbitrary_self_types`") ||
+                        desc.contains("no method named `map_or` found for type `std::result::Result") ||
                         desc.contains("unexpected `self` parameter in function") {
-                        findings.crates.insert((Some("1.40.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some("1.40.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("no associated item named `MAX` found for type `u") ||
+                        desc.starts_with("attributes are not yet allowed on `if` expressions") ||
+                        desc.starts_with("no associated item named `INFINITY` found for type `f") ||
+                        desc.starts_with("no associated item named `NEG_INFINITY` found for type `f") ||
+                        desc.starts_with("no associated item named `NAN` found for type `f") ||
                         desc.starts_with("no associated item named `MIN` found for type `i") ||
                         desc.starts_with("no associated item named `MIN` found for type `u") ||
                         desc.starts_with("no associated item named `MAX` found for type `i") {
-                        findings.crates.insert((Some("1.42.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some("1.42.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
                     }
-                    else if desc.starts_with("use of unstable library feature 'str_strip'") {
-                        findings.crates.insert((Some("1.44.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                    else if desc.starts_with("no method named `strip_prefix` found for type `&str`") {
+                        findings.crates.insert((Some("1.44.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("use of unstable library feature 'inner_deref'") ||
                         desc.starts_with("arrays only have std trait implementations for lengths 0..=32") {
-                        findings.crates.insert((Some("1.46.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some("1.46.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("#[doc(alias = \"...\")] is experimental") {
-                        findings.crates.insert((Some("1.47.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some("1.47.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
                     }
-                    else if desc.starts_with("const generics are unstable") {
-                        findings.crates.insert((Some("1.49.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                    else if desc.starts_with("const generics are unstable") ||
+                        desc.starts_with("const generics in any position are currently unsupported") {
+                        findings.crates.insert((Some("1.49.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("the `#[track_caller]` attribute is an experimental") ||
                         desc.starts_with("`while` is not allowed in a `const fn`") ||
                         desc.starts_with("`while` is not allowed in a `const`") ||
                         desc.starts_with("`if` is not allowed in a `const fn`") ||
+                        desc.starts_with("loops and conditional expressions are not stable in const fn") ||
+                        desc.starts_with("loops are not allowed in const fn") ||
                         desc.starts_with("`if`, `match`, `&&` and `||` are not stable in const fn") ||
                         desc.starts_with("`match` is not allowed in a `const fn`") {
-                        findings.crates.insert((Some("1.45.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some("1.45.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("use of unstable library feature 'ptr_cast") ||
-                       desc.starts_with("use of unstable library feature 'duration_float") ||
                        desc.starts_with("unresolved import `core::any::type_name") ||
                        desc.starts_with("unresolved import `std::any::type_name") ||
                        desc.starts_with("cannot find function `type_name` in module `core::any`") ||
+                       desc.starts_with("cannot find function `type_name` in module `std::any") ||
                        desc.starts_with("no method named `cast` found for type `*") ||
                        desc.starts_with("use of unstable library feature 'euclidean_division") {
-                        findings.crates.insert((Some("1.37.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some("1.37.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("use of unstable library feature 'option_flattening") ||
                         desc.starts_with("cannot find function `take` in module `mem") ||
@@ -231,31 +646,33 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                         desc.starts_with("no method named `to_be_bytes` found for type") ||
                         desc.starts_with("no function or associated item named `from_ne_bytes`") ||
                         desc.starts_with("no function or associated item named `from_be_bytes`") ||
-                        desc.starts_with("use of unstable library feature 'todo_macro'") ||
                         desc.starts_with("cannot find macro `todo!` in this scope") ||
                         desc.starts_with("no method named `as_deref` found for type") ||
-                        desc.starts_with("use of unstable library feature 'mem_take'") ||
+                        desc.starts_with("cannot find function `take` in module `std::mem") ||
                         desc.starts_with("`cfg(doctest)` is experimental and subject to change") ||
                         desc.starts_with("the `#[non_exhaustive]` attribute is an experimental") ||
                         desc.starts_with("syntax for subslices in slice patterns is not yet stabilized") ||
                         desc.starts_with("non exhaustive is an experimental feature") {
-                        findings.crates.insert((Some("1.39.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some("1.39.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("cannot bind by-move into a pattern") ||
                         desc.starts_with("async/await is unstable") ||
                         desc.starts_with("async blocks are unstable") ||
+                        desc.starts_with("`await` is a keyword in the 2018 edition") ||
                         desc.starts_with("async fn is unstable") {
-                        findings.crates.insert((Some("1.38.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some("1.38.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("use of unstable library feature 'copy_within") ||
                        desc.starts_with("naming constants with `_` is unstable") ||
-                       desc.starts_with("use of unstable library feature 'option_xor'") ||
                        desc.starts_with("enum variants on type aliases are experimental") {
-                        findings.crates.insert((Some("1.36.0"), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some("1.36.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("For more information about an error") ||
                         desc.starts_with("Some errors have detailed explanations") ||
+                        desc.starts_with("`#![feature]` may not be used on the stable release") ||
+                        desc.starts_with("#![feature] may not be used on the stable release channel") ||
                         desc.starts_with("For more information about this error, try") ||
+                        desc.starts_with("cannot continue compilation due to previous err") ||
                         desc.starts_with("Some errors occurred: E0") ||
                         desc.starts_with("aborting due to") {
                         // nothing
@@ -267,7 +684,7 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                 }
 
                 if msg.target.as_ref().and_then(|t| t.edition.as_ref()).map_or(false, |e| e == "2018") {
-                    findings.crates.insert((Some("1.30.1"), name.clone(), ver.clone(), Compat::Incompatible));
+                    findings.crates.insert((Some("1.30.1".into()), name.clone(), ver.clone(), Compat::Incompatible));
                 }
                 if level == "error" {
                     findings.crates.insert((None, name, ver, Compat::Incompatible));
@@ -363,8 +780,8 @@ exit failure
     let res = parse_analyses(out, err);
     assert!(res[0].crates.get(&(None, "vector2d".into(), "2.2.0".into(), Compat::VerifiedWorks)).is_some());
     assert!((res[0].check_time.unwrap() - 0.880) < 0.001);
-    assert!(res[0].crates.get(&(Some("1.30.1"), "proc_vector2d".into(), "1.0.2".into(), Compat::Incompatible)).is_some());
+    assert!(res[0].crates.get(&(Some("1.30.1".into()), "proc_vector2d".into(), "1.0.2".into(), Compat::Incompatible)).is_some());
     assert!(res[1].crates.get(&(None, "vector2d".into(), "2.2.0".into(), Compat::VerifiedWorks)).is_some());
-    assert!(res[1].crates.get(&(Some("1.30.1"), "proc_vector2d".into(), "1.0.2".into(), Compat::Incompatible)).is_some());
+    assert!(res[1].crates.get(&(Some("1.30.1".into()), "proc_vector2d".into(), "1.0.2".into(), Compat::Incompatible)).is_some());
     assert!(res[2].crates.get(&(None, "proc_vector2d".into(), "1.0.2".into(), Compat::Incompatible)).is_some());
 }

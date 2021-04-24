@@ -107,7 +107,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .filter_map(|x| {
                 let max_ver = x.rustc.oldest_ok.unwrap_or(999);
                 let min_ver = x.rustc.newest_bad.unwrap_or(0);
-                let mut possible_rusts = available_rust_versions.iter().enumerate().map(|(i, v)| {
+                let best_ver = (x.rustc.oldest_ok.unwrap_or(50) + x.rustc.newest_bad.unwrap_or(31))/2; // bisect?
+                let possible_rusts = available_rust_versions.iter().enumerate().map(|(i, v)| {
                     (i, v, SemVer::parse(v).unwrap().minor as u16)
                 }).filter(|&(_, _, minor)| {
                     minor > min_ver && minor < max_ver
@@ -115,7 +116,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let rustc_idx = if x.rustc.newest_bad.is_none() {
                     possible_rusts.max_by_key(|&(_, _, minor)| minor)? // avoid building 2018 with oldest compiler
                 } else {
-                    possible_rusts.next()?
+                    possible_rusts.min_by_key(|&(_, _, minor)| ((minor as i32) - best_ver as i32).abs())?
                 }.0;
                 Some((available_rust_versions.swap_remove(rustc_idx), x.crate_name, x.ver))
             })
@@ -193,6 +194,7 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
             let gap = oldest_ok.saturating_sub(newest_bad) as u32; // unknown version gap
             let score = rng.gen_range(0..if has_anything_built_ok_yet { 3 } else { 20 }) // spice it up a bit
                 + if gap > 4 { gap * 2 } else { gap }
+                + if gap > 10 { gap } else { 0 }
                 + if !has_ever_built && has_failed && has_anything_built_ok_yet { 15 } else { 0 } // unusable data? try fixing first
                 + if has_ever_built { 0 } else { 1 } // move to better ones
                 + if newest_bad < compat.newest_bad_raw.unwrap_or(0) { 5 } else { 0 } // really unusable data
@@ -201,7 +203,8 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
                 + if no_compat_bottom { 2 } else { 0 } // don't want to show 1.0 as compat rust
                 + if oldest_ok  > 30 { 1 } else { 0 }
                 + if oldest_ok  > 40 { 2 } else { 0 }
-                + if oldest_ok  > 50 { 3 } else { 0 };
+                + if oldest_ok  > 50 { 3 } else { 0 }
+                + if v.is_prerelease() { 0 } else { 2 }; // don't waste time testing alphas
 
             if !has_ever_built && has_failed {
                 // compat.oldest_ok = None; // build it with some new version
@@ -222,7 +225,7 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
 
 
     let dl = if candidates.is_empty() { 0 } else { crates.downloads_per_month(origin).await.unwrap_or(Some(0)).unwrap_or(0) };
-    let popularity_factor = (dl.max(100) as f32).sqrt() / 10.0;
+    let popularity_factor = (dl.max(100) as f32).log10();
 
     for c in candidates.iter_mut() {
         c.score = (c.score as f32 * popularity_factor) as u32;
@@ -238,6 +241,7 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
     }
 
     if !has_anything_built_ok_yet {
+        candidates.shuffle(&mut rng); // dunno which versions will build
         candidates.truncate(2); // don't waste time on broken crates
     }
 
@@ -256,7 +260,7 @@ fn run_and_analyze_versions(db: &BuildDb, docker_root: &Path, versions: &[(&'sta
     for f in parse_analyses(&stdout, &stderr) {
         if let Some(rustc_version) = f.rustc_version {
             for (rustc_override, name, version, compat) in f.crates {
-                let rustc_version = rustc_override.unwrap_or(&rustc_version);
+                let rustc_version = rustc_override.as_deref().unwrap_or(&rustc_version);
                 to_set.insert((compat, rustc_version.to_string(), Origin::from_crates_io_name(&name), version));
             }
         }
@@ -328,7 +332,11 @@ fn do_builds(docker_root: &Path, versions: &[(&'static str, Arc<str>, SemVer)]) 
             touch src/lib.rs
             printf > Cargo.toml '[package]\nname="_____"\nversion="0.0.0"\n[profile.dev]\ndebug=false\n[dependencies]\n%s = "=%s"\n' "$crate_name" "$libver";
             export CARGO_TARGET_DIR=/home/rustyuser/cargo_target/$rustver;
-            timeout 40 cargo +$rustver fetch; # RUSTC_BOOTSTRAP=1 timeout 40 cargo +$rustver -Z minimal-versions generate-lockfile ||
+            if (( RANDOM%5 == 0 )); then
+                RUSTC_BOOTSTRAP=1 timeout 40 cargo +$rustver -Z minimal-versions generate-lockfile || timeout 40 cargo +$rustver fetch
+            else
+                RUSTC_BOOTSTRAP=1 timeout 40 cargo +$rustver -Z no-index-update fetch || timeout 40 cargo +$rustver fetch;
+            fi
             timeout 30 nice cargo +$rustver check --locked --message-format=json;
         }}
         swapoff -a || true

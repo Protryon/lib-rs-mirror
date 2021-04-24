@@ -307,6 +307,18 @@ fn prepare_docker(docker_root: &Path) -> Result<(), Box<dyn std::error::Error>> 
 fn do_builds(docker_root: &Path, versions: &[(&'static str, Arc<str>, SemVer)]) -> Result<(String, String), Box<dyn std::error::Error>> {
     let script = format!(r##"
         set -euo pipefail
+        function yeet {{
+            mv "$1" "$1-delete" && rm -rf "$1-delete" # atomic delete
+        }}
+        function cleanup() {{
+            local rustver="$1"
+            local crate_name="$2"
+            local libver="$3"
+            export CARGO_TARGET_DIR=/home/rustyuser/cargo_target/$rustver;
+            rm -rf "$CARGO_TARGET_DIR"/debug/*/"$crate_name-"*; # eats disk space
+            rm -rf "$CARGO_TARGET_DIR"/debug/*/"lib$crate_name-"*;
+            yeet ~/.cargo/registry/src/*/"$crate_name-$libver";
+        }}
         function check_crate_with_rustc() {{
             local rustver="$1"
             local crate_name="$2"
@@ -323,7 +335,7 @@ fn do_builds(docker_root: &Path, versions: &[(&'static str, Arc<str>, SemVer)]) 
         swapoff -a || true
         for job in {jobs}; do
             (
-                check_crate_with_rustc $job > /tmp/"output-$job" 2>/tmp/"outputerr-$job" && echo "# $job done OK" || echo "# $job failed"
+                check_crate_with_rustc $job > /tmp/"output-$job" 2>/tmp/"outputerr-$job" && echo "# R.$job done OK" || echo "# R.$job failed"
             ) &
         done
         wait
@@ -332,6 +344,7 @@ fn do_builds(docker_root: &Path, versions: &[(&'static str, Arc<str>, SemVer)]) 
             cat /tmp/"output-$job";
             echo >&2 "{divider}"
             cat >&2 /tmp/"outputerr-$job";
+            cleanup $job
         done
     "##,
         divider = parse::DIVIDER,

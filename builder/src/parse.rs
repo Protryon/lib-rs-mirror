@@ -171,7 +171,8 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                         desc.starts_with("cannot find macro `matches` in") ||
                         desc.starts_with("use of unstable library feature 'slice_from_raw_parts'") ||
                         desc.starts_with("use of unstable library feature 'manually_drop_take'") ||
-                        desc.starts_with("no associated item named `MAX` found for type `u") {
+                        desc.starts_with("no associated item named `MAX` found for type `u") ||
+                        desc.starts_with("no associated item named `MIN` found for type `u") {
                         findings.crates.insert((Some("1.41.0"), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("arbitrary `self` types are unstable") ||
@@ -180,6 +181,8 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                         findings.crates.insert((Some("1.40.0"), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("no associated item named `MAX` found for type `u") ||
+                        desc.starts_with("no associated item named `MIN` found for type `i") ||
+                        desc.starts_with("no associated item named `MIN` found for type `u") ||
                         desc.starts_with("no associated item named `MAX` found for type `i") {
                         findings.crates.insert((Some("1.42.0"), name.clone(), ver.clone(), Compat::Incompatible));
                     }

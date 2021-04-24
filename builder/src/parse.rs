@@ -93,10 +93,16 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
 
                 let desc = msg.message.as_ref().and_then(|m| m.message.as_deref());
                 if let Some(desc) = desc {
+                    if desc.starts_with("couldn't read /") {
+                        eprintln!("• err: broken build, ignoring: {}", desc);
+                        return None; // oops, our bad
+                    }
+
                     if desc.starts_with("associated constants are experimental") {
                         findings.crates.insert((Some("1.19.0"), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("no method named `trim_start`") ||
+                        desc.starts_with("`crate` in paths is experimental") ||
                         desc.starts_with("use of unstable library feature 'iterator_find_map'") ||
                         desc.starts_with("no method named `trim_start_matches` found for type `std::") {
                         findings.crates.insert((Some("1.29.0"), name.clone(), ver.clone(), Compat::Incompatible));
@@ -139,7 +145,9 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                         desc.starts_with("128-bit integers are not stable") ||
                         desc.starts_with("use of unstable library feature 'i128'") ||
                         desc.starts_with("use of unstable library feature 'fs_read_write'") ||
-                        desc.starts_with("`..=` syntax in patterns is experimental") {
+                        desc.starts_with("underscore lifetimes are unstable") ||
+                        desc.starts_with("`..=` syntax in patterns is experimental") ||
+                        desc.starts_with("inclusive range syntax is experimental") {
                         findings.crates.insert((Some("1.25.0"), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("unresolved import `std::ptr::NonNull`") {
@@ -189,7 +197,8 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                     else if desc.starts_with("use of unstable library feature 'str_strip'") {
                         findings.crates.insert((Some("1.44.0"), name.clone(), ver.clone(), Compat::Incompatible));
                     }
-                    else if desc.starts_with("use of unstable library feature 'inner_deref'") {
+                    else if desc.starts_with("use of unstable library feature 'inner_deref'") ||
+                        desc.starts_with("arrays only have std trait implementations for lengths 0..=32") {
                         findings.crates.insert((Some("1.46.0"), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("#[doc(alias = \"...\")] is experimental") {
@@ -210,6 +219,7 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                        desc.starts_with("use of unstable library feature 'duration_float") ||
                        desc.starts_with("unresolved import `core::any::type_name") ||
                        desc.starts_with("unresolved import `std::any::type_name") ||
+                       desc.starts_with("cannot find function `type_name` in module `core::any`") ||
                        desc.starts_with("no method named `cast` found for type `*") ||
                        desc.starts_with("use of unstable library feature 'euclidean_division") {
                         findings.crates.insert((Some("1.37.0"), name.clone(), ver.clone(), Compat::Incompatible));

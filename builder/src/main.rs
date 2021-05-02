@@ -70,6 +70,19 @@ struct ToCheck {
     rustc: CompatRange,
 }
 
+fn out_of_disk_space() -> bool {
+    match fs2::available_space(TEMP_JUNK_DIR) {
+        Ok(size) => {
+            log::warn!("out of disk space: {}", size);
+            size < 5_000_000_000 // cargo easily chews gigabytes of disk space per build
+        },
+        Err(e) => {
+            log::error!("disk space check: {}", e);
+            return true;
+        },
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let crates = Arc::new(kitchen_sink::KitchenSink::new_default().await?);
@@ -86,7 +99,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut rng = rand::thread_rng();
 
         while let Ok(mut next_batch) = r.recv() {
-            if stopped() {
+            if stopped() || out_of_disk_space() {
                 break;
             }
 

@@ -701,8 +701,10 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
 
     let mut last_broken_manifest_crate: Option<(String, String)> = None;
     for line in stderr.split('\n') {
-        if line.trim_start().starts_with("error:") {
-            last_broken_manifest_crate = None; // there may be multiple errors, not all referring to the last known crate
+        if line.trim_start().starts_with("error:") || // there may be multiple errors, not all referring to the last known crate
+        line.starts_with("  process didn't exit successfully:") || // handled elsewhere
+        line.starts_with("  no targets specified in the manifest") {
+            last_broken_manifest_crate = None;
         }
         else if let Some(rest) = line.strip_prefix("  failed to parse manifest at `/home/rustyuser/.cargo/registry/src/github.com-1ecc6299db9ec823/") {
             let pattern = regex::Regex::new(r"([^.+/; ]+)-([0-9]+\.[^/; ]+)/Cargo.toml").expect("regex syntax");
@@ -714,20 +716,17 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
         }
         else if line.starts_with("  feature `profile-overrides` is required") {
             if let Some((name, ver)) = last_broken_manifest_crate.take() {
-                // it should say Incompatible, but the parsing here is shoddy, so use a weaker setting to avoid polluting the data too much
-                findings.crates.insert((Some("1.40.0".into()), name, ver, Compat::BrokenDeps));
+                findings.crates.insert((Some("1.40.0".into()), name, ver, Compat::Incompatible));
             }
         }
         else if line.starts_with("  editions are unstable") || line.starts_with("  feature `rename-dependency` is required") {
             if let Some((name, ver)) = last_broken_manifest_crate.take() {
-                // it should say Incompatible, but the parsing here is shoddy, so use a weaker setting to avoid polluting the data too much
-                findings.crates.insert((Some("1.30.0".into()), name, ver, Compat::BrokenDeps));
+                findings.crates.insert((Some("1.30.0".into()), name, ver, Compat::Incompatible));
             }
         }
         else if line.starts_with("  unknown cargo feature `resolver`") {
             if let Some((name, ver)) = last_broken_manifest_crate.take() {
-                // it should say Incompatible, but the parsing here is shoddy, so use a weaker setting to avoid polluting the data too much
-                findings.crates.insert((Some("1.50.0".into()), name, ver, Compat::BrokenDeps));
+                findings.crates.insert((Some("1.50.0".into()), name, ver, Compat::Incompatible));
             }
         }
         else if let Some(c) = user_time.captures(line) {

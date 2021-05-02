@@ -14,43 +14,39 @@ RUN useradd -u 4321 --create-home --user-group -s /bin/bash rustyuser
 RUN chown -R 4321:4321 /home/rustyuser
 USER rustyuser
 WORKDIR /home/rustyuser
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.51.0 --verbose # wat
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.50.0 --verbose # wat
 ENV PATH="$PATH:/home/rustyuser/.cargo/bin"
 RUN rustup set profile minimal
-RUN rustup toolchain add 1.25.0
 RUN rustup toolchain add 1.29.0
 RUN rustup toolchain add 1.30.0
-RUN rustup toolchain add 1.34.0
+RUN rustup toolchain add 1.31.0
+RUN rustup toolchain add 1.33.0
+RUN rustup toolchain add 1.36.0
 RUN rustup toolchain add 1.38.0
-RUN rustup toolchain add 1.40.0
-RUN rustup toolchain add 1.41.0
-RUN rustup toolchain add 1.44.0
-RUN rustup toolchain add 1.46.0
-RUN rustup toolchain add 1.48.0
-RUN rustup toolchain add 1.49.0
-RUN rustup toolchain add 1.35.0
-RUN rustup toolchain add 1.37.0
-RUN rustup toolchain add 1.32.0
+RUN rustup toolchain add 1.39.0
+RUN rustup toolchain add 1.42.0
+RUN rustup toolchain add 1.43.0
+RUN rustup toolchain add 1.45.0
+RUN rustup toolchain add 1.47.0
+RUN rustup toolchain add 1.50.0
 RUN rustup toolchain list
 "##;
 
 const TEMP_JUNK_DIR: &str = "/var/tmp/crates_env";
 
-const RUST_VERSIONS: [&str; 14] = [
-    "1.25.0",
-    "1.29.0",
-    "1.30.0",
-    "1.34.0",
-    "1.38.0",
-    "1.40.0",
-    "1.41.0",
-    "1.44.0",
-    "1.46.0",
-    "1.48.0",
-    "1.49.0",
-    "1.35.0",
-    "1.37.0",
-    "1.32.0",
+const RUST_VERSIONS: [&str; 12] = [
+"1.29.0",
+"1.30.0",
+"1.31.0",
+"1.33.0",
+"1.36.0",
+"1.38.0",
+"1.39.0",
+"1.42.0",
+"1.43.0",
+"1.45.0",
+"1.47.0",
+"1.50.0",
 ];
 
 use crate_db::builddb::*;
@@ -120,7 +116,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .filter_map(|x| {
                 let max_ver = x.rustc.oldest_ok.unwrap_or(999);
                 let min_ver = x.rustc.newest_bad.unwrap_or(0);
-                let best_ver = (x.rustc.oldest_ok.unwrap_or(50) + x.rustc.newest_bad.unwrap_or(31))/2; // bisect?
+
+                let upper_limit = x.rustc.oldest_ok.unwrap_or(53);
+                // don't pick 1.29 as the first choice
+                let lower_limit = x.rustc.newest_bad.unwrap_or(37).max(x.rustc.newest_bad_raw.unwrap_or(30));
+                let best_ver = (upper_limit + lower_limit)/2;
                 let possible_rusts = available_rust_versions.iter().enumerate().map(|(i, v)| {
                     (i, v, SemVer::parse(v).unwrap().minor as u16)
                 }).filter(|&(_, _, minor)| {
@@ -160,7 +160,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 continue;
             }
         }
-        if all.versions().len() < 3 {
+        if all.versions().len() == 1 || all.versions().len() > 500 {
             continue; // junk?
         }
 
@@ -189,7 +189,7 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
 
     let has_anything_built_ok_yet = compat_info.values().any(|c| c.oldest_ok_raw.is_some());
     let mut rng = rand::thread_rng();
-    let mut candidates: Vec<_> = all.versions().iter().rev().take(100)
+    let mut candidates: Vec<_> = all.versions().iter().rev().take(50)
         .filter(|v| !v.is_yanked())
         .filter_map(|v| SemVer::parse(v.version()).ok())
         .map(|v| {
@@ -340,8 +340,8 @@ fn do_builds(docker_root: &Path, versions: &[(&'static str, Arc<str>, SemVer)]) 
             local crate_name="$2"
             local libver="$3"
             echo "CHECKING $rustver $crate_name $libver"
-            mkdir -p "crate-$libver/src";
-            cd "crate-$libver";
+            mkdir -p "crate-$crate_name-$libver/src";
+            cd "crate-$crate_name-$libver";
             touch src/lib.rs
             printf > Cargo.toml '[package]\nname="_____"\nversion="0.0.0"\n[profile.dev]\ndebug=false\n[dependencies]\n%s = "=%s"\n' "$crate_name" "$libver";
             export CARGO_TARGET_DIR=/home/rustyuser/cargo_target/$rustver;

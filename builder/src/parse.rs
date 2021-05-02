@@ -698,8 +698,39 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
             eprintln!("Does not parse as JSON: {}", line);
         }
     }
+
+    let mut last_broken_manifest_crate: Option<(String, String)> = None;
     for line in stderr.split('\n') {
-        if let Some(c) = user_time.captures(line) {
+        if line.trim_start().starts_with("error:") {
+            last_broken_manifest_crate = None; // there may be multiple errors, not all referring to the last known crate
+        }
+        else if let Some(rest) = line.strip_prefix("  failed to parse manifest at `/home/rustyuser/.cargo/registry/src/github.com-1ecc6299db9ec823/") {
+            let pattern = regex::Regex::new(r"([^.+/; ]+)-([0-9]+\.[^/; ]+)/Cargo.toml").expect("regex syntax");
+            if let Some(cap) = pattern.captures(rest) {
+                last_broken_manifest_crate = Some((cap[1].to_string(), cap[2].to_string()));
+            } else {
+                log::error!("bad crate name in path? {}", rest);
+            }
+        }
+        else if line.starts_with("  feature `profile-overrides` is required") {
+            if let Some((name, ver)) = last_broken_manifest_crate.take() {
+                // it should say Incompatible, but the parsing here is shoddy, so use a weaker setting to avoid polluting the data too much
+                findings.crates.insert((Some("1.40.0".into()), name, ver, Compat::BrokenDeps));
+            }
+        }
+        else if line.starts_with("  editions are unstable") || line.starts_with("  feature `rename-dependency` is required") {
+            if let Some((name, ver)) = last_broken_manifest_crate.take() {
+                // it should say Incompatible, but the parsing here is shoddy, so use a weaker setting to avoid polluting the data too much
+                findings.crates.insert((Some("1.30.0".into()), name, ver, Compat::BrokenDeps));
+            }
+        }
+        else if line.starts_with("  unknown cargo feature `resolver`") {
+            if let Some((name, ver)) = last_broken_manifest_crate.take() {
+                // it should say Incompatible, but the parsing here is shoddy, so use a weaker setting to avoid polluting the data too much
+                findings.crates.insert((Some("1.50.0".into()), name, ver, Compat::BrokenDeps));
+            }
+        }
+        else if let Some(c) = user_time.captures(line) {
             let m: u32 = c[1].parse().expect("time");
             let s: f32 = c[2].parse().expect("time");
             findings.check_time = Some((m * 60) as f32 + s);
@@ -709,6 +740,39 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
         return None;
     }
     Some(findings)
+}
+
+#[test]
+fn parse_cargo() {
+    let stderr = r##"
+error: failed to download `search-autocompletion v0.3.0`
+
+Caused by:
+  unable to get packages from source
+
+Caused by:
+  failed to parse manifest at `/home/rustyuser/.cargo/registry/src/github.com-1ecc6299db9ec823/search-autocompletion-0.3.0/Cargo.toml`
+
+Caused by:
+  feature `profile-overrides` is required
+
+consider adding `cargo-features = ["profile-overrides"]` to the manifest
+error: failed to download `search-autocompletion v0.3.0`
+
+Caused by:
+  unable to get packages from source
+
+Caused by:
+  failed to parse manifest at `/home/rustyuser/.cargo/registry/src/github.com-1ecc6299db9ec823/search-autocompletion-0.3.0/Cargo.toml`
+"##;
+
+    let f = parse_analysis("CHECKING 1.37.0 wat ever", stderr).unwrap();
+
+    assert_eq!(f.crates.len(), 1);
+    let f = f.crates.into_iter().next().unwrap();
+    assert_eq!("1.40.0", f.0.unwrap());
+    assert_eq!("search-autocompletion", f.1);
+    assert_eq!("0.3.0", f.2);
 }
 
 #[test]

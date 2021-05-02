@@ -114,7 +114,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut available_rust_versions = RUST_VERSIONS.to_vec();
             available_rust_versions.shuffle(&mut rng);
 
-            let max_to_waste_trying = (candidates.len()/3).max(60);
+            let max_to_waste_trying = (candidates.len()/4).max(RUST_VERSIONS.len()*2);
             let versions: Vec<_> = std::iter::from_fn(|| candidates.pop())
             .take(max_to_waste_trying)
             .filter_map(|x| {
@@ -133,7 +133,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }.0;
                 Some((available_rust_versions.swap_remove(rustc_idx), x.crate_name, x.ver))
             })
-            .take(RUST_VERSIONS.len()-1)
+            .take((RUST_VERSIONS.len()+1)/2)
             .collect();
 
             eprintln!("running: {}/{}", versions.len(), candidates.len());

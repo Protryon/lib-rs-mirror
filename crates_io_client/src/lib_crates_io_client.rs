@@ -6,7 +6,7 @@ use std::sync::Arc;
 pub use simple_cache::Error;
 
 use serde_derive::*;
-use simple_cache::SimpleCache;
+use simple_cache::SimpleFetchCache;
 use simple_cache::TempCacheJson;
 use fetcher::Fetcher;
 
@@ -24,7 +24,7 @@ pub struct CratesIoClient {
     cache: TempCacheJson<(String, Payload)>,
     metacache: TempCacheJson<(String, CrateMetaFile)>,
     tarballs_path: PathBuf,
-    readmes: SimpleCache,
+    readmes: SimpleFetchCache,
 }
 
 macro_rules! cioopt {
@@ -42,7 +42,7 @@ impl CratesIoClient {
         Ok(Self {
             cache: TempCacheJson::new(&cache_base_path.join("cratesio.bin"), fetcher.clone())?,
             metacache: TempCacheJson::new(&cache_base_path.join("cratesiometa.bin"), fetcher.clone())?,
-            readmes: SimpleCache::new(&cache_base_path.join("readmes.db"), fetcher.clone())?,
+            readmes: SimpleFetchCache::new(&cache_base_path.join("readmes.db"), fetcher.clone())?,
             tarballs_path: cache_base_path.join("tarballs"),
             fetcher,
         })
@@ -56,7 +56,7 @@ impl CratesIoClient {
     pub fn cache_only(&mut self, no_net: bool) -> &mut Self {
         self.cache.set_cache_only(no_net);
         self.metacache.set_cache_only(no_net);
-        self.readmes.cache_only = no_net;
+        self.readmes.set_cache_only(no_net);
         self
     }
 

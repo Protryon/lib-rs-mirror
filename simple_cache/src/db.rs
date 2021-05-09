@@ -18,16 +18,57 @@ use thread_local::ThreadLocal;
 pub struct SimpleCache {
     url: String,
     conn: ThreadLocal<Result<Connection, rusqlite::Error>>,
-    fetcher: Arc<Fetcher>,
     pub cache_only: bool,
 }
 
-impl SimpleCache {
+#[derive(Debug)]
+pub struct SimpleFetchCache {
+    cache: SimpleCache,
+    fetcher: Arc<Fetcher>,
+}
+
+impl SimpleFetchCache {
     pub fn new(db_path: impl AsRef<Path>, fetcher: Arc<Fetcher>) -> Result<Self, Error> {
+        Ok(Self {
+            cache: SimpleCache::new(db_path)?,
+            fetcher,
+        })
+    }
+
+    pub async fn get_json<B>(&self, key: (&str, &str), url: impl AsRef<str>) -> Result<Option<B>, Error>
+    where B: for<'a> serde::Deserialize<'a> {
+        if let Some(data) = self.get_cached(key, url).await? {
+            match serde_json::from_slice(&data) {
+                Ok(res) => Ok(Some(res)),
+                Err(parse) => Err(Error::Parse(parse, data)),
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub async fn get_cached(&self, key: (&str, &str), url: impl AsRef<str>) -> Result<Option<Vec<u8>>, Error> {
+        Ok(if let Some(data) = self.cache.get(key)? {
+            Some(data)
+        } else if self.cache.cache_only {
+            None
+        } else {
+            let data = Box::pin(self.fetcher.fetch(url.as_ref())).await?;
+            self.cache.set(key, &data)?;
+            Some(data)
+        })
+    }
+
+    pub fn set_cache_only(&mut self, val: bool) {
+        self.cache.cache_only = val;
+    }
+}
+
+impl SimpleCache {
+    pub fn new(db_path: impl AsRef<Path>) -> Result<Self, Error> {
         Ok(Self {
             url: format!("file:{}?cache=shared", db_path.as_ref().display()),
             conn: ThreadLocal::new(),
-            fetcher,
             cache_only: false,
         })
     }
@@ -50,18 +91,6 @@ impl SimpleCache {
         match conn {
             Ok(conn) => cb(conn),
             Err(err) => Err(Error::Other(err.to_string())),
-        }
-    }
-
-    pub async fn get_json<B>(&self, key: (&str, &str), url: impl AsRef<str>) -> Result<Option<B>, Error>
-    where B: for<'a> serde::Deserialize<'a> {
-        if let Some(data) = self.get_cached(key, url).await? {
-            match serde_json::from_slice(&data) {
-                Ok(res) => Ok(Some(res)),
-                Err(parse) => Err(Error::Parse(parse, data)),
-            }
-        } else {
-            Ok(None)
         }
     }
 
@@ -92,18 +121,6 @@ impl SimpleCache {
                 Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
                 Err(err) => Err(err)?,
             }
-        })
-    }
-
-    pub async fn get_cached(&self, key: (&str, &str), url: impl AsRef<str>) -> Result<Option<Vec<u8>>, Error> {
-        Ok(if let Some(data) = self.get(key)? {
-            Some(data)
-        } else if self.cache_only {
-            None
-        } else {
-            let data = Box::pin(self.fetcher.fetch(url.as_ref())).await?;
-            self.set(key, &data)?;
-            Some(data)
         })
     }
 

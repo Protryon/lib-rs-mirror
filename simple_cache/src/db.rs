@@ -8,9 +8,9 @@ use rusqlite::Error::SqliteFailure;
 use rusqlite::ErrorCode::DatabaseLocked;
 use serde;
 use serde_json;
-use flate2::read::DeflateDecoder;
-use flate2::write::DeflateEncoder;
-use flate2::Compression;
+use brotli::BrotliCompress;
+use brotli::BrotliDecompress;
+
 
 use std::path::Path;
 use std::thread;
@@ -136,10 +136,10 @@ impl SimpleCache {
     }
 
     pub fn set_compressed<B: serde::Serialize>(&self, key: (&str, &str), value: &B) -> Result<(), Error> {
-        let mut e = DeflateEncoder::new(Vec::new(), Compression::best());
-        rmp_serde::encode::write_named(&mut e, value)?;
-        let compr = e.finish()?;
-        self.set(key, &compr)
+        let serialized = rmp_serde::encode::to_vec_named(value)?;
+        let mut out = Vec::with_capacity(serialized.len()/2);
+        BrotliCompress(&mut serialized.as_slice(), &mut out, &Default::default())?;
+        self.set(key, &out)
     }
 
     pub fn get_decompressed<B: serde::de::DeserializeOwned>(&self, key: (&str, &str)) -> Result<Option<B>, Error> {
@@ -147,7 +147,9 @@ impl SimpleCache {
             None => None,
             Some(data) => {
                 let mut data = data.as_slice();
-                rmp_serde::decode::from_read(DeflateDecoder::new(&mut data))?
+                let mut decomp = Vec::with_capacity(data.len()*2);
+                BrotliDecompress(&mut data, &mut decomp)?;
+                rmp_serde::decode::from_slice(&decomp)?
             },
         })
     }

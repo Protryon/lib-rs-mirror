@@ -199,7 +199,7 @@ impl Index {
     }
 
     pub async fn deps_stats(&self) -> Result<&DepsStats, DepsErr> {
-        Ok(tokio::time::timeout(Duration::from_secs(30), self.deps_stats.get_or_init(async { self.get_deps_stats() }))
+        Ok(tokio::time::timeout(Duration::from_secs(60), self.deps_stats.get_or_init(async { self.get_deps_stats() }))
             .await
             .map_err(|_| DepsErr::DepsNotAvailable)?)
     }

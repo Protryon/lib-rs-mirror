@@ -38,6 +38,7 @@ pub use github_info::Org;
 pub use github_info::User;
 pub use github_info::UserOrg;
 pub use github_info::UserType;
+pub use rich_crate::CachedCrate;
 pub use rich_crate::DependerChangesMonthly;
 pub use rich_crate::Edition;
 pub use rich_crate::MaintenanceStatus;
@@ -79,6 +80,7 @@ use rich_crate::CrateVersionSourceData;
 use rich_crate::Readme;
 use semver::VersionReq;
 use simple_cache::TempCache;
+use simple_cache::SimpleCache;
 use smol_str::SmolStr;
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -189,6 +191,7 @@ pub struct KitchenSink {
     url_check_cache: TempCache<bool>,
     readme_check_cache: TempCache<()>,
     crate_db: CrateDb,
+    derived_cache: SimpleCache,
     user_db: user_db::UserDb,
     gh: github_info::GitHub,
     loaded_rich_crate_version_cache: RwLock<FxHashMap<Origin, ArcRichCrateVersion>>,
@@ -206,7 +209,6 @@ pub struct KitchenSink {
     crate_rustc_compat_cache: RwLock<HashMap<Origin, CompatByCrateVersion>>,
     crate_rustc_compat_db: OnceCell<BuildDb>,
     data_path: PathBuf,
-
 }
 
 impl KitchenSink {
@@ -244,6 +246,7 @@ impl KitchenSink {
             readme_check_cache: TempCache::new(&data_path.join("readme_check.db")).context("readmecheck")?,
             docs_rs: docs_rs_client::DocsRsClient::new(data_path.join("docsrs.db")).context("docs")?,
             crate_db: CrateDb::new(Self::assert_exists(data_path.join("crate_data.db"))?).context("db")?,
+            derived_cache: SimpleCache::new(data_path.join("derived.db"))?,
             user_db: user_db::UserDb::new(Self::assert_exists(data_path.join("users.db"))?).context("udb")?,
             gh: gh.context("gh")?,
             loaded_rich_crate_version_cache: RwLock::new(FxHashMap::default()),
@@ -773,6 +776,17 @@ impl KitchenSink {
         watch("rcv-2", self.rich_crate_version_async_opt(origin, true))
     }
 
+    async fn rich_crate_version_data_cached(&self, origin: &Origin) -> CResult<CachedCrate> {
+        let origin_str = origin.to_str();
+        let key = (origin_str.as_str(), "");
+        if let Some(cached) = tokio::task::block_in_place(|| self.derived_cache.get_decompressed(key))? {
+            return Ok(cached);
+        }
+        let res = self.crate_db.rich_crate_version_data_old(origin).await?;
+        tokio::task::block_in_place(|| self.derived_cache.set_compressed(key, &res))?;
+        Ok(res)
+    }
+
     async fn rich_crate_version_async_opt(&self, origin: &Origin, allow_stale: bool) -> CResult<ArcRichCrateVersion> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
 
@@ -782,7 +796,7 @@ impl KitchenSink {
         }
         trace!("rich_crate_version_async MISS {:?}", origin);
 
-        let mut maybe_data = tokio::time::timeout(Duration::from_secs(3), self.crate_db.rich_crate_version_data(origin))
+        let mut maybe_data = tokio::time::timeout(Duration::from_secs(3), self.rich_crate_version_data_cached(origin))
             .await.map_err(|_| {
                 warn!("db data fetch for {:?} timed out", origin);
                 KitchenSinkErr::DerivedDataTimedOut
@@ -813,7 +827,7 @@ impl KitchenSink {
                 let _th = timeout("autoindex", 30, self.auto_indexing_throttle.acquire().map(|e| e.map_err(CError::from))).await?;
                 let reindex = timeout("reindex", 60, self.index_crate_highest_version(origin));
                 watch("reindex", reindex).await.with_context(|_| format!("reindexing {:?}", origin))?; // Pin to lower stack usage
-                timeout("reindexed data", 10, self.crate_db.rich_crate_version_data(origin)).await?
+                timeout("reindexed data", 10, self.rich_crate_version_data_cached(origin)).await?
             },
         };
 
@@ -1614,7 +1628,7 @@ impl KitchenSink {
 
         let extracted_auto_keywords = feat_extractor::auto_keywords(&manifest, source_data.github_description.as_deref(), readme_text.as_deref());
 
-        self.crate_db.index_latest(CrateVersionData {
+        let cached = self.crate_db.index_latest(CrateVersionData {
             cache_key,
             category_slugs,
             authors: &authors,
@@ -1626,6 +1640,9 @@ impl KitchenSink {
             source_data: &source_data,
             extracted_auto_keywords,
         }).await?;
+        tokio::task::block_in_place(|| {
+            self.derived_cache.set_compressed((&origin.to_str(), ""), &cached)
+        })?;
         Ok(())
     }
 

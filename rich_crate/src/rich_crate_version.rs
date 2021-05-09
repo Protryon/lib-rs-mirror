@@ -490,6 +490,13 @@ pub struct Derived {
     pub is_yanked: bool,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+pub struct CachedCrate {
+    pub manifest: Manifest,
+    pub derived: Derived,
+    pub cache_key: u64,
+}
+
 /// Metadata guessed
 #[derive(Debug, Clone, Default)]
 pub struct CrateVersionSourceData {

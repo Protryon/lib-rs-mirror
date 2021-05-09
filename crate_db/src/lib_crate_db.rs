@@ -5,9 +5,9 @@ use heck::KebabCase;
 use rich_crate::CrateVersionSourceData;
 use rich_crate::CrateOwner;
 use rich_crate::Derived;
+use rich_crate::CachedCrate;
 use rich_crate::Manifest;
 use rich_crate::ManifestExt;
-use rich_crate::Markup;
 use rich_crate::Origin;
 use rich_crate::Readme;
 use rich_crate::Repo;
@@ -52,12 +52,6 @@ pub struct CrateVersionData<'a> {
     pub category_slugs: &'a [Cow<'a, str>],
     pub repository: Option<&'a Repo>,
     pub extracted_auto_keywords: Vec<(f32, String)>,
-    pub cache_key: u64,
-}
-
-pub struct CachedCrate {
-    pub manifest: Manifest,
-    pub derived: Derived,
     pub cache_key: u64,
 }
 
@@ -163,7 +157,8 @@ impl CrateDb {
         Ok(Self::db(&self.url)?)
     }
 
-    pub async fn rich_crate_version_data(&self, origin: &Origin) -> FResult<CachedCrate> {
+    #[deprecated]
+    pub async fn rich_crate_version_data_old(&self, origin: &Origin) -> FResult<CachedCrate> {
         struct Row {
             capitalized_name: String,
             crate_compressed_size: u32,
@@ -247,20 +242,21 @@ impl CrateDb {
                 cache_key: row.cache_key,
                 manifest,
                 derived: Derived {
-                path_in_repo,
-                readme,
-                categories,
-                capitalized_name: row.capitalized_name,
-                crate_compressed_size: row.crate_compressed_size,
-                crate_decompressed_size: row.crate_decompressed_size,
-                keywords,
-                lib_file: row.lib_file,
-                has_buildrs: row.has_buildrs,
-                is_nightly: row.is_nightly,
-                is_yanked: row.is_yanked,
-                has_code_of_conduct: row.has_code_of_conduct,
-                language_stats,
-            }})
+                    path_in_repo,
+                    readme,
+                    categories,
+                    capitalized_name: row.capitalized_name,
+                    crate_compressed_size: row.crate_compressed_size,
+                    crate_decompressed_size: row.crate_decompressed_size,
+                    keywords,
+                    lib_file: row.lib_file,
+                    has_buildrs: row.has_buildrs,
+                    is_nightly: row.is_nightly,
+                    is_yanked: row.is_yanked,
+                    has_code_of_conduct: row.has_code_of_conduct,
+                    language_stats,
+                }
+            })
         }).await
     }
 
@@ -293,7 +289,7 @@ impl CrateDb {
 
     /// Add data of the latest version of a crate to the index
     /// Score is a ranking of a crate (0 = bad, 1 = great)
-    pub async fn index_latest(&self, c: CrateVersionData<'_>) -> FResult<()> {
+    pub async fn index_latest(&self, c: CrateVersionData<'_>) -> FResult<CachedCrate> {
         let origin = c.origin.to_str();
 
         let manifest = &c.manifest;
@@ -370,31 +366,10 @@ impl CrateDb {
             let mut clear_categories = tx.prepare_cached("DELETE FROM categories WHERE crate_id = ?1")?;
             let mut insert_category = tx.prepare_cached("INSERT OR IGNORE INTO categories (crate_id, slug, rank_weight, relevance_weight) VALUES (?1, ?2, ?3, ?4)")?;
             let mut get_crate_id = tx.prepare_cached("SELECT id, recent_downloads FROM crates WHERE origin = ?1")?;
-            let mut insert_derived = tx.prepare_cached("INSERT OR REPLACE INTO crate_derived (
-                 crate_id, readme, readme_format, readme_base_url, readme_base_image_url, crate_compressed_size, crate_decompressed_size, capitalized_name, lib_file, has_buildrs, is_nightly, is_yanked, has_code_of_conduct, manifest, language_stats,cache_key, keywords, categories)
-                VALUES (
-                :crate_id,:readme,:readme_format,:readme_base_url,:readme_base_image_url,:crate_compressed_size,:crate_decompressed_size,:capitalized_name,:lib_file,:has_buildrs,:is_nightly,:is_yanked,:has_code_of_conduct,:manifest,:language_stats,:cache_key,:keywords,:categories)
-                ")?;
 
             let args: &[&dyn ToSql] = &[&origin, &0, &0];
             insert_crate.execute(args).context("insert crate")?;
             let (crate_id, downloads): (u32, u32) = get_crate_id.query_row(&[&origin], |row| Ok((row.get_unwrap(0), row.get_unwrap(1)))).context("crate_id")?;
-            let (readme, readme_format, readme_base_url, readme_base_image_url) = match &c.source_data.readme {
-                Some(Readme {base_url, base_image_url, markup}) => {
-                    let (markup, format) = match markup {
-                        Markup::Html(s) => (s, "html"),
-                        Markup::Markdown(s) => (s, "md"),
-                        Markup::Rst(s) => (s, "rst"),
-                    };
-                    (Some(markup), Some(format), Some(base_url), Some(base_image_url))
-                },
-                None => (None, None, None, None),
-            };
-
-            let manifest = rmp_serde::encode::to_vec_named(c.manifest).context("manifest rmp")?;
-            let language_stats = rmp_serde::encode::to_vec_named(&c.source_data.language_stats).context("lang rmp")?;
-            let cache_key = c.cache_key as i64;
-
             let is_important_ish = downloads > 2000;
 
             if let Some(repo) = c.repository {
@@ -464,31 +439,37 @@ impl CrateDb {
                 keywords = Self::keywords_tx(tx, &c.origin).context("keywordsdb2")?;
             }
 
-            let named_args: &[(&str, &dyn ToSql)] = &[
-                (":crate_id", &crate_id),
-                (":readme", &readme),
-                (":readme_format", &readme_format),
-                (":readme_base_url", &readme_base_url),
-                (":readme_base_image_url", &readme_base_image_url),
-                (":categories", &categories.iter().map(|(_,_,slug)| slug.to_owned()).collect::<Vec<_>>().join(",")),
-                (":keywords", &keywords.join(",")),
-                (":crate_compressed_size", &c.source_data.crate_compressed_size),
-                (":crate_decompressed_size", &c.source_data.crate_decompressed_size),
-                (":capitalized_name", &c.source_data.capitalized_name),
-                (":lib_file", &c.source_data.lib_file),
-                (":has_buildrs", &c.source_data.has_buildrs),
-                (":is_nightly", &c.source_data.is_nightly),
-                (":is_yanked", &c.source_data.is_yanked),
-                (":has_code_of_conduct", &c.source_data.has_code_of_conduct),
-                (":manifest", &manifest),
-                (":language_stats", &language_stats),
-                (":cache_key", &cache_key),
-            ];
-            insert_derived.execute(named_args).context("insert_derived")?;
+            let package = manifest.package.as_ref().expect("package in manifest");
+            let name = &package.name;
+            let maybe_repo = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
+            let path_in_repo = match maybe_repo.as_ref() {
+                Some(repo) => Self::path_in_repo_tx(tx, repo, name)?,
+                None => None,
+            };
+
+            let res = CachedCrate {
+                cache_key: c.cache_key,
+                manifest: c.manifest.clone(),
+                derived: Derived {
+                    path_in_repo,
+                    readme: c.source_data.readme.clone(),
+                    categories: categories.iter().map(|(_,_,slug)| slug.to_owned()).collect::<Vec<_>>(),
+                    keywords: keywords,
+                    crate_compressed_size: c.source_data.crate_compressed_size,
+                    crate_decompressed_size: c.source_data.crate_decompressed_size,
+                    capitalized_name: c.source_data.capitalized_name.clone(),
+                    lib_file: c.source_data.lib_file.clone(),
+                    has_buildrs: c.source_data.has_buildrs,
+                    is_nightly: c.source_data.is_nightly,
+                    is_yanked: c.source_data.is_yanked,
+                    has_code_of_conduct: c.source_data.has_code_of_conduct,
+                    language_stats: c.source_data.language_stats.clone(),
+                },
+            };
 
             mark_updated.execute(&[&crate_id, &next_timestamp]).context("mark updated crate")?;
             println!("{}", out);
-            Ok(())
+            Ok(res)
         }).await
     }
 
@@ -1269,7 +1250,7 @@ version="1.2.3"
 keywords = ["test-CRATE"]
 categories = ["1", "two", "GAMES", "science", "::science::math::"]
 "#).unwrap();
-    db.index_latest(CrateVersionData {
+    let new = db.index_latest(CrateVersionData {
         source_data: &source_data,
         manifest: &manifest,
         origin: &origin,
@@ -1283,7 +1264,6 @@ categories = ["1", "two", "GAMES", "science", "::science::math::"]
         extracted_auto_keywords: Vec::new(),
     }).await.unwrap();
     assert_eq!(1, db.crates_with_keyword("test-crate").await.unwrap());
-    let new = db.rich_crate_version_data(&origin).await.unwrap();
     let new_manifest = new.manifest;
     let new_derived = new.derived;
     assert_eq!(manifest.package().name, new_manifest.package().name);

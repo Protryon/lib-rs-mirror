@@ -8,6 +8,9 @@ use rusqlite::Error::SqliteFailure;
 use rusqlite::ErrorCode::DatabaseLocked;
 use serde;
 use serde_json;
+use flate2::read::DeflateDecoder;
+use flate2::write::DeflateEncoder;
+use flate2::Compression;
 
 use std::path::Path;
 use std::thread;
@@ -129,6 +132,23 @@ impl SimpleCache {
             let mut q = conn.prepare_cached("DELETE FROM cache2 WHERE key = ?1")?;
             q.execute(&[&key.0])?;
             Ok(())
+        })
+    }
+
+    pub fn set_compressed<B: serde::Serialize>(&self, key: (&str, &str), value: &B) -> Result<(), Error> {
+        let mut e = DeflateEncoder::new(Vec::new(), Compression::best());
+        rmp_serde::encode::write_named(&mut e, value)?;
+        let compr = e.finish()?;
+        self.set(key, &compr)
+    }
+
+    pub fn get_decompressed<B: serde::de::DeserializeOwned>(&self, key: (&str, &str)) -> Result<Option<B>, Error> {
+        Ok(match self.get(key)? {
+            None => None,
+            Some(data) => {
+                let mut data = data.as_slice();
+                rmp_serde::decode::from_read(DeflateDecoder::new(&mut data))?
+            },
         })
     }
 

@@ -25,4 +25,4 @@ tokio = { version = "1.2.0", features = ["sync", "macros", "rt-multi-thread"] }
 
 [dev-dependencies]
 tempfile = "3.1.0"
-cargo_toml = "0.8.0"
+cargo_toml = "0.9.1"

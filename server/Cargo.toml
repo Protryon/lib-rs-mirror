@@ -27,7 +27,8 @@ assets = [
 ]
 
 [dependencies]
-actix-web = "4.0.0-beta.3"
+actix-web = "=4.0.0-beta.5"
+actix-service = "=2.0.0-beta.5" # hack for actix-files
 env_logger = "0.8.3"
 log = "0.4.14"
 render_readme = { path = "../render_readme", version = "0.7" }

@@ -24,7 +24,7 @@ render_readme = { path = "../render_readme" }
 rich_crate = { path = "../rich_crate", version = "0.5.1" }
 simple_cache = { path = "../simple_cache", version = "0.7.8" }
 repo_url = { path = "../repo_url", version = "0.3.3" }
-cargo_toml = "0.8.0"
+cargo_toml = "0.9.1"
 serde = "1.0.107"
 serde_derive = "1.0.107"
 serde_json = "1.0.52"

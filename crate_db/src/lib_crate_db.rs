@@ -454,7 +454,7 @@ impl CrateDb {
                     path_in_repo,
                     readme: c.source_data.readme.clone(),
                     categories: categories.iter().map(|(_,_,slug)| slug.to_owned()).collect::<Vec<_>>(),
-                    keywords: keywords,
+                    keywords,
                     crate_compressed_size: c.source_data.crate_compressed_size,
                     crate_decompressed_size: c.source_data.crate_decompressed_size,
                     capitalized_name: c.source_data.capitalized_name.clone(),

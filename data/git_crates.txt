@@ -29,6 +29,7 @@ github:bbodi/rust-voxlap-test/rust-voxlap-test
 github:bbodi/rust-voxlap/voxlap
 github:benanders/rjni/rjni
 github:benschza/pier/pier
+github:bexxmodd/paleatra/paleatra
 github:bitshifter/mathbench-rs/mathbench
 github:bolcom/unftp/unftp
 github:breeswish/slog-global/slog-global

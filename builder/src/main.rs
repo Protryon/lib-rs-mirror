@@ -17,36 +17,32 @@ WORKDIR /home/rustyuser
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.50.0 --verbose # wat
 ENV PATH="$PATH:/home/rustyuser/.cargo/bin"
 RUN rustup set profile minimal
-RUN rustup toolchain add 1.29.0
-RUN rustup toolchain add 1.30.0
 RUN rustup toolchain add 1.31.0
 RUN rustup toolchain add 1.33.0
-RUN rustup toolchain add 1.36.0
-RUN rustup toolchain add 1.38.0
+RUN rustup toolchain add 1.35.0
+RUN rustup toolchain add 1.37.0
 RUN rustup toolchain add 1.39.0
-RUN rustup toolchain add 1.42.0
+RUN rustup toolchain add 1.41.0
 RUN rustup toolchain add 1.43.0
 RUN rustup toolchain add 1.45.0
 RUN rustup toolchain add 1.47.0
-RUN rustup toolchain add 1.50.0
+RUN rustup toolchain add 1.49.0
 RUN rustup toolchain list
 "##;
 
 const TEMP_JUNK_DIR: &str = "/var/tmp/crates_env";
 
-const RUST_VERSIONS: [&str; 12] = [
-"1.29.0",
-"1.30.0",
+const RUST_VERSIONS: [&str; 10] = [
 "1.31.0",
 "1.33.0",
-"1.36.0",
-"1.38.0",
+"1.35.0",
+"1.37.0",
 "1.39.0",
-"1.42.0",
+"1.41.0",
 "1.43.0",
 "1.45.0",
 "1.47.0",
-"1.50.0",
+"1.49.0",
 ];
 
 use crate_db::builddb::*;
@@ -69,7 +65,7 @@ struct ToCheck {
 fn out_of_disk_space() -> bool {
     match fs2::available_space(TEMP_JUNK_DIR) {
         Ok(size) => {
-            log::warn!("out of disk space: {}", size);
+            log::info!("free disk space: {}MB", size / 1_000_000);
             size < 5_000_000_000 // cargo easily chews gigabytes of disk space per build
         },
         Err(e) => {
@@ -88,13 +84,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("starting…");
     prepare_docker(&docker_root)?;
 
-    let (s, r) = crossbeam_channel::bounded::<Vec<_>>(12);
+    let (s, r) = crossbeam_channel::bounded::<Vec<_>>(15);
 
     let builds = std::thread::spawn(move || {
         let mut candidates: Vec<ToCheck> = Vec::new();
         let mut rng = rand::thread_rng();
 
         while let Ok(mut next_batch) = r.recv() {
+            std::thread::sleep(std::time::Duration::from_millis(200)); // wait for more data
             if stopped() || out_of_disk_space() {
                 break;
             }
@@ -189,7 +186,7 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
 
     let has_anything_built_ok_yet = compat_info.values().any(|c| c.oldest_ok_raw.is_some());
     let mut rng = rand::thread_rng();
-    let mut candidates: Vec<_> = all.versions().iter().rev().take(50)
+    let mut candidates: Vec<_> = all.versions().iter().rev().take(50) // rev() starts from most recent
         .filter(|v| !v.is_yanked())
         .filter_map(|v| SemVer::parse(v.version()).ok())
         .map(|v| {
@@ -197,7 +194,8 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
             (v, c)
         })
         .filter(|(_, c)| c.oldest_ok.unwrap_or(999) > 29) // old crates, don't bother
-        .map(|(v, mut compat)| {
+        .enumerate()
+        .map(|(idx, (v, mut compat))| {
             let has_ever_built = compat.oldest_ok_raw.is_some();
             let has_failed = compat.newest_bad_raw.is_some();
             let no_compat_bottom = compat.newest_bad.is_none();
@@ -214,10 +212,11 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
                 + if compat.oldest_ok_raw.unwrap_or(999) > oldest_ok { 2 } else { 0 } // haven't really checked min ver yet
                 + if newest_bad > 30 { 1 } else { 0 } // don't want to check old crap
                 + if no_compat_bottom { 2 } else { 0 } // don't want to show 1.0 as compat rust
-                + if oldest_ok  > 30 { 1 } else { 0 }
-                + if oldest_ok  > 40 { 2 } else { 0 }
-                + if oldest_ok  > 50 { 3 } else { 0 }
-                + if v.is_prerelease() { 0 } else { 2 }; // don't waste time testing alphas
+                + if oldest_ok  > 35 { 1 } else { 0 }
+                + if oldest_ok  > 40 { 4 } else { 0 }
+                + if oldest_ok  > 50 { 8 } else { 0 }
+                + if v.is_prerelease() { 0 } else { 2 } // don't waste time testing alphas
+                + 5u32.saturating_sub(idx as u32); // prefer latest
 
             if !has_ever_built && has_failed {
                 // compat.oldest_ok = None; // build it with some new version
@@ -291,6 +290,8 @@ fn run_and_analyze_versions(db: &BuildDb, docker_root: &Path, versions: &[(&'sta
 }
 
 fn prepare_docker(docker_root: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let _ = std::fs::create_dir_all(&docker_root);
+
     for &p in &["git","registry","target"] {
         let p = Path::new(TEMP_JUNK_DIR).join(p);
         let _ = std::fs::create_dir_all(&p);

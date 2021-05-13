@@ -1851,7 +1851,11 @@ impl KitchenSink {
     }
 
     fn crate_rustc_compat_set_cached(&self, origin: Origin, val: CompatByCrateVersion) {
-        self.crate_rustc_compat_cache.write().insert(origin, val);
+        let mut w = self.crate_rustc_compat_cache.write();
+        if w.len() > 5000 {
+            w.clear();
+        }
+        w.insert(origin, val);
     }
 
     pub async fn rustc_compatibility(&self, all: &RichCrate) -> Result<CompatByCrateVersion, KitchenSinkErr> {
@@ -2664,6 +2668,7 @@ impl KitchenSink {
         let _ = self.url_check_cache.save();
         let _ = self.readme_check_cache.save();
         self.loaded_rich_crate_version_cache.write().clear();
+        self.crate_rustc_compat_cache.write().clear();
         self.crates_io.cleanup();
     }
 

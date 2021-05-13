@@ -9,6 +9,7 @@ extern crate log;
 mod yearly;
 use tokio::time::Instant;
 
+use futures::future::BoxFuture;
 use futures::FutureExt;
 pub use crate::yearly::*;
 pub use deps_index::*;
@@ -1858,7 +1859,7 @@ impl KitchenSink {
         w.insert(origin, val);
     }
 
-    pub async fn rustc_compatibility(&self, all: &RichCrate) -> Result<CompatByCrateVersion, KitchenSinkErr> {
+    pub fn rustc_compatibility(&self, all: RichCrate) -> BoxFuture<'_, Result<CompatByCrateVersion, KitchenSinkErr>> { async move {
         if let Some(cached) = self.crate_rustc_compat_get_cached(all.origin()) {
             return Ok(cached);
         }
@@ -1866,7 +1867,7 @@ impl KitchenSink {
             .get_or_try_init(|| BuildDb::new(self.main_cache_dir().join("builds.db")))
             .map_err(|_| KitchenSinkErr::BadRustcCompatData)?;
 
-        let mut c = self.rustc_compatibility_inner_non_recursive(all, db)?;
+        let mut c = self.rustc_compatibility_inner_non_recursive(&all, db)?;
 
         // crates most often fail to compile because their dependencies fail
         if let Ok(vers) = self.all_crates_io_versions(all.origin()) {
@@ -1910,8 +1911,9 @@ impl KitchenSink {
                     let dep_compat = if let Some(cached) = self.crate_rustc_compat_get_cached(&dep_origin) {
                         cached
                     } else {
+                        debug!("recursing to get compat of {}", dep_origin.short_crate_name());
                         let dep_rich_crate = self.rich_crate_async(&dep_origin).await.ok()?;
-                        self.rustc_compatibility_inner_non_recursive(&dep_rich_crate, db).ok()?
+                        self.rustc_compatibility(dep_rich_crate).await.ok()?
                     };
                     Some((dep_compat, dep_origin, reqs))
                 }
@@ -1945,7 +1947,7 @@ impl KitchenSink {
 
         self.crate_rustc_compat_set_cached(all.origin().clone(), c.clone());
         Ok(c)
-    }
+    }.boxed()}
 
     fn rustc_release_from_date(date: &DateTime<FixedOffset>) -> Option<u16> {
         let zero = Utc.ymd(2015,5,15).and_hms(0,0,0);

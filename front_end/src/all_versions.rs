@@ -11,8 +11,9 @@ use rich_crate::{RichCrate, RichCrateVersion};
 use semver::Version as SemVer;
 use std::mem;
 
-pub struct AllVersions<'a> {
-    pub(crate) all: &'a RichCrate,
+pub struct AllVersions {
+    pub(crate) origin: Origin,
+    pub(crate) is_yanked: bool,
     pub(crate) version_history: Vec<VerRow>,
     pub(crate) changelog_url: Option<String>,
     pub(crate) capitalized_name: String,
@@ -40,16 +41,17 @@ pub(crate) struct VerRow {
     pub msrv: Option<(u16, u16, bool)>, // min version, max version, both are rustc minor v; true if certain
 }
 
-impl<'a> AllVersions<'a> {
-    pub(crate) async fn new(all: &'a RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink) -> Result<AllVersions<'a>, KitchenSinkErr> {
-        let compat = kitchen_sink.rustc_compatibility(all).await?;
+impl AllVersions {
+    pub(crate) async fn new(all: RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink) -> Result<AllVersions, KitchenSinkErr> {
+        let origin = all.origin().clone();
+        let is_yanked = all.is_yanked();
 
         let (changelog_url, downloads, all_owners, release_meta) = futures::join!(
             kitchen_sink.changelog_url(ver),
-            kitchen_sink.recent_downloads_by_version(ver.origin()),
-            kitchen_sink.crate_owners(ver.origin(), true),
+            kitchen_sink.recent_downloads_by_version(&origin),
+            kitchen_sink.crate_owners(&origin, true),
             async {
-                match all.origin() {
+                match &origin {
                     Origin::CratesIo(name) => {
                         kitchen_sink.crates_io_meta(name).await
                             .map_err(|e| log::error!("{}", e))
@@ -76,6 +78,7 @@ impl<'a> AllVersions<'a> {
             Err(e) => return Err(e),
         };
 
+
         let mut combined_meta: Vec<_> = ver.into_iter().filter_map(|version_meta| {
             let num = version_meta.version();
             let sem: SemVer = num.parse().ok()?;
@@ -95,7 +98,7 @@ impl<'a> AllVersions<'a> {
                 let (actual_version, _) = match kitchen_sink.newest_crates_io_version_matching_requirement_by_lowercase_name(&dep_name, ver_req) {
                     Ok(d) => d,
                     Err(e) => {
-                        log::warn!("{} requires broken {} {}: {}", all.name(), dep_name, ver_req, e);
+                        log::warn!("{} requires broken {} {}: {}", capitalized_name, dep_name, ver_req, e);
                         continue;
                     },
                 };
@@ -108,6 +111,8 @@ impl<'a> AllVersions<'a> {
             Some((sem, version_meta, release_date, required_deps, audit))
         }).collect();
         combined_meta.sort_by(|(a, ..), (b, ..)| a.cmp(b));
+
+        let compat = kitchen_sink.rustc_compatibility(all).await?;
 
         let mut prev_required_deps = None::<HashMap<String, HashMap<_, _>>>;
         let mut prev_features = None::<HashSet<_>>;
@@ -257,9 +262,10 @@ impl<'a> AllVersions<'a> {
             has_feat_changes: version_history.iter().any(|v| !v.feat_added.is_empty() || !v.feat_removed.is_empty()),
             has_deps_changes: version_history.iter().any(|v| !v.deps_added.is_empty() || !v.deps_removed.is_empty() || !v.deps_upgraded.is_empty()),
             changelog_url,
-            all,
             version_history,
             capitalized_name,
+            origin,
+            is_yanked,
         })
     }
 

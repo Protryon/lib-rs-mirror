@@ -186,7 +186,7 @@ pub async fn render_install_page(out: &mut impl Write, ver: &RichCrateVersion, k
 }
 
 /// See `all_versions.rs.html`
-pub async fn render_all_versions_page(out: &mut impl Write, all: &RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink) -> Result<(), failure::Error> {
+pub async fn render_all_versions_page(out: &mut impl Write, all: RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink) -> Result<(), failure::Error> {
     if stopped() {
         Err(KitchenSinkErr::Stopped)?;
     }
@@ -252,7 +252,7 @@ pub async fn render_trending_crates(out: &mut impl Write, kitchen_sink: &Kitchen
     Ok(())
 }
 
-pub async fn render_debug_page(out: &mut impl Write, all: &RichCrate, kitchen_sink: &KitchenSink) -> Result<(), failure::Error> {
+pub async fn render_debug_page(out: &mut impl Write, all: RichCrate, kitchen_sink: &KitchenSink) -> Result<(), failure::Error> {
     let mut rustc_versions = HashSet::new();
 
     let by_crate_ver = kitchen_sink.rustc_compatibility(all).await?;

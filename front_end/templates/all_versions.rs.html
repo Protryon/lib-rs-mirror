@@ -5,22 +5,22 @@
 @(url: &Urler, c: &AllVersions)
 
 @:base(&c.page(), {
-  <header id="package" @if c.all.is_yanked() {class="yanked"}>
+  <header id="package" @if c.is_yanked {class="yanked"}>
     <div class="inner-col">
     <div class="breadcrumbs">
     <h1>
       <a href="/"><span>Lib</span>.rs</a>
     </h1>
-     › <a href="@url.crate_by_origin(c.all.origin())" rel="up">@c.capitalized_name</a>
+     › <a href="@url.crate_by_origin(&c.origin)" rel="up">@c.capitalized_name</a>
      › Versions
     </div>
     <nav><ul>
-      <li><a href="@url.crate_by_origin(c.all.origin())">Latest version</a></li>
+      <li><a href="@url.crate_by_origin(&c.origin)">Latest version</a></li>
       <li class=active>All Versions</li>
       @if let Some(url) = &c.changelog_url {
         <li><a href="@url">Changelog</a></li>
       }
-      @if let Some(url) = url.reverse_deps(c.all.origin()) {
+      @if let Some(url) = url.reverse_deps(&c.origin) {
         <li><a href="@url">Reverse dependencies</a></li>
       }
     </ul></nav>
@@ -46,7 +46,7 @@
         <tr class="@if v.yanked {yanked} @if v.is_semver_major_change {break}">
           <th class="ver">
             @if !v.yanked {
-              @if let Some(url) = url.crates_io_crate_at_version(c.all.origin(), &v.version.to_string()) {
+              @if let Some(url) = url.crates_io_crate_at_version(&c.origin, &v.version.to_string()) {
                 <a href="@url">@v.version</a>
               } else {
                 @v.version
@@ -130,7 +130,7 @@
 
   <footer>
     <div class="inner-col">
-        <p>Back to <a href="@url.crate_by_origin(c.all.origin())" rel="up">@c.capitalized_name</a>.</p>
+        <p>Back to <a href="@url.crate_by_origin(&c.origin)" rel="up">@c.capitalized_name</a>.</p>
     </div>
   </footer>
 })

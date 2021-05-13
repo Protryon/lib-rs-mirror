@@ -182,7 +182,7 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
 
     println!("checking https://lib.rs/compat/{}", crate_name);
 
-    let mut compat_info = crates.rustc_compatibility(&crates.rich_crate_async(&origin).await?).await.map_err(|_| "rustc_compatibility")?;
+    let mut compat_info = crates.rustc_compatibility(crates.rich_crate_async(&origin).await?).await.map_err(|_| "rustc_compatibility")?;
 
     let has_anything_built_ok_yet = compat_info.values().any(|c| c.oldest_ok_raw.is_some());
     let mut rng = rand::thread_rng();

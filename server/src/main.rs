@@ -506,7 +506,7 @@ async fn handle_compat(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let page = rt_run_timeout(&state.rt, "dbgcrate", 60, async move {
         let all = crates.rich_crate_async(&origin).await?;
         let mut page: Vec<u8> = Vec::with_capacity(32000);
-        front_end::render_debug_page(&mut page, &all, &crates).await?;
+        front_end::render_debug_page(&mut page, all, &crates).await?;
         Ok(page)
     }).await?;
     Ok(HttpResponse::Ok()
@@ -747,7 +747,7 @@ async fn render_crate_all_versions(state: AServerState, origin: Origin) -> Resul
         let (all, ver) = futures::try_join!(crates.rich_crate_async(&origin), crates.rich_crate_version_async(&origin))?;
         let last_modified = Some(get_last_modified(&all));
         let mut page: Vec<u8> = Vec::with_capacity(60000);
-        front_end::render_all_versions_page(&mut page, &all, &ver, &crates).await?;
+        front_end::render_all_versions_page(&mut page, all, &ver, &crates).await?;
         minify_html(&mut page);
         mark_server_still_alive(&state);
         Ok::<_, failure::Error>(Rendered {page, cache_time: 24*3600, refresh: false, last_modified})

@@ -15,5 +15,5 @@ cargo_toml = "0.9.1"
 render_readme = { path = "../render_readme" }
 repo_url = { path = "../repo_url" }
 failure = "0.1.8"
-urlencoding = "1.1.1"
+urlencoding = "1.3.2"
 lazy_static = "1.4.0"

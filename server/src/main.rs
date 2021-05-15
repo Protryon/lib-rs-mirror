@@ -31,7 +31,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 use tokio::runtime::Handle;
 use urlencoding::decode;
-use urlencoding::encode;
+use urlencoding::Encoded;
 
 #[macro_use]
 extern crate log;
@@ -344,10 +344,10 @@ async fn default_handler(req: HttpRequest) -> Result<HttpResponse, ServerError> 
     }).await?;
 
     if let Some(k) = found_crate {
-        return Ok(HttpResponse::PermanentRedirect().insert_header(("Location", format!("/crates/{}", encode(k.name())))).body(""));
+        return Ok(HttpResponse::PermanentRedirect().insert_header(("Location", format!("/crates/{}", Encoded(k.name())))).body(""));
     }
     if let Some(keyword) = found_keyword {
-        return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", format!("/keywords/{}", encode(&keyword)))).body(""));
+        return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", format!("/keywords/{}", Encoded(&keyword)))).body(""));
     }
 
     render_404_page(state, path, "crate or category").await
@@ -549,7 +549,7 @@ async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
         }
     };
     if aut.github.login != login {
-        return Ok(HttpResponse::PermanentRedirect().insert_header(("Location", format!("/~{}", encode(&aut.github.login)))).body(""));
+        return Ok(HttpResponse::PermanentRedirect().insert_header(("Location", format!("/~{}", Encoded(&aut.github.login)))).body(""));
     }
     let cache_file = state.page_cache_dir.join(format!("@{}.html", login));
     Ok(serve_cached(
@@ -799,7 +799,7 @@ async fn handle_keyword(req: HttpRequest) -> Result<HttpResponse, ServerError> {
             .no_chunking(page.len() as u64)
             .body(page)
     } else {
-        HttpResponse::TemporaryRedirect().insert_header(("Location", format!("/search?q={}", urlencoding::encode(&query)))).finish()
+        HttpResponse::TemporaryRedirect().insert_header(("Location", format!("/search?q={}", Encoded(&query)))).finish()
     })
 }
 

@@ -89,7 +89,8 @@ impl Builder {
         if !self.query_string_started {
             self.url.push('/');
         }
-        self.url.push_str(&urlencoding::encode(arg));
+        use std::fmt::Write;
+        write!(&mut self.url, "{}", urlencoding::Encoded(arg));
         self
     }
 

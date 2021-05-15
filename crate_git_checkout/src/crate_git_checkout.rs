@@ -19,7 +19,6 @@ use std::path::Path;
 use std::process::Command;
 use std::sync::Arc;
 use std::sync::Mutex;
-use urlencoding;
 
 mod iter;
 

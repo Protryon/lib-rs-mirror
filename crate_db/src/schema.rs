@@ -60,27 +60,6 @@ impl CrateDb {
             );
             CREATE UNIQUE INDEX IF NOT EXISTS crate_versions_idx on crate_versions(crate_id, version);
 
-            CREATE TABLE IF NOT EXISTS crate_derived (
-                crate_id        INTEGER NOT NULL UNIQUE,
-                keywords        TEXT NOT NULL, -- comma-separated filtered kebab-cased
-                categories      TEXT NOT NULL, -- comma-separated filtered slugs
-                readme          TEXT,
-                readme_format   TEXT,
-                readme_base_url TEXT,
-                readme_base_image_url TEXT,
-                crate_compressed_size INTEGER NOT NULL,
-                crate_decompressed_size INTEGER NOT NULL,
-                capitalized_name TEXT NOT NULL,
-                lib_file        TEXT,
-                has_buildrs     INTEGER, -- bool
-                is_nightly      INTEGER, -- bool
-                is_yanked       INTEGER, -- bool
-                has_code_of_conduct       INTEGER, -- bool
-                cache_key       INTEGER NOT NULL, -- u64
-                manifest        BLOB NOT NULL,
-                language_stats  BLOB NOT NULL
-            );
-
             CREATE UNIQUE INDEX IF NOT EXISTS keywords_idx on crate_keywords(keyword_id, crate_id);
             CREATE INDEX IF NOT EXISTS keywords_ridx on crate_keywords(crate_id);
             CREATE TABLE IF NOT EXISTS categories (

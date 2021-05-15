@@ -9,7 +9,6 @@ use rich_crate::CachedCrate;
 use rich_crate::Manifest;
 use rich_crate::ManifestExt;
 use rich_crate::Origin;
-use rich_crate::Readme;
 use rich_crate::Repo;
 use rich_crate::RichCrate;
 use rusqlite::types::ToSql;
@@ -155,109 +154,6 @@ impl CrateDb {
 
     fn connect(&self) -> std::result::Result<Connection, rusqlite::Error> {
         Ok(Self::db(&self.url)?)
-    }
-
-    #[deprecated]
-    pub async fn rich_crate_version_data_old(&self, origin: &Origin) -> FResult<CachedCrate> {
-        struct Row {
-            capitalized_name: String,
-            crate_compressed_size: u32,
-            crate_decompressed_size: u32,
-            lib_file: Option<String>,
-            keywords: Vec<String>,
-            categories: Vec<String>,
-            has_buildrs: bool,
-            is_nightly: bool,
-            is_yanked: bool,
-            has_code_of_conduct: bool,
-            cache_key: u64,
-        }
-        let origin = origin.clone();
-        self.with_read_spawn("rich_crate_version_data", move |conn| {
-            let origin = &origin;
-            let args: &[&dyn ToSql] = &[&origin.to_str()];
-            let (manifest, readme, row, language_stats): (Manifest, _, Row, _) = conn.query_row("SELECT * FROM crates c JOIN crate_derived d ON (c.id = d.crate_id)
-                WHERE origin = ?1", args, |row| {
-                    let readme = match row.get_ref_unwrap("readme_format").as_str() {
-                        Err(_) => None,
-                        Ok(ty) => {
-                            let txt: String = row.get("readme")?;
-                            Some(Readme {
-                                markup: match ty {
-                                    "html" => rich_crate::Markup::Html(txt),
-                                    "md" => rich_crate::Markup::Markdown(txt),
-                                    "rst" => rich_crate::Markup::Rst(txt),
-                                    _ => unimplemented!(),
-                                },
-                                base_url: row.get("readme_base_url")?,
-                                base_image_url: row.get("readme_base_image_url")?,
-                            })
-                        },
-                    };
-
-                    let manifest = row.get_ref_unwrap("manifest").as_blob()?;
-                    let keywords = row.get_ref_unwrap("keywords").as_str()?.split(',').filter(|s| s.len() > 0).map(String::from).collect::<Vec<_>>();
-                    let categories = row.get_ref_unwrap("categories").as_str()?.split(',').filter(|s| s.len() > 0).map(String::from).collect::<Vec<_>>();
-                    let manifest = rmp_serde::from_slice(manifest).map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
-                    let language_stats = row.get_ref_unwrap("language_stats").as_blob()?;
-                    let language_stats = rmp_serde::from_slice(language_stats).map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
-                    let cache_key: i64 = row.get("cache_key")?; // sqlite makes it signed :/
-                    Ok((manifest, readme, Row {
-                        lib_file: row.get("lib_file")?,
-                        capitalized_name: row.get("capitalized_name")?,
-                        crate_compressed_size: row.get("crate_compressed_size")?,
-                        crate_decompressed_size: row.get("crate_decompressed_size")?,
-                        has_buildrs: row.get("has_buildrs")?,
-                        is_nightly: row.get("is_nightly")?,
-                        is_yanked: row.get("is_yanked")?,
-                        has_code_of_conduct: row.get("has_code_of_conduct")?,
-                        cache_key: cache_key as u64,
-                        keywords,
-                        categories,
-                    }, language_stats))
-                })?;
-
-            let package = manifest.package.as_ref().expect("package in manifest");
-            let name = &package.name;
-            let maybe_repo = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
-            let path_in_repo = match maybe_repo.as_ref() {
-                Some(repo) => Self::path_in_repo_tx(conn, repo, name)?,
-                None => None,
-            };
-
-            let keywords = if row.keywords.is_empty() {
-                Self::keywords_tx(conn, &origin).context("keywordsdb2")?
-            } else {
-                row.keywords
-            };
-            let categories = if row.categories.is_empty() {
-                let keywords = keywords.iter().cloned().collect();
-                Self::crate_categories_tx(conn, &origin, &keywords, 0.1).context("catdb")?
-                    .into_iter().map(|(_, c)| c).collect()
-            } else {
-                row.categories
-            };
-
-            Ok(CachedCrate {
-                cache_key: row.cache_key,
-                manifest,
-                derived: Derived {
-                    path_in_repo,
-                    readme,
-                    categories,
-                    capitalized_name: row.capitalized_name,
-                    crate_compressed_size: row.crate_compressed_size,
-                    crate_decompressed_size: row.crate_decompressed_size,
-                    keywords,
-                    lib_file: row.lib_file,
-                    has_buildrs: row.has_buildrs,
-                    is_nightly: row.is_nightly,
-                    is_yanked: row.is_yanked,
-                    has_code_of_conduct: row.has_code_of_conduct,
-                    language_stats,
-                }
-            })
-        }).await
     }
 
     #[inline]
@@ -742,31 +638,6 @@ impl CrateDb {
             })?;
             Ok(q.filter_map(|x| x.ok()).collect())
         }).await
-    }
-
-    /// Fetch or guess categories for a crate
-    ///
-    /// Returns category slugs
-    fn crate_categories_tx(conn: &Connection, origin: &Origin, kebab_keywords: &HashSet<String>, threshold: f64) -> FResult<Vec<(f64, String)>> {
-        let assigned = Self::assigned_crate_categories_tx(conn, origin)?;
-        if !assigned.is_empty() {
-            Ok(assigned)
-        } else {
-            Self::guess_crate_categories_tx(&conn, origin, kebab_keywords, threshold)
-        }
-    }
-
-    /// Assigned categories with their weights
-    fn assigned_crate_categories_tx(conn: &Connection, origin: &Origin) -> FResult<Vec<(f64, String)>> {
-            let mut query = conn.prepare_cached(r#"
-                SELECT c.relevance_weight, c.slug
-                FROM crates k
-                JOIN categories c on c.crate_id = k.id
-                WHERE k.origin = ?1
-                ORDER by relevance_weight desc
-            "#)?;
-            let res = query.query_map(&[&origin.to_str()], |row| Ok((row.get_unwrap(0), row.get_unwrap(1)))).context("crate_categories")?;
-            Ok(res.collect::<std::result::Result<_,_>>()?)
     }
 
     fn guess_crate_categories_tx(conn: &Connection, origin: &Origin, kebab_keywords: &HashSet<String>, threshold: f64) -> FResult<Vec<(f64, String)>> {

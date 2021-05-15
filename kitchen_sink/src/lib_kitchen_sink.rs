@@ -777,16 +777,11 @@ impl KitchenSink {
         watch("rcv-2", self.rich_crate_version_async_opt(origin, true))
     }
 
-    async fn rich_crate_version_data_cached(&self, origin: &Origin) -> CResult<CachedCrate> {
+    async fn rich_crate_version_data_cached(&self, origin: &Origin) -> CResult<Option<CachedCrate>> {
         let origin_str = origin.to_str();
         let key = (origin_str.as_str(), "");
-        if let Some(cached) = tokio::task::block_in_place(|| self.derived_cache.get_decompressed(key))? {
-            return Ok(cached);
+        Ok(tokio::task::block_in_place(|| self.derived_cache.get_deserialized(key))?)
         }
-        let res = self.crate_db.rich_crate_version_data_old(origin).await?;
-        tokio::task::block_in_place(|| self.derived_cache.set_compressed(key, &res))?;
-        Ok(res)
-    }
 
     async fn rich_crate_version_async_opt(&self, origin: &Origin, allow_stale: bool) -> CResult<ArcRichCrateVersion> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
@@ -801,16 +796,16 @@ impl KitchenSink {
             .await.map_err(|_| {
                 warn!("db data fetch for {:?} timed out", origin);
                 KitchenSinkErr::DerivedDataTimedOut
-            })?;
+            })??;
 
-        if let Ok(cached) = &maybe_data {
+        if let Some(cached) = &maybe_data {
             match origin {
                 Origin::CratesIo(name) => {
                     if !allow_stale {
                         let expected_cache_key = self.index.cache_key_for_crate(name).context("error finding crates-io index data")?;
                         if expected_cache_key != cached.cache_key {
                             info!("Ignoring derived cache of {}, because it changed", name);
-                            maybe_data = Err(KitchenSinkErr::CacheExpired.into());
+                            maybe_data = None;
                         }
                     }
                 },
@@ -819,16 +814,16 @@ impl KitchenSink {
         }
 
         let data = match maybe_data {
-            Ok(data) => data,
-            Err(e) => {
+            Some(data) => data,
+            None => {
                 if allow_stale {
-                    return Err(e);
+                    return Err(KitchenSinkErr::CacheExpired.into());
                 }
-                debug!("Getting/indexing {:?}: {}", origin, e);
+                debug!("Getting/indexing {:?}", origin);
                 let _th = timeout("autoindex", 30, self.auto_indexing_throttle.acquire().map(|e| e.map_err(CError::from))).await?;
                 let reindex = timeout("reindex", 60, self.index_crate_highest_version(origin));
                 watch("reindex", reindex).await.with_context(|_| format!("reindexing {:?}", origin))?; // Pin to lower stack usage
-                timeout("reindexed data", 10, self.rich_crate_version_data_cached(origin)).await?
+                timeout("reindexed data", 10, self.rich_crate_version_data_cached(origin)).await?.ok_or(KitchenSinkErr::CacheExpired)?
             },
         };
 

@@ -351,7 +351,7 @@ fn do_builds(docker_root: &Path, versions: &[(&'static str, Arc<str>, SemVer)]) 
             else
                 RUSTC_BOOTSTRAP=1 timeout 40 cargo +$rustver -Z no-index-update fetch || timeout 40 cargo +$rustver fetch;
             fi
-            timeout 30 nice cargo +$rustver check --locked --message-format=json;
+            timeout 30 nice cargo +$rustver check -j2 --locked --message-format=json;
         }}
         swapoff -a || true
         for job in {jobs}; do
@@ -386,8 +386,8 @@ fn do_builds(docker_root: &Path, versions: &[(&'static str, Arc<str>, SemVer)]) 
         // .arg("-e").arg("CCXX=true")
         // .arg("-e").arg("AR=true")
         .arg("-e").arg("CARGO_BUILD_JOBS=6")
-        .arg("-m2700m")
-        //.arg("--cpus=3")
+        .arg("-m3000m")
+        .arg("--cpus=3")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

@@ -1859,10 +1859,19 @@ impl KitchenSink {
         w.insert(origin, val);
     }
 
-    pub fn rustc_compatibility(&self, all: RichCrate) -> BoxFuture<'_, Result<CompatByCrateVersion, KitchenSinkErr>> { async move {
+    pub async fn rustc_compatibility(&self, all: RichCrate) -> Result<CompatByCrateVersion, KitchenSinkErr> {
+        let in_progress = Arc::new(Mutex::new(HashSet::new()));
+        Ok(self.rustc_compatibility_inner(all, in_progress).await?.unwrap())
+    }
+
+    fn rustc_compatibility_inner<'a>(&'a self, all: RichCrate, in_progress: Arc<Mutex<HashSet<Origin>>>) -> BoxFuture<'a, Result<Option<CompatByCrateVersion>, KitchenSinkErr>> { async move {
         if let Some(cached) = self.crate_rustc_compat_get_cached(all.origin()) {
-            return Ok(cached);
+            return Ok(Some(cached));
         }
+        if !in_progress.lock().unwrap().insert(all.origin().clone()) {
+            return Ok(None);
+        }
+
         let db = self.crate_rustc_compat_db
             .get_or_try_init(|| BuildDb::new(self.main_cache_dir().join("builds.db")))
             .map_err(|_| KitchenSinkErr::BadRustcCompatData)?;
@@ -1907,13 +1916,14 @@ impl KitchenSink {
 
             // fetch crate meta in parallel
             let deps = futures::future::join_all(by_dep.into_iter().map(|(dep_origin, reqs)| {
+                let in_progress = Arc::clone(&in_progress);
                 async move {
                     let dep_compat = if let Some(cached) = self.crate_rustc_compat_get_cached(&dep_origin) {
                         cached
                     } else {
                         debug!("recursing to get compat of {}", dep_origin.short_crate_name());
                         let dep_rich_crate = self.rich_crate_async(&dep_origin).await.ok()?;
-                        self.rustc_compatibility(dep_rich_crate).await.ok()?
+                        self.rustc_compatibility_inner(dep_rich_crate, in_progress).await.ok()??
                     };
                     Some((dep_compat, dep_origin, reqs))
                 }
@@ -1928,16 +1938,25 @@ impl KitchenSink {
                             c.get_mut(&crate_ver).unwrap()
                         },
                     };
+                    // find known-bad dep to bump msrv
                     let dep_newest_bad = dep_compat.iter()
                         .filter_map(|(semver, compat)| Some((semver, compat.newest_bad?)))
                         .filter(|(semver, _)| req.matches(semver))
+                        .min_by_key(|&(_, n)| n);
+                    // but don't let one broken build override known-good builds
+                    let dep_oldest_ok = dep_compat.iter()
+                        .filter_map(|(semver, compat)| Some((semver, compat.oldest_ok?)))
+                        .filter(|(semver, _)| req.matches(semver))
                         .map(|(_, n)| n)
                         .min()
-                        .unwrap_or(0);
-                    if c.newest_bad.unwrap_or(0) < dep_newest_bad && dep_newest_bad < c.oldest_ok.unwrap_or(9999) {
-                        debug!("{} {} MSRV went from {} to {} because of {} {}", all.name(), crate_ver, c.newest_bad.unwrap_or(0), dep_newest_bad, dep_origin.short_crate_name(), req);
-                        c.newest_bad = Some(dep_newest_bad);
-                        let _ = db.set_compat(all.origin(), &crate_ver.to_string(), &format!("1.{}.0", dep_newest_bad), Compat::BrokenDeps);
+                        .unwrap_or(999);
+                    if let Some((dep_found_ver, mut dep_newest_bad)) = dep_newest_bad {
+                        dep_newest_bad = dep_newest_bad.min(dep_oldest_ok);
+                        if c.newest_bad.unwrap_or(0) < dep_newest_bad && dep_newest_bad < c.oldest_ok.unwrap_or(9999) {
+                            debug!("{} {} MSRV went from {} to {} because of https://lib.rs/compat/{} {} = {}", all.name(), crate_ver, c.newest_bad.unwrap_or(0), dep_newest_bad, dep_origin.short_crate_name(), req, dep_found_ver);
+                            c.newest_bad = Some(dep_newest_bad);
+                            let _ = db.set_compat(all.origin(), &crate_ver.to_string(), &format!("1.{}.0", dep_newest_bad), Compat::BrokenDeps);
+                        }
                     }
                 }
             }
@@ -1946,7 +1965,7 @@ impl KitchenSink {
         BuildDb::postprocess_compat(&mut c);
 
         self.crate_rustc_compat_set_cached(all.origin().clone(), c.clone());
-        Ok(c)
+        Ok(Some(c))
     }.boxed()}
 
     fn rustc_release_from_date(date: &DateTime<FixedOffset>) -> Option<u16> {

@@ -247,7 +247,7 @@ impl KitchenSink {
             readme_check_cache: TempCache::new(&data_path.join("readme_check.db")).context("readmecheck")?,
             docs_rs: docs_rs_client::DocsRsClient::new(data_path.join("docsrs.db")).context("docs")?,
             crate_db: CrateDb::new(Self::assert_exists(data_path.join("crate_data.db"))?).context("db")?,
-            derived_cache: SimpleCache::new(data_path.join("derived.db"))?,
+            derived_cache: SimpleCache::new(data_path.join("derived.db"), true)?,
             user_db: user_db::UserDb::new(Self::assert_exists(data_path.join("users.db"))?).context("udb")?,
             gh: gh.context("gh")?,
             loaded_rich_crate_version_cache: RwLock::new(FxHashMap::default()),
@@ -781,7 +781,7 @@ impl KitchenSink {
         let origin_str = origin.to_str();
         let key = (origin_str.as_str(), "");
         Ok(tokio::task::block_in_place(|| self.derived_cache.get_deserialized(key))?)
-        }
+    }
 
     async fn rich_crate_version_async_opt(&self, origin: &Origin, allow_stale: bool) -> CResult<ArcRichCrateVersion> {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
@@ -1637,7 +1637,7 @@ impl KitchenSink {
             extracted_auto_keywords,
         }).await?;
         tokio::task::block_in_place(|| {
-            self.derived_cache.set_compressed((&origin.to_str(), ""), &cached)
+            self.derived_cache.set_serialized((&origin.to_str(), ""), &cached)
         })?;
         Ok(())
     }

@@ -42,7 +42,7 @@ impl CratesIoClient {
         Ok(Self {
             cache: TempCacheJson::new(&cache_base_path.join("cratesio.bin"), fetcher.clone())?,
             metacache: TempCacheJson::new(&cache_base_path.join("cratesiometa.bin"), fetcher.clone())?,
-            readmes: SimpleFetchCache::new(&cache_base_path.join("readmes.db"), fetcher.clone())?,
+            readmes: SimpleFetchCache::new(&cache_base_path.join("readmes.db"), fetcher.clone(), false)?,
             tarballs_path: cache_base_path.join("tarballs"),
             fetcher,
         })

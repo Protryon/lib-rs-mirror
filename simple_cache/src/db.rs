@@ -22,6 +22,7 @@ pub struct SimpleCache {
     url: String,
     conn: ThreadLocal<Result<Connection, rusqlite::Error>>,
     pub cache_only: bool,
+    compress: bool,
 }
 
 #[derive(Debug)]
@@ -31,9 +32,9 @@ pub struct SimpleFetchCache {
 }
 
 impl SimpleFetchCache {
-    pub fn new(db_path: impl AsRef<Path>, fetcher: Arc<Fetcher>) -> Result<Self, Error> {
+    pub fn new(db_path: impl AsRef<Path>, fetcher: Arc<Fetcher>, compress: bool) -> Result<Self, Error> {
         Ok(Self {
-            cache: SimpleCache::new(db_path)?,
+            cache: SimpleCache::new(db_path, compress)?,
             fetcher,
         })
     }
@@ -68,11 +69,12 @@ impl SimpleFetchCache {
 }
 
 impl SimpleCache {
-    pub fn new(db_path: impl AsRef<Path>) -> Result<Self, Error> {
+    pub fn new(db_path: impl AsRef<Path>, compress: bool) -> Result<Self, Error> {
         Ok(Self {
             url: format!("file:{}?cache=shared", db_path.as_ref().display()),
             conn: ThreadLocal::new(),
             cache_only: false,
+            compress,
         })
     }
 
@@ -135,14 +137,12 @@ impl SimpleCache {
         })
     }
 
-    pub fn set_compressed<B: serde::Serialize>(&self, key: (&str, &str), value: &B) -> Result<(), Error> {
+    pub fn set_serialized<B: serde::Serialize>(&self, key: (&str, &str), value: &B) -> Result<(), Error> {
         let serialized = rmp_serde::encode::to_vec_named(value)?;
-        let mut out = Vec::with_capacity(serialized.len()/2);
-        BrotliCompress(&mut serialized.as_slice(), &mut out, &Default::default())?;
-        self.set(key, &out)
+        self.set(key, &serialized)
     }
 
-    pub fn get_decompressed<B: serde::de::DeserializeOwned>(&self, key: (&str, &str)) -> Result<Option<B>, Error> {
+    pub fn get_deserialized<B: serde::de::DeserializeOwned>(&self, key: (&str, &str)) -> Result<Option<B>, Error> {
         Ok(match self.get(key)? {
             None => None,
             Some(data) => {
@@ -154,7 +154,15 @@ impl SimpleCache {
         })
     }
 
-    pub fn set(&self, key: (&str, &str), data: &[u8]) -> Result<(), Error> {
+    pub fn set(&self, key: (&str, &str), mut data_in: &[u8]) -> Result<(), Error> {
+        let mut out;
+        let data = if self.compress {
+            out = Vec::with_capacity(data_in.len()/2);
+            BrotliCompress(&mut data_in, &mut out, &Default::default())?;
+            &out
+        } else {
+            data_in
+        };
         Self::with_retries(|| self.set_inner(key, data))
     }
 

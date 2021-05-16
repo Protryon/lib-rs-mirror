@@ -589,10 +589,9 @@ impl KitchenSink {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
         match origin {
             Origin::CratesIo(name) => {
-                let (meta, owners) = futures::try_join!(
-                    self.crates_io_meta(name),
-                    self.crate_owners(origin, false),
-                )?;
+                let meta = self.crates_io_meta(name).await?;
+                // don't parallelize with meta, it also reads meta
+                let owners = self.crate_owners(origin, false).await?;
                 let versions = meta.versions().map(|c| CrateVersion {
                     num: c.num,
                     updated_at: c.updated_at,
@@ -736,7 +735,7 @@ impl KitchenSink {
     async fn downloads_recent_90_days(&self, origin: &Origin) -> CResult<Option<usize>> {
         Ok(match origin {
             Origin::CratesIo(name) => {
-                let meta = self.crates_io_meta(name).await?;
+                let meta = timeout("download counts", 5, self.crates_io_meta(name)).await?;
                 meta.krate.recent_downloads
             },
             _ => None,
@@ -1574,14 +1573,14 @@ impl KitchenSink {
             Origin::CratesIo(ref name) => {
                 let cache_key = self.index.cache_key_for_crate(name)?;
                 let ver = self.index.crate_highest_version(name, false).context("rich_crate_version2")?;
-                let res = watch("rcv-3", self.rich_crate_version_data_from_crates_io(ver)).await.context("rich_crate_version_data_from_crates_io")?;
+                let res = watch("reindexing-cio-data", self.rich_crate_version_data_from_crates_io(ver)).await.context("rich_crate_version_data_from_crates_io")?;
                 (res, cache_key)
             },
             Origin::GitHub { .. } | Origin::GitLab { .. } => {
                 if !self.crate_exists(origin) {
                     Err(KitchenSinkErr::GitCrateNotAllowed(origin.to_owned()))?
                 }
-                let res = watch("rcv-4", self.rich_crate_version_from_repo(&origin)).await?;
+                let res = watch("reindexing-repodata", self.rich_crate_version_from_repo(&origin)).await?;
                 (res, 0)
             },
         };

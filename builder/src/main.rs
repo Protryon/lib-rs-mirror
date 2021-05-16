@@ -28,6 +28,8 @@ RUN rustup toolchain add 1.45.0
 RUN rustup toolchain add 1.47.0
 RUN rustup toolchain add 1.49.0
 RUN rustup toolchain list
+RUN cargo install lts --vers 0.3
+RUN cargo new lts-dummy; cd lts-dummy; cargo lts setup; echo 'itoa = "*"' >> Cargo.toml; cargo update;
 "##;
 
 const TEMP_JUNK_DIR: &str = "/var/tmp/crates_env";
@@ -347,6 +349,8 @@ fn do_builds(docker_root: &Path, versions: &[(&'static str, Arc<str>, SemVer)]) 
             printf > Cargo.toml '[package]\nname="_____"\nversion="0.0.0"\n[profile.dev]\ndebug=false\n[dependencies]\n%s = "=%s"\n' "$crate_name" "$libver";
             export CARGO_TARGET_DIR=/home/rustyuser/cargo_target/$rustver;
             if (( RANDOM%5 == 0 )); then
+                mkdir .cargo
+                cp /home/rustyuser/lts-dummy/.cargo/config .cargo/
                 RUSTC_BOOTSTRAP=1 timeout 40 cargo +$rustver -Z minimal-versions generate-lockfile || timeout 40 cargo +$rustver fetch
             else
                 RUSTC_BOOTSTRAP=1 timeout 40 cargo +$rustver -Z no-index-update fetch || timeout 40 cargo +$rustver fetch;

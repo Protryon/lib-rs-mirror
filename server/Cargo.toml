@@ -36,7 +36,7 @@ search_index = { path = "../search_index" }
 repo_url = { path = "../repo_url" }
 kitchen_sink = { path = "../kitchen_sink", version = "0.9" }
 front_end = { path = "../front_end", version = "0.4" }
-urlencoding = "1.3.2"
+urlencoding = "1.3.3"
 failure = "0.1.8"
 tokio = { version = "1.2.0", features = ["rt-multi-thread", "macros", "time"] }
 categories = { path = "../categories" }

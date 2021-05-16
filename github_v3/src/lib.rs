@@ -90,7 +90,7 @@ impl Builder {
             self.url.push('/');
         }
         use std::fmt::Write;
-        write!(&mut self.url, "{}", urlencoding::Encoded(arg));
+        write!(&mut self.url, "{}", urlencoding::Encoded(arg)).unwrap();
         self
     }
 

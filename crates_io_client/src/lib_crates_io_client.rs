@@ -5,7 +5,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 pub use simple_cache::Error;
 
-use serde_derive::*;
 use simple_cache::SimpleFetchCache;
 use simple_cache::TempCacheJson;
 use fetcher::Fetcher;
@@ -21,8 +20,9 @@ pub use crate::crate_owners::*;
 
 pub struct CratesIoClient {
     fetcher: Arc<Fetcher>,
-    cache: TempCacheJson<(String, Payload)>,
     metacache: TempCacheJson<(String, CrateMetaFile)>,
+    ownerscache1: TempCacheJson<(String, CrateOwnersFile)>,
+    ownerscache2: TempCacheJson<(String, CrateTeamsFile)>,
     tarballs_path: PathBuf,
     readmes: SimpleFetchCache,
 }
@@ -40,8 +40,9 @@ impl CratesIoClient {
     pub fn new(cache_base_path: &Path) -> Result<Self, Error> {
         let fetcher = Arc::new(Fetcher::new(4));
         Ok(Self {
-            cache: TempCacheJson::new(&cache_base_path.join("cratesio.bin"), fetcher.clone())?,
             metacache: TempCacheJson::new(&cache_base_path.join("cratesiometa.bin"), fetcher.clone())?,
+            ownerscache1: TempCacheJson::new(&cache_base_path.join("cratesioowners1.bin"), fetcher.clone())?,
+            ownerscache2: TempCacheJson::new(&cache_base_path.join("cratesioowners2.bin"), fetcher.clone())?,
             readmes: SimpleFetchCache::new(&cache_base_path.join("readmes.db"), fetcher.clone(), false)?,
             tarballs_path: cache_base_path.join("tarballs"),
             fetcher,
@@ -49,12 +50,14 @@ impl CratesIoClient {
     }
 
     pub fn cleanup(&self) {
-        let _ = self.cache.save();
+        let _ = self.ownerscache1.save();
+        let _ = self.ownerscache2.save();
         let _ = self.metacache.save();
     }
 
     pub fn cache_only(&mut self, no_net: bool) -> &mut Self {
-        self.cache.set_cache_only(no_net);
+        self.ownerscache1.set_cache_only(no_net);
+        self.ownerscache2.set_cache_only(no_net);
         self.metacache.set_cache_only(no_net);
         self.readmes.set_cache_only(no_net);
         self
@@ -66,7 +69,7 @@ impl CratesIoClient {
             return Ok(data);
         }
 
-        if self.cache.cache_only() {
+        if self.metacache.cache_only() {
             return Err(Error::NotInCache);
         }
 
@@ -96,36 +99,14 @@ impl CratesIoClient {
         let url1 = format!("{}/owner_user", encode(crate_name));
         let url2 = format!("{}/owner_team", encode(crate_name));
         let (res1, res2) = futures::join!(
-            self.get_json((&url1, as_of_version), &url1),
-            self.get_json((&url2, as_of_version), &url2));
+            self.get_json_from(&self.ownerscache1, (&url1, as_of_version), &url1),
+            self.get_json_from(&self.ownerscache2, (&url2, as_of_version), &url2));
 
         let u: CrateOwnersFile = cioopt!(res1?);
         let mut t: CrateTeamsFile = cioopt!(res2?);
         let mut out = u.users;
         out.append(&mut t.teams);
         Ok(Some(out))
-    }
-
-    async fn get_json<B>(&self, key: (&str, &str), path: impl AsRef<str>) -> Result<Option<B>, Error>
-        where B: for<'a> serde::Deserialize<'a> + Payloadable
-    {
-        if let Some((ver, res)) = self.cache.get(key.0)? {
-            if ver == key.1 || self.cache.cache_only() {
-                return Ok(Some(B::from(res)));
-            }
-        }
-
-        if self.cache.cache_only() {
-            return Err(Error::NotInCache);
-        }
-
-        self.cache.delete(key.0)?; // out of date
-
-        let url = format!("https://crates.io/api/v1/crates/{}", path.as_ref());
-        let res = Box::pin(self.cache.get_json(key.0, url, |raw: B| {
-            Some((key.1.to_string(), raw.to()))
-        })).await?;
-        Ok(res.map(|(_, res)| B::from(res)))
     }
 
     async fn get_json_from<B: Serialize + DeserializeOwned + Clone + Send>(&self, from_cache: &TempCacheJson<(String, B)>, key: (&str, &str), path: impl AsRef<str>) -> Result<Option<B>, Error> {
@@ -153,33 +134,6 @@ fn fs_safe(name: &str) -> Cow<str> {
     } else {
         name.as_bytes().iter().map(|b| format!("{:02x}", b)).collect::<String>().into()
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-enum Payload {
-    CrateMetaFile(CrateMetaFile),
-    CrateOwnersFile(CrateOwnersFile),
-    CrateTeamsFile(CrateTeamsFile),
-}
-
-pub(crate) trait Payloadable {
-    fn to(&self) -> Payload;
-    fn from(val: Payload) -> Self;
-}
-
-impl Payloadable for CrateMetaFile {
-    fn to(&self) -> Payload { Payload::CrateMetaFile(self.clone()) }
-    fn from(val: Payload) -> Self { match val { Payload::CrateMetaFile(d) => d, _ => panic!("bad cache") } }
-}
-
-impl Payloadable for CrateOwnersFile {
-    fn to(&self) -> Payload { Payload::CrateOwnersFile(self.clone()) }
-    fn from(val: Payload) -> Self { match val { Payload::CrateOwnersFile(d) => d, _ => panic!("bad cache") } }
-}
-
-impl Payloadable for CrateTeamsFile {
-    fn to(&self) -> Payload { Payload::CrateTeamsFile(self.clone()) }
-    fn from(val: Payload) -> Self { match val { Payload::CrateTeamsFile(d) => d, _ => panic!("bad cache") } }
 }
 
 #[tokio::test]

@@ -2318,7 +2318,7 @@ impl KitchenSink {
                 let current_owners = async {
                     Ok(match self.crates_io_owners_cache.get(name)? {
                         Some(o) => o,
-                        None => timeout("owners-fallback", 5, self.crates_io.crate_owners(name, "fallback").map(|r| r.map_err(CError::from))).await?.unwrap_or_default(),
+                        None => timeout("owners-fallback", 3, self.crates_io.crate_owners(name, "fallback").map(|r| r.map_err(CError::from))).await?.unwrap_or_default(),
                     })
                 };
                 let (mut current_owners, meta) = futures::try_join!(current_owners, self.crates_io_meta(name))?;

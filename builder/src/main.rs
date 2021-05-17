@@ -14,37 +14,28 @@ RUN useradd -u 4321 --create-home --user-group -s /bin/bash rustyuser
 RUN chown -R 4321:4321 /home/rustyuser
 USER rustyuser
 WORKDIR /home/rustyuser
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.50.0 --verbose # wat
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.52.0 --verbose # wat
 ENV PATH="$PATH:/home/rustyuser/.cargo/bin"
-RUN rustup set profile minimal
-RUN rustup toolchain add 1.31.0
-RUN rustup toolchain add 1.33.0
-RUN rustup toolchain add 1.35.0
-RUN rustup toolchain add 1.37.0
-RUN rustup toolchain add 1.39.0
-RUN rustup toolchain add 1.41.0
-RUN rustup toolchain add 1.43.0
-RUN rustup toolchain add 1.45.0
-RUN rustup toolchain add 1.47.0
-RUN rustup toolchain add 1.49.0
-RUN rustup toolchain list
 RUN cargo install lts --vers ^0.3.1
 RUN cargo new lts-dummy; cd lts-dummy; cargo lts setup; echo 'itoa = "*"' >> Cargo.toml; cargo update;
+RUN rustup set profile minimal
+RUN rustup toolchain add 1.32.0
+RUN rustup toolchain add 1.36.0
+RUN rustup toolchain add 1.40.0
+RUN rustup toolchain add 1.44.0
+RUN rustup toolchain add 1.48.0
+RUN rustup toolchain list
 "##;
 
 const TEMP_JUNK_DIR: &str = "/var/tmp/crates_env";
 
-const RUST_VERSIONS: [&str; 10] = [
-"1.31.0",
-"1.33.0",
-"1.35.0",
-"1.37.0",
-"1.39.0",
-"1.41.0",
-"1.43.0",
-"1.45.0",
-"1.47.0",
-"1.49.0",
+const RUST_VERSIONS: [&str; 6] = [
+    "1.32.0",
+    "1.36.0",
+    "1.40.0",
+    "1.44.0",
+    "1.48.0",
+    "1.52.0",
 ];
 
 use crate_db::builddb::*;

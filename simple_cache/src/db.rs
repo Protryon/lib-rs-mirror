@@ -52,14 +52,31 @@ impl SimpleFetchCache {
     }
 
     pub async fn get_cached(&self, key: (&str, &str), url: impl AsRef<str>) -> Result<Option<Vec<u8>>, Error> {
-        Ok(if let Some(data) = self.cache.get(key)? {
+        Ok(if let Some(data) = tokio::task::block_in_place(|| self.cache.get(key))? {
             Some(data)
         } else if self.cache.cache_only {
             None
         } else {
             let data = Box::pin(self.fetcher.fetch(url.as_ref())).await?;
-            self.cache.set(key, &data)?;
+            tokio::task::block_in_place(|| self.cache.set(key, &data))?;
             Some(data)
+        })
+    }
+
+
+    pub fn get_deserialized<B: serde::de::DeserializeOwned>(&self, key: (&str, &str)) -> Result<Option<B>, Error> {
+        tokio::task::block_in_place(|| self.cache.get_deserialized(key))
+    }
+
+    pub async fn fetch_cached_deserialized<B: serde::de::DeserializeOwned>(&self, key: (&str, &str), url: impl AsRef<str>) -> Result<Option<B>, Error> {
+        Ok(if let Some(data) = self.get_deserialized(key)? {
+            Some(data)
+        } else if self.cache.cache_only {
+            None
+        } else {
+            let data = Box::pin(self.fetcher.fetch(url.as_ref())).await?;
+            tokio::task::block_in_place(|| self.cache.set(key, &data))?;
+            Some(SimpleCache::deserialize(&data)?)
         })
     }
 
@@ -149,9 +166,14 @@ impl SimpleCache {
                 let mut data = data.as_slice();
                 let mut decomp = Vec::with_capacity(data.len()*2);
                 BrotliDecompress(&mut data, &mut decomp)?;
-                rmp_serde::decode::from_slice(&decomp)?
+                let res: B = Self::deserialize(&decomp)?;
+                Some(res)
             },
         })
+    }
+
+    pub(crate) fn deserialize<B: serde::de::DeserializeOwned>(data: &[u8]) -> Result<B, Error> {
+        Ok(rmp_serde::decode::from_slice(data)?)
     }
 
     pub fn set(&self, key: (&str, &str), mut data_in: &[u8]) -> Result<(), Error> {

@@ -747,7 +747,7 @@ impl KitchenSink {
             self.index.crates_io_crate_by_lowercase_name(name).context("rich_crate")
         })?;
         let latest_in_index = krate.latest_version().version(); // most recently published version
-        let meta = timeout("meta request", 10, self.crates_io.crate_meta(name, latest_in_index).map(|r| r.map_err(CError::from))).await
+        let meta = timeout("cacheable meta request", 10, self.crates_io.crate_meta(name, latest_in_index).map(|r| r.map_err(CError::from))).await
             .with_context(|_| format!("crates.io meta for {} {}", name, latest_in_index))?;
         let mut meta = meta.ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?;
         if !meta.versions.iter().any(|v| v.num == latest_in_index) {
@@ -773,7 +773,7 @@ impl KitchenSink {
 
     /// Same as rich_crate_version_async, but it won't try to refresh the data. Just fails if there's no cached data.
     pub fn rich_crate_version_stale_is_ok<'a>(&'a self, origin: &'a Origin) -> Pin<Box<dyn Future<Output = CResult<ArcRichCrateVersion>> + Send + 'a>> {
-        watch("rcv-2", self.rich_crate_version_async_opt(origin, true))
+        watch("stale-rich-crate", self.rich_crate_version_async_opt(origin, true))
     }
 
     async fn rich_crate_version_data_cached(&self, origin: &Origin) -> CResult<Option<CachedCrate>> {
@@ -1636,7 +1636,7 @@ impl KitchenSink {
             extracted_auto_keywords,
         }).await?;
         tokio::task::block_in_place(|| {
-            self.derived_cache.set_serialized((&origin.to_str(), ""), &cached)
+            self.derived_cache.set_serialize((&origin.to_str(), ""), &cached)
         })?;
         Ok(())
     }

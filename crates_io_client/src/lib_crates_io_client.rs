@@ -20,7 +20,7 @@ pub use crate::crate_owners::*;
 
 pub struct CratesIoClient {
     fetcher: Arc<Fetcher>,
-    metacache: TempCacheJson<(String, CrateMetaFile)>,
+    metacache: SimpleFetchCache,
     ownerscache1: TempCacheJson<(String, CrateOwnersFile)>,
     ownerscache2: TempCacheJson<(String, CrateTeamsFile)>,
     tarballs_path: PathBuf,
@@ -40,7 +40,7 @@ impl CratesIoClient {
     pub fn new(cache_base_path: &Path) -> Result<Self, Error> {
         let fetcher = Arc::new(Fetcher::new(4));
         Ok(Self {
-            metacache: TempCacheJson::new(&cache_base_path.join("cratesiometa.bin"), fetcher.clone())?,
+            metacache: SimpleFetchCache::new(&cache_base_path.join("cratesiometadb.bin"), fetcher.clone(), true)?,
             ownerscache1: TempCacheJson::new(&cache_base_path.join("cratesioowners1.bin"), fetcher.clone())?,
             ownerscache2: TempCacheJson::new(&cache_base_path.join("cratesioowners2.bin"), fetcher.clone())?,
             readmes: SimpleFetchCache::new(&cache_base_path.join("readmes.db"), fetcher.clone(), false)?,
@@ -52,7 +52,6 @@ impl CratesIoClient {
     pub fn cleanup(&self) {
         let _ = self.ownerscache1.save();
         let _ = self.ownerscache2.save();
-        let _ = self.metacache.save();
     }
 
     pub fn cache_only(&mut self, no_net: bool) -> &mut Self {
@@ -69,7 +68,7 @@ impl CratesIoClient {
             return Ok(data);
         }
 
-        if self.metacache.cache_only() {
+        if self.ownerscache1.cache_only() {
             return Err(Error::NotInCache);
         }
 
@@ -92,7 +91,10 @@ impl CratesIoClient {
 
     pub async fn crate_meta(&self, crate_name: &str, as_of_version: &str) -> Result<Option<CrateMetaFile>, Error> {
         let encoded_name = encode(crate_name);
-        self.get_json_from(&self.metacache, (&encoded_name, as_of_version), &encoded_name).await
+        let cache_key = (encoded_name.as_str(), as_of_version);
+
+        let url = format!("https://crates.io/api/v1/crates/{}", encoded_name);
+        self.metacache.fetch_cached_deserialized(cache_key, url).await
     }
 
     pub async fn crate_owners(&self, crate_name: &str, as_of_version: &str) -> Result<Option<Vec<CrateOwner>>, Error> {

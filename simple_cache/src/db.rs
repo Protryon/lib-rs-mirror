@@ -64,20 +64,27 @@ impl SimpleFetchCache {
     }
 
 
+    pub fn set_serialize<B: serde::Serialize>(&self, key: (&str, &str), value: &B) -> Result<(), Error> {
+        tokio::task::block_in_place(|| self.cache.set_serialize(key, value))
+    }
+
     pub fn get_deserialized<B: serde::de::DeserializeOwned>(&self, key: (&str, &str)) -> Result<Option<B>, Error> {
         tokio::task::block_in_place(|| self.cache.get_deserialized(key))
     }
 
-    pub async fn fetch_cached_deserialized<B: serde::de::DeserializeOwned>(&self, key: (&str, &str), url: impl AsRef<str>) -> Result<Option<B>, Error> {
-        Ok(if let Some(data) = self.get_deserialized(key)? {
-            Some(data)
+    pub async fn fetch_cached_deserialized<B: serde::de::DeserializeOwned + serde::Serialize>(&self, key: (&str, &str), url: impl AsRef<str>) -> Result<Option<B>, Error> {
+        if let Some(data) = self.get_deserialized(key)? {
+            Ok(Some(data))
         } else if self.cache.cache_only {
-            None
+            Ok(None)
         } else {
             let data = Box::pin(self.fetcher.fetch(url.as_ref())).await?;
-            tokio::task::block_in_place(|| self.cache.set(key, &data))?;
-            Some(SimpleCache::deserialize(&data)?)
-        })
+            tokio::task::block_in_place(|| {
+                let res = serde_json::from_slice(&data).map_err(|e| Error::Parse(e, data))?;
+                self.cache.set_serialize(key, &res)?;
+                Ok(Some(res))
+            })
+        }
     }
 
     pub fn set_cache_only(&mut self, val: bool) {
@@ -154,7 +161,7 @@ impl SimpleCache {
         })
     }
 
-    pub fn set_serialized<B: serde::Serialize>(&self, key: (&str, &str), value: &B) -> Result<(), Error> {
+    pub fn set_serialize<B: serde::Serialize>(&self, key: (&str, &str), value: &B) -> Result<(), Error> {
         let serialized = rmp_serde::encode::to_vec_named(value)?;
         self.set(key, &serialized)
     }
@@ -163,13 +170,22 @@ impl SimpleCache {
         Ok(match self.get(key)? {
             None => None,
             Some(data) => {
-                let mut data = data.as_slice();
-                let mut decomp = Vec::with_capacity(data.len()*2);
-                BrotliDecompress(&mut data, &mut decomp)?;
-                let res: B = Self::deserialize(&decomp)?;
-                Some(res)
+                match Self::deserialize_compressed(&data) {
+                    Ok(res) => Some(res),
+                    Err(e) => {
+                        log::error!("Deserialization error: {} for {:?}", e, key);
+                        self.delete(key)?;
+                        None
+                    },
+                }
             },
         })
+    }
+
+    pub(crate) fn deserialize_compressed<B: serde::de::DeserializeOwned>(mut data: &[u8]) -> Result<B, Error> {
+        let mut decomp = Vec::with_capacity(data.len()*2);
+        BrotliDecompress(&mut data, &mut decomp)?;
+        Self::deserialize(&decomp)
     }
 
     pub(crate) fn deserialize<B: serde::de::DeserializeOwned>(data: &[u8]) -> Result<B, Error> {

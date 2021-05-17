@@ -33,10 +33,11 @@ members = [
 
 [profile.dev]
 opt-level = 1
-debug = 1
+debug = false
 
 [profile.release]
-debug = false
+opt-level = 2
+debug = 1
 lto = true
 
 [profile.dev.package.miniz_oxide]

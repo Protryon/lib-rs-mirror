@@ -662,7 +662,7 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
         let age_secs = now.duration_since(modified).ok().map(|age| age.as_secs() as u32).unwrap_or(0);
 
         if let Ok(mut page_cached) = std::fs::read(&cache_file) {
-            if !is_acceptable {
+            if !is_acceptable || page_cached.len() <= 4 {
                 let _ = std::fs::remove_file(&cache_file); // next req will block instead of an endless refresh loop
             }
 

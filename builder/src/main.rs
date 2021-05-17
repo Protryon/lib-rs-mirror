@@ -28,7 +28,7 @@ RUN rustup toolchain add 1.45.0
 RUN rustup toolchain add 1.47.0
 RUN rustup toolchain add 1.49.0
 RUN rustup toolchain list
-RUN cargo install lts --vers 0.3
+RUN cargo install lts --vers ^0.3.1
 RUN cargo new lts-dummy; cd lts-dummy; cargo lts setup; echo 'itoa = "*"' >> Cargo.toml; cargo update;
 "##;
 

@@ -233,6 +233,8 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
         all.owners().len() as u32
     };
 
+    let is_on_shitlist = crates.is_crate_on_shitlist(all);
+
     let langs = k.language_stats();
     let (rust_code_lines, rust_comment_lines) = langs.langs.get(&udedokei::Language::Rust).map(|rs| (rs.code, rs.comments)).unwrap_or_default();
     let total_code_lines = langs.langs.iter().filter(|(k, _)| k.is_code()).map(|(_, l)| l.code).sum::<u32>();
@@ -342,7 +344,7 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
         is_deprecated: is_deprecated(&k),
         is_crates_io_published: k.origin().is_crates_io(),
         is_yanked: k.is_yanked(),
-        is_squatspam: is_squatspam(&k),
+        is_squatspam: is_squatspam(&k) || is_on_shitlist,
     });
 
     (downloads_per_month as usize, score)

@@ -16,7 +16,7 @@
 
 @:base(&c.page(url), {
   <div typeof="SoftwareApplication">
-  <header id="package" @if c.ver.is_yanked() {class="yanked"} else {@if c.ver.is_nightly() {class="nightly"}}>
+  <header id="package" @if c.ver.is_yanked() || c.is_on_shitlist {class="yanked"} else {@if c.ver.is_nightly() {class="nightly"}}>
     <div class="inner-col">
     <div class="breadcrumbs" typeof="BreadcrumbList">
     <h1>
@@ -82,9 +82,11 @@
       </span>
 
     </h2>
-    @if let Some(desc) = c.ver.description() {
-      @if !c.has_no_readme_or_lib() {
-        <p class=desc>@c.render_markdown_str(desc)</p>
+    @if !c.is_on_shitlist {
+      @if let Some(desc) = c.ver.description() {
+        @if !c.has_no_readme_or_lib() {
+          <p class=desc>@c.render_markdown_str(desc)</p>
+        }
       }
     }
     <p class=byline>
@@ -129,25 +131,30 @@
         @if c.has_reviews {
           <li><a class="button" href="@url.reviews(c.ver.origin())">Reviews</a></li>
         }
-        <li><a class="button" href="@url.install(c.ver.origin())">@if c.has_reviews {Installation} else {Install}</a></li>
-        @if let Some(doc) = c.api_reference_url() {
-          <li><a href="@doc">API reference</a></li>
+        @if !c.is_on_shitlist {
+          <li><a class="button" href="@url.install(c.ver.origin())">@if c.has_reviews {Installation} else {Install}</a></li>
+          @if let Some(doc) = c.api_reference_url() {
+            <li><a href="@doc">API reference</a></li>
+          }
         }
       }
-      @if let Some((url, label)) = c.repository_link() {
-        <li><a href="@url" @if c.homepage_link().is_none() {property="url"}>@label</a></li>
-      }
-      @if let Some((url, label)) = c.documentation_link() {
-        <li><a href="@url">@label</a></li>
-      }
-      @if let Some((url, label)) = c.homepage_link() {
-        <li><a href="@url" property="url" >@label</a></li>
+      @if !c.is_on_shitlist {
+        @if let Some((url, label)) = c.repository_link() {
+          <li><a href="@url" @if c.homepage_link().is_none() {property="url"}>@label</a></li>
+        }
+        @if let Some((url, label)) = c.documentation_link() {
+          <li><a href="@url">@label</a></li>
+        }
+        @if let Some((url, label)) = c.homepage_link() {
+          <li><a href="@url" property="url" >@label</a></li>
+        }
       }
     </ul></nav>
     </div>
   </header>
   <main>
     <div class="inner-col">
+      @if !c.is_on_shitlist {
       <section id="readme-deps">
         <div>
           <section class="about-crate">
@@ -413,6 +420,9 @@
           }
         </section>
       </section>
+      } else {
+        <p>⛔️ Owner of this crate is banned from lib.rs ⛔️</p>
+      }
     </div>
   </main>
   </div>

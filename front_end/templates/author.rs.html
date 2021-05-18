@@ -62,6 +62,14 @@
   </header>
   <main>
     <div class="inner-col">
+      @if let Some(reason) = p.shitlist_reason {
+        <section>
+          <h3>⛔️ Banned user ⛔️</h3>
+          <p>This user has been banned from lib.rs. Reason: <i>@reason</i>.</p>
+          <hr>
+          <p>If you're the banned user, you can appeal by opening an issue in <a href="https://gitlab.com/crates.rs/crates.rs">the project repo</a>.</p>
+        </section>
+      }
       @if !p.orgs.is_empty() {
         <section>
           <h3>Member of GitHub orgs</h3>

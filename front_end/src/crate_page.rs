@@ -74,6 +74,7 @@ pub struct CratePage<'a> {
     downloads_per_month_or_equivalent: Option<usize>,
     pub(crate) top_versions: Vec<VersionGroup<'a>>,
     pub has_reviews: bool,
+    pub is_on_shitlist: bool,
 }
 
 /// Helper used to find most "interesting" versions
@@ -153,6 +154,7 @@ impl<'a> CratePage<'a> {
             None
         };
         let has_reviews = !kitchen_sink.reviews_for_crate(ver.origin()).is_empty();
+        let is_on_shitlist = kitchen_sink.is_crate_on_shitlist(all);
         let mut page = Self {
             top_keyword,
             all_contributors,
@@ -174,6 +176,7 @@ impl<'a> CratePage<'a> {
             parent_crate,
             downloads_per_month_or_equivalent,
             has_reviews,
+            is_on_shitlist,
             top_versions: Vec::new(),
         };
         page.top_versions = page.make_top_versions();
@@ -197,7 +200,7 @@ impl<'a> CratePage<'a> {
             item_description: self.ver.description().map(|d| d.to_string()),
             alternate: url.crates_io_crate(self.ver.origin()),
             canonical: Some(format!("https://lib.rs{}", url.crate_abs_path_by_origin(self.ver.origin()))),
-            noindex: self.ver.is_yanked(),
+            noindex: self.ver.is_yanked() || self.is_on_shitlist,
             search_meta: false,
             ..Default::default()
         }

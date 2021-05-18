@@ -210,6 +210,8 @@ pub struct KitchenSink {
     crate_rustc_compat_cache: RwLock<HashMap<Origin, CompatByCrateVersion>>,
     crate_rustc_compat_db: OnceCell<BuildDb>,
     data_path: PathBuf,
+    /// login -> reason
+    pub author_shitlist: HashMap<String, String>,
 }
 
 impl KitchenSink {
@@ -257,6 +259,7 @@ impl KitchenSink {
             yearly: AllDownloads::new(&main_cache_dir),
             main_cache_dir,
             category_overrides: Self::load_category_overrides(&data_path.join("category_overrides.txt"))?,
+            author_shitlist: Self::load_author_shitlist(&data_path.join("author_shitlist.txt"))?,
             crates_io_owners_cache: TempCache::new(&data_path.join("cio-owners.tmp"))?,
             depender_changes: TempCache::new(&data_path.join("deps-changes2.tmp"))?,
             throttle: tokio::sync::Semaphore::new(40),
@@ -300,6 +303,24 @@ impl KitchenSink {
         &self.main_cache_dir
     }
 
+    fn load_author_shitlist(path: &Path) -> CResult<HashMap<String, String>> {
+        let p = std::fs::read_to_string(path)?;
+        let mut out = HashMap::with_capacity(10);
+        for line in p.lines() {
+            if line.starts_with('#') {
+                continue;
+            }
+            let mut parts = line.splitn(2, ':');
+            let login = parts.next().unwrap().trim();
+            if login.is_empty() {
+                continue;
+            }
+            let reason = parts.next().expect("shitlist broken").trim();
+            out.insert(login.to_ascii_lowercase(), reason.to_owned());
+        }
+        Ok(out)
+    }
+
     fn load_category_overrides(path: &Path) -> CResult<HashMap<String, Vec<Cow<'static, str>>>> {
         let p = std::fs::read_to_string(path)?;
         let mut out = HashMap::new();
@@ -317,6 +338,13 @@ impl KitchenSink {
             out.insert(crate_name.to_owned(), categories);
         }
         Ok(out)
+    }
+
+    pub fn is_crate_on_shitlist(&self, k: &RichCrate) -> bool {
+        k.owners().iter()
+            .any(|owner| {
+                self.author_shitlist.get(&owner.login.to_ascii_lowercase()).is_some()
+            })
     }
 
     /// Don't make requests to crates.io

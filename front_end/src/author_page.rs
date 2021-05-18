@@ -39,6 +39,8 @@ pub struct AuthorPage<'a> {
     pub(crate) keywords: Vec<String>,
     pub(crate) collab: Vec<User>,
     pub(crate) rustacean: Option<Rustacean>,
+    // If Some, it's banned
+    pub(crate) shitlist_reason: Option<&'a str>,
 }
 
 impl<'a> AuthorPage<'a> {
@@ -113,6 +115,8 @@ impl<'a> AuthorPage<'a> {
             kitchen_sink.user_by_github_login(login).await.map_err(|e| eprintln!("{}: {}", login, e)).ok().and_then(|x| x)
         }).collect().await;
 
+        let shitlist_reason = kitchen_sink.author_shitlist.get(&aut.github.login.to_ascii_lowercase()).map(|s| s.as_str());
+
         Ok(Self {
             founder_crates, member_crates,
             founder_total, member_total,
@@ -123,6 +127,7 @@ impl<'a> AuthorPage<'a> {
             keywords,
             collab,
             rustacean,
+            shitlist_reason,
         })
     }
 
@@ -230,7 +235,7 @@ impl<'a> AuthorPage<'a> {
             title: format!("@{}'s Rust crates", self.login()),
             critical_css_data: Some(include_str!("../../style/public/author.css")),
             critical_css_dev_url: Some("/author.css"),
-            noindex: self.joined.is_none(),
+            noindex: self.joined.is_none() || self.shitlist_reason.is_some(),
             ..Default::default()
         }
     }

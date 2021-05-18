@@ -18,6 +18,7 @@ assets = [
     ["../data/page/*", "/var/lib/crates-server/page/", "644"],
     ["../data/git_crates.txt", "/var/lib/crates-server/", "644"],
     ["../data/category_overrides.txt", "/var/lib/crates-server/", "644"],
+    ["../data/author_shitlist.txt", "/var/lib/crates-server/", "644"],
     ["../style/public/index.css", "/var/www/lib.rs/public/", "644"],
     ["../style/public/fira/*", "/var/www/lib.rs/public/fira/", "644"],
     ["../front_end/public/robots.txt", "/var/www/lib.rs/public/", "644"],

@@ -807,7 +807,7 @@ impl KitchenSink {
     async fn rich_crate_version_data_cached(&self, origin: &Origin) -> CResult<Option<CachedCrate>> {
         let origin_str = origin.to_str();
         let key = (origin_str.as_str(), "");
-        Ok(tokio::task::block_in_place(|| self.derived_cache.get_deserialized(key))?)
+        Ok(self.derived_cache.get_deserialized(key)?)
     }
 
     async fn rich_crate_version_async_opt(&self, origin: &Origin, allow_stale: bool) -> CResult<ArcRichCrateVersion> {
@@ -1595,7 +1595,7 @@ impl KitchenSink {
         if stopped() {Err(KitchenSinkErr::Stopped)?;}
         info!("Indexing {:?}", origin);
 
-        self.crate_db.before_index_latest(origin).await?;
+        timeout("before-index", 5, self.crate_db.before_index_latest(origin)).await?;
 
         let ((source_data, manifest, _warn), cache_key) = match origin {
             Origin::CratesIo(ref name) => {
@@ -1651,7 +1651,7 @@ impl KitchenSink {
 
         let extracted_auto_keywords = feat_extractor::auto_keywords(&manifest, source_data.github_description.as_deref(), readme_text.as_deref());
 
-        let cached = self.crate_db.index_latest(CrateVersionData {
+        let db_index = self.crate_db.index_latest(CrateVersionData {
             cache_key,
             category_slugs,
             authors: &authors,
@@ -1662,10 +1662,9 @@ impl KitchenSink {
             manifest: &manifest,
             source_data: &source_data,
             extracted_auto_keywords,
-        }).await?;
-        tokio::task::block_in_place(|| {
-            self.derived_cache.set_serialize((&origin.to_str(), ""), &cached)
-        })?;
+        });
+        let cached = timeout("db-index", 30, db_index).await?;
+        self.derived_cache.set_serialize((&origin.to_str(), ""), &cached)?;
         Ok(())
     }
 

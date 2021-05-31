@@ -216,11 +216,10 @@ impl Index {
     pub fn cache_key_for_crate(&self, name: &str) -> Result<u64, DepsErr> {
         use std::hash::Hash;
         use std::hash::Hasher;
-        let mut hasher = ahash::AHasher::new_with_keys(1234, 5678);
+        let mut hasher = fxhash::FxHasher::default();
 
         let c = self.crates_io_crate_by_lowercase_name(name)?;
         for v in c.versions() {
-            v.version().hash(&mut hasher);
             v.checksum().hash(&mut hasher);
             v.is_yanked().hash(&mut hasher);
         }
@@ -526,17 +525,3 @@ pub struct DepQuery {
     pub dev: bool,
 }
 
-#[test]
-fn stable_hash() {
-    use ahash::AHasher;
-    use std::hash::Hasher;
-
-    let mut hasher = AHasher::new_with_keys(1234, 5678);
-
-    hasher.write_u32(1989);
-    hasher.write_u8(11);
-    hasher.write_u8(9);
-    hasher.write(b"Huh?");
-
-    assert_eq!(13780556590398363848, hasher.finish());
-}

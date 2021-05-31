@@ -29,4 +29,5 @@ futures = "0.3.5"
 double-checked-cell-async = "2.0.2"
 triomphe = "0.1.1"
 smol_str = "0.1.16"
+fxhash = "0.2.1"
 

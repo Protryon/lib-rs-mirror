@@ -312,6 +312,7 @@ dia-args: command-line-interface
 diceware-rs: command-line-utilities, authentication
 diceware: command-line-utilities, authentication
 dicom-core: multimedia::images
+diener: cryptography::cryptocurrencies
 diesel-derive-newtype: databases
 diesel: databases
 diesel_mate_derive: databases

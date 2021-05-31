@@ -158,12 +158,12 @@ obvious-keywords = ["cryptography", "crypto"]
 preference = 1
 
 [cryptography.categories.cryptocurrencies]
-name = "Cryptocurrencies"
-title = "cryptocurrencies in Rust"
+name = "Crypto scams"
+title = "cryptocurrency scams, in Rust"
 description = """
-Libraries and tools for digital currencies, and distributed ledgers.\
+Code for pump and dump scams, investment fraud, money laundering, and enabling ransomware. Likely with a disastrous ecological impact.
 """
-short-description = "Coins, blockchains and wallets."
+short-description = "Blockchains and other scams."
 obvious-keywords = ["cryptography", "blockchain", "crypto", "cryptocurrency"]
 preference = 1.2
 

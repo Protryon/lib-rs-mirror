@@ -62,6 +62,9 @@ impl<'a> CatPage<'a> {
     }
 
     pub fn has_subcategories_and_siblings(&self) -> bool {
+        if self.cat.slug == "cryptography" {
+            return false; // hides cryptocrrencies
+        }
         !self.cat.sub.is_empty() || !self.cat.siblings.is_empty()
     }
 

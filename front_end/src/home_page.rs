@@ -194,10 +194,8 @@ impl<'a> HomePage<'a> {
                 pmh.0 /= 32;
             }
 
-            // move cryptocurrencies out of cryptography for the homepage, so that cryptocurrencies are sorted by their own popularity
-            if let Some(cryptocurrencies) = ranked.get_mut("cryptography").and_then(|(_, c)| c.sub.pop()) {
-                ranked.insert(cryptocurrencies.cat.slug.as_str(), (cryptocurrencies.dl * cryptocurrencies.pop, cryptocurrencies));
-            }
+            // move cryptocurrencies out of cryptography for the homepage
+            ranked.get_mut("cryptography").and_then(|(_, c)| c.sub.pop());
 
             for &(slug, adjust) in CATEGORY_RANK_ADJUST.iter() {
                 if let Some(c) = ranked.get_mut(slug) {

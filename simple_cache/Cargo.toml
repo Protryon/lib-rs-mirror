@@ -16,7 +16,7 @@ tempfile = "3.1.0"
 rmp-serde = "0.15"
 flate2 = "1.0.14"
 parking_lot = "0.11"
-ahash = "0.6"
+ahash = "0.7.4"
 fetcher = { path = "../fetcher/" }
 brotli = "3.3.0"
 tokio = { version = "1.6.0", features = ["rt-multi-thread"] }

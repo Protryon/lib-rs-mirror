@@ -47,7 +47,7 @@ parking_lot = "0.11"
 udedokei = { path = "../udedokei" }
 tar = "0.4.26"
 libflate = "1.0.0"
-ahash = "0.6"
+ahash = "0.7.4"
 deunicode = "1.1.1"
 futures = "0.3.5"
 double-checked-cell-async = "2.0.2"

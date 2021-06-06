@@ -62,6 +62,7 @@ ass-rs: web-programming
 assembly-core: development-tools
 ast_node: parser-implementations
 async-codec: asynchronous
+async-recursion: asynchronous, rust-patterns
 async_command: asynchronous
 atelier_core: web-programming
 atomicring: concurrency, data-structures
@@ -325,6 +326,7 @@ dither: multimedia::images
 ditto: concurrency, data-structures
 dlopen: os
 dmg: os::macos-apis, filesystem
+dns-lookup: network-programming
 dockerfile-parser: parser-implementations
 dockerfile: development-tools, encoding
 docstrings: parser-implementations
@@ -927,6 +929,7 @@ nmea-parser: parser-implementations, science
 nokiahealth: databases
 nom-bibtex: parser-implementations
 nom_pem: parser-implementations, cryptography
+nonzero_ext: rust-patterns
 nordselect: network-programming, command-line-utilities
 notcurses: command-line-interface
 notes: command-line-utilities

@@ -25,6 +25,7 @@ RUN rustup toolchain add 1.40.0
 RUN rustup toolchain add 1.44.0
 RUN rustup toolchain add 1.48.0
 RUN rustup toolchain list
+RUN cargo install libc --vers 99.9.9 || true # force index update
 "##;
 
 const TEMP_JUNK_DIR: &str = "/var/tmp/crates_env";

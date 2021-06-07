@@ -138,7 +138,7 @@ fn fs_safe(name: &str) -> Cow<str> {
     }
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn cratesioclient() {
     let client = CratesIoClient::new(Path::new("../data")).expect("new");
 

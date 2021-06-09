@@ -17,7 +17,6 @@ WORKDIR /home/rustyuser
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.52.0 --verbose # wat
 ENV PATH="$PATH:/home/rustyuser/.cargo/bin"
 RUN cargo install lts --vers ^0.3.1
-RUN cargo new lts-dummy; cd lts-dummy; cargo lts setup; echo 'itoa = "*"' >> Cargo.toml; cargo update;
 RUN rustup set profile minimal
 RUN rustup toolchain add 1.32.0
 RUN rustup toolchain add 1.36.0
@@ -25,6 +24,7 @@ RUN rustup toolchain add 1.40.0
 RUN rustup toolchain add 1.44.0
 RUN rustup toolchain add 1.48.0
 RUN rustup toolchain list
+RUN cargo new lts-dummy; cd lts-dummy; cargo lts setup; echo 'itoa = "*"' >> Cargo.toml; cargo update;
 RUN cargo install libc --vers 99.9.9 || true # force index update
 "##;
 
@@ -111,7 +111,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let upper_limit = x.rustc.oldest_ok.unwrap_or(53);
                 // don't pick 1.29 as the first choice
                 let lower_limit = x.rustc.newest_bad.unwrap_or(37).max(x.rustc.newest_bad_raw.unwrap_or(30));
-                let best_ver = (upper_limit + lower_limit)/2;
+                let best_ver = (upper_limit * 5 + lower_limit * 11)/16; // bias towards lower ver, because lower versions see features from newer versions
                 let possible_rusts = available_rust_versions.iter().enumerate().map(|(i, v)| {
                     (i, v, SemVer::parse(v).unwrap().minor as u16)
                 }).filter(|&(_, _, minor)| {

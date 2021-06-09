@@ -26,9 +26,10 @@ pub struct CompilerMessage {
     target: Option<CompilerMessageTarget>,
     message: Option<CompilerMessageInner>,
     reason: Option<String>,
-    package_id: String,
+    package_id: Option<String>,
     #[serde(default)]
     filenames: Vec<String>,
+    success: Option<bool>,
 }
 
 #[derive(Default, Debug)]
@@ -45,8 +46,8 @@ pub fn parse_analyses(stdout: &str, stderr: &str) -> Vec<Findings> {
         .filter_map(|(out, err)| parse_analysis(out, err)).collect()
 }
 
-fn parse_package_id(id: &str) -> Option<(String, String)> {
-    let mut parts = id.splitn(3, " ");
+fn parse_package_id(id: Option<&str>) -> Option<(String, String)> {
+    let mut parts = id?.splitn(3, " ");
     let name = parts.next()?.to_owned();
     let ver = parts.next()?.to_owned();
     let rest = parts.next()?;
@@ -472,6 +473,8 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
         return None;
     }
     findings.rustc_version = Some(fl.next()?.to_owned());
+    let top_level_crate_name = fl.next()?;
+    let top_level_crate_ver = fl.next()?;
 
     let mut printed = HashSet::new();
     for line in lines.filter(|l| l.starts_with('{')) {
@@ -481,7 +484,7 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
             .trim_start_matches("compiler-message ");
 
         if let Ok(msg) = serde_json::from_str::<CompilerMessage>(line) {
-            if let Some((name, ver)) = parse_package_id(&msg.package_id) {
+            if let Some((name, ver)) = parse_package_id(msg.package_id.as_deref()) {
                 if name == "______" || name == "_____" || name == "build-script-build" {
                     continue;
                 }
@@ -693,6 +696,14 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                 } else if level != "warning" && reason != "build-script-executed" && !(level == "" && reason == "compiler-message") {
                     eprintln!("unknown line {} {} {}", level, reason, line);
                 }
+            } else if let Some(success) = msg.success {
+                findings.crates.insert((None, top_level_crate_name.to_owned(), top_level_crate_ver.to_owned(), if success {
+                    Compat::ProbablyWorks
+                } else {
+                    Compat::BrokenDeps
+                }));
+            } else {
+                eprintln!("• Odd compiler message: {}", line);
             }
         } else {
             eprintln!("Does not parse as JSON: {}", line);
@@ -790,11 +801,12 @@ CHECKING 1.34.2 wat ever
 {"reason":"compiler-artifact","package_id":"proc_vector2d 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)","target":{"kind":["proc-macro"],"crate_types":["proc-macro"],"name":"proc_vector2d","src_path":"/usr/local/cargo/registry/src/-18c1fa267ed022ff/proc_vector2d-1.0.2/src/lib.rs","edition":"2018"},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/tmp/cargo-target-dir/debug/deps/libproc_vector2d-9470d66afa730e34.so"],"executable":null,"fresh":false}
 {"reason":"compiler-artifact","package_id":"vector2d 2.2.0 (path+file:///crate)","target":{"kind":["lib"],"crate_types":["lib"],"name":"vector2d","src_path":"/crate/src/lib.rs","edition":"2018"},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/tmp/cargo-target-dir/debug/deps/libvector2d-59c2022ebc0120a6.rmeta"],"executable":null,"fresh":false}
 ---XBdt8MQTMWYwcSsH---
-CHECKING 1.24.1 wat ever
+CHECKING 1.24.1 toplevelcrate 1.0.1-testcrate
 
 {"message":{"children":[],"code":null,"level":"error","message":"function-like proc macros are currently unstable (see issue #38356)","rendered":"error: function-like proc macros are currently unstable (see issue #38356)\n --> /usr/local/cargo/registry/src/-18c1fa267ed022ff/proc_vector2d-1.0.2/src/lib.rs:4:1\n  |\n4 | #[proc_macro]\n  | ^^^^^^^^^^^^^\n\n","spans":[{"byte_end":68,"byte_start":55,"column_end":14,"column_start":1,"expansion":null,"file_name":"/usr/local/cargo/registry/src/-18c1fa267ed022ff/proc_vector2d-1.0.2/src/lib.rs","is_primary":true,"label":null,"line_end":4,"line_start":4,"suggested_replacement":null,"text":[{"highlight_end":14,"highlight_start":1,"text":"#[proc_macro]"}]}]},"package_id":"proc_vector2d 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)","reason":"compiler-message","target":{"crate_types":["proc-macro"],"kind":["proc-macro"],"name":"proc_vector2d","src_path":"/usr/local/cargo/registry/src/-18c1fa267ed022ff/proc_vector2d-1.0.2/src/lib.rs"}}
 {"message":{"children":[],"code":null,"level":"error","message":"function-like proc macros are currently unstable (see issue #38356)","rendered":"error: function-like proc macros are currently unstable (see issue #38356)\n  --> /usr/local/cargo/registry/src/-18c1fa267ed022ff/proc_vector2d-1.0.2/src/lib.rs:18:1\n   |\n18 | #[proc_macro]\n   | ^^^^^^^^^^^^^\n\n","spans":[{"byte_end":360,"byte_start":347,"column_end":14,"column_start":1,"expansion":null,"file_name":"/usr/local/cargo/registry/src/-18c1fa267ed022ff/proc_vector2d-1.0.2/src/lib.rs","is_primary":true,"label":null,"line_end":18,"line_start":18,"suggested_replacement":null,"text":[{"highlight_end":14,"highlight_start":1,"text":"#[proc_macro]"}]}]},"package_id":"proc_vector2d 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)","reason":"compiler-message","target":{"crate_types":["proc-macro"],"kind":["proc-macro"],"name":"proc_vector2d","src_path":"/usr/local/cargo/registry/src/-18c1fa267ed022ff/proc_vector2d-1.0.2/src/lib.rs"}}
 {"message":{"children":[],"code":null,"level":"error","message":"aborting due to 2 previous errors","rendered":"error: aborting due to 2 previous errors\n\n","spans":[]},"package_id":"proc_vector2d 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)","reason":"compiler-message","target":{"crate_types":["proc-macro"],"kind":["proc-macro"],"name":"proc_vector2d","src_path":"/usr/local/cargo/registry/src/-18c1fa267ed022ff/proc_vector2d-1.0.2/src/lib.rs"}}
+{"reason":"build-finished","success":false}
 "##;
 
     let err = r##"WARNING: Your kernel does not support swap limit capabilities or the cgroup is not mounted. Memory limited without swap.
@@ -847,4 +859,5 @@ exit failure
     assert!(res[1].crates.get(&(None, "vector2d".into(), "2.2.0".into(), Compat::VerifiedWorks)).is_some());
     assert!(res[1].crates.get(&(Some("1.30.1".into()), "proc_vector2d".into(), "1.0.2".into(), Compat::Incompatible)).is_some());
     assert!(res[2].crates.get(&(None, "proc_vector2d".into(), "1.0.2".into(), Compat::Incompatible)).is_some());
+    assert!(res[2].crates.get(&(None, "toplevelcrate".into(), "1.0.1-testcrate".into(), Compat::BrokenDeps)).is_some());
 }

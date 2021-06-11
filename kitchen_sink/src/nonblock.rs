@@ -1,6 +1,6 @@
-use std::task::Poll;
-use std::pin::Pin;
 use std::future::Future;
+use std::pin::Pin;
+use std::task::Poll;
 
 pub struct NonBlock<F> {
     future: F,

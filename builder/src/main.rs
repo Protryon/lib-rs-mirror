@@ -64,7 +64,7 @@ fn out_of_disk_space() -> bool {
         },
         Err(e) => {
             log::error!("disk space check: {}", e);
-            return true;
+            true
         },
     }
 }
@@ -155,7 +155,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             continue; // junk?
         }
 
-        match find_versions_to_build(&all, &crates).await {
+        match find_versions_to_build(all, &crates).await {
             Ok(vers) => {
                 s.send(vers).unwrap();
             },
@@ -176,7 +176,7 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
 
     println!("checking https://lib.rs/compat/{}", crate_name);
 
-    let mut compat_info = crates.rustc_compatibility(crates.rich_crate_async(&origin).await?).await.map_err(|_| "rustc_compatibility")?;
+    let mut compat_info = crates.rustc_compatibility(crates.rich_crate_async(origin).await?).await.map_err(|_| "rustc_compatibility")?;
 
     let has_anything_built_ok_yet = compat_info.values().any(|c| c.oldest_ok_raw.is_some());
     let mut rng = rand::thread_rng();
@@ -260,7 +260,7 @@ fn run_and_analyze_versions(db: &BuildDb, docker_root: &Path, versions: &[(&'sta
         return Ok(());
     }
 
-    let (stdout, stderr) = do_builds(&docker_root, &versions)?;
+    let (stdout, stderr) = do_builds(docker_root, versions)?;
 
     let mut to_set = BTreeSet::new();
     for f in parse_analyses(&stdout, &stderr) {
@@ -276,7 +276,7 @@ fn run_and_analyze_versions(db: &BuildDb, docker_root: &Path, versions: &[(&'sta
         eprintln!("https://lib.rs/compat/{}#{} R.{}={:?}", o.short_crate_name(), cv, rv, c);
         (o, cv.as_str(), rv.as_str(), *c)
     }).collect::<Vec<(&Origin, &str, &str, Compat)>>();
-    if let Err(_) = db.set_compat_multi(&tmp) {
+    if db.set_compat_multi(&tmp).is_err() {
         // retry, sqlite is flaky
         db.set_compat_multi(&tmp)?;
     }
@@ -416,10 +416,8 @@ fn streamfetch(prefix: &'static str, inp: impl std::io::Read + Send + 'static) -
             let mut tmp = out.lock();
             tmp.push_str(&line);
             tmp.push('\n');
-            if line.len() > 230 {
-                if line.is_char_boundary(230) {
-                    line.truncate(230);
-                }
+            if line.len() > 230 && line.is_char_boundary(230) {
+                line.truncate(230);
             }
             println!("{}: {}", prefix, line);
         }

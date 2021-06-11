@@ -1,4 +1,5 @@
-#[macro_use] extern crate failure;
+#[macro_use]
+extern crate failure;
 
 #[macro_use]
 extern crate serde_derive;
@@ -9,10 +10,10 @@ extern crate log;
 mod yearly;
 use tokio::time::Instant;
 
-use futures::future::BoxFuture;
-use futures::FutureExt;
 pub use crate::yearly::*;
 pub use deps_index::*;
+use futures::future::BoxFuture;
+use futures::FutureExt;
 use tokio::task::spawn_blocking;
 pub mod filter;
 
@@ -23,8 +24,8 @@ pub use crate::nonblock::*;
 mod tarball;
 
 pub use crate_db::builddb::Compat;
-pub use crate_db::builddb::CompatRange;
 pub use crate_db::builddb::CompatByCrateVersion;
+pub use crate_db::builddb::CompatRange;
 pub use crate_db::CrateOwnerRow;
 pub use crates_io_client::CrateDepKind;
 pub use crates_io_client::CrateDependency;
@@ -80,8 +81,8 @@ use rich_crate::CrateVersion;
 use rich_crate::CrateVersionSourceData;
 use rich_crate::Readme;
 use semver::VersionReq;
-use simple_cache::TempCache;
 use simple_cache::SimpleCache;
+use simple_cache::TempCache;
 use smol_str::SmolStr;
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -239,7 +240,7 @@ impl KitchenSink {
                 || github_info::GitHub::new(&data_path.join("github.db"), github_token)),
             || rayon::join(
                 || Index::new(data_path),
-                || Creviews::new(),
+                Creviews::new,
             ));
         Ok(Self {
             crev: Arc::new(crev?),
@@ -614,7 +615,7 @@ impl KitchenSink {
 
     /// Wrapper object for metadata common for all versions of a crate
     pub async fn rich_crate_async(&self, origin: &Origin) -> CResult<RichCrate> {
-        if stopped() {Err(KitchenSinkErr::Stopped)?;}
+        if stopped() {return Err(KitchenSinkErr::Stopped.into());}
         match origin {
             Origin::CratesIo(name) => {
                 let meta = self.crates_io_meta(name).await?;
@@ -730,7 +731,7 @@ impl KitchenSink {
                     return Ok(versions);
                 }
             }
-            Err(KitchenSinkErr::CrateNotFound(origin.clone())).context("missing releases, even tags")?
+            Err(KitchenSinkErr::CrateNotFound(origin)).context("missing releases, even tags")?
         }).await?
     }
 
@@ -811,7 +812,7 @@ impl KitchenSink {
     }
 
     async fn rich_crate_version_async_opt(&self, origin: &Origin, allow_stale: bool) -> CResult<ArcRichCrateVersion> {
-        if stopped() {Err(KitchenSinkErr::Stopped)?;}
+        if stopped() {return Err(KitchenSinkErr::Stopped.into());}
 
         if let Some(krate) = self.loaded_rich_crate_version_cache.read().get(origin) {
             trace!("rich_crate_version_async HIT {:?}", origin);
@@ -902,7 +903,7 @@ impl KitchenSink {
 
             let mut meta = tarball::read_repo(&checkout, tree_id)?;
             debug_assert_eq!(meta.manifest.package, manifest.package);
-            let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin))?;
+            let package = meta.manifest.package.as_mut().ok_or(KitchenSinkErr::NotAPackage(origin))?;
 
             // Allowing any other URL would allow spoofing
             package.repository = Some(repo.canonical_git_url().into_owned());
@@ -911,7 +912,6 @@ impl KitchenSink {
     }
 
     async fn rich_crate_version_from_repo(&self, origin: &Origin) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
-
         tokio::task::yield_now().await;
         let _f = self.throttle.acquire().await;
         let (mut meta, path_in_repo) = self.package_in_repo_host(origin.clone()).await?;
@@ -1045,10 +1045,8 @@ impl KitchenSink {
         if origin.is_crates_io() {
             // Delete the original docs.rs link, because we have our own
             // TODO: what if the link was to another crate or a subpage?
-            if package.documentation.as_ref().map_or(false, |s| Self::is_docs_rs_link(s)) {
-                if self.has_docs_rs(&origin, &package.name, &package.version).await {
-                    package.documentation = None; // docs.rs is not proper docs
-                }
+            if package.documentation.as_ref().map_or(false, |s| Self::is_docs_rs_link(s)) && self.has_docs_rs(&origin, &package.name, &package.version).await {
+                package.documentation = None; // docs.rs is not proper docs
             }
         }
 
@@ -1098,7 +1096,7 @@ impl KitchenSink {
                 words.push(&readme_txt);
             }
             if let Some(ref lib) = meta.lib_file {
-                words.push(&lib);
+                words.push(lib);
             }
             if let Some(ref s) = package.description {words.push(s);}
             if let Some(ref s) = github_description {words.push(s);}
@@ -1160,41 +1158,32 @@ impl KitchenSink {
             if cat.as_bytes().iter().any(|c| c.is_ascii_uppercase()) {
                 *cat = cat.to_lowercase();
             }
-            if cat == "development-tools" || (cat == "command-line-utilities" && has_cargo_bin) {
-                if package.keywords.iter().any(|k| k.eq_ignore_ascii_case("cargo-subcommand") || k.eq_ignore_ascii_case("subcommand")) {
-                    *cat = "development-tools::cargo-plugins".into();
-                }
+            if (cat == "development-tools" || (cat == "command-line-utilities" && has_cargo_bin)) && package.keywords.iter().any(|k| k.eq_ignore_ascii_case("cargo-subcommand") || k.eq_ignore_ascii_case("subcommand")) {
+                *cat = "development-tools::cargo-plugins".into();
             }
             if cat == "localization" {
                 // nobody knows the difference
                 *cat = "internationalization".to_string();
             }
-            if cat == "parsers" {
-                if direct_dependencies.keys().any(|k| k == "nom" || k == "peresil" || k == "combine") ||
+            if cat == "parsers" && (direct_dependencies.keys().any(|k| k == "nom" || k == "peresil" || k == "combine") ||
                     package.keywords.iter().any(|k| match k.to_ascii_lowercase().as_ref() {
                         "asn1" | "tls" | "idl" | "crawler" | "xml" | "nom" | "json" | "logs" | "elf" | "uri" | "html" | "protocol" | "semver" | "ecma" |
                         "chess" | "vcard" | "exe" | "fasta" => true,
                         _ => false,
-                    })
-                {
-                    *cat = "parser-implementations".into();
-                }
+                    })) {
+                *cat = "parser-implementations".into();
             }
-            if cat == "cryptography" || cat == "database" || cat == "rust-patterns" || cat == "development-tools" {
-                if package.keywords.iter().any(|k| eq(k, "bitcoin") || eq(k, "ethereum") || eq(k, "ledger") || eq(k, "exonum") || eq(k, "blockchain")) {
-                    *cat = "cryptography::cryptocurrencies".into();
-                }
+            if (cat == "cryptography" || cat == "database" || cat == "rust-patterns" || cat == "development-tools") && package.keywords.iter().any(|k| eq(k, "bitcoin") || eq(k, "ethereum") || eq(k, "ledger") || eq(k, "exonum") || eq(k, "blockchain")) {
+                *cat = "cryptography::cryptocurrencies".into();
             }
             // crates-io added a better category
             if cat == "game-engines" {
                 *cat = "game-development".to_string();
             }
-            if cat == "games" {
-                if package.keywords.iter().any(|k| {
+            if cat == "games" && package.keywords.iter().any(|k| {
                     k == "game-dev" || k == "game-development" || eq(k,"gamedev") || eq(k,"framework") || eq(k,"utilities") || eq(k,"parser") || eq(k,"api")
                 }) {
-                    *cat = "game-development".into();
-                }
+                *cat = "game-development".into();
             }
             // got out of sync with crates-io
             if cat == "mathematics" {
@@ -1307,7 +1296,7 @@ impl KitchenSink {
         let homepage_is_canonical_repo = maybe_repo
             .and_then(|repo| {
                 package.homepage.as_ref()
-                .and_then(|home| Repo::new(&home).ok())
+                .and_then(|home| Repo::new(home).ok())
                 .map(|other| {
                     repo.canonical_git_url() == other.canonical_git_url()
                 })
@@ -1380,7 +1369,7 @@ impl KitchenSink {
         }
 
         match (a, b) {
-            (Some(ref a), Some(ref b)) if trim(a.as_ref()).eq_ignore_ascii_case(trim(b)) => true,
+            (Some(ref a), Some(b)) if trim(a.as_ref()).eq_ignore_ascii_case(trim(b)) => true,
             _ => false,
         }
     }
@@ -1512,12 +1501,12 @@ impl KitchenSink {
     /// Returns (nth, keyword)
     #[inline]
     pub async fn top_keyword(&self, krate: &RichCrate) -> CResult<Option<(u32, String)>> {
-        Ok(self.crate_db.top_keyword(&krate.origin()).await?)
+        Ok(self.crate_db.top_keyword(krate.origin()).await?)
     }
 
     /// Maintenance: add user to local db index
     pub(crate) async fn index_user_m(&self, user: &MinimalUser, commit: &GitCommitAuthor) -> CResult<()> {
-        if stopped() {Err(KitchenSinkErr::Stopped)?;}
+        if stopped() {return Err(KitchenSinkErr::Stopped.into());}
         let user = self.gh.user_by_login(&user.login).await?.ok_or_else(|| KitchenSinkErr::AuthorNotFound(user.login.clone()))?;
         if !self.user_db.email_has_github(&commit.email)? {
             println!("{} => {}", commit.email, user.login);
@@ -1528,19 +1517,19 @@ impl KitchenSink {
 
     /// Maintenance: add user to local db index
     pub fn index_user(&self, user: &User, commit: &GitCommitAuthor) -> CResult<()> {
-        if stopped() {Err(KitchenSinkErr::Stopped)?;}
+        if stopped() {return Err(KitchenSinkErr::Stopped.into());}
         if !self.user_db.email_has_github(&commit.email)? {
             println!("{} => {}", commit.email, user.login);
-            self.user_db.index_user(&user, Some(&commit.email), commit.name.as_deref())?;
+            self.user_db.index_user(user, Some(&commit.email), commit.name.as_deref())?;
         }
         Ok(())
     }
 
     /// Maintenance: add user to local db index
     pub async fn index_email(&self, email: &str, name: Option<&str>) -> CResult<()> {
-        if stopped() {Err(KitchenSinkErr::Stopped)?;}
-        if !self.user_db.email_has_github(&email)? {
-            match self.gh.user_by_email(&email).await {
+        if stopped() {return Err(KitchenSinkErr::Stopped.into());}
+        if !self.user_db.email_has_github(email)? {
+            match self.gh.user_by_email(email).await {
                 Ok(Some(users)) => {
                     for user in users {
                         println!("{} == {} ({:?})", user.login, email, name);
@@ -1556,13 +1545,13 @@ impl KitchenSink {
 
     /// Maintenance: add crate to local db index
     pub async fn index_crate(&self, k: &RichCrate, score: f64) -> CResult<()> {
-        if stopped() {Err(KitchenSinkErr::Stopped)?;}
+        if stopped() {return Err(KitchenSinkErr::Stopped.into());}
         self.crate_db.index_versions(k, score, self.downloads_per_month(k.origin()).await?).await?;
         Ok(())
     }
 
     pub fn index_crate_downloads(&self, crates_io_name: &str, by_ver: &HashMap<&str, &[(Date<Utc>, u32)]>) -> CResult<()> {
-        if stopped() {Err(KitchenSinkErr::Stopped)?;}
+        if stopped() {return Err(KitchenSinkErr::Stopped.into());}
         let mut year_data = HashMap::new();
         for (version, date_dls) in by_ver {
             let version = MiniVer::from(semver::Version::parse(version)?);
@@ -1592,7 +1581,7 @@ impl KitchenSink {
     }
 
     pub async fn index_crate_highest_version(&self, origin: &Origin) -> CResult<()> {
-        if stopped() {Err(KitchenSinkErr::Stopped)?;}
+        if stopped() {return Err(KitchenSinkErr::Stopped.into());}
         info!("Indexing {:?}", origin);
 
         timeout("before-index", 5, self.crate_db.before_index_latest(origin)).await?;
@@ -1606,9 +1595,9 @@ impl KitchenSink {
             },
             Origin::GitHub { .. } | Origin::GitLab { .. } => {
                 if !self.crate_exists(origin) {
-                    Err(KitchenSinkErr::GitCrateNotAllowed(origin.to_owned()))?
+                    return Err(KitchenSinkErr::GitCrateNotAllowed(origin.to_owned()).into())
                 }
-                let res = watch("reindexing-repodata", self.rich_crate_version_from_repo(&origin)).await?;
+                let res = watch("reindexing-repodata", self.rich_crate_version_from_repo(origin)).await?;
                 (res, 0)
             },
         };
@@ -1699,12 +1688,10 @@ impl KitchenSink {
         let can_capitalize = words.get(&first_capital).is_some();
         if let Some((name, _)) = words.into_iter().max_by_key(|&(_, v)| v) {
             name
+        } else if can_capitalize {
+            first_capital
         } else {
-            if can_capitalize {
-                first_capital
-            } else {
-                name.to_owned()
-            }
+            name.to_owned()
         }
     }
 
@@ -1738,7 +1725,7 @@ impl KitchenSink {
 
     pub async fn index_repo(&self, repo: &Repo, as_of_version: &str) -> CResult<()> {
         let _f = self.throttle.acquire().await;
-        if stopped() {Err(KitchenSinkErr::Stopped)?;}
+        if stopped() {return Err(KitchenSinkErr::Stopped.into());}
         let (checkout, manif) = tokio::task::spawn_blocking({
             let git_checkout_path = self.git_checkout_path.clone();
             let repo = repo.clone();
@@ -1770,7 +1757,7 @@ impl KitchenSink {
             }
         }
 
-        if stopped() {Err(KitchenSinkErr::Stopped)?;}
+        if stopped() {return Err(KitchenSinkErr::Stopped.into());}
 
         let mut changes = Vec::new();
         tokio::task::yield_now().await;
@@ -1950,7 +1937,7 @@ impl KitchenSink {
                 }
             })).await;
 
-            for (dep_compat, dep_origin, reqs) in deps.into_iter().filter_map(|x| x) {
+            for (dep_compat, dep_origin, reqs) in deps.into_iter().flatten() {
                 for (crate_ver, req) in reqs {
                     let c = match c.get_mut(&crate_ver) {
                         Some(c) => c,
@@ -2152,7 +2139,7 @@ impl KitchenSink {
                 if let Some(ref url) = author.url {
                     let gh_url = "https://github.com/";
                     if url.to_ascii_lowercase().starts_with(gh_url) {
-                        let login = url[gh_url.len()..].splitn(1, '/').next().expect("can't happen");
+                        let login = url[gh_url.len()..].splitn(2, '/').next().expect("can't happen");
                         if let Ok(Some(gh)) = self.gh.user_by_login(login).await {
                             let id = gh.id;
                             ca.github = Some(gh);
@@ -2277,7 +2264,7 @@ impl KitchenSink {
         let max_author_contribution = authors_by_name
             .values()
             .map(|a| if a.owner || a.nth_author.is_some() { a.contribution } else { 0. })
-            .max_by(|a, b| a.partial_cmp(&b).unwrap_or(Ordering::Equal))
+            .max_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal))
             .unwrap_or(0.);
         let big_contribution = if max_author_contribution < 50. { 200. } else { max_author_contribution / 2. };
 
@@ -2331,7 +2318,7 @@ impl KitchenSink {
         if let Some(user) = self.gh.user_by_login(owner.github_login().ok_or(KitchenSinkErr::OwnerWithoutLogin)?).await? {
             return Ok(user);
         }
-        Err(KitchenSinkErr::OwnerWithoutLogin)?
+        Err(KitchenSinkErr::OwnerWithoutLogin.into())
     }
 
     #[inline]
@@ -2602,7 +2589,7 @@ impl KitchenSink {
                 *n += 2;
             }
             let primary_owner_id = owners.get(0).map(|o| o.login.as_str()).unwrap_or("");
-            for keyword in keywords.into_iter().take(5) {
+            for keyword in keywords.iter().take(5) {
                 // obvious keywords are too repetitive and affect innocent crates
                 if !top_keywords.contains(keyword.as_str()) {
                     let n = seen_keywords.entry(keyword.clone()).or_insert(0u32);
@@ -2729,7 +2716,7 @@ pub struct RichAuthor {
 impl RichAuthor {
     pub fn name(&self) -> &str {
         match &self.github.name {
-            Some(n) if !n.is_empty() => &n,
+            Some(n) if !n.is_empty() => n,
             _ => &self.github.login,
         }
     }

@@ -15,12 +15,12 @@ use rich_crate::RichDep;
 use semver::Version as SemVer;
 use semver::VersionReq;
 use serde_derive::*;
+use smol_str::SmolStr;
 use std::iter;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use string_interner::symbol::SymbolU32 as Sym;
 use string_interner::StringInterner;
-use smol_str::SmolStr;
 
 use feat_extractor::is_deprecated_requirement;
 use triomphe::Arc;
@@ -195,7 +195,7 @@ impl Index {
     /// All crates available in the crates.io index and our index
     ///
     pub fn all_crates(&self) -> impl Iterator<Item = Origin> + '_ {
-        self.git_index.crates().cloned().chain(self.crates_io_crates().keys().map(|n| Origin::from_crates_io_name(&n)))
+        self.git_index.crates().cloned().chain(self.crates_io_crates().keys().map(|n| Origin::from_crates_io_name(n)))
     }
 
     pub async fn deps_stats(&self) -> Result<&DepsStats, DepsErr> {
@@ -269,7 +269,7 @@ impl Index {
         })
     }
 
-    pub(crate) fn deps_of_ver<'a>(&self, ver: &'a impl IVersion, wants: Features) -> Result<ArcDepSet, DepsErr> {
+    pub(crate) fn deps_of_ver(&self, ver: &impl IVersion, wants: Features) -> Result<ArcDepSet, DepsErr> {
         let key = (format!("{}-{}", ver.name(), ver.version()).into(), wants);
         if let Some(cached) = self.cache.read().get(&key) {
             return Ok(cached.clone());
@@ -355,7 +355,7 @@ impl Index {
                 .filter(|v| !v.is_yanked())
                 .filter_map(|v| Some((v, SemVer::parse(v.version()).ok()?)))
                 .find(|(_, semver)| {
-                    req.matches(&semver)
+                    req.matches(semver)
                 })
                 .unwrap_or_else(|| {
                     let fallback = krate.latest_version(); // bad version, but it shouldn't happen anyway
@@ -464,7 +464,7 @@ impl Index {
         let stats = self.deps_stats().await?;
         Ok(stats.counts.get(crate_name)
         .and_then(|c| {
-            c.versions.get(&version)
+            c.versions.get(version)
             .map(|&ver| ver as f32 / stats.total as f32)
         }))
     }
@@ -524,4 +524,3 @@ pub struct DepQuery {
     pub all_optional: bool,
     pub dev: bool,
 }
-

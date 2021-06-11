@@ -237,7 +237,7 @@ impl BuildDb {
         }
 
         if t.newest_bad.map_or(true, |v| v < t.newest_bad_raw.unwrap_or(0)) {
-            t.newest_bad_raw = t.newest_bad_raw;
+            t.newest_bad = t.newest_bad_raw;
         }
     }
 
@@ -341,6 +341,6 @@ impl BuildDb {
         let res = get.query_map(&[origin_str.as_str(), ver], |row| {
             Ok((row.get(0)?, row.get(1)?, row.get(2)?))
         })?;
-        Ok(res.collect::<Result<Vec<(String, String, String)>>>()?)
+        res.collect::<Result<Vec<(String, String, String)>>>()
     }
 }

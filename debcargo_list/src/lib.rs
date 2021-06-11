@@ -71,7 +71,7 @@ impl DebcargoList {
         let src = tree.get_name("src").ok_or("oops, borked repo")?.to_object(&self.repo)?.peel_to_tree()?;
         let data: HashSet<_, _> = src.iter().filter_map(|e| e.name().map(Box::from)).collect();
         if data.is_empty() {
-            return Err("unexpectedly empty")?;
+            return Err("unexpectedly empty".into());
         }
         *locked_list = data;
         Ok(())

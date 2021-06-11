@@ -1,11 +1,10 @@
-use std::sync::Arc;
 use chrono::prelude::*;
 use failure::*;
 use heck::KebabCase;
-use rich_crate::CrateVersionSourceData;
-use rich_crate::CrateOwner;
-use rich_crate::Derived;
 use rich_crate::CachedCrate;
+use rich_crate::CrateOwner;
+use rich_crate::CrateVersionSourceData;
+use rich_crate::Derived;
 use rich_crate::Manifest;
 use rich_crate::ManifestExt;
 use rich_crate::Origin;
@@ -21,6 +20,7 @@ use std::collections::HashSet;
 use std::fmt::Write;
 use std::fs;
 use std::path::Path;
+use std::sync::Arc;
 use thread_local::ThreadLocal;
 use tokio::sync::{Mutex, RwLock};
 type FResult<T> = std::result::Result<T, failure::Error>;
@@ -153,7 +153,7 @@ impl CrateDb {
     }
 
     fn connect(&self) -> std::result::Result<Connection, rusqlite::Error> {
-        Ok(Self::db(&self.url)?)
+        Self::db(&self.url)
     }
 
     #[inline]
@@ -199,7 +199,7 @@ impl CrateDb {
             if STOPWORDS.get(k.as_str()).is_some() {
                 w *= 0.6;
             }
-            insert_keyword.add(&k, w, true);
+            insert_keyword.add(k, w, true);
         }
 
         for (i, k) in package.name.split(|c: char| !c.is_alphanumeric()).enumerate() {
@@ -217,7 +217,7 @@ impl CrateDb {
 
         for (i, (w2, k)) in c.extracted_auto_keywords.iter().enumerate() {
             let w = *w2 as f64 * 150. / (80 + i) as f64;
-            insert_keyword.add(&k, w, false);
+            insert_keyword.add(k, w, false);
         }
 
         for feat in manifest.features.keys() {
@@ -278,11 +278,11 @@ impl CrateDb {
 
             let prev_c = prev_categories.query_map(&[&crate_id], |row| row.get(0))?.collect::<Result<Vec<String>,_>>()?;
             clear_categories.execute(&[&crate_id]).context("clear cat")?;
-            insert_keyword.pre_commit(&tx, crate_id).context("clear kw")?;
+            insert_keyword.pre_commit(tx, crate_id).context("clear kw")?;
 
             let (categories, had_explicit_categories) = {
                 let keywords = insert_keyword.keywords.iter().map(|(k,_)| k.to_string());
-                self.extract_crate_categories(&tx, &c, keywords, is_important_ish)?
+                self.extract_crate_categories(tx, &c, keywords, is_important_ish)?
             };
 
             if !had_explicit_categories {
@@ -298,7 +298,7 @@ impl CrateDb {
                 write!(&mut out, "[guessed]: ")?;
             }
             for (rank, rel, slug) in &categories {
-                if !prev_c.contains(&slug) {
+                if !prev_c.contains(slug) {
                     write!(&mut out, ">NEW {}, ", slug)?;
                 } else {
                     write!(&mut out, ">{}, ", slug)?;
@@ -318,7 +318,7 @@ impl CrateDb {
 
             for (i, k) in c.authors.iter().filter_map(|a| a.email.as_ref().or(a.name.as_ref())).enumerate() {
                 let w: f64 = 50. / (100 + i) as f64;
-                insert_keyword.add(&k, w, false);
+                insert_keyword.add(k, w, false);
             }
 
             if let Some(repo) = c.repository {
@@ -328,11 +328,11 @@ impl CrateDb {
 
             // yanked crates may contain garbage, or needlessly come up in similar crates
             // so knock all keywords' importance if it's yanked
-            insert_keyword.commit(&tx, crate_id, if c.source_data.is_yanked {0.1} else {1.})?;
+            insert_keyword.commit(tx, crate_id, if c.source_data.is_yanked {0.1} else {1.})?;
 
             let mut keywords: Vec<_> = package.keywords.iter().filter(|k| !k.is_empty()).map(|s| s.to_kebab_case()).collect();
             if keywords.is_empty() {
-                keywords = Self::keywords_tx(tx, &c.origin).context("keywordsdb2")?;
+                keywords = Self::keywords_tx(tx, c.origin).context("keywordsdb2")?;
             }
 
             let package = manifest.package.as_ref().expect("package in manifest");
@@ -398,7 +398,7 @@ impl CrateDb {
             categories::adjusted_relevance(candidates, &keywords_collected, 0.01, 15)
         } else {
             let cat_w = 0.2 + 0.2 * c.manifest.package().keywords.len() as f64;
-            Self::guess_crate_categories_tx(conn, &c.origin, &keywords_collected, if is_important_ish {0.1} else {0.25})?.into_iter()
+            Self::guess_crate_categories_tx(conn, c.origin, &keywords_collected, if is_important_ish {0.1} else {0.25})?.into_iter()
             .map(|(w, slug)| {
                 ((w * cat_w).min(0.99), slug)
             }).collect()
@@ -410,7 +410,7 @@ impl CrateDb {
         }
 
         let max_weight = categories.iter().map(|&(w, _)| w)
-            .max_by(|a, b| a.partial_cmp(&b).unwrap_or(Ordering::Equal))
+            .max_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal))
             .unwrap_or(0.1)
             .max(0.1); // prevents div/0, ensures odd choices stay low
 
@@ -505,8 +505,8 @@ impl CrateDb {
                 if s.ends_with("-rs") || s.ends_with("_rs") {
                     return &s[..s.len() - 3];
                 }
-                if s.starts_with("rust") {
-                    return &s[4..];
+                if let Some(derusted) = s.strip_prefix("rust") {
+                    return derusted;
                 }
                 s
             }
@@ -592,7 +592,7 @@ impl CrateDb {
                 let crate_id: u32 = match get_crate_id.query_row(&[&origin.to_str()], |row| row.get(0)) {
                     Ok(id) => id,
                     Err(rusqlite::Error::QueryReturnedNoRows) => continue,
-                    Err(e) => Err(e)?,
+                    Err(e) => return Err(e.into()),
                 };
                 for o in owners {
                     if let Some(github_id) = o.github_id {
@@ -1018,7 +1018,7 @@ impl KeywordInsert {
     pub fn add_synonyms(&mut self, tag_synonyms: &HashMap<Box<str>, (Box<str>, u8)>) {
         let to_add: Vec<_> = self.keywords.iter().filter_map(|(k, &(v, _))| {
             tag_synonyms.get(k.as_str()).and_then(|&(ref synonym, votes)| {
-                let synonym: &str = &synonym;
+                let synonym: &str = synonym;
                 if self.keywords.get(synonym).is_some() {
                     None
                 } else {
@@ -1081,8 +1081,8 @@ impl KeywordInsert {
 }
 
 fn crates_io_name(name: &str) -> std::result::Result<Origin, rusqlite::Error> {
-    Ok(Origin::try_from_crates_io_name(name)
-                    .ok_or_else(|| rusqlite::Error::ToSqlConversionFailure(format!("bad name {}", name).into()))?)
+    Origin::try_from_crates_io_name(name)
+                    .ok_or_else(|| rusqlite::Error::ToSqlConversionFailure(format!("bad name {}", name).into()))
 }
 
 #[derive(Debug)]

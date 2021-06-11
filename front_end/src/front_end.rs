@@ -5,6 +5,7 @@
 //! because the template engine Ructe doesn't support
 //! complex expressions in the templates.
 
+mod all_versions;
 mod author_page;
 mod cat_page;
 mod crate_page;
@@ -16,7 +17,6 @@ mod iter;
 mod not_found_page;
 mod reverse_dependencies;
 mod search_page;
-mod all_versions;
 mod urler;
 pub use crate::not_found_page::*;
 pub use crate::search_page::*;
@@ -27,7 +27,7 @@ use crate::crate_page::*;
 use crate::urler::Urler;
 use categories::Category;
 use chrono::prelude::*;
-use failure;
+
 use failure::ResultExt;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::Review;
@@ -142,7 +142,7 @@ pub async fn render_sitemap(sitemap: &mut impl Write, crates: &KitchenSink) -> R
 /// See `author.rs.html`
 pub async fn render_author_page<W: Write>(out: &mut W, aut: &RichAuthor, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
     if stopped() {
-        Err(KitchenSinkErr::Stopped)?;
+        return Err(KitchenSinkErr::Stopped.into());
     }
 
     let urler = Urler::new(None);
@@ -154,7 +154,7 @@ pub async fn render_author_page<W: Write>(out: &mut W, aut: &RichAuthor, kitchen
 /// See `crate_page.rs.html`
 pub async fn render_crate_page<W: Write>(out: &mut W, all: &RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<Option<DateTime<FixedOffset>>, failure::Error> {
     if stopped() {
-        Err(KitchenSinkErr::Stopped)?;
+        return Err(KitchenSinkErr::Stopped.into());
     }
 
     let urler = Urler::new(Some(ver.origin().clone()));
@@ -166,7 +166,7 @@ pub async fn render_crate_page<W: Write>(out: &mut W, all: &RichCrate, ver: &Ric
 /// See `reverse_dependencies.rs.html`
 pub async fn render_crate_reverse_dependencies<W: Write>(out: &mut W, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
     if stopped() {
-        Err(KitchenSinkErr::Stopped)?;
+        return Err(KitchenSinkErr::Stopped.into());
     }
     let urler = Urler::new(None);
     let c = reverse_dependencies::CratePageRevDeps::new(ver, kitchen_sink, renderer).await?;
@@ -177,7 +177,7 @@ pub async fn render_crate_reverse_dependencies<W: Write>(out: &mut W, ver: &Rich
 /// See `install.rs.html`
 pub async fn render_install_page(out: &mut impl Write, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
     if stopped() {
-        Err(KitchenSinkErr::Stopped)?;
+        return Err(KitchenSinkErr::Stopped.into());
     }
     let urler = Urler::new(None); // Don't set self-crate, because we want to link back to crate page
     let c = crate::install_page::InstallPage::new(ver, kitchen_sink, renderer).await;
@@ -188,7 +188,7 @@ pub async fn render_install_page(out: &mut impl Write, ver: &RichCrateVersion, k
 /// See `all_versions.rs.html`
 pub async fn render_all_versions_page(out: &mut impl Write, all: RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink) -> Result<(), failure::Error> {
     if stopped() {
-        Err(KitchenSinkErr::Stopped)?;
+        return Err(KitchenSinkErr::Stopped.into());
     }
     let urler = Urler::new(None); // Don't set self-crate, because we want to link back to crate page
     let c = crate::all_versions::AllVersions::new(all, ver, kitchen_sink).await?;
@@ -199,7 +199,7 @@ pub async fn render_all_versions_page(out: &mut impl Write, all: RichCrate, ver:
 /// See `crev.rs.html`
 pub async fn render_crate_reviews(out: &mut impl Write, reviews: &[Review], ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
     if stopped() {
-        Err(KitchenSinkErr::Stopped)?;
+        return Err(KitchenSinkErr::Stopped.into());
     }
     let urler = Urler::new(None); // Don't set self-crate, because we want to link back to crate page
     let c = crate::crev::ReviewsPage::new(reviews, ver, kitchen_sink, renderer).await;
@@ -264,7 +264,7 @@ pub async fn render_debug_page(out: &mut impl Write, all: RichCrate, kitchen_sin
     }
 
     let mut rustc_versions = rustc_versions.into_iter().collect::<Vec<u16>>();
-    rustc_versions.sort();
+    rustc_versions.sort_unstable();
     templates::debug(out, (rustc_versions, by_crate_ver))?;
     Ok(())
 }
@@ -276,7 +276,7 @@ pub fn render_error(out: &mut impl Write, err: &failure::Error) {
 /// See `crate_page.rs.html`
 pub fn render_static_page(out: &mut impl Write, title: String, page: &Markup, renderer: &Renderer) -> Result<(), failure::Error> {
     if stopped() {
-        Err(KitchenSinkErr::Stopped)?;
+        return Err(KitchenSinkErr::Stopped.into());
     }
 
     let (html, warnings) = renderer.page(page, Some(("https://lib.rs", "https://lib.rs")), Links::Trusted, None);

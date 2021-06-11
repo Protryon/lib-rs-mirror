@@ -45,7 +45,7 @@ async fn main() {
                             seen.insert(email.clone());
                         }
 
-                        if let Err(err) = crates.index_email(&email, a.name.as_deref()).await {
+                        if let Err(err) = crates.index_email(email, a.name.as_deref()).await {
                             eprintln!("•• {}: {}", email, err);
                         }
                     }

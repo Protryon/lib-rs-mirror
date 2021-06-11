@@ -1,14 +1,13 @@
 use crate::iter::HistoryIter;
 use cargo_toml::{Manifest, Package};
-use failure;
-use git2;
+
 use git2::build::RepoBuilder;
 use git2::Commit;
 pub use git2::Oid;
 pub use git2::Repository;
 use git2::{Blob, ObjectType, Reference, Tree};
 use lazy_static::lazy_static;
-use render_readme;
+
 use render_readme::Markup;
 use repo_url::Repo;
 use std::collections::hash_map::Entry::Vacant;
@@ -131,7 +130,7 @@ fn get_repo(repo: &Repo, base_path: &Path) -> Result<Repository, git2::Error> {
             let mut ch = RepoBuilder::new();
             ch.bare(true);
             // no support for depth=1!
-            ch.clone(&url, &repo_path)
+            ch.clone(url, &repo_path)
         },
     }
 }
@@ -140,7 +139,7 @@ fn get_repo(repo: &Repo, base_path: &Path) -> Result<Repository, git2::Error> {
 pub fn find_manifests(repo: &Repository) -> Result<(Vec<(String, Oid, Manifest)>, Vec<ParseError>), failure::Error> {
     let head = repo.head()?;
     let tree = head.peel_to_tree()?;
-    find_manifests_in_tree(&repo, &tree)
+    find_manifests_in_tree(repo, &tree)
 }
 
 struct GitFS<'a, 'b> {
@@ -150,7 +149,7 @@ struct GitFS<'a, 'b> {
 
 impl cargo_toml::AbstractFilesystem for GitFS<'_, '_> {
     fn file_names_in(&self, dir_path: &str) -> Result<HashSet<Box<str>>, io::Error> {
-        self.file_names_in_tree(&self.tree, Some(dir_path))
+        self.file_names_in_tree(self.tree, Some(dir_path))
     }
 }
 
@@ -226,11 +225,11 @@ pub type PackageVersionTimestamps = HashMap<String, HashMap<String, i64>>;
 pub fn find_versions(repo: &Repository) -> Result<PackageVersionTimestamps, failure::Error> {
     let mut package_versions: PackageVersionTimestamps = HashMap::with_capacity(4);
     for commit in repo.tag_names(None)?.iter()
-        .filter_map(|s| s)
+        .flatten()
         .filter_map(|tag| repo.find_reference(&format!("refs/tags/{}", tag)).map_err(|e| eprintln!("bad tag {}: {}", tag, e)).ok())
         .filter_map(|r| r.peel_to_commit().map_err(|e| eprintln!("bad ref/tag: {}", e)).ok())
     {
-        for (_, _, manifest) in find_manifests_in_tree(&repo, &commit.tree()?)?.0 {
+        for (_, _, manifest) in find_manifests_in_tree(repo, &commit.tree()?)?.0 {
             if let Some(pkg) = manifest.package {
                 add_package(&mut package_versions, pkg, &commit);
             }
@@ -244,7 +243,6 @@ pub fn find_versions(repo: &Repository) -> Result<PackageVersionTimestamps, fail
 
     Ok(package_versions)
 }
-
 
 fn is_alnum(q: &str) -> bool {
     q.as_bytes().iter().copied().all(|c| c.is_ascii_alphanumeric() || c == b'_' || c == b'-')
@@ -274,12 +272,12 @@ pub fn find_dependency_changes(repo: &Repository, mut cb: impl FnMut(HashSet<Str
     // The generation number here is not quite accurate (due to diamond-shaped histories),
     // but I need the fiction of it being linerar for this implementation.
     // A recursive implementation could do it better, maybe.
-    let commits = commit_history_iter(&repo, &head)?.filter(|c| !c.is_merge).map(|c| c.commit);
+    let commits = commit_history_iter(repo, &head)?.filter(|c| !c.is_merge).map(|c| c.commit);
     for (age, commit) in commits.enumerate().take(1000) {
         // All deps in a repo, because we traverse history once per repo, not once per crate,
         // and because moving of deps between internal crates doesn't count.
         let mut older_deps = HashSet::with_capacity(100);
-        for (_, _, manifest) in find_manifests_in_tree(&repo, &commit.tree()?)?.0 {
+        for (_, _, manifest) in find_manifests_in_tree(repo, &commit.tree()?)?.0 {
             // Find oldest occurence of each version, assuming it's a release date
             if let Some(pkg) = manifest.package {
                 add_package(&mut package_versions, pkg, &commit);
@@ -325,7 +323,7 @@ pub fn find_readme(repo: &Repository, package: &Package) -> Result<Option<(Strin
     let mut readme = None;
     let mut found_best = false; // it'll find many readmes, including fallbacks
 
-    let mut prefix = path_in_repo_in_tree(&repo, &tree, &package.name)?;
+    let mut prefix = path_in_repo_in_tree(repo, &tree, &package.name)?;
     if let Some((ref mut prefix, ..)) = prefix {
         if !prefix.ends_with('/') {
             prefix.push('/');
@@ -333,7 +331,7 @@ pub fn find_readme(repo: &Repository, package: &Package) -> Result<Option<(Strin
     }
     let prefix = prefix.as_ref().map(|(s, ..)| s.as_str()).unwrap_or("");
 
-    iter_blobs_in_tree(&repo, &tree, |base, _inner_tree, name, blob| {
+    iter_blobs_in_tree(repo, &tree, |base, _inner_tree, name, blob| {
         if found_best {
             return Ok(()); // done
         }

@@ -347,7 +347,7 @@ impl ManifestExt for Manifest {
     /// run dev build
     fn direct_dependencies(&self) -> (Vec<RichDep>, Vec<RichDep>, Vec<RichDep>) {
         fn to_dep((name, dep): (&String, &Dependency)) -> (String, RichDep) {
-            let package = dep.package().unwrap_or(&name);
+            let package = dep.package().unwrap_or(name);
             (package.into(), RichDep {
                 package: package.into(),
                 name: name.as_str().into(),
@@ -364,7 +364,7 @@ impl ManifestExt for Manifest {
         fn add_targets(dest: &mut BTreeMap<String, RichDep>, src: &DepsSet, target: &str) {
             for (name, dep) in src {
                 use std::collections::btree_map::Entry::*;
-                let package = dep.package().unwrap_or(&name);
+                let package = dep.package().unwrap_or(name);
                 if let Vacant(e) = dest.entry(package.to_string()) {
                     let mut only_for_targets = Vec::new();
                     if let Ok(target) = target.parse().map_err(|e| log::warn!("Bad target '{}': {}", target, e)) {
@@ -382,7 +382,7 @@ impl ManifestExt for Manifest {
                 }
             }
         }
-        for (ref target, ref plat) in &self.target {
+        for (target, plat) in &self.target {
             add_targets(&mut normal, &plat.dependencies, target);
             add_targets(&mut build, &plat.build_dependencies, target);
             add_targets(&mut dev, &plat.dev_dependencies, target);
@@ -534,8 +534,8 @@ fn extract_doc_comments(code: &str) -> String {
             if !rest.trim().is_empty() {
                 out.push('\n');
             }
-        } else if l.starts_with("//!") {
-            out.push_str(&l[3..]);
+        } else if let Some(doccomment) = l.strip_prefix("//!") {
+            out.push_str(doccomment);
             out.push('\n');
         }
     }

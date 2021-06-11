@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::convert::TryFrom;
-use url;
+
 use url::Url;
 
 pub type GResult<T> = Result<T, GitError>;
@@ -133,7 +133,7 @@ impl Repo {
     /// Base dir is without leading or trailing `/`, i.e. `""` for root, `"foo/bar"`, etc.
     pub fn readme_base_url(&self, base_dir_in_repo: &str) -> String {
         assert!(!base_dir_in_repo.starts_with('/'));
-        let slash = if base_dir_in_repo != "" && !base_dir_in_repo.ends_with('/') { "/" } else { "" };
+        let slash = if !base_dir_in_repo.is_empty() && !base_dir_in_repo.ends_with('/') { "/" } else { "" };
         match self.host {
             RepoHost::GitHub(SimpleRepo {ref owner, ref repo}) => {
                 format!("https://github.com/{}/{}/blob/HEAD/{}{}", owner, repo, base_dir_in_repo, slash)
@@ -151,7 +151,7 @@ impl Repo {
     /// Base dir is without leading or trailing `/`, i.e. `""` for root, `"foo/bar"`, etc.
     pub fn readme_base_image_url(&self, base_dir_in_repo: &str) -> String {
         assert!(!base_dir_in_repo.starts_with('/'));
-        let slash = if base_dir_in_repo != "" && !base_dir_in_repo.ends_with('/') { "/" } else { "" };
+        let slash = if !base_dir_in_repo.is_empty() && !base_dir_in_repo.ends_with('/') { "/" } else { "" };
         match self.host {
             RepoHost::GitHub(SimpleRepo {ref owner, ref repo}) => {
                 format!("https://raw.githubusercontent.com/{}/{}/HEAD/{}{}", owner, repo, base_dir_in_repo, slash)
@@ -206,7 +206,7 @@ impl RepoHost {
     /// URL for browsing the repository via web browser
     pub fn canonical_http_url(&self, base_dir_in_repo: &str) -> Option<Cow<'_, str>> {
         assert!(!base_dir_in_repo.starts_with('/'));
-        let slash = if base_dir_in_repo != "" { "/tree/HEAD/" } else { "" };
+        let slash = if !base_dir_in_repo.is_empty() { "/tree/HEAD/" } else { "" };
         match self {
             RepoHost::GitHub(SimpleRepo {ref owner, ref repo}) => {
                 Some(format!("https://github.com/{}/{}{}{}", owner, repo, slash, base_dir_in_repo).into())

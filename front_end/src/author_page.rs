@@ -45,7 +45,6 @@ pub struct AuthorPage<'a> {
 
 impl<'a> AuthorPage<'a> {
     pub async fn new(aut: &'a RichAuthor, kitchen_sink: &'a KitchenSink, markup: &'a Renderer) -> CResult<AuthorPage<'a>> {
-
         let rustacean = kitchen_sink.rustacean_for_github_login(&aut.github.login);
 
         let (rows, orgs) = futures::try_join!(
@@ -208,7 +207,7 @@ impl<'a> AuthorPage<'a> {
     pub fn org_name(org: &Org) -> &str {
         if let Some(name) = &org.name {
             if name.eq_ignore_ascii_case(&org.login) {
-                return &name;
+                return name;
             }
         }
         &org.login

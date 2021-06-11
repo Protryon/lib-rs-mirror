@@ -1,9 +1,9 @@
 use fetcher::Fetcher;
-use std::sync::Arc;
 use render_readme::ImageFilter;
 use simple_cache::{Error, TempCacheJson};
 use std::borrow::Cow;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 #[derive(Clone, Copy, Deserialize, Serialize, Debug)]
 struct ImageOptimImageMeta {

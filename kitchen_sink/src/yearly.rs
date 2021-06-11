@@ -38,7 +38,7 @@ impl AllDownloads {
                 e.insert(TempCache::new(self.base_path.join(format!("{}-big.rmpz", year)))?)
             },
         };
-        Ok(cache.get(crate_name)?)
+        cache.get(crate_name)
     }
 
     pub fn set_crate_year(&self, crate_name: &str, year: u16, v: &PerVersionDownloads) -> Result<(), simple_cache::Error> {

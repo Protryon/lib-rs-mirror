@@ -38,13 +38,13 @@ impl<'a> WLITA<'a> {
 
         // keep line boundaries to eliminate duplicate/redundant headers
         for line in text.lines().map(str::trim).filter(|s| !s.is_empty()) {
-            let mut fragments = sentence_end.split(line);
-            while let Some(text) = fragments.next() {
+            let fragments = sentence_end.split(line);
+            for text in fragments {
                 if !norm_acc.is_empty() {
                     orig_acc.push(' ');
                     norm_acc.push(' ');
                 }
-                orig_acc.push_str(&text);
+                orig_acc.push_str(text);
                 let normalized = self.variables.replace_all(text, "_").to_ascii_lowercase();
                 norm_acc.push_str(&normalized);
                 if norm_acc.len() > 16 { // can't be too long, or it could easily fall out of sync

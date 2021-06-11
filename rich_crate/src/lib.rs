@@ -114,10 +114,7 @@ impl Origin {
 
     #[inline]
     pub fn is_crates_io(&self) -> bool {
-        match self {
-            Origin::CratesIo(_) => true,
-            _ => false,
-        }
+        matches!(self, Origin::CratesIo(_))
     }
 
     #[inline]

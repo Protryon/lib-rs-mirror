@@ -71,7 +71,6 @@ pub struct CrateMetaVersion {
     pub license: Option<String>, // "MIT",
     #[serde(default)]
     pub audit_actions: Vec<AuditAction>,
-
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

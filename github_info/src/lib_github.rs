@@ -234,7 +234,7 @@ impl GitHub {
                 }
                 Ok(None)
             },
-            Err(err) => Err(err)?,
+            Err(err) => Err(err),
         }
     }
 }

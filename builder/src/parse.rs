@@ -47,7 +47,7 @@ pub fn parse_analyses(stdout: &str, stderr: &str) -> Vec<Findings> {
 }
 
 fn parse_package_id(id: Option<&str>) -> Option<(String, String)> {
-    let mut parts = id?.splitn(3, " ");
+    let mut parts = id?.splitn(3, ' ');
     let name = parts.next()?.to_owned();
     let ver = parts.next()?.to_owned();
     let rest = parts.next()?;
@@ -57,7 +57,7 @@ fn parse_package_id(id: Option<&str>) -> Option<(String, String)> {
     Some((name, ver))
 }
 
-const RUSTC_FEATURES_STABLE_SINCE: [(u16, &'static str); 392] = [
+const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 392] = [
 // rg  --no-filename -o '\[stable\(feature.*\]' library/ | fgrep 1. | sort -u | sed -E 's/.*feature ?= ?"(.+)", since ?= ?"1\.(..+)\..".*/(\2, "\1"),/' | sort -V | pbcopy
 
 (17, "addr_from_into_ip"),
@@ -456,7 +456,7 @@ const RUSTC_FEATURES_STABLE_SINCE: [(u16, &'static str); 392] = [
 
 fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
     let stdout = stdout.trim();
-    if stdout == "" {
+    if stdout.is_empty() {
         return None;
     }
 
@@ -679,10 +679,8 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                         desc.starts_with("Some errors occurred: E0") ||
                         desc.starts_with("aborting due to") {
                         // nothing
-                    } else {
-                        if printed.insert(desc.to_string()) {
-                            eprintln!("• err: {} ({})", desc, name);
-                        }
+                    } else if printed.insert(desc.to_string()) {
+                        eprintln!("• err: {} ({})", desc, name);
                     }
                 }
 
@@ -693,7 +691,7 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                     findings.crates.insert((None, name, ver, Compat::Incompatible));
                 } else if reason == "compiler-artifact" {
                     findings.crates.insert((None, name, ver, Compat::VerifiedWorks));
-                } else if level != "warning" && reason != "build-script-executed" && !(level == "" && reason == "compiler-message") {
+                } else if level != "warning" && reason != "build-script-executed" && !(level.is_empty() && reason == "compiler-message") {
                     eprintln!("unknown line {} {} {}", level, reason, line);
                 }
             } else if let Some(success) = msg.success {

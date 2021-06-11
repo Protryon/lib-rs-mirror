@@ -1,4 +1,4 @@
-use toml;
+
 
 #[macro_use] extern crate serde_derive;
 #[macro_use] extern crate lazy_static;
@@ -89,7 +89,7 @@ impl Categories {
             let siblings = details.remove("siblings").and_then(|v| v.try_into().ok()).unwrap_or_default();
 
             let mut full_slug = String::with_capacity(full_slug_start.len() + 2 + slug.len());
-            if full_slug_start != "" {
+            if !full_slug_start.is_empty() {
                 full_slug.push_str(full_slug_start);
                 full_slug.push_str("::");
             }

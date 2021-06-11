@@ -1,11 +1,11 @@
 use crate::reverse_dependencies::DownloadsBar;
-use chrono::DateTime;
-use std::collections::HashMap;
-use std::collections::HashSet;
 use crate::Page;
+use chrono::DateTime;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::KitchenSinkErr;
 use kitchen_sink::Origin;
+use std::collections::HashMap;
+use std::collections::HashSet;
 
 use rich_crate::{RichCrate, RichCrateVersion};
 use semver::Version as SemVer;
@@ -21,7 +21,6 @@ pub struct AllVersions {
     pub(crate) has_feat_changes: bool,
     pub(crate) has_deps_changes: bool,
 }
-
 
 #[derive(Debug)]
 pub(crate) struct VerRow {
@@ -144,13 +143,9 @@ impl AllVersions {
             };
             prev_semver = Some(version.clone());
 
-            let yanked_by = if let Some(pos) = audit.iter().position(|a| a.action == "yank") {
-                Some(audit.remove(pos).user)
-            } else { None }.map(|u| (u.login, u.name));
+            let yanked_by = audit.iter().position(|a| a.action == "yank").map(|pos| audit.remove(pos).user).map(|u| (u.login, u.name));
 
-            let published_by = if let Some(pos) = audit.iter().position(|a| a.action == "publish") {
-                Some(audit.remove(pos).user)
-            } else { None }.map(|u| (u.login, u.name));
+            let published_by = audit.iter().position(|a| a.action == "publish").map(|pos| audit.remove(pos).user).map(|u| (u.login, u.name));
 
             if yanked {
                 // everything intentionally left empty, don't update prev deps, so
@@ -295,4 +290,3 @@ fn map_to_major(v: &SemVer) -> (bool, bool, u64) {
 fn semver_major_differs(a: &SemVer, b: &SemVer) -> bool {
     a.major != b.major || (a.major == 0 && a.minor != b.minor) || a.is_prerelease() != b.is_prerelease()
 }
-

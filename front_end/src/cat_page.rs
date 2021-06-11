@@ -9,9 +9,9 @@ use kitchen_sink::KitchenSink;
 use render_readme::Renderer;
 use rich_crate::RichCrateVersion;
 use std::collections::HashSet;
-use tokio::time::Instant;
 use std::time::Duration;
 use tokio::time::timeout_at;
+use tokio::time::Instant;
 
 /// Data for category page template
 pub struct CatPage<'a> {

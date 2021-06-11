@@ -8,7 +8,7 @@ use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
 use tar::{Archive, Entry, EntryType};
-use udedokei;
+
 use udedokei::LanguageExt;
 
 #[derive(Debug, Fail)]

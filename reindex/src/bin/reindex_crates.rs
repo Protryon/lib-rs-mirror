@@ -1,5 +1,5 @@
 use debcargo_list::DebcargoList;
-use failure;
+
 use feat_extractor::*;
 use futures::future::join_all;
 use futures::future::FutureExt;
@@ -131,7 +131,7 @@ async fn main_indexing_loop(r: Arc<Reindexer>, crate_origins: Box<dyn Iterator<I
                 Ok(v) => {
                     drop(index_finished);
                     if repos {
-                        if let Some(ref repo) = v.repository() {
+                        if let Some(repo) = v.repository() {
                             {
                                 let mut s = seen_repos.lock();
                                 let url = repo.canonical_git_url().to_string();
@@ -226,7 +226,7 @@ fn index_search(indexer: &mut Indexer, lines: &TempCache<(String, f64), [u8; 16]
 impl Reindexer {
 async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) -> (usize, f64) {
     let crates = &self.crates;
-    let contrib_info = crates.all_contributors(&k).await.map_err(|e| log::error!("{}", e)).ok();
+    let contrib_info = crates.all_contributors(k).await.map_err(|e| log::error!("{}", e)).ok();
     let contributors_count = if let Some((authors, _owner_only, _, extra_contributors)) = &contrib_info {
         (authors.len() + extra_contributors) as u32
     } else {
@@ -340,11 +340,11 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
         is_proc_macro: k.is_proc_macro(),
         is_sys: k.is_sys(),
         is_sub_component: crates.is_sub_component(k).await,
-        is_autopublished: is_autopublished(&k),
-        is_deprecated: is_deprecated(&k),
+        is_autopublished: is_autopublished(k),
+        is_deprecated: is_deprecated(k),
         is_crates_io_published: k.origin().is_crates_io(),
         is_yanked: k.is_yanked(),
-        is_squatspam: is_squatspam(&k) || is_on_shitlist,
+        is_squatspam: is_squatspam(k) || is_on_shitlist,
     });
 
     (downloads_per_month as usize, score)

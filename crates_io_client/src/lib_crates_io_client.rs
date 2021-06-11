@@ -1,13 +1,13 @@
-use serde::Serialize;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
+pub use simple_cache::Error;
 use std::borrow::Cow;
 use std::path::PathBuf;
 use std::sync::Arc;
-pub use simple_cache::Error;
 
+use fetcher::Fetcher;
 use simple_cache::SimpleFetchCache;
 use simple_cache::TempCacheJson;
-use fetcher::Fetcher;
 
 use std::path::Path;
 use urlencoding::encode;
@@ -102,7 +102,8 @@ impl CratesIoClient {
         let url2 = format!("{}/owner_team", encode(crate_name));
         let (res1, res2) = futures::join!(
             self.get_json_from(&self.ownerscache1, (&url1, as_of_version), &url1),
-            self.get_json_from(&self.ownerscache2, (&url2, as_of_version), &url2));
+            self.get_json_from(&self.ownerscache2, (&url2, as_of_version), &url2)
+        );
 
         let u: CrateOwnersFile = cioopt!(res1?);
         let mut t: CrateTeamsFile = cioopt!(res2?);
@@ -132,7 +133,7 @@ impl CratesIoClient {
 
 fn fs_safe(name: &str) -> Cow<str> {
     if name.as_bytes().iter().all(|&c| c >= b' ' && c != b'/' && c != b'\\' && c < 0x7f) {
-        return name.into();
+        name.into()
     } else {
         name.as_bytes().iter().map(|b| format!("{:02x}", b)).collect::<String>().into()
     }

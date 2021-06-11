@@ -1256,7 +1256,7 @@ pub fn adjusted_relevance(mut candidates: HashMap<String, f64>, keywords: &HashS
 
     let max_score = candidates.iter()
         .map(|(_, v)| *v)
-        .max_by(|a, b| a.partial_cmp(&b).expect("nan"))
+        .max_by(|a, b| a.partial_cmp(b).expect("nan"))
         .unwrap_or(0.);
 
     let min_category_match_threshold = min_category_match_threshold.max(max_score * 0.951);

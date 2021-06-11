@@ -25,7 +25,7 @@ use rich_crate::RichCrate;
 use rich_crate::RichCrateVersion;
 use rich_crate::RichDep;
 use semver::Version as SemVer;
-use semver_parser;
+
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -193,7 +193,7 @@ impl<'a> CratePage<'a> {
         let keywords = self.ver.keywords().join(", ");
         Page {
             title: self.page_title(),
-            keywords: if keywords != "" { Some(keywords) } else { None },
+            keywords: if !keywords.is_empty() { Some(keywords) } else { None },
             created: self.date_created_string(),
             description: self.ver.description().map(|d| format!("{} | Rust/Cargo package", d)),
             item_name: Some(self.ver.short_name().to_string()),
@@ -413,7 +413,7 @@ impl<'a> CratePage<'a> {
     pub fn non_dep_features(&self) -> Option<Vec<String>> {
         let f = self.ver.features();
         let tmp: Vec<_> = f.iter().filter_map(|(k,v)| {
-            if k.starts_with("_") {
+            if k.starts_with('_') {
                 return None; // hidden feature
             }
             let non_dep = k != "default" && v.iter().all(|feature| f.get(feature).is_some());
@@ -895,7 +895,7 @@ impl<'a> CratePage<'a> {
             let uncompr_weighed_minimal = (crate_size.1 as f32 * weight_minimal) as usize;
             let crate_stats = krate.language_stats();
 
-            if depinf.direct && Self::is_same_project(&self.ver, &krate) {
+            if depinf.direct && Self::is_same_project(self.ver, &krate) {
                 main_crate_size.0 += tarball_weighed;
                 main_crate_size.1 += uncompr_weighed;
 
@@ -994,7 +994,7 @@ impl ReleaseCounts {
         } else if n * 3 >= self.total * 2 {
             (format!("{} release{}", self.total, plural(self.total)), Some(format!("({})", label)))
         } else {
-            (format!("{} release{}", self.total, plural(self.total)), if label != "" { Some(format!("({} {})", n, label)) } else { None })
+            (format!("{} release{}", self.total, plural(self.total)), if !label.is_empty() { Some(format!("({} {})", n, label)) } else { None })
         }
     }
 }

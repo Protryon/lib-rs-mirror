@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use crate::error::Error;
 use fetcher::Fetcher;
 use flate2::read::DeflateDecoder;
@@ -7,10 +6,11 @@ use flate2::Compression;
 use parking_lot::RwLock;
 use parking_lot::RwLockReadGuard;
 use parking_lot::RwLockWriteGuard;
-use rmp_serde;
+use std::sync::Arc;
+
 use serde::de::DeserializeOwned;
 use serde::*;
-use serde_json;
+
 use std::borrow::Borrow;
 use std::collections::hash_map::Entry;
 use std::fs::File;

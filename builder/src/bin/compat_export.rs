@@ -1,24 +1,22 @@
-use std::fmt::Write as _;
-use std::io::Write;
 use futures::StreamExt;
 use kitchen_sink::stopped;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::Origin;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
-
+use std::fmt::Write as _;
+use std::io::Write;
 
 #[tokio::main]
 async fn main() {
-
-    let ref filter = std::env::args().nth(1);
+    let filter = &std::env::args().nth(1);
 
     println!("# minimum supported rust versions for crates on https://lib.rs");
     println!("# lines starting with # are comments");
     println!("# the format is: 'crate name' 'rustc version'<='newest stable crate version that works with it'");
     println!("# or: 'crate name' !'remove all crate versions matching this semver expression'");
 
-    let ref crates = KitchenSink::new_default().await.unwrap();
+    let crates = &KitchenSink::new_default().await.unwrap();
 
     println!("backtrace !<=0.1.8");
     println!("backtrace !=0.2.2");

@@ -70,8 +70,8 @@ impl<'a> CratePageRevDeps<'a> {
     pub async fn new(ver: &'a RichCrateVersion, kitchen_sink: &'a KitchenSink, _markup: &'a Renderer) -> CResult<CratePageRevDeps<'a>> {
         let all_deps_stats = kitchen_sink.index.deps_stats().await?;
         let own_name = &ver.short_name().to_ascii_lowercase();
-        let latest_stable_semver = &kitchen_sink.index.crate_highest_version(&own_name, true)?.version().parse()?;
-        let latest_unstable_semver = &kitchen_sink.index.crate_highest_version(&own_name, false)?.version().parse()?;
+        let latest_stable_semver = &kitchen_sink.index.crate_highest_version(own_name, true)?.version().parse()?;
+        let latest_unstable_semver = &kitchen_sink.index.crate_highest_version(own_name, false)?.version().parse()?;
         let stats = all_deps_stats.counts.get(own_name.as_str());
 
         let mut downloads_by_ver: Vec<_> = kitchen_sink.recent_downloads_by_version(ver.origin()).await?.into_iter().map(|(v, d)| (v.to_semver(), d)).collect();
@@ -91,7 +91,7 @@ impl<'a> CratePageRevDeps<'a> {
                 .unwrap_or_default();
 
                 let req = req.parse().unwrap_or_else(|_| VersionReq::any());
-                let matches_latest = req.matches(&latest_stable_semver) || req.matches(&latest_unstable_semver);
+                let matches_latest = req.matches(latest_stable_semver) || req.matches(latest_unstable_semver);
 
                 RevDepInf {
                     origin,

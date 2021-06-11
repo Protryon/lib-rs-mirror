@@ -1,16 +1,14 @@
-use std::sync::Arc;
 use crate::error::Error;
 use fetcher::Fetcher;
-use rusqlite;
+use std::sync::Arc;
+
 use rusqlite::types::ToSql;
 use rusqlite::Connection;
 use rusqlite::Error::SqliteFailure;
 use rusqlite::ErrorCode::DatabaseLocked;
-use serde;
-use serde_json;
+
 use brotli::BrotliCompress;
 use brotli::BrotliDecompress;
-
 
 use std::path::Path;
 use std::thread;
@@ -148,7 +146,7 @@ impl SimpleCache {
             match row {
                 Ok(row) => Ok(Some(row)),
                 Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-                Err(err) => Err(err)?,
+                Err(err) => Err(err.into()),
             }
         })
     }
@@ -183,7 +181,7 @@ impl SimpleCache {
     }
 
     pub(crate) fn deserialize_compressed<B: serde::de::DeserializeOwned>(mut data: &[u8]) -> Result<B, Error> {
-        let mut decomp = Vec::with_capacity(data.len()*2);
+        let mut decomp = Vec::with_capacity(data.len() * 2);
         BrotliDecompress(&mut data, &mut decomp)?;
         Self::deserialize(&decomp)
     }
@@ -195,7 +193,7 @@ impl SimpleCache {
     pub fn set(&self, key: (&str, &str), mut data_in: &[u8]) -> Result<(), Error> {
         let mut out;
         let data = if self.compress {
-            out = Vec::with_capacity(data_in.len()/2);
+            out = Vec::with_capacity(data_in.len() / 2);
             BrotliCompress(&mut data_in, &mut out, &Default::default())?;
             &out
         } else {

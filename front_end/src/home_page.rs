@@ -1,14 +1,14 @@
 #![allow(unused_imports)]
-use categories::CATEGORIES;
+use crate::Page;
 use categories::Category;
 use categories::CategoryMap;
-use crate::Page;
-use failure;
+use categories::CATEGORIES;
+
 use futures::prelude::*;
+use kitchen_sink::stopped;
 use kitchen_sink::ArcRichCrateVersion;
 use kitchen_sink::CrateAuthor;
 use kitchen_sink::KitchenSink;
-use kitchen_sink::stopped;
 use locale::Numeric;
 use rich_crate::Origin;
 use rich_crate::RichCrate;
@@ -19,9 +19,9 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::time::Instant;
 use tokio::time::timeout;
 use tokio::time::timeout_at;
+use tokio::time::Instant;
 
 /// Editorialize the category list a little
 const CATEGORY_RANK_ADJUST: [(&str, f64); 28] = [
@@ -175,7 +175,7 @@ impl<'a> HomePage<'a> {
                     top.into_iter()
                     .filter(|c| seen.insert(c.clone()))
                     .map(|c| async move {
-                        Ok::<_, failure::Error>(timeout_at(deadline, self.crates.rich_crate_version_async(&c)).await??)
+                        timeout_at(deadline, self.crates.rich_crate_version_async(&c)).await?
                     })).await;
 
                 for c in top_resolved {

@@ -288,7 +288,7 @@ fn handle_static_page(state: &ServerState, path: &str) -> Result<Option<HttpResp
     front_end::render_static_page(&mut page, path_capitalized, &Markup::Markdown(md), &state.markup)?;
     minify_html(&mut page);
 
-    mark_server_still_alive(&state);
+    mark_server_still_alive(state);
     Ok(Some(HttpResponse::Ok()
         .content_type("text/html;charset=UTF-8")
         .insert_header(("Cache-Control", "public, max-age=7200, stale-while-revalidate=604800, stale-if-error=86400"))
@@ -406,7 +406,7 @@ async fn handle_home(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let state: &AServerState = req.app_data().expect("appdata");
     let cache_file = state.page_cache_dir.join("_.html");
     Ok(serve_cached(
-        with_file_cache(&state, cache_file, 3600, {
+        with_file_cache(state, cache_file, 3600, {
             let state = state.clone();
             run_timeout("homepage", 300, async move {
                 let crates = state.crates.load();
@@ -457,8 +457,8 @@ async fn handle_git_crate(req: HttpRequest, slug: &'static str) -> Result<HttpRe
     let repo = inf.query("repo");
     let crate_name = inf.query("crate");
     debug!("{} crate {}/{}/{}", slug, owner, repo, crate_name);
-    if !is_alnum_dot(&owner) || !is_alnum_dot(&repo) || !is_alnum(&crate_name) {
-        return render_404_page(state, &crate_name, "git crate").await;
+    if !is_alnum_dot(owner) || !is_alnum_dot(repo) || !is_alnum(crate_name) {
+        return render_404_page(state, crate_name, "git crate").await;
     }
 
     let cache_file = state.page_cache_dir.join(format!("{},{},{},{}.html", slug, owner, repo, crate_name));
@@ -472,7 +472,7 @@ async fn handle_git_crate(req: HttpRequest, slug: &'static str) -> Result<HttpRe
         return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", url.into_owned())).finish());
     }
 
-    Ok(serve_cached(with_file_cache(&state, cache_file, 86400, {
+    Ok(serve_cached(with_file_cache(state, cache_file, 86400, {
         render_crate_page(state.clone(), origin)
     }).await?))
 }
@@ -482,7 +482,7 @@ fn get_origin_from_subpath(q: &actix_web::dev::Path<Url>) -> Option<Origin> {
     let mut parts = parts.splitn(4, '/');
     let first = parts.next()?;
     match parts.next() {
-        None => Origin::try_from_crates_io_name(&first),
+        None => Origin::try_from_crates_io_name(first),
         Some(owner) => {
             let repo = parts.next()?;
             let package = parts.next()?;
@@ -520,7 +520,7 @@ async fn handle_install(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let origin = if let Some(o) = get_origin_from_subpath(req.match_info()) {
         o
     } else {
-        return render_404_page(&state2, req.path().trim_start_matches("/install"), "crate").await;
+        return render_404_page(state2, req.path().trim_start_matches("/install"), "crate").await;
     };
 
     let state = state2.clone();
@@ -541,7 +541,7 @@ async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     debug!("author page for {:?}", login);
     let state: &AServerState = req.app_data().expect("appdata");
     let crates = state.crates.load();
-    let aut = match crates.author_by_login(&login).await {
+    let aut = match crates.author_by_login(login).await {
         Ok(aut) => aut,
         Err(_) => {
             return render_404_page(state, login, "user").await;
@@ -572,9 +572,9 @@ async fn handle_crate(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     debug!("crate page for {:?}", crate_name);
     let state: &AServerState = req.app_data().expect("appdata");
     let crates = state.crates.load();
-    let origin = match Origin::try_from_crates_io_name(&crate_name).filter(|o| crates.crate_exists(o)) {
+    let origin = match Origin::try_from_crates_io_name(crate_name).filter(|o| crates.crate_exists(o)) {
         Some(o) => o,
-        None => return render_404_page(state, &crate_name, "crate").await,
+        None => return render_404_page(state, crate_name, "crate").await,
     };
     let cache_file = state.page_cache_dir.join(format!("{}.html", crate_name));
     Ok(serve_cached(with_file_cache(state, cache_file, 600, {
@@ -587,9 +587,9 @@ async fn handle_crate_all_versions(req: HttpRequest) -> Result<HttpResponse, Ser
     debug!("allver for {:?}", crate_name);
     let state: &AServerState = req.app_data().expect("appdata");
     let crates = state.crates.load();
-    let origin = match Origin::try_from_crates_io_name(&crate_name).filter(|o| crates.crate_exists(o)) {
+    let origin = match Origin::try_from_crates_io_name(crate_name).filter(|o| crates.crate_exists(o)) {
         Some(o) => o,
-        None => return render_404_page(state, &crate_name, "crate").await,
+        None => return render_404_page(state, crate_name, "crate").await,
     };
     Ok(serve_cached(render_crate_all_versions(state.clone(), origin).await?))
 }
@@ -599,9 +599,9 @@ async fn handle_crate_reverse_dependencies(req: HttpRequest) -> Result<HttpRespo
     debug!("rev deps for {:?}", crate_name);
     let state: &AServerState = req.app_data().expect("appdata");
     let crates = state.crates.load();
-    let origin = match Origin::try_from_crates_io_name(&crate_name).filter(|o| crates.crate_exists(o)) {
+    let origin = match Origin::try_from_crates_io_name(crate_name).filter(|o| crates.crate_exists(o)) {
         Some(o) => o,
-        None => return render_404_page(state, &crate_name, "crate").await,
+        None => return render_404_page(state, crate_name, "crate").await,
     };
     Ok(serve_cached(render_crate_reverse_dependencies(state.clone(), origin).await?))
 }
@@ -611,9 +611,9 @@ async fn handle_crate_reviews(req: HttpRequest) -> Result<HttpResponse, ServerEr
     debug!("crev for {:?}", crate_name);
     let state: &AServerState = req.app_data().expect("appdata");
     let crates = state.crates.load();
-    let origin = match Origin::try_from_crates_io_name(&crate_name).filter(|o| crates.crate_exists(o)) {
+    let origin = match Origin::try_from_crates_io_name(crate_name).filter(|o| crates.crate_exists(o)) {
         Some(o) => o,
-        None => return render_404_page(state, &crate_name, "crate").await,
+        None => return render_404_page(state, crate_name, "crate").await,
     };
     let state = state.clone();
     Ok(serve_cached(
@@ -719,7 +719,7 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
         let state = state.clone();
         async move {
             let _s = tokio::time::timeout(Duration::from_secs(10), state.foreground_job.acquire()).await?;
-            Ok::<_, failure::Error>(generate.await?)
+            generate.await
         }}).await??;
     if let Err(e) = std::fs::write(&cache_file, &page) {
         error!("warning: Failed writing to {}: {}", cache_file.display(), e);

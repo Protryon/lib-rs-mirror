@@ -13,9 +13,7 @@ pub struct Creviews {
 impl Creviews {
     pub fn new() -> Result<Self, Error> {
         let local = local::Local::auto_create_or_open()?;
-        Ok(Self {
-            local,
-        })
+        Ok(Self { local })
     }
 
     pub fn update(&self) -> Result<(), Error> {
@@ -52,7 +50,7 @@ impl Creviews {
                 version: r.package.id.version.clone(),
                 thoroughness: review.thoroughness,
                 understanding: review.understanding,
-                rating: review.rating.clone(),
+                rating: review.rating,
                 comment_markdown: r.comment.clone(),
                 date: r.common.date,
                 issues,

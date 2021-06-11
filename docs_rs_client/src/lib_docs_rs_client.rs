@@ -1,6 +1,6 @@
-pub use simple_cache::Error;
 use fetcher::Fetcher;
 use serde_derive::*;
+pub use simple_cache::Error;
 use simple_cache::TempCacheJson;
 use std::path::Path;
 use std::sync::Arc;

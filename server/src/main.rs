@@ -385,7 +385,7 @@ async fn handle_category(req: HttpRequest, cat: &'static Category) -> Result<Htt
     Ok(serve_cached(
         with_file_cache(state, cache_file, 1800, {
             let state = state.clone();
-            run_timeout("catrender", 30, async move {
+            rt_run_timeout(&state.clone().rt, "catrender", 30, async move {
                 let mut page: Vec<u8> = Vec::with_capacity(150000);
                 front_end::render_category(&mut page, cat, &crates, &state.markup).await?;
                 minify_html(&mut page);
@@ -398,7 +398,6 @@ async fn handle_category(req: HttpRequest, cat: &'static Category) -> Result<Htt
 }
 
 async fn handle_home(req: HttpRequest) -> Result<HttpResponse, ServerError> {
-    debug!("home route");
     let query = req.query_string().trim_start_matches('?');
     if !query.is_empty() && query.find('=').is_none() {
         return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", format!("/search?q={}", query))).finish());

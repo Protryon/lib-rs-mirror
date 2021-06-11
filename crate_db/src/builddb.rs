@@ -214,24 +214,30 @@ impl BuildDb {
         let rustc_version = c.rustc_version;
         match c.compat {
             Compat::VerifiedWorks | Compat::ProbablyWorks => {
-                if t.oldest_ok.as_ref().map_or(true, |v| rustc_version < *v) {
+                if t.oldest_ok.map_or(true, |v| rustc_version < v) {
                     t.oldest_ok = Some(rustc_version);
                     if c.compat != Compat::ProbablyWorks {
                         t.oldest_ok_raw = Some(rustc_version);
                     }
                 }
-                else if t.newest_ok.as_ref().map_or(true, |v| rustc_version > *v) {
+                else if t.newest_ok.map_or(true, |v| rustc_version > v) {
                     t.newest_ok = Some(rustc_version);
                 }
             },
-            Compat::Incompatible | Compat::BrokenDeps => {
-                if t.newest_bad.as_ref().map_or(true, |v| rustc_version > *v) {
-                    t.newest_bad = Some(rustc_version);
-                    if c.compat != Compat::BrokenDeps {
-                        t.newest_bad_raw = Some(rustc_version);
-                    }
+            Compat::Incompatible => {
+                if t.newest_bad_raw.map_or(true, |v| rustc_version > v) {
+                    t.newest_bad_raw = Some(rustc_version);
                 }
             },
+            Compat::BrokenDeps => {
+                if t.newest_bad.map_or(true, |v| rustc_version > v) {
+                    t.newest_bad = Some(rustc_version);
+                }
+            },
+        }
+
+        if t.newest_bad.map_or(true, |v| v < t.newest_bad_raw.unwrap_or(0)) {
+            t.newest_bad_raw = t.newest_bad_raw;
         }
     }
 

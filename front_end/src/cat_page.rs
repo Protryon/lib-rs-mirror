@@ -9,6 +9,9 @@ use kitchen_sink::KitchenSink;
 use render_readme::Renderer;
 use rich_crate::RichCrateVersion;
 use std::collections::HashSet;
+use tokio::time::Instant;
+use std::time::Duration;
+use tokio::time::timeout_at;
 
 /// Data for category page template
 pub struct CatPage<'a> {
@@ -22,6 +25,8 @@ pub struct CatPage<'a> {
 
 impl<'a> CatPage<'a> {
     pub async fn new(cat: &'a Category, crates: &'a KitchenSink, markup: &'a Renderer) -> Result<CatPage<'a>, Error> {
+        let deadline = Instant::now() + Duration::from_secs(20);
+
         let (count, keywords, related) = futures::join!(
             crates.category_crate_count(&cat.slug),
             crates.top_keywords_in_category(cat),
@@ -34,10 +39,14 @@ impl<'a> CatPage<'a> {
             crates: futures::stream::iter(crates
                 .top_crates_in_category(&cat.slug).await?.iter().cloned())
                 .map(|o| async move {
-                    let c = match crates.rich_crate_version_async(&o).await {
-                        Ok(c) => c,
+                    let c = match timeout_at(deadline, crates.rich_crate_version_stale_is_ok(&o)).await {
+                        Ok(Ok(c)) => c,
                         Err(e) => {
-                            eprintln!("Skipping {:?} because {}", o, e);
+                            eprintln!("Skipping in cat {:?} because timed out {}", o, e);
+                            return None;
+                        },
+                        Ok(Err(e)) => {
+                            eprintln!("Skipping in cat {:?} because {}", o, e);
                             return None;
                         },
                     };

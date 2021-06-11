@@ -749,6 +749,14 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
     if findings.crates.is_empty() {
         return None;
     }
+
+    // this is slightly inaccurate, because we don't know if older deps would work
+    // but not marking it as failure makes builder retry the crate over and over again
+    let has_toplevel_crate_compat = findings.crates.iter().any(|c| c.1 == top_level_crate_name);
+    let some_deps_broken = findings.crates.iter().any(|c| c.0.is_none() && c.3 == Compat::Incompatible);
+    if !has_toplevel_crate_compat && some_deps_broken {
+        findings.crates.insert((None, top_level_crate_name.to_owned(), top_level_crate_ver.to_owned(), Compat::BrokenDeps));
+    }
     Some(findings)
 }
 

@@ -24,8 +24,8 @@ RUN rustup toolchain add 1.40.0
 RUN rustup toolchain add 1.44.0
 RUN rustup toolchain add 1.48.0
 RUN rustup toolchain list
-RUN cargo new lts-dummy; cd lts-dummy; cargo lts setup; echo 'itoa = "*"' >> Cargo.toml; cargo update;
 RUN cargo install libc --vers 99.9.9 || true # force index update
+# RUN cargo new lts-dummy; cd lts-dummy; cargo lts setup; echo 'itoa = "*"' >> Cargo.toml; cargo update;
 "##;
 
 const TEMP_JUNK_DIR: &str = "/var/tmp/crates_env";
@@ -78,7 +78,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("starting…");
     prepare_docker(&docker_root)?;
 
-    let (s, r) = crossbeam_channel::bounded::<Vec<_>>(15);
+    let (s, r) = crossbeam_channel::bounded::<Vec<_>>(25);
 
     let builds = std::thread::spawn(move || {
         let mut candidates: Vec<ToCheck> = Vec::new();
@@ -340,14 +340,14 @@ fn do_builds(docker_root: &Path, versions: &[(&'static str, Arc<str>, SemVer)]) 
             touch src/lib.rs
             printf > Cargo.toml '[package]\nname="_____"\nversion="0.0.0"\n[profile.dev]\ndebug=false\n[dependencies]\n%s = "=%s"\n' "$crate_name" "$libver";
             export CARGO_TARGET_DIR=/home/rustyuser/cargo_target/$rustver;
-            if (( RANDOM%5 == 0 )); then
-                mkdir .cargo
-                cp /home/rustyuser/lts-dummy/.cargo/config .cargo/
-                RUSTC_BOOTSTRAP=1 timeout 40 cargo +$rustver -Z minimal-versions generate-lockfile || timeout 40 cargo +$rustver fetch
+            if (( RANDOM%25 == 0 )); then
+                # mkdir .cargo
+                # cp /home/rustyuser/lts-dummy/.cargo/config .cargo/
+                RUSTC_BOOTSTRAP=1 timeout 20 cargo +$rustver -Z minimal-versions generate-lockfile || timeout 40 cargo +$rustver fetch
             else
-                RUSTC_BOOTSTRAP=1 timeout 40 cargo +$rustver -Z no-index-update fetch || timeout 40 cargo +$rustver fetch;
+                RUSTC_BOOTSTRAP=1 timeout 20 cargo +$rustver -Z no-index-update fetch || timeout 40 cargo +$rustver fetch;
             fi
-            timeout 30 nice cargo +$rustver check -j2 --locked --message-format=json;
+            timeout 60 nice cargo +$rustver check -j2 --locked --message-format=json;
         }}
         swapoff -a || true
         for job in {jobs}; do

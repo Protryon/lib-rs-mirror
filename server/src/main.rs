@@ -227,8 +227,8 @@ async fn run_server(rt: Handle) -> Result<(), failure::Error> {
             .route("/users/{author}", web::get().to(handle_author_redirect))
             .route("/install/{crate:.*}", web::get().to(handle_install))
             .route("/compat/{crate:.*}", web::get().to(handle_compat))
-            .route("/gh/{owner}/{repo}/{crate}", web::get().to(handle_github_crate))
-            .route("/lab/{owner}/{repo}/{crate}", web::get().to(handle_gitlab_crate))
+            .route("/{host}/{owner}/{repo}/{crate}", web::get().to(handle_repo_crate))
+            .route("/{host}/{owner}/{repo}/{crate}/versions", web::get().to(handle_repo_crate_all_versions))
             .route("/atom.xml", web::get().to(handle_feed))
             .route("/sitemap.xml", web::get().to(handle_sitemap))
             .service(actix_files::Files::new("/", &public_document_root))
@@ -421,13 +421,6 @@ async fn handle_home(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     ))
 }
 
-async fn handle_github_crate(req: HttpRequest) -> Result<HttpResponse, ServerError> {
-    handle_git_crate(req, "gh").await
-}
-async fn handle_gitlab_crate(req: HttpRequest) -> Result<HttpResponse, ServerError> {
-    handle_git_crate(req, "lab").await
-}
-
 async fn handle_redirect(req: HttpRequest) -> HttpResponse {
     let inf = req.match_info();
     let rest = inf.query("rest");
@@ -450,31 +443,43 @@ async fn handle_game_redirect(_: HttpRequest) -> HttpResponse {
     HttpResponse::PermanentRedirect().insert_header(("Location", "/game-development")).body("")
 }
 
-async fn handle_git_crate(req: HttpRequest, slug: &'static str) -> Result<HttpResponse, ServerError> {
-    let inf = req.match_info();
+async fn handle_repo_crate(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let state: &AServerState = req.app_data().expect("appdata");
-    let owner = inf.query("owner");
-    let repo = inf.query("repo");
-    let crate_name = inf.query("crate");
-    debug!("{} crate {}/{}/{}", slug, owner, repo, crate_name);
-    if !is_alnum_dot(owner) || !is_alnum_dot(repo) || !is_alnum(crate_name) {
-        return render_404_page(state, crate_name, "git crate").await;
-    }
-
-    let cache_file = state.page_cache_dir.join(format!("{},{},{},{}.html", slug, owner, repo, crate_name));
-    let origin = match slug {
-        "gh" => Origin::from_github(SimpleRepo::new(owner, repo), crate_name),
-        _ => Origin::from_gitlab(SimpleRepo::new(owner, repo), crate_name),
+    let (origin, cache_file_name) = match get_origin_from_req_match(&req) {
+        Ok(res) => res,
+        Err(crate_name) => return render_404_page(state, crate_name, "git crate").await,
     };
+
     if !state.crates.load().crate_exists(&origin) {
         let (repo, _) = origin.into_repo().expect("repohost");
         let url = repo.canonical_http_url("").expect("repohost");
         return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", url.into_owned())).finish());
     }
 
+    let cache_file = state.page_cache_dir.join(cache_file_name);
     Ok(serve_cached(with_file_cache(state, cache_file, 86400, {
         render_crate_page(state.clone(), origin)
     }).await?))
+}
+
+fn get_origin_from_req_match(req: &HttpRequest) -> Result<(Origin, String), &str> {
+    let inf = req.match_info();
+    let slug = inf.query("host");
+    let owner = inf.query("owner");
+    let repo = inf.query("repo");
+    let crate_name = inf.query("crate");
+    debug!("{} crate {}/{}/{}", slug, owner, repo, crate_name);
+    if !is_alnum_dot(owner) || !is_alnum_dot(repo) || !is_alnum(crate_name) {
+        return Err(crate_name);
+    }
+    let cache_file_name = format!("{},{},{},{}.html", slug, owner, repo, crate_name);
+
+    let origin = match slug {
+        "gh" => Origin::from_github(SimpleRepo::new(owner, repo), crate_name),
+        "lab" => Origin::from_gitlab(SimpleRepo::new(owner, repo), crate_name),
+        _ => return Err(crate_name),
+    };
+    Ok((origin, cache_file_name))
 }
 
 fn get_origin_from_subpath(q: &actix_web::dev::Path<Url>) -> Option<Origin> {
@@ -582,6 +587,17 @@ async fn handle_crate(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     }).await?))
 }
 
+
+async fn handle_repo_crate_all_versions(req: HttpRequest) -> Result<HttpResponse, ServerError> {
+    let state: &AServerState = req.app_data().expect("appdata");
+    let (origin, _) = match get_origin_from_req_match(&req) {
+        Ok(res) => res,
+        Err(crate_name) => return render_404_page(state, crate_name, "git crate").await,
+    };
+
+    Ok(serve_cached(render_crate_all_versions(state.clone(), origin).await?))
+}
+
 async fn handle_crate_all_versions(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let crate_name = req.match_info().query("crate");
     debug!("allver for {:?}", crate_name);
@@ -589,7 +605,7 @@ async fn handle_crate_all_versions(req: HttpRequest) -> Result<HttpResponse, Ser
     let crates = state.crates.load();
     let origin = match Origin::try_from_crates_io_name(crate_name).filter(|o| crates.crate_exists(o)) {
         Some(o) => o,
-        None => return render_404_page(state, crate_name, "crate").await,
+        None => return render_404_page(state, crate_name, "git crate").await,
     };
     Ok(serve_cached(render_crate_all_versions(state.clone(), origin).await?))
 }

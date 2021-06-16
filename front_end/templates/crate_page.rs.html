@@ -161,8 +161,8 @@
             <section id="versions">
               @if let Some(parts) = c.version_stats_summary() {
                 <h3>
-                  @if c.top_versions.len() > 1 {
-                    <a href="@url.all_versions(c.ver.origin())">@parts.0</a>
+                  @if let Some(verurl) = url.all_versions(c.ver.origin()) {
+                    <a href="@verurl">@parts.0</a>
                   } else {
                     @parts.0
                   }

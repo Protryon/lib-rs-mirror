@@ -62,14 +62,13 @@ impl Urler {
         }
     }
 
-    pub fn all_versions(&self, origin: &Origin) -> String {
+    pub fn all_versions(&self, origin: &Origin) -> Option<String> {
         match origin {
             Origin::CratesIo(lowercase_name) => {
-                format!("/crates/{}/versions", encode(lowercase_name))
+                Some(format!("/crates/{}/versions", encode(lowercase_name)))
             }
             Origin::GitHub { repo, package } | Origin::GitLab { repo, package } => {
-                let host = if let Origin::GitHub { .. } = origin { "gh" } else { "lab" };
-                format!("/crates/{}/{}/{}/{}/versions", host, encode(&repo.owner), encode(&repo.repo), encode(package))
+                None
             }
         }
     }

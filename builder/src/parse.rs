@@ -5,7 +5,7 @@ use regex::Regex;
 use serde_derive::*;
 use std::collections::HashSet;
 
-pub const DIVIDER: &str = "---XBdt8MQTMWYwcSsH---";
+pub const DIVIDER: &str = "---XBdt8MQTMWYwcSsHz---";
 
 
 #[derive(Deserialize)]
@@ -796,17 +796,17 @@ fn parse_test() {
     let out = r##"
 
 garbage
----XBdt8MQTMWYwcSsH---
+---XBdt8MQTMWYwcSsHz---
 CHECKING 1.37.0 wat ever
 
 {"reason":"compiler-artifact","package_id":"proc_vector2d 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)","target":{"kind":["proc-macro"],"crate_types":["proc-macro"],"name":"proc_vector2d","src_path":"/usr/local/cargo/registry/src/-18c1fa267ed022ff/proc_vector2d-1.0.2/src/lib.rs","edition":"2018","doctest":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/tmp/cargo-target-dir/debug/deps/libproc_vector2d-a0e1c737778cdd0d.so"],"executable":null,"fresh":false}
 {"reason":"compiler-artifact","package_id":"vector2d 2.2.0 (path+file:///crate)","target":{"kind":["lib"],"crate_types":["lib"],"name":"vector2d","src_path":"/crate/src/lib.rs","edition":"2018","doctest":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/tmp/cargo-target-dir/debug/deps/libvector2d-f9ac6cbd40409fbe.rmeta"],"executable":null,"fresh":false}
----XBdt8MQTMWYwcSsH---
+---XBdt8MQTMWYwcSsHz---
 CHECKING 1.34.2 wat ever
 
 {"reason":"compiler-artifact","package_id":"proc_vector2d 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)","target":{"kind":["proc-macro"],"crate_types":["proc-macro"],"name":"proc_vector2d","src_path":"/usr/local/cargo/registry/src/-18c1fa267ed022ff/proc_vector2d-1.0.2/src/lib.rs","edition":"2018"},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/tmp/cargo-target-dir/debug/deps/libproc_vector2d-9470d66afa730e34.so"],"executable":null,"fresh":false}
 {"reason":"compiler-artifact","package_id":"vector2d 2.2.0 (path+file:///crate)","target":{"kind":["lib"],"crate_types":["lib"],"name":"vector2d","src_path":"/crate/src/lib.rs","edition":"2018"},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/tmp/cargo-target-dir/debug/deps/libvector2d-59c2022ebc0120a6.rmeta"],"executable":null,"fresh":false}
----XBdt8MQTMWYwcSsH---
+---XBdt8MQTMWYwcSsHz---
 CHECKING 1.24.1 toplevelcrate 1.0.1-testcrate
 
 {"message":{"children":[],"code":null,"level":"error","message":"function-like proc macros are currently unstable (see issue #38356)","rendered":"error: function-like proc macros are currently unstable (see issue #38356)\n --> /usr/local/cargo/registry/src/-18c1fa267ed022ff/proc_vector2d-1.0.2/src/lib.rs:4:1\n  |\n4 | #[proc_macro]\n  | ^^^^^^^^^^^^^\n\n","spans":[{"byte_end":68,"byte_start":55,"column_end":14,"column_start":1,"expansion":null,"file_name":"/usr/local/cargo/registry/src/-18c1fa267ed022ff/proc_vector2d-1.0.2/src/lib.rs","is_primary":true,"label":null,"line_end":4,"line_start":4,"suggested_replacement":null,"text":[{"highlight_end":14,"highlight_start":1,"text":"#[proc_macro]"}]}]},"package_id":"proc_vector2d 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)","reason":"compiler-message","target":{"crate_types":["proc-macro"],"kind":["proc-macro"],"name":"proc_vector2d","src_path":"/usr/local/cargo/registry/src/-18c1fa267ed022ff/proc_vector2d-1.0.2/src/lib.rs"}}
@@ -816,7 +816,7 @@ CHECKING 1.24.1 toplevelcrate 1.0.1-testcrate
 "##;
 
     let err = r##"WARNING: Your kernel does not support swap limit capabilities or the cgroup is not mounted. Memory limited without swap.
----XBdt8MQTMWYwcSsH---
+---XBdt8MQTMWYwcSsHz---
 + rustup show
 + cargo check --locked --message-format=json
    Compiling proc_vector2d v1.0.2
@@ -826,7 +826,7 @@ CHECKING 1.24.1 toplevelcrate 1.0.1-testcrate
 real    0m1.413s
 user    0m0.880s
 sys 0m0.376s
----XBdt8MQTMWYwcSsH---
+---XBdt8MQTMWYwcSsHz---
 + rustup default 1.34.2
 info: using existing install for '1.34.2-x86_64-unknown-linux-gnu'
 info: default toolchain set to '1.34.2-x86_64-unknown-linux-gnu'
@@ -839,7 +839,7 @@ info: default toolchain set to '1.34.2-x86_64-unknown-linux-gnu'
 real    0m1.660s
 user    0m1.060s
 sys 0m0.412s
----XBdt8MQTMWYwcSsH---
+---XBdt8MQTMWYwcSsHz---
 + rustup default 1.24.1
 info: using existing install for '1.24.1-x86_64-unknown-linux-gnu'
 info: default toolchain set to '1.24.1-x86_64-unknown-linux-gnu'

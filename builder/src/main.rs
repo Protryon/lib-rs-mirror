@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use log::debug;
+use log::info;
 use parking_lot::Mutex;
 use rand::Rng;
 use rand::seq::SliceRandom;
@@ -62,7 +63,7 @@ struct ToCheck {
 fn out_of_disk_space() -> bool {
     match fs2::available_space(TEMP_JUNK_DIR) {
         Ok(size) => {
-            log::info!("free disk space: {}MB", size / 1_000_000);
+            info!("free disk space: {}MB", size / 1_000_000);
             size < 5_000_000_000 // cargo easily chews gigabytes of disk space per build
         },
         Err(e) => {
@@ -138,10 +139,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 candidates.drain(..candidates.len()/2);
             }
 
-            if let Err(e) = run_and_analyze_versions(&db, &docker_root, &versions) {
-                eprintln!("•• {}: {}", versions[0].1, e);
+            if let Err(e) = run_and_analyze_versions(&db, &docker_root, versions) {
+                eprintln!("•• {}", e);
             }
-
         }
     });
 
@@ -260,19 +260,30 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
 }
 
 
-fn run_and_analyze_versions(db: &BuildDb, docker_root: &Path, versions: &[(&'static str, Arc<str>, SemVer)]) -> Result<(), Box<dyn std::error::Error>> {
+fn run_and_analyze_versions(db: &BuildDb, docker_root: &Path, mut versions: Vec<(&'static str, Arc<str>, SemVer)>) -> Result<(), Box<dyn std::error::Error>> {
+    versions.retain(|(_r, name, ver)| {
+        let origin = Origin::from_crates_io_name(&name);
+        if let Ok(existing_info) = db.get_compat_raw(&origin) {
+            if let Some(res) = existing_info.iter().find(|inf| &inf.crate_version == ver) {
+                info!("already built {}@{}; skipping {:?}", name, ver, res);
+                return false;
+            }
+        }
+        true
+    });
     if versions.is_empty() {
         return Ok(());
     }
 
-    let (stdout, stderr) = do_builds(docker_root, versions)?;
+    let (stdout, stderr) = do_builds(docker_root, &versions)?;
 
     let mut to_set = BTreeMap::new();
     for f in parse_analyses(&stdout, &stderr) {
         if let Some(rustc_version) = f.rustc_version {
             for (rustc_override, name, version, compat) in f.crates {
+                let origin = Origin::from_crates_io_name(&name);
                 let rustc_version = rustc_override.as_deref().unwrap_or(&rustc_version);
-                to_set.entry((rustc_version.to_string(), Origin::from_crates_io_name(&name), version))
+                to_set.entry((rustc_version.to_string(), origin, version))
                     .and_modify(|c| {
                         let replace = match (*c, compat) {
                             (Compat::VerifiedWorks, _) => false,
@@ -354,7 +365,9 @@ fn do_builds(docker_root: &Path, versions: &[(&'static str, Arc<str>, SemVer)]) 
             local rustver="$1"
             local crate_name="$2"
             local libver="$3"
-            echo "CHECKING $rustver $crate_name $libver"
+            local stdoutfile="$4"
+            local stderrfile="$5"
+            echo >"$stdoutfile" "CHECKING $rustver $crate_name $libver"
             mkdir -p "crate-$crate_name-$libver/src";
             cd "crate-$crate_name-$libver";
             touch src/lib.rs
@@ -367,20 +380,20 @@ fn do_builds(docker_root: &Path, versions: &[(&'static str, Arc<str>, SemVer)]) 
             else
                 RUSTC_BOOTSTRAP=1 timeout 20 cargo +$rustver -Z no-index-update fetch || timeout 40 cargo +$rustver fetch;
             fi
-            timeout 60 nice cargo +$rustver check -j2 --locked --message-format=json;
+            timeout 60 nice cargo +$rustver check -j2 --locked --message-format=json >>"$stdoutfile" 2>"$stderrfile";
         }}
         swapoff -a || true
         for job in {jobs}; do
             (
-                check_crate_with_rustc $job > /tmp/"output-$job" 2>/tmp/"outputerr-$job" && echo "# R.$job done OK" || echo "# R.$job failed"
+                check_crate_with_rustc $job "/tmp/output-$job" "/tmp/outputerr-$job" && echo "# R.$job done OK" || echo "# R.$job failed"
             ) &
         done
         wait
         for job in {jobs}; do
             echo "{divider}"
-            cat /tmp/"output-$job";
+            cat "/tmp/output-$job";
             echo >&2 "{divider}"
-            cat >&2 /tmp/"outputerr-$job";
+            cat >&2 "/tmp/outputerr-$job";
             cleanup $job
         done
     "##,

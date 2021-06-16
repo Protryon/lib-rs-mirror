@@ -1,7 +1,9 @@
+use std::collections::BTreeMap;
+use log::debug;
 use parking_lot::Mutex;
 use rand::Rng;
 use rand::seq::SliceRandom;
-use std::collections::BTreeSet;
+
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Write;
@@ -22,7 +24,9 @@ RUN rustup toolchain add 1.32.0
 RUN rustup toolchain add 1.36.0
 RUN rustup toolchain add 1.40.0
 RUN rustup toolchain add 1.44.0
-RUN rustup toolchain add 1.48.0
+RUN rustup toolchain add 1.49.0
+RUN rustup toolchain add 1.50.0
+RUN rustup toolchain add 1.51.0
 RUN rustup toolchain list
 RUN cargo install libc --vers 99.9.9 || true # force index update
 # RUN cargo new lts-dummy; cd lts-dummy; cargo lts setup; echo 'itoa = "*"' >> Cargo.toml; cargo update;
@@ -30,12 +34,11 @@ RUN cargo install libc --vers 99.9.9 || true # force index update
 
 const TEMP_JUNK_DIR: &str = "/var/tmp/crates_env";
 
-const RUST_VERSIONS: [&str; 6] = [
-    "1.32.0",
-    "1.36.0",
-    "1.40.0",
+const RUST_VERSIONS: [&str; 5] = [
     "1.44.0",
-    "1.48.0",
+    "1.49.0",
+    "1.50.0",
+    "1.51.0",
     "1.52.0",
 ];
 
@@ -96,7 +99,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             // biggest gap, then latest ver; best at the end, because pops
-            candidates.sort_by(|a,b| a.score.cmp(&b.score).then(a.ver.cmp(&b.ver)));
+            candidates.sort_unstable_by(|a,b| a.score.cmp(&b.score).then(a.ver.cmp(&b.ver)));
 
             let mut available_rust_versions = RUST_VERSIONS.to_vec();
             available_rust_versions.shuffle(&mut rng);
@@ -118,7 +121,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     minor > min_ver && minor < max_ver
                 });
                 let rustc_idx = if x.rustc.newest_bad.is_none() {
-                    possible_rusts.max_by_key(|&(_, _, minor)| minor)? // avoid building 2018 with oldest compiler
+                    let v = possible_rusts.max_by_key(|&(_, _, minor)| minor)?; // avoid building 2018 with oldest compiler
+                    debug!("{}-{} never built, trying latest R.{}", x.crate_name, x.ver, v.1);
+                    v
                 } else {
                     possible_rusts.min_by_key(|&(_, _, minor)| ((minor as i32) - best_ver as i32).abs())?
                 }.0;
@@ -262,17 +267,32 @@ fn run_and_analyze_versions(db: &BuildDb, docker_root: &Path, versions: &[(&'sta
 
     let (stdout, stderr) = do_builds(docker_root, versions)?;
 
-    let mut to_set = BTreeSet::new();
+    let mut to_set = BTreeMap::new();
     for f in parse_analyses(&stdout, &stderr) {
         if let Some(rustc_version) = f.rustc_version {
             for (rustc_override, name, version, compat) in f.crates {
                 let rustc_version = rustc_override.as_deref().unwrap_or(&rustc_version);
-                to_set.insert((compat, rustc_version.to_string(), Origin::from_crates_io_name(&name), version));
+                to_set.entry((rustc_version.to_string(), Origin::from_crates_io_name(&name), version))
+                    .and_modify(|c| {
+                        let replace = match (*c, compat) {
+                            (Compat::VerifiedWorks, _) => false,
+                            (_, Compat::VerifiedWorks) => true,
+                            (Compat::Incompatible, _) => false,
+                            (_, Compat::Incompatible) => true,
+                            (Compat::ProbablyWorks, _) => false,
+                            (_, Compat::ProbablyWorks) => true,
+                            _ => false,
+                        };
+                        if replace {
+                            *c = compat;
+                        }
+                    })
+                    .or_insert(compat);
             }
         }
     }
 
-    let tmp = to_set.iter().map(|(c, rv, o, cv)| {
+    let tmp = to_set.iter().map(|((rv, o, cv), c)| {
         eprintln!("https://lib.rs/compat/{}#{} R.{}={:?}", o.short_crate_name(), cv, rv, c);
         (o, cv.as_str(), rv.as_str(), *c)
     }).collect::<Vec<(&Origin, &str, &str, Compat)>>();

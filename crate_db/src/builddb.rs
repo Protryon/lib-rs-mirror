@@ -6,6 +6,7 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::path::Path;
+use log::debug;
 
 pub struct BuildDb {
     pub(crate) conn: Mutex<Connection>,
@@ -86,14 +87,6 @@ impl BuildDb {
                 rustc_version TEXT NOT NULL,
                 compat TEXT NOT NULL
             );
-            CREATE TABLE IF NOT EXISTS raw_builds (
-                origin TEXT NOT NULL,
-                version TEXT NOT NULL,
-                tool TEXT NOT NULL,
-                stdout TEXT NOT NULL,
-                stderr TEXT NOT NULL
-            );
-            CREATE UNIQUE INDEX IF NOT EXISTS raw_builds_ver on raw_builds(origin, version, tool);
             CREATE UNIQUE INDEX IF NOT EXISTS build_results_ver on build_results(origin, version, rustc_version);
             ")?;
         Ok(Self {
@@ -119,9 +112,15 @@ impl BuildDb {
             Self::append_compat(&mut compat, Self::compat_row(row)?);
         }
 
+        let mut any_version_has_built = false;
+
         // some crates used 2018 edition without using 2018 features,
         // allowing very old edition-unaware Rust to compile it.
         for v in compat.values_mut() {
+            if v.oldest_ok.is_some() {
+                any_version_has_built = true;
+            }
+
             if let (Some(oldest_ok), Some(newest_bad)) = (v.oldest_ok, v.newest_bad) {
                 if oldest_ok <= newest_bad {
                     if oldest_ok < 29 {
@@ -132,11 +131,16 @@ impl BuildDb {
                 }
             }
         }
-        // Remove broken data
-        for c in compat.values_mut() {
-            // if it never built, it may be garbage data
-            if c.oldest_ok.is_none() && c.newest_bad.is_some() {
-                c.newest_bad = None;
+
+        if !any_version_has_built {
+            // Remove broken data
+            for c in compat.values_mut() {
+                // if it never built, it may be garbage data
+                // but keep deps broken info to help the builder narrow target ranges
+                if c.oldest_ok.is_none() && c.newest_bad.is_some() {
+                    debug!("{:?} never built; so ignoring failures ({:?})", origin, c.newest_bad);
+                    c.newest_bad = None;
+                }
             }
         }
         Ok(compat)
@@ -323,24 +327,5 @@ impl BuildDb {
 
     pub fn set_compat(&self, origin: &Origin, ver: &str, rustc_version: &str, compat: Compat) -> Result<()> {
         self.set_compat_multi(&[(origin, ver, rustc_version, compat)])
-    }
-
-    pub fn set_raw_build_info(&self, origin: &Origin, ver: &str, tool: &str, stdout: &str, stderr: &str) -> Result<()> {
-        let conn = self.conn.lock();
-        let mut ins = conn.prepare_cached(r"INSERT OR REPLACE INTO raw_builds(origin, version, tool, stdout, stderr) VALUES(?1, ?2, ?3, ?4, ?5)")?;
-        let origin_str = origin.to_str();
-        ins.execute(&[origin_str.as_str(), ver, tool, stdout, stderr])?;
-        Ok(())
-    }
-
-    /// tool, stdout, stderr
-    pub fn get_raw_build_info(&self, origin: &Origin, ver: &str) -> Result<Vec<(String, String, String)>> {
-        let conn = self.conn.lock();
-        let mut get = conn.prepare_cached(r"SELECT tool, stdout, stderr FROM raw_builds WHERE origin = ?1 AND version = ?2")?;
-        let origin_str = origin.to_str();
-        let res = get.query_map(&[origin_str.as_str(), ver], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
-        })?;
-        res.collect::<Result<Vec<(String, String, String)>>>()
     }
 }

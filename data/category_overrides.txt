@@ -38,6 +38,7 @@ anitomy-sys: parser-implementations
 anitomy: parser-implementations
 anybar_rs: os::macos-apis
 aocl: command-line-utilities
+apple-wallet-passes: os::macos-apis
 apply_attr: rust-patterns
 approvals: development-tools::testing
 apt-cache: os::unix-apis
@@ -208,6 +209,8 @@ codenano: science
 codespan-lsp: encoding
 codespan-reporting: command-line-interface
 codice_fiscale: parser-implementations
+coins-bip32: cryptography::cryptocurrencies
+coins-core: cryptography::cryptocurrencies
 collectd-plugin: os
 collider: science::math, game-development
 collisions: algorithms
@@ -224,6 +227,7 @@ commoncrypto-sys: os::macos-apis
 commoncrypto: os::macos-apis, cryptography
 compile-time-run: development-tools::build-tools
 compose_yml: development-tools
+concordium-std: cryptography::cryptocurrencies
 concurrent-hashmap: concurrency, data-structures
 conllx: parser-implementations
 console: command-line-interface
@@ -302,6 +306,7 @@ dependent_ghost: rust-patterns
 deribit: web-programming
 derp: parser-implementations
 derpy: development-tools
+descriptor-wallet: cryptography::cryptocurrencies
 destruct: rust-patterns
 deterministic-zip: compression
 devbox-build: development-tools::build-tools
@@ -417,6 +422,8 @@ exonum: cryptography::cryptocurrencies
 extfg-sigma: encoding
 extrablatt: parser-implementations, web-programming
 extract-frontmatter: parser-implementations, web-programming
+fabric-support: cryptography::cryptocurrencies
+fabric-system: cryptography::cryptocurrencies
 factom: web-programming
 failsafe: rust-patterns, asynchronous
 failure: rust-patterns
@@ -591,6 +598,7 @@ haskell_bits: rust-patterns
 hdf5: data-structures
 hdlc: network-programming
 hdwallet-bitcoin: cryptography::cryptocurrencies
+hdwallet: cryptography::cryptocurrencies
 heliometer: emulators
 hematite_server: games
 hesoyam_core: databases
@@ -636,6 +644,7 @@ image-interlacer: multimedia::images, command-line-utilities
 imap-proto: email
 imdb-index: web-programming
 imdb: web-programming
+img_hash: multimedia::images
 imperator-save: game-development
 impl-codec: cryptography::cryptocurrencies
 indicatif: command-line-interface
@@ -755,19 +764,24 @@ libnotcurses-sys: command-line-interface
 librdkafka-sys: asynchronous
 libreddit: web-programming
 librespot-core: multimedia::audio
+librgb: cryptography::cryptocurrencies
 librsyncr: network-programming
 libsbc-sys: hardware-support
 libswe-sys: science
 libtimew: parser-implementations
 license-exprs: parser-implementations
 ligen-core: development-tools
+lightning-net-tokio: cryptography::cryptocurrencies
 lightning: cryptography::cryptocurrencies
+lightning_encoding: cryptography::cryptocurrencies
 lightspeed_core: web-programming
 line: text-editors
 line_drawing: game-development, algorithms
 link-ippcore: hardware-support
 link-ippi: hardware-support
 llvm-passgen: development-tools
+lnp_node: cryptography::cryptocurrencies
+lnpbp: cryptography::cryptocurrencies
 loc: text-processing
 loc: text-processing, command-line-utilities
 locationsharing: science, web-programming
@@ -818,6 +832,7 @@ mathematica-notebook-filter: science::math, text-processing, command-line-utilit
 matrix_bot_api: network-programming
 matrixmultiply: science::math
 matter: parser-implementations, web-programming
+max-lang: cryptography::cryptocurrencies
 mdbook-epub: text-processing
 mdtoc: text-processing
 mediawiki: web-programming
@@ -926,6 +941,8 @@ nite2-sys: science::machine-learning
 nix-db: databases, os::unix-apis
 nloq: parser-implementations
 nmea-parser: parser-implementations, science
+noble-balances: cryptography::cryptocurrencies
+noble-elections-phragmen: cryptography::cryptocurrencies
 nokiahealth: databases
 nom-bibtex: parser-implementations
 nom_pem: parser-implementations, cryptography
@@ -1051,6 +1068,9 @@ preftool-env: config
 pretty: text-processing, command-line-interface
 print_perf: development-tools::profiling
 printpdf: text-processing
+pro_lang: cryptography::cryptocurrencies
+pro_lang_ir: cryptography::cryptocurrencies
+pro_lang_macro: cryptography::cryptocurrencies
 proc-concat-bytes: data-structures, rust-patterns
 proc_use: rust-patterns
 process-memory-reader: development-tools::debugging
@@ -1139,6 +1159,9 @@ rfc2396: web-programming
 rfc6570-level-2: parser-implementations, web-programming
 rfind_url: parser-implementations
 rg3d-core: rendering::graphics-api, game-development
+rgb-core: cryptography::cryptocurrencies
+rgb23: cryptography::cryptocurrencies
+rgb_node: cryptography::cryptocurrencies
 rgraph: concurrency
 rhq-core: development-tools
 richter: games
@@ -1385,6 +1408,9 @@ terminated: development-tools::ffi, no-std
 termplay: multimedia::images, multimedia::video
 termplay: multimedia::video, command-line-utilities
 termtpl: template-engines, command-line-interface
+tet-core: cryptography::cryptocurrencies
+tetcore-std: cryptography::cryptocurrencies
+tetsy-scale-codec: cryptography::cryptocurrencies
 text_io: text-processing
 tfio: database-implementations
 tfio: database-implementations, filesystem
@@ -1409,6 +1435,8 @@ toast: development-tools
 toks: parser-implementations, web-programming
 toml-parse: parser-implementations
 torrent_search: parser-implementations, network-programming
+tp-authorship: cryptography::cryptocurrencies
+tp-runtime: cryptography::cryptocurrencies
 trace-time: development-tools::profiling
 trackable: development-tools::debugging
 tracy-client-sys: development-tools::profiling

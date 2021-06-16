@@ -144,20 +144,13 @@ github:google/opensk/libtock_drivers
 github:google/opensk/nrf52840_dongle_dfu
 github:google/opensk/nrf52840_mdk_dfu
 github:google/rust-shell/shell
-github:graphprotocol/graph-node/graph-graphql
-github:graphprotocol/graph-node/graph-store-postgres
 github:greshake/i3status-rust/i3status-rs
 github:guywaldman/ravro/ravro
 github:habitat-sh/habitat/hab
 github:habitat-sh/habitat/habitat-launcher
 github:habitat-sh/habitat/habitat_api_client
 github:henninglive/boids-rs/boids
-github:holochain/holochain-rust/holochain
-github:holochain/holochain-rust/holochain_common
 github:huggingface/tokenizers/tokenizers-python
-github:hyperledger/indy-sdk/indy-cli
-github:hyperledger/indy-sdk/libindy
-github:hyperledger/indy-sdk/libvcx
 github:iamsix/oxidenes/oxidenes
 github:icepuma/rust-action/rust-action
 github:imazen/imageflow/imageflow_core
@@ -166,12 +159,6 @@ github:imjacobclark/herd/herd
 github:indygreg/pyoxidizer/tugger-apple-codesign
 github:influxdata/influxdb_iox/influxdb2_client
 github:influxdata/influxdb_iox/influxdb_iox
-github:input-output-hk/cardano-cli/cardano-cli
-github:input-output-hk/jormungandr/jcli
-github:input-output-hk/jormungandr/jormungandr
-github:input-output-hk/rust-cardano/cardano
-github:input-output-hk/rust-cardano/cardano-c
-github:input-output-hk/rust-cardano/cardano-storage
 github:intecture/api/intecture_api
 github:intecture/api/intecture_bindings
 github:intel/cloud-hypervisor/cloud-hypervisor
@@ -182,8 +169,6 @@ github:jharrilim/pong-amethyst/pong-amethyst
 github:joaoh82/rust_sqlite/rust_sqlite
 github:johalun/echo/module
 github:joyent/rust-cueball/cueball
-github:joystream/substrate-runtime-joystream/joystream-node-runtime
-github:joystream/substrate-runtime-joystream/joystream-node-runtime-wasm
 github:jussiniinikoski/wasm-pdf/wasm-pdf
 github:katharostech/arsenal/arsenal_blender_core
 github:katharostech/arsenal/arsenal_runtime
@@ -212,8 +197,6 @@ github:librespot-org/librespot/librespot
 github:librespot-org/librespot/librespot-audio
 github:librespot-org/librespot/librespot-connect
 github:lifthrasiir/angolmois-rust/angolmois
-github:limeth/ethaddrgen/ethaddrgen
-github:limeth/euclider/euclider
 github:linebender/piet-gpu/piet-gpu
 github:linebender/piet-gpu/piet-gpu-derive
 github:linebender/piet-gpu/piet-gpu-hal
@@ -409,7 +392,6 @@ github:schulke-214/connect-four/connect-four
 github:schulke-214/rsnake/rsnake
 github:scipr-lab/zexe/dpc
 github:scipr-lab/zexe/groth16
-github:scs/substrate-api-client/substrate-api-client
 github:sebbbi/rust_test/rust_test
 github:seppo0010/rsedis/rsedis
 github:sequal32/yourcontrols/sharedcockpit
@@ -432,7 +414,6 @@ github:servo/pathfinder/svg-to-skia
 github:servo/webxr/webxr
 github:servo/webxr/webxr-api
 github:sfikas/rusteval/rusteval
-github:sigp/milagro_bls/milagro_bls
 github:simias/rustation/rustation
 github:skytrias/everpuzzle/everpuzzle
 github:snowplow/factotum/factotum

@@ -67,7 +67,9 @@ impl Urler {
             Origin::CratesIo(lowercase_name) => {
                 Some(format!("/crates/{}/versions", encode(lowercase_name)))
             }
-            Origin::GitHub { repo, package } | Origin::GitLab { repo, package } => {
+            Origin::GitHub { repo: _, package: _ } | Origin::GitLab { repo: _, package: _ } => {
+                // let host = if let Origin::GitHub { .. } = origin { "gh" } else { "lab" };
+                // format!("/{}/{}/{}/{}/versions", host, encode(&repo.owner), encode(&repo.repo), encode(package))
                 None
             }
         }

@@ -1961,7 +1961,9 @@ impl KitchenSink {
                     if let Some((dep_found_ver, mut dep_newest_bad)) = dep_newest_bad {
                         dep_newest_bad = dep_newest_bad.min(dep_oldest_ok);
                         if c.newest_bad.unwrap_or(0) < dep_newest_bad && dep_newest_bad < c.oldest_ok.unwrap_or(9999) {
-                            debug!("{} {} MSRV went from {} to {} because of https://lib.rs/compat/{} {} = {}", all.name(), crate_ver, c.newest_bad.unwrap_or(0), dep_newest_bad, dep_origin.short_crate_name(), req, dep_found_ver);
+                            if dep_newest_bad > 31 {
+                                debug!("{} {} MSRV went from {} to {} because of https://lib.rs/compat/{} {} = {}", all.name(), crate_ver, c.newest_bad.unwrap_or(0), dep_newest_bad, dep_origin.short_crate_name(), req, dep_found_ver);
+                            }
                             c.newest_bad = Some(dep_newest_bad);
                             let _ = db.set_compat(all.origin(), &crate_ver.to_string(), &format!("1.{}.0", dep_newest_bad), Compat::BrokenDeps);
                         }

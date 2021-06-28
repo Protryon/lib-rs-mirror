@@ -841,25 +841,23 @@ fn serve_cached(Rendered {page, cache_time, refresh, last_modified}: Rendered) -
     hasher.update(&page);
     let etag = format!("\"{:.16}\"", base64::encode(hasher.finalize().as_bytes()));
 
-    #[allow(deprecated)]
-    HttpResponse::Ok()
-        .content_type("text/html;charset=UTF-8")
-        .insert_header(("etag", etag))
-        .if_true(!refresh, |h| {
-            h.insert_header(("Cache-Control", format!("public, max-age={}, stale-while-revalidate={}, stale-if-error={}", cache_time, cache_time * 3, err_max)));
-        })
-        .if_true(refresh, |h| {
-            h.insert_header(("Refresh", "5"));
-            h.insert_header(("Cache-Control", "no-cache, s-maxage=4, must-revalidate"));
-        })
-        .if_some(last_modified, |l, h| {
-            // can't give validator, because then 304 leaves refresh
-            if !refresh {
-                h.insert_header(("Last-Modified", l.to_rfc2822()));
-            }
-        })
-        .no_chunking(page.len() as u64)
-        .body(page)
+    let mut h = HttpResponse::Ok();
+    h.content_type("text/html;charset=UTF-8");
+    h.insert_header(("etag", etag));
+    if !refresh {
+        h.insert_header(("Cache-Control", format!("public, max-age={}, stale-while-revalidate={}, stale-if-error={}", cache_time, cache_time * 3, err_max)));
+    }
+    if refresh {
+        h.insert_header(("Refresh", "5"));
+        h.insert_header(("Cache-Control", "no-cache, s-maxage=4, must-revalidate"));
+    }
+    if let Some(l) = last_modified {
+        // can't give validator, because then 304 leaves refresh
+        if !refresh {
+            h.insert_header(("Last-Modified", l.to_rfc2822()));
+        }
+    }
+    h.no_chunking(page.len() as u64).body(page)
 }
 
 fn is_alnum(q: &str) -> bool {
@@ -912,11 +910,11 @@ async fn handle_sitemap(req: HttpRequest) -> Result<HttpResponse, ServerError> {
             }
         }
     });
-
+use futures::StreamExt;
     Ok(HttpResponse::Ok()
         .content_type("application/xml;charset=UTF-8")
         .insert_header(("Cache-Control", "public, max-age=259200, stale-while-revalidate=72000, stale-if-error=72000"))
-        .streaming(page))
+        .streaming(page.map(|e| e.map_err(|e| e.err.compat()))))
 }
 
 async fn handle_feed(req: HttpRequest) -> Result<HttpResponse, ServerError> {
@@ -957,7 +955,7 @@ where
 }
 
 struct ServerError {
-    err: failure::Error,
+    pub(crate) err: failure::Error,
 }
 
 impl ServerError {

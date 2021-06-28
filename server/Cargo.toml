@@ -28,8 +28,8 @@ assets = [
 ]
 
 [dependencies]
-actix-web = "=4.0.0-beta.5"
-actix-service = "=2.0.0-beta.5" # hack for actix-files
+actix-web = "4.0.0-beta.8"
+actix-service = "2.0.0"
 env_logger = "0.8.3"
 log = "0.4.14"
 render_readme = { path = "../render_readme", version = "0.7" }
@@ -46,7 +46,7 @@ signal-hook = "0.3.6"
 locale = "0.2.2"
 cap = "0.1.0"
 futures = "0.3.13"
-actix-files = "0.6.0-beta.2"
+actix-files = "0.6.0-beta.6"
 actix-threadpool = "0.3.3"
 either = "1.6.1"
 qstring = "0.7.2"

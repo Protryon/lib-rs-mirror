@@ -1,9 +1,11 @@
 use fetcher::Fetcher;
 use render_readme::ImageFilter;
 use simple_cache::{Error, TempCacheJson};
+use tokio::time::timeout;
 use std::borrow::Cow;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 #[derive(Clone, Copy, Deserialize, Serialize, Debug)]
 struct ImageOptimImageMeta {
@@ -26,7 +28,7 @@ impl ImageOptimAPIFilter {
         Ok(Self {
             img_prefix: format!("https://img.gs/{}/full/", api_id),
             img2x_prefix: format!("https://img.gs/{}/full,2x/", api_id),
-            meta_prefix: format!("https://img.gs/{}/meta,timeout=90/", api_id),
+            meta_prefix: format!("https://img.gs/{}/meta,timeout=3/", api_id),
             cache: TempCacheJson::new(cache_path, Arc::new(Fetcher::new(8)))?,
             handle: tokio::runtime::Handle::current(),
         })
@@ -51,7 +53,12 @@ impl ImageFilter for ImageOptimAPIFilter {
         let image_url = image_url.trim_start_matches(&self.img_prefix).trim_start_matches(&self.img2x_prefix);
         let api_url = format!("{}{}", self.meta_prefix, image_url);
         let rt = self.handle.enter();
-        let ImageOptimImageMeta { mut width, mut height } = futures::executor::block_on(self.cache.get_json(image_url, api_url, |f| f))
+        let cache_future = timeout(Duration::from_secs(5), self.cache.get_json(image_url, api_url, |f| f));
+        let ImageOptimImageMeta { mut width, mut height } = futures::executor::block_on(cache_future)
+            .map_err(|_| {
+                eprintln!("warning: image req to meta of {} timed out", image_url);
+            })
+            .ok()?
             .map_err(|e| {
                 eprintln!("warning: image req to meta of {} failed: {}", image_url, e);
             })

@@ -17,17 +17,19 @@ RUN useradd -u 4321 --create-home --user-group -s /bin/bash rustyuser
 RUN chown -R 4321:4321 /home/rustyuser
 USER rustyuser
 WORKDIR /home/rustyuser
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.52.0 --verbose # wat
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.53.0 --verbose # wat
 ENV PATH="$PATH:/home/rustyuser/.cargo/bin"
 RUN cargo install lts --vers ^0.3.1
 RUN rustup set profile minimal
 RUN rustup toolchain add 1.32.0
-RUN rustup toolchain add 1.36.0
-RUN rustup toolchain add 1.40.0
-RUN rustup toolchain add 1.44.0
+RUN rustup toolchain add 1.37.0
+RUN rustup toolchain add 1.41.0
+RUN rustup toolchain add 1.43.0
+RUN rustup toolchain add 1.45.0
+RUN rustup toolchain add 1.47.0
+RUN rustup toolchain add 1.48.0
 RUN rustup toolchain add 1.49.0
 RUN rustup toolchain add 1.50.0
-RUN rustup toolchain add 1.51.0
 RUN rustup toolchain list
 RUN cargo install libc --vers 99.9.9 || true # force index update
 # RUN cargo new lts-dummy; cd lts-dummy; cargo lts setup; echo 'itoa = "*"' >> Cargo.toml; cargo update;
@@ -35,12 +37,17 @@ RUN cargo install libc --vers 99.9.9 || true # force index update
 
 const TEMP_JUNK_DIR: &str = "/var/tmp/crates_env";
 
-const RUST_VERSIONS: [&str; 5] = [
-    "1.44.0",
+const RUST_VERSIONS: [&str; 10] = [
+    "1.32.0",
+    "1.37.0",
+    "1.41.0",
+    "1.43.0",
+    "1.45.0",
+    "1.47.0",
+    "1.48.0",
     "1.49.0",
     "1.50.0",
-    "1.51.0",
-    "1.52.0",
+    "1.53.0",
 ];
 
 use crate_db::builddb::*;
@@ -95,7 +102,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             candidates.append(&mut next_batch);
-            for mut tmp in r.try_iter() {
+            for mut tmp in r.try_iter().take(10) {
                 candidates.append(&mut tmp);
             }
 
@@ -105,7 +112,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut available_rust_versions = RUST_VERSIONS.to_vec();
             available_rust_versions.shuffle(&mut rng);
 
-            let max_to_waste_trying = (candidates.len()/4).max(RUST_VERSIONS.len()*2);
+            let max_to_waste_trying = (candidates.len()/5).max(RUST_VERSIONS.len());
             let versions: Vec<_> = std::iter::from_fn(|| candidates.pop())
             .take(max_to_waste_trying)
             .filter_map(|x| {
@@ -116,10 +123,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // don't pick 1.29 as the first choice
                 let lower_limit = x.rustc.newest_bad.unwrap_or(37).max(x.rustc.newest_bad_raw.unwrap_or(30));
                 let best_ver = (upper_limit * 5 + lower_limit * 11)/16; // bias towards lower ver, because lower versions see features from newer versions
+
+
+                let origin = Origin::from_crates_io_name(&x.crate_name);
+                let mut existing_info = db.get_compat_raw(&origin).unwrap_or_default();
+                existing_info.retain(|inf| inf.crate_version == x.ver);
+
                 let possible_rusts = available_rust_versions.iter().enumerate().map(|(i, v)| {
                     (i, v, SemVer::parse(v).unwrap().minor as u16)
-                }).filter(|&(_, _, minor)| {
+                })
+                .filter(|&(_, _, minor)| {
                     minor > min_ver && minor < max_ver
+                })
+                .filter(|&(_, _, v)| {
+                    !existing_info.iter().any(|inf| inf.rustc_version == v)
                 });
                 let rustc_idx = if x.rustc.newest_bad.is_none() {
                     let v = possible_rusts.max_by_key(|&(_, _, minor)| minor)?; // avoid building 2018 with oldest compiler
@@ -128,6 +145,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 } else {
                     possible_rusts.min_by_key(|&(_, _, minor)| ((minor as i32) - best_ver as i32).abs())?
                 }.0;
+
                 Some((available_rust_versions.swap_remove(rustc_idx), x.crate_name, x.ver))
             })
             .take((RUST_VERSIONS.len()+1)/2)
@@ -135,7 +153,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             eprintln!("running: {}/{}", versions.len(), candidates.len());
 
-            if candidates.len() > 2000 {
+            if candidates.len() > 3000 {
                 candidates.drain(..candidates.len()/2);
             }
 
@@ -260,17 +278,7 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
 }
 
 
-fn run_and_analyze_versions(db: &BuildDb, docker_root: &Path, mut versions: Vec<(&'static str, Arc<str>, SemVer)>) -> Result<(), Box<dyn std::error::Error>> {
-    versions.retain(|(_r, name, ver)| {
-        let origin = Origin::from_crates_io_name(&name);
-        if let Ok(existing_info) = db.get_compat_raw(&origin) {
-            if let Some(res) = existing_info.iter().find(|inf| &inf.crate_version == ver) {
-                info!("already built {}@{}; skipping {:?}", name, ver, res);
-                return false;
-            }
-        }
-        true
-    });
+fn run_and_analyze_versions(db: &BuildDb, docker_root: &Path, versions: Vec<(&'static str, Arc<str>, SemVer)>) -> Result<(), Box<dyn std::error::Error>> {
     if versions.is_empty() {
         return Ok(());
     }
@@ -409,7 +417,7 @@ fn do_builds(docker_root: &Path, versions: &[(&'static str, Arc<str>, SemVer)]) 
         .arg("-v").arg(format!("{}/git:/home/rustyuser/.cargo/git", TEMP_JUNK_DIR))
         .arg("-v").arg(format!("{}/registry:/home/rustyuser/.cargo/registry", TEMP_JUNK_DIR))
         .arg("-v").arg(format!("{}/target:/home/rustyuser/cargo_target", TEMP_JUNK_DIR))
-        // .arg("-e").arg("CARGO_INCREMENTAL=0")
+        .arg("-e").arg("CARGO_INCREMENTAL=0")
         // skip native compilation
         // .arg("-e").arg("CC=true")
         // .arg("-e").arg("CCXX=true")

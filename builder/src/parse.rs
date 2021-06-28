@@ -619,9 +619,15 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                     else if desc.starts_with("#[doc(alias = \"...\")] is experimental") {
                         findings.crates.insert((Some("1.47.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
                     }
+                    else if desc.starts_with("unions with non-`Copy` fields are unstable") {
+                        findings.crates.insert((Some("1.48.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                    }
                     else if desc.starts_with("const generics are unstable") ||
                         desc.starts_with("const generics in any position are currently unsupported") {
                         findings.crates.insert((Some("1.49.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                    }
+                    else if desc.starts_with("no method named `fill_with` found for mutable reference `&mut [") {
+                        findings.crates.insert((Some("1.50.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("the `#[track_caller]` attribute is an experimental") ||
                         desc.starts_with("`while` is not allowed in a `const fn`") ||
@@ -728,12 +734,17 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                 findings.crates.insert((Some("1.40.0".into()), name, ver, Compat::Incompatible));
             }
         }
+        else if line.starts_with("  feature `default-run` is required") {
+            if let Some((name, ver)) = last_broken_manifest_crate.take() {
+                findings.crates.insert((Some("1.36.0".into()), name, ver, Compat::Incompatible));
+            }
+        }
         else if line.starts_with("  editions are unstable") || line.starts_with("  feature `rename-dependency` is required") {
             if let Some((name, ver)) = last_broken_manifest_crate.take() {
                 findings.crates.insert((Some("1.30.0".into()), name, ver, Compat::Incompatible));
             }
         }
-        else if line.starts_with("  unknown cargo feature `resolver`") {
+        else if line.starts_with("  unknown cargo feature `resolver`") || line.starts_with("  feature `resolver` is required") {
             if let Some((name, ver)) = last_broken_manifest_crate.take() {
                 findings.crates.insert((Some("1.50.0".into()), name, ver, Compat::Incompatible));
             }

@@ -76,6 +76,7 @@ lazy_static! {
         ("neural", Some(&["network"])),
         ("fantasy", Some(&["console"])),
         ("learning", Some(&["network"])),
+        ("safe", Some(&["network"])),
         ("database", Some(&["embedded"])),
         ("robotics", Some(&["localization"])),
         ("thread", Some(&["storage"])),

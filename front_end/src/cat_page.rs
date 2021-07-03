@@ -2,7 +2,7 @@ use crate::templates;
 use crate::Page;
 use categories::Category;
 use categories::CATEGORIES;
-use failure::Error;
+use anyhow::Error;
 use futures::stream::StreamExt;
 use kitchen_sink::ArcRichCrateVersion;
 use kitchen_sink::KitchenSink;

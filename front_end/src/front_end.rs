@@ -28,7 +28,7 @@ use crate::urler::Urler;
 use categories::Category;
 use chrono::prelude::*;
 
-use failure::ResultExt;
+use anyhow::Context;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::Review;
 use kitchen_sink::RichAuthor;
@@ -88,7 +88,7 @@ impl Page {
 }
 
 /// See `cat_page.rs.html`
-pub async fn render_category(out: &mut impl Write, cat: &Category, crates: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
+pub async fn render_category(out: &mut impl Write, cat: &Category, crates: &KitchenSink, renderer: &Renderer) -> Result<(), anyhow::Error> {
     let urler = Urler::new(None);
     let page = cat_page::CatPage::new(cat, crates, renderer).await?;
     templates::cat_page(out, &page, &urler)?;
@@ -96,7 +96,7 @@ pub async fn render_category(out: &mut impl Write, cat: &Category, crates: &Kitc
 }
 
 /// See `homepage.rs.html`
-pub async fn render_homepage<W>(out: &mut W, crates: &KitchenSink) -> Result<(), failure::Error> where W: ?Sized, for<'a> &'a mut W: Write {
+pub async fn render_homepage<W>(out: &mut W, crates: &KitchenSink) -> Result<(), anyhow::Error> where W: ?Sized, for<'a> &'a mut W: Write {
     let urler = Urler::new(None);
     let home = home_page::HomePage::new(crates).await?;
     let all = home.all_categories().await;
@@ -105,13 +105,13 @@ pub async fn render_homepage<W>(out: &mut W, crates: &KitchenSink) -> Result<(),
 }
 
 /// See `atom.rs.html`
-pub async fn render_feed(out: &mut impl Write, crates: &KitchenSink) -> Result<(), failure::Error> {
+pub async fn render_feed(out: &mut impl Write, crates: &KitchenSink) -> Result<(), anyhow::Error> {
     let urler = Urler::new(None);
     templates::atom(out, &home_page::HomePage::new(crates).await?, &urler)?;
     Ok(())
 }
 
-pub async fn render_sitemap(sitemap: &mut impl Write, crates: &KitchenSink) -> Result<(), failure::Error> {
+pub async fn render_sitemap(sitemap: &mut impl Write, crates: &KitchenSink) -> Result<(), anyhow::Error> {
     let all_crates = crates.sitemap_crates().await?;
     let urler = Urler::new(None);
 
@@ -140,7 +140,7 @@ pub async fn render_sitemap(sitemap: &mut impl Write, crates: &KitchenSink) -> R
 }
 
 /// See `author.rs.html`
-pub async fn render_author_page<W: Write>(out: &mut W, aut: &RichAuthor, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
+pub async fn render_author_page<W: Write>(out: &mut W, aut: &RichAuthor, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), anyhow::Error> {
     if stopped() {
         return Err(KitchenSinkErr::Stopped.into());
     }
@@ -152,7 +152,7 @@ pub async fn render_author_page<W: Write>(out: &mut W, aut: &RichAuthor, kitchen
 }
 
 /// See `crate_page.rs.html`
-pub async fn render_crate_page<W: Write>(out: &mut W, all: &RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<Option<DateTime<FixedOffset>>, failure::Error> {
+pub async fn render_crate_page<W: Write>(out: &mut W, all: &RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<Option<DateTime<FixedOffset>>, anyhow::Error> {
     if stopped() {
         return Err(KitchenSinkErr::Stopped.into());
     }
@@ -164,7 +164,7 @@ pub async fn render_crate_page<W: Write>(out: &mut W, all: &RichCrate, ver: &Ric
 }
 
 /// See `reverse_dependencies.rs.html`
-pub async fn render_crate_reverse_dependencies<W: Write>(out: &mut W, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
+pub async fn render_crate_reverse_dependencies<W: Write>(out: &mut W, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), anyhow::Error> {
     if stopped() {
         return Err(KitchenSinkErr::Stopped.into());
     }
@@ -175,7 +175,7 @@ pub async fn render_crate_reverse_dependencies<W: Write>(out: &mut W, ver: &Rich
 }
 
 /// See `install.rs.html`
-pub async fn render_install_page(out: &mut impl Write, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
+pub async fn render_install_page(out: &mut impl Write, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), anyhow::Error> {
     if stopped() {
         return Err(KitchenSinkErr::Stopped.into());
     }
@@ -186,7 +186,7 @@ pub async fn render_install_page(out: &mut impl Write, ver: &RichCrateVersion, k
 }
 
 /// See `all_versions.rs.html`
-pub async fn render_all_versions_page(out: &mut impl Write, all: RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink) -> Result<(), failure::Error> {
+pub async fn render_all_versions_page(out: &mut impl Write, all: RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink) -> Result<(), anyhow::Error> {
     if stopped() {
         return Err(KitchenSinkErr::Stopped.into());
     }
@@ -197,7 +197,7 @@ pub async fn render_all_versions_page(out: &mut impl Write, all: RichCrate, ver:
 }
 
 /// See `crev.rs.html`
-pub async fn render_crate_reviews(out: &mut impl Write, reviews: &[Review], ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
+pub async fn render_crate_reviews(out: &mut impl Write, reviews: &[Review], ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), anyhow::Error> {
     if stopped() {
         return Err(KitchenSinkErr::Stopped.into());
     }
@@ -207,7 +207,7 @@ pub async fn render_crate_reviews(out: &mut impl Write, reviews: &[Review], ver:
     Ok(())
 }
 
-pub async fn render_trending_crates(out: &mut impl Write, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), failure::Error> {
+pub async fn render_trending_crates(out: &mut impl Write, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), anyhow::Error> {
     let (top, upd) = futures::join!(kitchen_sink.trending_crates(55), Box::pin(kitchen_sink.notable_recently_updated_crates(70)));
     let upd = upd?;
 
@@ -252,7 +252,7 @@ pub async fn render_trending_crates(out: &mut impl Write, kitchen_sink: &Kitchen
     Ok(())
 }
 
-pub async fn render_debug_page(out: &mut impl Write, all: RichCrate, kitchen_sink: &KitchenSink) -> Result<(), failure::Error> {
+pub async fn render_debug_page(out: &mut impl Write, all: RichCrate, kitchen_sink: &KitchenSink) -> Result<(), anyhow::Error> {
     let mut rustc_versions = HashSet::new();
 
     let by_crate_ver = kitchen_sink.rustc_compatibility(all).await?;
@@ -269,12 +269,12 @@ pub async fn render_debug_page(out: &mut impl Write, all: RichCrate, kitchen_sin
     Ok(())
 }
 
-pub fn render_error(out: &mut impl Write, err: &failure::Error) {
+pub fn render_error(out: &mut impl Write, err: &anyhow::Error) {
     templates::error_page(out, err).expect("error rendering error page");
 }
 
 /// See `crate_page.rs.html`
-pub fn render_static_page(out: &mut impl Write, title: String, page: &Markup, renderer: &Renderer) -> Result<(), failure::Error> {
+pub fn render_static_page(out: &mut impl Write, title: String, page: &Markup, renderer: &Renderer) -> Result<(), anyhow::Error> {
     if stopped() {
         return Err(KitchenSinkErr::Stopped.into());
     }

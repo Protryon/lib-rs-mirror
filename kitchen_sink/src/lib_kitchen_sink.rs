@@ -1,13 +1,11 @@
 #[macro_use]
-extern crate failure;
-
-#[macro_use]
 extern crate serde_derive;
 
 #[macro_use]
 extern crate log;
 
 mod yearly;
+use anyhow::Context;
 use futures::TryFutureExt;
 use tokio::time::Instant;
 
@@ -62,7 +60,6 @@ use chrono::DateTime;
 use crate_db::{builddb::BuildDb, CrateDb, CrateVersionData, RepoChange};
 use creviews::Creviews;
 use double_checked_cell_async::DoubleCheckedCell;
-use failure::ResultExt;
 use futures::future::join_all;
 use futures::stream::StreamExt;
 use futures::Future;
@@ -102,79 +99,79 @@ pub type ArcRichCrateVersion = Arc<RichCrateVersion>;
 
 type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 
-pub type CError = failure::Error;
+pub type CError = anyhow::Error;
 pub type CResult<T> = Result<T, CError>;
 pub type Warnings = HashSet<Warning>;
 
-#[derive(Debug, Clone, Serialize, Fail, Deserialize, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Serialize, thiserror::Error, Deserialize, Hash, Eq, PartialEq)]
 pub enum Warning {
-    #[fail(display = "`Cargo.toml` doesn't have `repository` property")]
+    #[error("`Cargo.toml` doesn't have `repository` property")]
     NoRepositoryProperty,
-    #[fail(display = "`Cargo.toml` doesn't have `[package]` section")]
+    #[error("`Cargo.toml` doesn't have `[package]` section")]
     NotAPackage,
-    #[fail(display = "`Cargo.toml` doesn't have `readme` property")]
+    #[error("`Cargo.toml` doesn't have `readme` property")]
     NoReadmeProperty,
-    #[fail(display = "`readme` property points to a file that hasn't been published")]
+    #[error("`readme` property points to a file that hasn't been published")]
     NoReadmePackaged,
-    #[fail(display = "Can't find README in repository: {}", _0)]
+    #[error("Can't find README in repository: {}", _0)]
     NoReadmeInRepo(String),
-    #[fail(display = "Could not clone repository: {}", _0)]
+    #[error("Could not clone repository: {}", _0)]
     ErrorCloning(String),
-    #[fail(display = "{} URL is a broken link: {}", _0, _1)]
+    #[error("{} URL is a broken link: {}", _0, _1)]
     BrokenLink(String, String),
-    #[fail(display = "Error parsing manifest: {}", _0)]
+    #[error("Error parsing manifest: {}", _0)]
     ManifestParseError(String),
 }
 
-#[derive(Debug, Clone, Fail)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum KitchenSinkErr {
-    #[fail(display = "git checkout meh")]
+    #[error("git checkout meh")]
     GitCheckoutFailed,
-    #[fail(display = "category count not found in crates db: {}", _0)]
+    #[error("category count not found in crates db: {}", _0)]
     CategoryNotFound(String),
-    #[fail(display = "category query failed")]
+    #[error("category query failed")]
     CategoryQueryFailed,
-    #[fail(display = "crate not found: {:?}", _0)]
+    #[error("crate not found: {:?}", _0)]
     CrateNotFound(Origin),
-    #[fail(display = "author not found: {}", _0)]
+    #[error("author not found: {}", _0)]
     AuthorNotFound(String),
-    #[fail(display = "crate {} not found in repo {}", _0, _1)]
+    #[error("crate {} not found in repo {}", _0, _1)]
     CrateNotFoundInRepo(String, String),
-    #[fail(display = "crate is not a package: {:?}", _0)]
+    #[error("crate is not a package: {:?}", _0)]
     NotAPackage(Origin),
-    #[fail(display = "data not found, wanted {}", _0)]
+    #[error("data not found, wanted {}", _0)]
     DataNotFound(String),
-    #[fail(display = "crate has no versions")]
+    #[error("crate has no versions")]
     NoVersions,
-    #[fail(display = "cached data has different version than the index")]
+    #[error("cached data has different version than the index")]
     CacheExpired,
-    #[fail(display = "Environment variable CRATES_DATA_DIR is not set.\nChoose a dir where it's OK to store lots of data, and export it like CRATES_DATA_DIR=/var/lib/crates.rs")]
+    #[error("Environment variable CRATES_DATA_DIR is not set.\nChoose a dir where it's OK to store lots of data, and export it like CRATES_DATA_DIR=/var/lib/crates.rs")]
     CratesDataDirEnvVarMissing,
-    #[fail(display = "{} does not exist\nPlease get data files from https://lib.rs/data and put them in that directory, or set CRATES_DATA_DIR to their location.", _0)]
+    #[error("{} does not exist\nPlease get data files from https://lib.rs/data and put them in that directory, or set CRATES_DATA_DIR to their location.", _0)]
     CacheDbMissing(String),
-    #[fail(display = "Error when parsing verison")]
+    #[error("Error when parsing verison")]
     SemverParsingError,
-    #[fail(display = "Stopped")]
+    #[error("Stopped")]
     Stopped,
-    #[fail(display = "Deps stats timeout")]
+    #[error("Deps stats timeout")]
     DepsNotAvailable,
-    #[fail(display = "Crate data timeout")]
+    #[error("Crate data timeout")]
     DataTimedOut,
-    #[fail(display = "{} timed out after {}s", _0, _1)]
+    #[error("{} timed out after {}s", _0, _1)]
     TimedOut(&'static str, u16),
-    #[fail(display = "Crate derived cache timeout")]
+    #[error("Crate derived cache timeout")]
     DerivedDataTimedOut,
-    #[fail(display = "Missing github login for crate owner")]
+    #[error("Missing github login for crate owner")]
     OwnerWithoutLogin,
-    #[fail(display = "Git index parsing failed: {}", _0)]
+    #[error("Git index parsing failed: {}", _0)]
     GitIndexParse(String),
-    #[fail(display = "Git index {:?}: {}", _0, _1)]
+    #[error("Git index {:?}: {}", _0, _1)]
     GitIndexFile(PathBuf, String),
-    #[fail(display = "Git crate '{:?}' can't be indexed, because it's not on the list", _0)]
+    #[error("Git crate '{:?}' can't be indexed, because it's not on the list", _0)]
     GitCrateNotAllowed(Origin),
-    #[fail(display = "Deps err: {}", _0)]
+    #[error("Deps err: {}", _0)]
     Deps(DepsErr),
-    #[fail(display = "Bad rustc compat data")]
+    #[error("Bad rustc compat data")]
     BadRustcCompatData,
 }
 
@@ -244,8 +241,8 @@ impl KitchenSink {
             ));
         Ok(Self {
             crev: Arc::new(crev?),
-            crates_io: crates_io.context("cratesio")?,
-            index: index.context("index")?,
+            crates_io: crates_io?,
+            index: index?,
             url_check_cache: TempCache::new(&data_path.join("url_check.db")).context("urlcheck")?,
             readme_check_cache: TempCache::new(&data_path.join("readme_check.db")).context("readmecheck")?,
             docs_rs: docs_rs_client::DocsRsClient::new(data_path.join("docsrs.db")).context("docs")?,
@@ -596,7 +593,7 @@ impl KitchenSink {
             .map(move |origin| async move {
                 self.rich_crate_async(&origin).await.map_err(|e| {
                     error!("Can't reindex {:?}: {}", origin, e);
-                    for e in e.iter_chain() {
+                    for e in e.chain() {
                         error!("• {}", e);
                     }
                 }).ok()
@@ -777,7 +774,7 @@ impl KitchenSink {
         })?;
         let latest_in_index = krate.latest_version().version(); // most recently published version
         let meta = timeout("cacheable meta request", 10, self.crates_io.crate_meta(name, latest_in_index).map(|r| r.map_err(CError::from))).await
-            .with_context(|_| format!("crates.io meta for {} {}", name, latest_in_index))?;
+            .with_context(|| format!("crates.io meta for {} {}", name, latest_in_index))?;
         let mut meta = meta.ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?;
         if !meta.versions.iter().any(|v| v.num == latest_in_index) {
             warn!("Crate data missing latest version {}@{}", name, latest_in_index);
@@ -850,7 +847,7 @@ impl KitchenSink {
                 debug!("Getting/indexing {:?}", origin);
                 let _th = timeout("autoindex", 30, self.auto_indexing_throttle.acquire().map(|e| e.map_err(CError::from))).await?;
                 let reindex = timeout("reindex", 60, self.index_crate_highest_version(origin));
-                watch("reindex", reindex).await.with_context(|_| format!("reindexing {:?}", origin))?; // Pin to lower stack usage
+                watch("reindex", reindex).await.with_context(|| format!("reindexing {:?}", origin))?; // Pin to lower stack usage
                 timeout("reindexed data", 10, self.rich_crate_version_data_cached(origin)).await?.ok_or(KitchenSinkErr::CacheExpired)?
             },
         };
@@ -1584,7 +1581,7 @@ impl KitchenSink {
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
         info!("Indexing {:?}", origin);
 
-        timeout("before-index", 5, self.crate_db.before_index_latest(origin).map_err(failure::Error::from)).await?;
+        timeout("before-index", 5, self.crate_db.before_index_latest(origin).map_err(anyhow::Error::from)).await?;
 
         let ((source_data, manifest, _warn), cache_key) = match origin {
             Origin::CratesIo(ref name) => {
@@ -1652,7 +1649,7 @@ impl KitchenSink {
             source_data: &source_data,
             extracted_auto_keywords,
         });
-        let cached = timeout("db-index", 30, db_index.map_err(failure::Error::from)).await?;
+        let cached = timeout("db-index", 30, db_index.map_err(anyhow::Error::from)).await?;
         self.derived_cache.set_serialize((&origin.to_str(), ""), &cached)?;
         Ok(())
     }
@@ -1734,7 +1731,7 @@ impl KitchenSink {
             let checkout = crate_git_checkout::checkout(&repo, &git_checkout_path)?;
 
             let (manif, warnings) = crate_git_checkout::find_manifests(&checkout)
-                .with_context(|_| format!("find manifests in {}", url))?;
+                .with_context(|| format!("find manifests in {}", url))?;
             for warn in warnings {
                 warn!("warning: {}", warn.0);
             }
@@ -2528,7 +2525,7 @@ impl KitchenSink {
                 };
                 let _ = watch("dupes", self.knock_duplicates(&mut crates)).await;
                 let crates: Vec<_> = crates.into_iter().map(|(o, _)| o).take(wanted_num as usize).collect();
-                Ok::<_, failure::Error>(Arc::new(crates))
+                Ok::<_, anyhow::Error>(Arc::new(crates))
             }).await
         }).await?;
         Ok(Arc::clone(res))
@@ -2554,7 +2551,7 @@ impl KitchenSink {
                 },
                 Ok(Err(e)) => {
                     error!("Skipping dedup {:?} because {}", o, e);
-                    for e in e.iter_chain() {
+                    for e in e.chain() {
                         error!(" • because {}", e);
                     }
                     return None;

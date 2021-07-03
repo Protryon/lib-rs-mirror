@@ -34,7 +34,7 @@ async fn main() {
             waiting.push(handle.spawn(async move {
                 let _f = concurrency.acquire().await?;
                 println!("{}…", o.short_crate_name());
-                let c = crates.rich_crate_version_async(&o).await.map_err(|e| e.compat())?;
+                let c = crates.rich_crate_version_async(&o).await?;
                 if stopped() {anyhow!("stop");}
                 for a in c.authors().iter().filter(|a| a.email.is_some()) {
                     if let Some(email) = a.email.as_ref() {

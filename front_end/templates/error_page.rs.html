@@ -1,4 +1,4 @@
-@use failure::Error;
+@use anyhow::Error;
 
 @(err: &Error)
 
@@ -25,7 +25,7 @@
         <h2>Sorry, something went wrong!</h2>
         <p>@err</p>
         <ol>
-          @for cause in err.iter_causes() {
+          @for cause in err.chain() {
             <li>@cause</li>
           }
         </ol>

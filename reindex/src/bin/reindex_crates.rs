@@ -1,11 +1,10 @@
-use futures::TryFutureExt;
-use debcargo_list::DebcargoList;
 use anyhow::anyhow;
+use debcargo_list::DebcargoList;
 use feat_extractor::*;
-use futures::future::join_all;
 use futures::future::FutureExt;
-use futures::stream::StreamExt;
+use futures::future::join_all;
 use futures::Future;
+use futures::stream::StreamExt;
 use kitchen_sink::ArcRichCrateVersion;
 use kitchen_sink::RichCrate;
 use kitchen_sink::{self, stop, stopped, KitchenSink, Origin, RichCrateVersion};
@@ -120,7 +119,7 @@ async fn main_indexing_loop(r: Arc<Reindexer>, crate_origins: Box<dyn Iterator<I
             let index_finished = concurrency.acquire().await;
             if stopped() {return;}
             println!("{}…", i);
-            match run_timeout(62, r.crates.index_crate_highest_version(&origin).map_err(|e| e.compat())).await {
+            match run_timeout(62, r.crates.index_crate_highest_version(&origin)).await {
                 Ok(()) => {},
                 err => {
                     print_res(err);
@@ -144,7 +143,7 @@ async fn main_indexing_loop(r: Arc<Reindexer>, crate_origins: Box<dyn Iterator<I
                             }
                             let _finished = repo_concurrency.acquire().await;
                             if stopped() {return;}
-                            print_res(run_timeout(600, r.crates.index_repo(repo, v.version()).map_err(|e| e.compat())).await);
+                            print_res(run_timeout(600, r.crates.index_repo(repo, v.version())).await);
                         }
                     }
                 },
@@ -160,7 +159,7 @@ async fn main_indexing_loop(r: Arc<Reindexer>, crate_origins: Box<dyn Iterator<I
 impl Reindexer {
 async fn index_crate(&self, origin: &Origin, renderer: &Renderer, search_sender: &mut mpsc::Sender<(ArcRichCrateVersion, usize, f64)>) -> Result<ArcRichCrateVersion, anyhow::Error> {
     let crates = &self.crates;
-    let (k, v) = futures::try_join!(crates.rich_crate_async(origin).map_err(|e| e.compat().into()), run_timeout(45, crates.rich_crate_version_async(origin).map_err(|e| e.compat())))?;
+    let (k, v) = futures::try_join!(crates.rich_crate_async(origin), run_timeout(45, crates.rich_crate_version_async(origin)))?;
 
     let (downloads_per_month, score) = self.crate_overall_score(&k, &v, renderer).await;
     let (_, index_res) = futures::join!(
@@ -168,7 +167,7 @@ async fn index_crate(&self, origin: &Origin, renderer: &Renderer, search_sender:
             search_sender.send((v.clone(), downloads_per_month, score)).await
                 .map_err(|e| {stop();e}).expect("closed channel?");
         },
-        run_timeout(60, crates.index_crate(&k, score).map_err(|e| e.compat()))
+        run_timeout(60, crates.index_crate(&k, score))
     );
     index_res?;
     Ok(v)

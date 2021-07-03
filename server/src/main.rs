@@ -1,5 +1,6 @@
 use crate::writer::*;
 use actix_web::body::Body;
+use actix_web::dev::Server;
 use actix_web::dev::Url;
 use actix_web::http::header::HeaderValue;
 use actix_web::http::StatusCode;
@@ -11,7 +12,7 @@ use cap::Cap;
 use categories::Category;
 use categories::CATEGORIES;
 use chrono::prelude::*;
-use failure::ResultExt;
+use anyhow::{anyhow, Context};
 use futures::future::Future;
 use futures::future::FutureExt;
 use kitchen_sink::filter::ImageOptimAPIFilter;
@@ -82,14 +83,14 @@ fn main() {
     rt.shutdown_timeout(Duration::from_secs(1));
 
     if let Err(e) = res {
-        for c in e.iter_chain() {
+        for c in e.chain() {
             error!("Error: {}", c);
         }
         std::process::exit(1);
     }
 }
 
-async fn run_server(rt: Handle) -> Result<(), failure::Error> {
+async fn run_server(rt: Handle) -> Result<(), anyhow::Error> {
     unsafe { signal_hook::low_level::register(signal_hook::consts::SIGHUP, || HUP_SIGNAL.store(1, Ordering::SeqCst)) }?;
     unsafe { signal_hook::low_level::register(signal_hook::consts::SIGUSR1, || HUP_SIGNAL.store(1, Ordering::SeqCst)) }?;
 
@@ -390,7 +391,7 @@ async fn handle_category(req: HttpRequest, cat: &'static Category) -> Result<Htt
                 front_end::render_category(&mut page, cat, &crates, &state.markup).await?;
                 minify_html(&mut page);
                 mark_server_still_alive(&state);
-                Ok::<_, failure::Error>((page, None))
+                Ok::<_, anyhow::Error>((page, None))
             })
         })
         .await?,
@@ -414,7 +415,7 @@ async fn handle_home(req: HttpRequest) -> Result<HttpResponse, ServerError> {
                 front_end::render_homepage(&mut page, &crates).await?;
                 minify_html(&mut page);
                 mark_server_still_alive(&state);
-                Ok::<_, failure::Error>((page, Some(Utc::now().into())))
+                Ok::<_, anyhow::Error>((page, Some(Utc::now().into())))
             })
         })
         .await?,
@@ -504,7 +505,7 @@ async fn handle_compat(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     // if !cfg!(debug_assertions) {
     //     Err(failure::err_msg("off"))?
     // }
-    let origin = get_origin_from_subpath(req.match_info()).ok_or(failure::format_err!("boo"))?;
+    let origin = get_origin_from_subpath(req.match_info()).ok_or(anyhow!("boo"))?;
     let state: &AServerState = req.app_data().expect("appdata");
     let crates = state.crates.load();
     let page = rt_run_timeout(&state.rt, "dbgcrate", 60, async move {
@@ -536,7 +537,7 @@ async fn handle_install(req: HttpRequest) -> Result<HttpResponse, ServerError> {
         front_end::render_install_page(&mut page, &ver, &crates, &state.markup).await?;
         minify_html(&mut page);
         mark_server_still_alive(&state);
-        Ok::<_, failure::Error>((page, None))
+        Ok::<_, anyhow::Error>((page, None))
     }).await?;
     Ok(serve_cached(Rendered {page, cache_time: 24 * 3600, refresh: false, last_modified}))
 }
@@ -565,7 +566,7 @@ async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
                 front_end::render_author_page(&mut page, &aut, &crates, &state.markup).await?;
                 minify_html(&mut page);
                 mark_server_still_alive(&state);
-                Ok::<_, failure::Error>((page, None))
+                Ok::<_, anyhow::Error>((page, None))
             })
         })
         .await?,
@@ -641,7 +642,7 @@ async fn handle_crate_reviews(req: HttpRequest) -> Result<HttpResponse, ServerEr
             front_end::render_crate_reviews(&mut page, &reviews, &ver, &crates, &state.markup).await?;
             minify_html(&mut page);
             mark_server_still_alive(&state);
-            Ok::<_, failure::Error>(Rendered {page, cache_time: 24 * 3600, refresh: false, last_modified: None})
+            Ok::<_, anyhow::Error>(Rendered {page, cache_time: 24 * 3600, refresh: false, last_modified: None})
         })
         .await?,
     ))
@@ -657,7 +658,7 @@ async fn handle_new_trending(req: HttpRequest) -> Result<HttpResponse, ServerErr
                 let mut page: Vec<u8> = Vec::with_capacity(32000);
                 front_end::render_trending_crates(&mut page, &crates, &state.markup).await?;
                 minify_html(&mut page);
-                Ok::<_, failure::Error>((page, None))
+                Ok::<_, anyhow::Error>((page, None))
             })
         })
         .await?,
@@ -666,8 +667,8 @@ async fn handle_new_trending(req: HttpRequest) -> Result<HttpResponse, ServerErr
 
 /// takes path to storage, freshness in seconds, and a function to call on cache miss
 /// returns (page, fresh in seconds)
-async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cache_time: u32, generate: F) -> Result<Rendered, failure::Error>
-    where F: Future<Output=Result<(Vec<u8>, Option<DateTime<FixedOffset>>), failure::Error>> + 'static {
+async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cache_time: u32, generate: F) -> Result<Rendered, anyhow::Error>
+    where F: Future<Output=Result<(Vec<u8>, Option<DateTime<FixedOffset>>), anyhow::Error>> + 'static {
     if let Ok(modified) = std::fs::metadata(&cache_file).and_then(|m| m.modified()) {
         let now = SystemTime::now();
         // rebuild in debug always
@@ -708,7 +709,7 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
                                     }
                                 }
                                 Err(e) => {
-                                    error!("Refresh err: {} {}", e.iter_chain().map(|e| e.to_string()).collect::<Vec<_>>().join("; "), cache_file.display());
+                                    error!("Refresh err: {} {}", e.chain().map(|e| e.to_string()).collect::<Vec<_>>().join("; "), cache_file.display());
                                 }
                             }
                         } else {
@@ -743,7 +744,7 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
     Ok(Rendered {page, cache_time, refresh: false, last_modified})
 }
 
-fn render_crate_page(state: AServerState, origin: Origin) -> impl Future<Output = Result<(Vec<u8>, Option<DateTime<FixedOffset>>), failure::Error>> + 'static {
+fn render_crate_page(state: AServerState, origin: Origin) -> impl Future<Output = Result<(Vec<u8>, Option<DateTime<FixedOffset>>), anyhow::Error>> + 'static {
     run_timeout("cratepage", 30, async move {
         let crates = state.crates.load();
         let (all, ver) = futures::try_join!(crates.rich_crate_async(&origin), crates.rich_crate_version_async(&origin))?;
@@ -751,11 +752,11 @@ fn render_crate_page(state: AServerState, origin: Origin) -> impl Future<Output 
         let last_mod = Box::pin(front_end::render_crate_page(&mut page, &all, &ver, &crates, &state.markup)).await?;
         minify_html(&mut page);
         mark_server_still_alive(&state);
-        Ok::<_, failure::Error>((page, last_mod))
+        Ok::<_, anyhow::Error>((page, last_mod))
     })
 }
 
-async fn render_crate_all_versions(state: AServerState, origin: Origin) -> Result<Rendered, failure::Error> {
+async fn render_crate_all_versions(state: AServerState, origin: Origin) -> Result<Rendered, anyhow::Error> {
     let s = state.clone();
     rt_run_timeout(&s.rt, "allver", 60, async move {
         let crates = state.crates.load();
@@ -765,11 +766,11 @@ async fn render_crate_all_versions(state: AServerState, origin: Origin) -> Resul
         front_end::render_all_versions_page(&mut page, all, &ver, &crates).await?;
         minify_html(&mut page);
         mark_server_still_alive(&state);
-        Ok::<_, failure::Error>(Rendered {page, cache_time: 24*3600, refresh: false, last_modified})
+        Ok::<_, anyhow::Error>(Rendered {page, cache_time: 24*3600, refresh: false, last_modified})
     }).await
 }
 
-async fn render_crate_reverse_dependencies(state: AServerState, origin: Origin) -> Result<Rendered, failure::Error> {
+async fn render_crate_reverse_dependencies(state: AServerState, origin: Origin) -> Result<Rendered, anyhow::Error> {
     let s = state.clone();
     rt_run_timeout(&s.rt, "revpage2", 30, async move {
         let crates = state.crates.load();
@@ -778,7 +779,7 @@ async fn render_crate_reverse_dependencies(state: AServerState, origin: Origin) 
         front_end::render_crate_reverse_dependencies(&mut page, &ver, &crates, &state.markup).await?;
         minify_html(&mut page);
         mark_server_still_alive(&state);
-        Ok::<_, failure::Error>(Rendered {page, cache_time: 24*3600, refresh: false, last_modified: None})
+        Ok::<_, anyhow::Error>(Rendered {page, cache_time: 24*3600, refresh: false, last_modified: None})
     }).await
 }
 
@@ -793,7 +794,7 @@ async fn handle_keyword(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let state2 = state.clone();
     let (query, page) = tokio::task::spawn_blocking(move || {
         if !is_alnum(&query) {
-            return Ok::<_, failure::Error>((query, None));
+            return Ok::<_, anyhow::Error>((query, None));
         }
         let keyword_query = format!("keywords:\"{}\"", query);
         let results = state2.index.search(&keyword_query, 150, false)?;
@@ -886,7 +887,7 @@ async fn handle_search(req: HttpRequest) -> Result<HttpResponse, ServerError> {
                     let mut page = Vec::with_capacity(32000);
                     front_end::render_serp_page(&mut page, &query, &results, &state.markup)?;
                     minify_html(&mut page);
-                    Ok::<_, failure::Error>(Rendered {page, cache_time: 600, refresh: false, last_modified: None})
+                    Ok::<_, anyhow::Error>(Rendered {page, cache_time: 600, refresh: false, last_modified: None})
                 }
             }).await??;
             Ok(serve_cached(page))
@@ -910,11 +911,10 @@ async fn handle_sitemap(req: HttpRequest) -> Result<HttpResponse, ServerError> {
             }
         }
     });
-use futures::StreamExt;
     Ok(HttpResponse::Ok()
         .content_type("application/xml;charset=UTF-8")
         .insert_header(("Cache-Control", "public, max-age=259200, stale-while-revalidate=72000, stale-if-error=72000"))
-        .streaming(page.map(|e| e.map_err(|e| e.err.compat()))))
+        .streaming::<_, ServerError>(page))
 }
 
 async fn handle_feed(req: HttpRequest) -> Result<HttpResponse, ServerError> {
@@ -924,7 +924,7 @@ async fn handle_feed(req: HttpRequest) -> Result<HttpResponse, ServerError> {
         let crates = state2.crates.load();
         let mut page: Vec<u8> = Vec::with_capacity(32000);
         front_end::render_feed(&mut page, &crates).await?;
-        Ok::<_, failure::Error>(page)
+        Ok::<_, anyhow::Error>(page)
     }).await?;
     Ok(HttpResponse::Ok()
         .content_type("application/atom+xml;charset=UTF-8")
@@ -933,34 +933,34 @@ async fn handle_feed(req: HttpRequest) -> Result<HttpResponse, ServerError> {
         .body(page))
 }
 
-fn run_timeout<R, T: 'static + Send>(label: &'static str, secs: u64, fut: R) -> Pin<Box<dyn Future<Output = Result<T, failure::Error>> + Send>>
+fn run_timeout<R, T: 'static + Send>(label: &'static str, secs: u64, fut: R) -> Pin<Box<dyn Future<Output = Result<T, anyhow::Error>> + Send>>
 where
-    R: 'static + Send + Future<Output = Result<T, failure::Error>>,
+    R: 'static + Send + Future<Output = Result<T, anyhow::Error>>,
 {
     let fut = kitchen_sink::NonBlock::new(label, tokio::time::timeout(Duration::from_secs(secs), fut));
     let timeout = fut.map(move |res| {
-        res.map_err(|_| failure::format_err!("{} timed out after >{}s", label, secs))?
+        res.map_err(|_| anyhow!("{} timed out after >{}s", label, secs))?
     });
     Box::pin(timeout)
 }
 
-fn rt_run_timeout<R, T: 'static + Send>(rt: &Handle, label: &'static str, secs: u64, fut: R) -> impl Future<Output=Result<T, failure::Error>> + 'static + Send
+fn rt_run_timeout<R, T: 'static + Send>(rt: &Handle, label: &'static str, secs: u64, fut: R) -> impl Future<Output=Result<T, anyhow::Error>> + 'static + Send
 where
-    R: 'static + Send + Future<Output = Result<T, failure::Error>>,
+    R: 'static + Send + Future<Output = Result<T, anyhow::Error>>,
 {
     rt.spawn(kitchen_sink::NonBlock::new(label, tokio::time::timeout(Duration::from_secs(secs), fut)))
-    .map(move |res| -> Result<T, failure::Error> {
-        res?.map_err(|_| failure::format_err!("{} timed out after >{}s", label, secs))?
+    .map(move |res| -> Result<T, anyhow::Error> {
+        res?.map_err(|_| anyhow!("{} timed out after >{}s", label, secs))?
     })
 }
 
 struct ServerError {
-    pub(crate) err: failure::Error,
+    pub(crate) err: anyhow::Error,
 }
 
 impl ServerError {
-    pub fn new(err: failure::Error) -> Self {
-        for cause in err.iter_chain() {
+    pub fn new(err: anyhow::Error) -> Self {
+        for cause in err.chain() {
             error!("• {}", cause);
             // The server is stuck and useless
             let s = cause.to_string();
@@ -974,15 +974,9 @@ impl ServerError {
     }
 }
 
-impl From<failure::Error> for ServerError {
-    fn from(err: failure::Error) -> Self {
+impl From<anyhow::Error> for ServerError {
+    fn from(err: anyhow::Error) -> Self {
         Self::new(err)
-    }
-}
-
-impl<T: Send + Sync + fmt::Display> From<failure::Context<T>> for ServerError {
-    fn from(err: failure::Context<T>) -> Self {
-        Self::new(err.into())
     }
 }
 
@@ -1002,6 +996,8 @@ impl fmt::Debug for ServerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.err.fmt(f)
     }
+}
+impl std::error::Error for ServerError {
 }
 
 impl actix_web::ResponseError for ServerError {

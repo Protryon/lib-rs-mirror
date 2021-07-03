@@ -73,7 +73,7 @@ pub struct HomePage<'a> {
 }
 
 impl<'a> HomePage<'a> {
-    pub async fn new(crates: &'a KitchenSink) -> Result<HomePage<'a>, failure::Error> {
+    pub async fn new(crates: &'a KitchenSink) -> Result<HomePage<'a>, anyhow::Error> {
         Ok(Self {
             crates,
             handle: tokio::runtime::Handle::current(),

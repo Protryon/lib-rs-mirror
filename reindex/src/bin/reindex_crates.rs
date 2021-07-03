@@ -377,18 +377,3 @@ where anyhow::Error: From<E> {
         res.map_err(From::from)
     }
 }
-
-#[test]
-fn stable_hash() {
-    use ahash::AHasher;
-    use std::hash::Hasher;
-
-    let mut hasher = AHasher::new_with_keys(1234, 5678);
-
-    hasher.write_u32(1989);
-    hasher.write_u8(11);
-    hasher.write_u8(9);
-    hasher.write(b"Huh?");
-
-    assert_eq!(13780556590398363848, hasher.finish());
-}

@@ -2874,7 +2874,7 @@ async fn index_test() {
     let stats = idx.deps_stats().await.unwrap();
     assert!(stats.total > 13800);
     let lode = stats.counts.get("lodepng").unwrap();
-    assert!(lode.runtime.def >= 15 && lode.runtime.def < 100);
+    assert!(lode.runtime.def >= 14 && lode.runtime.def < 50, "{:?}", lode);
 }
 
 fn is_alnum(q: &str) -> bool {

@@ -1,5 +1,4 @@
 mod index;
-use failure::Fail;
 pub use index::*;
 use rich_crate::Origin;
 use std::path::PathBuf;
@@ -10,25 +9,25 @@ pub use crates_index::Crate as CratesIndexCrate;
 pub use crates_index::Version as CratesIndexVersion;
 pub use deps_stats::*;
 
-#[derive(Debug, Clone, Fail)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum DepsErr {
-    #[fail(display = "crate not found: {:?}", _0)]
+    #[error("crate not found: {0:?}")]
     CrateNotFound(Origin),
-    #[fail(display = "crate {} not found in repo {}", _0, _1)]
+    #[error("crate {0} not found in repo {1}")]
     CrateNotFoundInRepo(String, String),
-    #[fail(display = "crate is not a package: {:?}", _0)]
+    #[error("crate is not a package: {0:?}")]
     NotAPackage(Origin),
 
-    #[fail(display = "Error when parsing verison")]
+    #[error("Error when parsing verison")]
     SemverParsingError,
-    #[fail(display = "Stopped")]
+    #[error("Stopped")]
     Stopped,
-    #[fail(display = "Deps stats timeout")]
+    #[error("Deps stats timeout")]
     DepsNotAvailable,
-    #[fail(display = "Index is empty or parsing failed")]
+    #[error("Index is empty or parsing failed")]
     IndexBroken,
-    #[fail(display = "Crate timeout")]
+    #[error("Error in git index file {0:?}: {1}")]
     GitIndexFile(PathBuf, String),
-    #[fail(display = "Git crate '{:?}' can't be indexed, because it's not on the list", _0)]
+    #[error("Git crate {0:?} can't be indexed, because it's not on the list")]
     GitCrateNotAllowed(Origin),
 }

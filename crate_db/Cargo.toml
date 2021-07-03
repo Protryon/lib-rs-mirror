@@ -13,7 +13,6 @@ path = "src/lib_crate_db.rs"
 rusqlite = "0.25"
 rich_crate = { path = "../rich_crate" }
 categories = { path = "../categories" }
-failure = "0.1.8"
 lazy_static = "1.4.0"
 chrono = "0.4.11"
 thread_local = "1.0.1"
@@ -23,6 +22,7 @@ heck = "0.3.1"
 semver = "0.10.0"
 tokio = { version = "1.2.0", features = ["sync", "macros", "rt-multi-thread"] }
 log = "0.4.14"
+thiserror = "1.0.26"
 
 [dev-dependencies]
 tempfile = "3.1.0"

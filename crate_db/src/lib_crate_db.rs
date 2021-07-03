@@ -1,5 +1,4 @@
 use chrono::prelude::*;
-use failure::*;
 use heck::KebabCase;
 use rich_crate::CachedCrate;
 use rich_crate::CrateOwner;
@@ -23,7 +22,22 @@ use std::path::Path;
 use std::sync::Arc;
 use thread_local::ThreadLocal;
 use tokio::sync::{Mutex, RwLock};
-type FResult<T> = std::result::Result<T, failure::Error>;
+type FResult<T, E = Error> = std::result::Result<T, E>;
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("DB sqlite error")]
+    Db(#[source] #[from] rusqlite::Error),
+
+    #[error("DB sqlite error in {1}")]
+    DbCtx(#[source] rusqlite::Error, &'static str),
+
+    #[error("DB I/O error")]
+    Io(#[source] #[from] std::io::Error),
+
+    #[error("{0}")]
+    Other(String),
+}
 
 pub mod builddb;
 
@@ -99,9 +113,9 @@ impl CrateDb {
                     if elapsed > std::time::Duration::from_secs(3) {
                         eprintln!("{} write callback took {}s", context, elapsed.as_secs());
                     }
-                    Ok(res.context(context)?)
+                    res
                 },
-                Err(err) => bail!("{} (in {})", err, context),
+                Err(err) => Err(Error::Other(format!("{}: {}", err, context))),
             }
         })
     }
@@ -124,11 +138,11 @@ impl CrateDb {
                     if elapsed > std::time::Duration::from_secs(3) {
                         eprintln!("{} write callback took {}s", context, elapsed.as_secs());
                     }
-                    Ok(res.context(context)?)
+                    res
                 },
-                Err(err) => bail!("{} (in {})", err, context),
+                Err(err) => Err(Error::Other(format!("{} (in {})", err, context))),
             }
-        }).await?
+        }).await.expect("spawn")
     }
 
     #[inline]
@@ -142,8 +156,8 @@ impl CrateDb {
 
             let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
             let now = std::time::Instant::now();
-            let res = cb(&tx).context(context)?;
-            tx.commit().context(context)?;
+            let res = cb(&tx)?;
+            tx.commit().map_err(|e| Error::DbCtx(e, context))?;
             let elapsed = now.elapsed();
             if elapsed > std::time::Duration::from_secs(3) {
                 eprintln!("{} write callback took {}s", context, elapsed.as_secs());
@@ -178,7 +192,7 @@ impl CrateDb {
             let next_timestamp = (Utc::now().timestamp() + 3600 * 24 * 3) as u32;
             let mut mark_updated = tx.prepare_cached("UPDATE crates SET next_update = ?2 WHERE origin = ?1")?;
             let args: &[&dyn ToSql] = &[&origin.to_str(), &next_timestamp];
-            mark_updated.execute(args).context("premark updated crate")?;
+            mark_updated.execute(args)?;
             Ok(())
         }).await
     }
@@ -249,7 +263,7 @@ impl CrateDb {
         }
 
         let mut out = String::with_capacity(200);
-        write!(&mut out, "https://lib.rs/{} ", if c.origin.is_crates_io() { c.origin.short_crate_name() } else { &origin })?;
+        write!(&mut out, "https://lib.rs/{} ", if c.origin.is_crates_io() { c.origin.short_crate_name() } else { &origin }).unwrap();
 
         let next_timestamp = (Utc::now().timestamp() + 3600 * 24 * 31) as u32;
 
@@ -264,21 +278,22 @@ impl CrateDb {
             let mut get_crate_id = tx.prepare_cached("SELECT id, recent_downloads FROM crates WHERE origin = ?1")?;
 
             let args: &[&dyn ToSql] = &[&origin, &0, &0];
-            insert_crate.execute(args).context("insert crate")?;
-            let (crate_id, downloads): (u32, u32) = get_crate_id.query_row(&[&origin], |row| Ok((row.get_unwrap(0), row.get_unwrap(1)))).context("crate_id")?;
+            insert_crate.execute(args)?;
+            let (crate_id, downloads): (u32, u32) = get_crate_id.query_row(&[&origin], |row| Ok((row.get_unwrap(0), row.get_unwrap(1))))
+                .map_err(|e| Error::DbCtx(e, "crate id"))?;
             let is_important_ish = downloads > 2000;
 
             if let Some(repo) = c.repository {
                 let url = repo.canonical_git_url();
                 let args: &[&dyn ToSql] = &[&crate_id, &url.as_ref()];
-                insert_repo.execute(args).context("insert repo")?;
+                insert_repo.execute(args).map_err(|e| Error::DbCtx(e, "insert repo"))?;
             } else {
-                delete_repo.execute(&[&crate_id]).context("del repo")?;
+                delete_repo.execute(&[&crate_id])?;
             }
 
             let prev_c = prev_categories.query_map(&[&crate_id], |row| row.get(0))?.collect::<Result<Vec<String>,_>>()?;
-            clear_categories.execute(&[&crate_id]).context("clear cat")?;
-            insert_keyword.pre_commit(tx, crate_id).context("clear kw")?;
+            clear_categories.execute(&[&crate_id]).map_err(|e| Error::DbCtx(e, "clear cat"))?;
+            insert_keyword.pre_commit(tx, crate_id)?;
 
             let (categories, had_explicit_categories) = {
                 let keywords = insert_keyword.keywords.iter().map(|(k,_)| k.to_string());
@@ -288,23 +303,23 @@ impl CrateDb {
             if !had_explicit_categories {
                 let mut tmp = insert_keyword.keywords.iter().collect::<Vec<_>>();
                 tmp.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
-                write!(&mut out, "#{} ", tmp.into_iter().take(10).map(|(k, _)| k.to_string()).collect::<Vec<_>>().join(" #"))?;
+                write!(&mut out, "#{} ", tmp.into_iter().take(10).map(|(k, _)| k.to_string()).collect::<Vec<_>>().join(" #")).unwrap();
             }
 
             if categories.is_empty() {
-                write!(&mut out, "[no categories] {:?}", prev_c)?;
+                write!(&mut out, "[no categories] {:?}", prev_c).unwrap();
             }
             if !had_explicit_categories && !categories.is_empty() {
-                write!(&mut out, "[guessed]: ")?;
+                write!(&mut out, "[guessed]: ").unwrap();
             }
             for (rank, rel, slug) in &categories {
                 if !prev_c.contains(slug) {
-                    write!(&mut out, ">NEW {}, ", slug)?;
+                    write!(&mut out, ">NEW {}, ", slug).unwrap();
                 } else {
-                    write!(&mut out, ">{}, ", slug)?;
+                    write!(&mut out, ">{}, ", slug).unwrap();
                 }
                 let args: &[&dyn ToSql] = &[&crate_id, slug, rank, rel];
-                insert_category.execute(args).context("insert cat")?;
+                insert_category.execute(args).map_err(|e| Error::DbCtx(e, "insert cat"))?;
                 if had_explicit_categories {
                     insert_keyword.add(slug, rel/3., false);
                 }
@@ -312,7 +327,7 @@ impl CrateDb {
 
             for slug in &prev_c {
                 if !categories.iter().any(|(_,_,old)| old == slug) {
-                    write!(&mut out, ">LOST {}", slug)?;
+                    write!(&mut out, ">LOST {}", slug).unwrap();
                 }
             }
 
@@ -332,7 +347,7 @@ impl CrateDb {
 
             let mut keywords: Vec<_> = package.keywords.iter().filter(|k| !k.is_empty()).map(|s| s.to_kebab_case()).collect();
             if keywords.is_empty() {
-                keywords = Self::keywords_tx(tx, c.origin).context("keywordsdb2")?;
+                keywords = Self::keywords_tx(tx, c.origin)?;
             }
 
             let package = manifest.package.as_ref().expect("package in manifest");
@@ -363,7 +378,7 @@ impl CrateDb {
                 },
             };
 
-            mark_updated.execute(&[&crate_id, &next_timestamp]).context("mark updated crate")?;
+            mark_updated.execute(&[&crate_id, &next_timestamp])?;
             println!("{}", out);
             Ok(res)
         }).await
@@ -447,7 +462,7 @@ impl CrateDb {
             for (path, name) in paths_and_names {
                 let name = name.as_ref();
                 let path = path.as_ref();
-                insert_repo.execute(&[&repo.as_ref(), &path, &name]).context("repo rev insert")?;
+                insert_repo.execute(&[&repo.as_ref(), &path, &name]).map_err(|e| Error::DbCtx(e, "repo rev insert"))?;
             }
             Ok(())
         }).await
@@ -553,7 +568,7 @@ impl CrateDb {
         let repo = repo.canonical_git_url();
         let mut get_path = conn.prepare_cached("SELECT path FROM repo_crates WHERE repo = ?1 AND crate_name = ?2")?;
         let args: &[&dyn ToSql] = &[&repo, &crate_name];
-        Ok(none_rows(get_path.query_row(args, |row| row.get(0))).context("path_in_repo")?)
+        Ok(none_rows(get_path.query_row(args, |row| row.get(0))).map_err(|e| Error::DbCtx(e, "path_in_repo"))?)
     }
 
     /// Update download counts of the crate
@@ -564,17 +579,18 @@ impl CrateDb {
 
             let origin = all.origin().to_str();
             let crate_id: u32 = get_crate_id.query_row(&[&origin], |row| row.get(0))
-                .with_context(|_| format!("the crate {} hasn't been indexed yet", origin))?;
+                .map_err(|e| Error::DbCtx(e, "the crate hasn't been indexed yet"))?;
 
             let recent_90_days = downloads_per_month.unwrap_or(0) as u32 * 3;
             let mut update_recent = tx.prepare_cached("UPDATE crates SET recent_downloads = ?1, ranking = ?2 WHERE id = ?3")?;
             let args: &[&dyn ToSql] = &[&recent_90_days, &score, &crate_id];
-            update_recent.execute(args).context("update recent_90_days")?;
+            update_recent.execute(args)?;
 
             for ver in all.versions() {
-                let timestamp = DateTime::parse_from_rfc3339(&ver.created_at).context("version timestamp")?;
-                let args: &[&dyn ToSql] = &[&crate_id, &ver.num, &timestamp.timestamp()];
-                insert_version.execute(args).context("insert ver")?;
+                if let Ok(timestamp) = DateTime::parse_from_rfc3339(&ver.created_at) {
+                    let args: &[&dyn ToSql] = &[&crate_id, &ver.num, &timestamp.timestamp()];
+                    insert_version.execute(args)?;
+                }
             }
             Ok(())
         }).await
@@ -663,8 +679,8 @@ impl CrateDb {
         join categories cc on cc.crate_id = ck.crate_id
         group by slug
         order by 2 desc
-        limit 10"#).context("categories")?;
-        let candidates = query.query_map(&[&origin.to_str()], |row| Ok((row.get_unwrap(0), row.get_unwrap(1)))).context("categories q")?;
+        limit 10"#)?;
+        let candidates = query.query_map(&[&origin.to_str()], |row| Ok((row.get_unwrap(0), row.get_unwrap(1))))?;
         let candidates = candidates.collect::<std::result::Result<_, _>>()?;
 
         Ok(categories::adjusted_relevance(candidates, kebab_keywords, threshold, 2))
@@ -720,7 +736,7 @@ impl CrateDb {
                 order by 1 desc
                 limit 6
             "#)?;
-            let res = query.query_map(&[&slug], |row| row.get(1)).context("related_categories")?;
+            let res = query.query_map(&[&slug], |row| row.get(1))?;
             Ok(res.collect::<std::result::Result<_,_>>()?)
         }).await
     }
@@ -740,7 +756,7 @@ impl CrateDb {
             let res = query.query_map(&[&crate_name], |row| {
                 let s = row.get_ref_unwrap(1).as_str()?;
                 crates_io_name(s)
-            }).context("replacement_crates")?;
+            })?;
             Ok(res.collect::<std::result::Result<_,_>>()?)
         }).await
     }
@@ -764,7 +780,7 @@ impl CrateDb {
             let args: &[&dyn ToSql] = &[&origin.to_str(), &min_recent_downloads];
             let res = query.query_map(args, |row| {
                 Ok(Origin::from_str(row.get_ref_unwrap(1).as_str()?))
-            }).context("related_crates")?;
+            })?;
             Ok(res.collect::<std::result::Result<_,_>>()?)
         }).await
     }
@@ -824,7 +840,7 @@ impl CrateDb {
                     order by 1 desc
                     limit 12
             "#)?;
-            let q = query.query_map(&[&slug], |row| row.get(1)).context("top keywords")?;
+            let q = query.query_map(&[&slug], |row| row.get(1))?;
             let q = q.filter_map(|r| r.ok());
             Ok(q.collect())
         }).await
@@ -946,7 +962,7 @@ impl CrateDb {
             "#)?;
             let q = q.query_map([], |row| -> Result<(Origin, f64, i64)> {
                 Ok((Origin::from_str(row.get_ref_unwrap(0).as_str()?), row.get_unwrap(1), row.get_unwrap(2)))
-            }).context("sitemap")?.filter_map(|r| r.ok());
+            })?.filter_map(|r| r.ok());
             Ok(q.collect())
         }).await
     }
@@ -959,7 +975,7 @@ impl CrateDb {
             "#)?;
             let q = q.query_map([], |row| -> Result<(String, u32)> {
                 Ok((row.get_unwrap(0), row.get_unwrap(1)))
-            }).context("counts")?.filter_map(|r| r.ok());
+            })?.filter_map(|r| r.ok());
             Ok(q.collect())
         }).await
     }
@@ -1035,7 +1051,7 @@ impl KeywordInsert {
     /// Clears old keywords from the db
     pub fn pre_commit(&mut self, conn: &Connection, crate_id: u32) -> FResult<()> {
         let mut clear_keywords = conn.prepare_cached("DELETE FROM crate_keywords WHERE crate_id = ?1")?;
-        clear_keywords.execute(&[&crate_id]).context("clear cat")?;
+        clear_keywords.execute(&[&crate_id])?;
         self.ready = true;
         Ok(())
     }
@@ -1068,13 +1084,13 @@ impl KeywordInsert {
         for (word, (weight, visible)) in self.keywords {
             let args: &[&dyn ToSql] = &[&word, if visible { &1 } else { &0 }];
             insert_name.execute(args)?;
-            let (keyword_id, old_vis): (u32, u32) = select_id.query_row(&[&word], |r| Ok((r.get_unwrap(0), r.get_unwrap(1)))).context("get keyword")?;
+            let (keyword_id, old_vis): (u32, u32) = select_id.query_row(&[&word], |r| Ok((r.get_unwrap(0), r.get_unwrap(1))))?;
             if visible && old_vis == 0 {
-                make_visible.execute(&[&keyword_id]).context("keyword vis")?;
+                make_visible.execute(&[&keyword_id])?;
             }
             let weight = weight * overall_weight;
             let args: &[&dyn ToSql] = &[&keyword_id, &crate_id, &weight, if visible { &1 } else { &0 }];
-            insert_value.execute(args).context("keyword")?;
+            insert_value.execute(args)?;
         }
         Ok(())
     }

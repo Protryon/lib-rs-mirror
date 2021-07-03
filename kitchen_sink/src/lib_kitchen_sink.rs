@@ -8,6 +8,7 @@ extern crate serde_derive;
 extern crate log;
 
 mod yearly;
+use futures::TryFutureExt;
 use tokio::time::Instant;
 
 pub use crate::yearly::*;
@@ -1465,7 +1466,7 @@ impl KitchenSink {
     /// "See also"
     #[inline]
     pub async fn related_categories(&self, slug: &str) -> CResult<Vec<String>> {
-        self.crate_db.related_categories(slug).await
+        Ok(self.crate_db.related_categories(slug).await?)
     }
 
     /// Recommendations
@@ -1584,7 +1585,7 @@ impl KitchenSink {
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
         info!("Indexing {:?}", origin);
 
-        timeout("before-index", 5, self.crate_db.before_index_latest(origin)).await?;
+        timeout("before-index", 5, self.crate_db.before_index_latest(origin).map_err(failure::Error::from)).await?;
 
         let ((source_data, manifest, _warn), cache_key) = match origin {
             Origin::CratesIo(ref name) => {
@@ -1652,7 +1653,7 @@ impl KitchenSink {
             source_data: &source_data,
             extracted_auto_keywords,
         });
-        let cached = timeout("db-index", 30, db_index).await?;
+        let cached = timeout("db-index", 30, db_index.map_err(failure::Error::from)).await?;
         self.derived_cache.set_serialize((&origin.to_str(), ""), &cached)?;
         Ok(())
     }
@@ -2325,7 +2326,7 @@ impl KitchenSink {
 
     #[inline]
     pub async fn crates_of_author(&self, aut: &RichAuthor) -> CResult<Vec<CrateOwnerRow>> {
-        self.crate_db.crates_of_author(aut.github.id).await
+        Ok(self.crate_db.crates_of_author(aut.github.id).await?)
     }
 
     pub async fn crate_owners(&self, origin: &Origin, include_maybe_past_owners: bool) -> CResult<Vec<CrateOwner>> {

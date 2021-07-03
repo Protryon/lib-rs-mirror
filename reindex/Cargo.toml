@@ -10,7 +10,6 @@ github_info = { path = "../github_info", version = "0.9" }
 kitchen_sink = { path = "../kitchen_sink", version = "0.9" }
 repo_url = { path = "../repo_url" }
 user_db = { path = "../user_db", version = "0.3" }
-failure = "0.1.6"
 rand = "0.8"
 search_index = { path = "../search_index" }
 render_readme = { path = "../render_readme" }
@@ -25,6 +24,7 @@ simple_cache = { path = "../simple_cache", version = "0.7.0" }
 debcargo_list = { path = "../debcargo_list" }
 blake3 = "0.3.4"
 log = "0.4.14"
+anyhow = "1.0.41"
 
 [dev-dependencies]
 ahash = "0.7.4"

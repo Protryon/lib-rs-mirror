@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
 use kitchen_sink::{stopped, KitchenSink};
@@ -31,10 +32,10 @@ async fn main() {
             let concurrency = Arc::clone(&concurrency);
             let seen = Arc::clone(&seen);
             waiting.push(handle.spawn(async move {
-                let _f = concurrency.acquire().await;
+                let _f = concurrency.acquire().await?;
                 println!("{}…", o.short_crate_name());
-                let c = crates.rich_crate_version_async(&o).await?;
-                if stopped() {failure::bail!("stop");}
+                let c = crates.rich_crate_version_async(&o).await.map_err(|e| e.compat())?;
+                if stopped() {anyhow!("stop");}
                 for a in c.authors().iter().filter(|a| a.email.is_some()) {
                     if let Some(email) = a.email.as_ref() {
                         {
@@ -46,16 +47,16 @@ async fn main() {
                         }
 
                         if let Err(err) = crates.index_email(email, a.name.as_deref()).await {
-                            eprintln!("•• {}: {}", email, err);
+                            eprintln!("•• {}: {}", email, err);
                         }
                     }
                 }
-                Ok(())
+                Ok::<_, anyhow::Error>(())
             }.then(|res| async move {
                 if let Err(e) = res {
-                    eprintln!("••• error: {}", e);
-                    for c in e.iter_chain() {
-                        eprintln!("•   error: -- {}", c);
+                    eprintln!("••• error: {}", e);
+                    for c in e.chain() {
+                        eprintln!("•   error: -- {}", c);
                     }
                 }
             })).map(drop));

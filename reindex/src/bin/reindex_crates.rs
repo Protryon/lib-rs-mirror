@@ -1,5 +1,6 @@
+use futures::TryFutureExt;
 use debcargo_list::DebcargoList;
-
+use anyhow::anyhow;
 use feat_extractor::*;
 use futures::future::join_all;
 use futures::future::FutureExt;
@@ -71,12 +72,12 @@ fn main() {
                         println!("savepoint…");
                         indexer.commit()?;
                     }
-                    Ok::<_, failure::Error>(())
+                    Ok::<_, anyhow::Error>(())
                 })?;
             }
             tokio::task::block_in_place(|| indexer.commit())?;
             let _ = indexer.bye()?;
-            Ok::<_, failure::Error>(())
+            Ok::<_, anyhow::Error>(())
         }
     });
 
@@ -119,7 +120,7 @@ async fn main_indexing_loop(r: Arc<Reindexer>, crate_origins: Box<dyn Iterator<I
             let index_finished = concurrency.acquire().await;
             if stopped() {return;}
             println!("{}…", i);
-            match run_timeout(62, r.crates.index_crate_highest_version(&origin)).await {
+            match run_timeout(62, r.crates.index_crate_highest_version(&origin).map_err(|e| e.compat())).await {
                 Ok(()) => {},
                 err => {
                     print_res(err);
@@ -143,7 +144,7 @@ async fn main_indexing_loop(r: Arc<Reindexer>, crate_origins: Box<dyn Iterator<I
                             }
                             let _finished = repo_concurrency.acquire().await;
                             if stopped() {return;}
-                            print_res(run_timeout(600, r.crates.index_repo(repo, v.version())).await);
+                            print_res(run_timeout(600, r.crates.index_repo(repo, v.version()).map_err(|e| e.compat())).await);
                         }
                     }
                 },
@@ -157,9 +158,9 @@ async fn main_indexing_loop(r: Arc<Reindexer>, crate_origins: Box<dyn Iterator<I
 }
 
 impl Reindexer {
-async fn index_crate(&self, origin: &Origin, renderer: &Renderer, search_sender: &mut mpsc::Sender<(ArcRichCrateVersion, usize, f64)>) -> Result<ArcRichCrateVersion, failure::Error> {
+async fn index_crate(&self, origin: &Origin, renderer: &Renderer, search_sender: &mut mpsc::Sender<(ArcRichCrateVersion, usize, f64)>) -> Result<ArcRichCrateVersion, anyhow::Error> {
     let crates = &self.crates;
-    let (k, v) = futures::try_join!(crates.rich_crate_async(origin), run_timeout(45, crates.rich_crate_version_async(origin)))?;
+    let (k, v) = futures::try_join!(crates.rich_crate_async(origin).map_err(|e| e.compat().into()), run_timeout(45, crates.rich_crate_version_async(origin).map_err(|e| e.compat())))?;
 
     let (downloads_per_month, score) = self.crate_overall_score(&k, &v, renderer).await;
     let (_, index_res) = futures::join!(
@@ -167,14 +168,14 @@ async fn index_crate(&self, origin: &Origin, renderer: &Renderer, search_sender:
             search_sender.send((v.clone(), downloads_per_month, score)).await
                 .map_err(|e| {stop();e}).expect("closed channel?");
         },
-        run_timeout(60, crates.index_crate(&k, score))
+        run_timeout(60, crates.index_crate(&k, score).map_err(|e| e.compat()))
     );
     index_res?;
     Ok(v)
 }
 }
 
-fn index_search(indexer: &mut Indexer, lines: &TempCache<(String, f64), [u8; 16]>, renderer: &Renderer, k: &RichCrateVersion, downloads_per_month: usize, score: f64) -> Result<(), failure::Error> {
+fn index_search(indexer: &mut Indexer, lines: &TempCache<(String, f64), [u8; 16]>, renderer: &Renderer, k: &RichCrateVersion, downloads_per_month: usize, score: f64) -> Result<(), anyhow::Error> {
     let keywords: Vec<_> = k.keywords().iter().map(|s| s.as_str()).collect();
     let version = k.version();
 
@@ -351,7 +352,7 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
 }
 }
 
-fn print_res<T>(res: Result<T, failure::Error>) {
+fn print_res<T>(res: Result<T, anyhow::Error>) {
     if let Err(e) = res {
         let s = e.to_string();
         if s.starts_with("Too many open files") {
@@ -359,7 +360,7 @@ fn print_res<T>(res: Result<T, failure::Error>) {
             panic!("{}", s);
         }
         log::error!("••• Error: {}", s);
-        for c in e.iter_chain().skip(1) {
+        for c in e.chain().skip(1) {
             let s = c.to_string();
             log::error!("•   error: -- {}", s);
             if s.starts_with("Too many open files") {
@@ -370,8 +371,12 @@ fn print_res<T>(res: Result<T, failure::Error>) {
     }
 }
 
-fn run_timeout<'a, T>(secs: u64, fut: impl Future<Output = Result<T, failure::Error>> + 'a) -> impl Future<Output = Result<T, failure::Error>> + 'a {
-    tokio::time::timeout(Duration::from_secs(secs), fut).map(move |r| r.map_err(|_| failure::format_err!("timed out {}", secs)).and_then(|x| x))
+fn run_timeout<'a, T, E>(secs: u64, fut: impl Future<Output = Result<T, E>> + 'a) -> impl Future<Output = Result<T, anyhow::Error>> + 'a
+where anyhow::Error: From<E> {
+    async move {
+        let res = tokio::time::timeout(Duration::from_secs(secs), fut).await.map_err(|_| anyhow!("timed out {}", secs))?;
+        res.map_err(From::from)
+    }
 }
 
 #[test]

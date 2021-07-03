@@ -22,7 +22,6 @@ mod ctrlcbreak;
 pub use crate::ctrlcbreak::*;
 mod nonblock;
 pub use crate::nonblock::*;
-mod tarball;
 
 pub use crate_db::builddb::Compat;
 pub use crate_db::builddb::CompatByCrateVersion;
@@ -54,7 +53,7 @@ pub use rich_crate::RichDep;
 pub use rich_crate::{Cfg, Target};
 pub use semver::Version as SemVer;
 
-use crate::tarball::CrateFile;
+use tarball::CrateFile;
 use cargo_toml::Manifest;
 use cargo_toml::Package;
 use categories::Category;
@@ -956,7 +955,7 @@ impl KitchenSink {
             let name = name.to_owned();
             let ver = ver.to_owned();
             move || {
-                crate::tarball::read_archive(&crate_tarball[..], &name, &ver)
+                tarball::read_archive(&crate_tarball[..], &name, &ver)
             }
         }).await??;
 

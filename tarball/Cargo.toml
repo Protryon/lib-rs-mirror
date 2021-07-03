@@ -1,0 +1,18 @@
+[package]
+name = "tarball"
+version = "0.1.0"
+edition = "2018"
+publish = false
+
+[dependencies]
+anyhow = "1.0.41"
+cargo_toml = "0.9.1"
+crate_git_checkout = { path = "../crate_git_checkout", version = "0.4.7" }
+libflate = "1.0.0"
+render_readme = { path = "../render_readme" }
+tar = "0.4.26"
+thiserror = "1.0.26"
+udedokei = { path = "../udedokei" }
+
+[dev-dependencies]
+repo_url = { path = "../repo_url", version = "0.3.3" }

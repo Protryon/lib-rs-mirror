@@ -19,6 +19,14 @@ use std::process::Command;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("Git")]
+    Git(#[from] #[source] git2::Error),
+    #[error("Cargo.toml")]
+    Toml(#[from] #[source] cargo_toml::Error),
+}
+
 mod iter;
 
 lazy_static! {
@@ -41,28 +49,28 @@ pub fn checkout(repo: &Repo, base_path: &Path) -> Result<Repository, git2::Error
 }
 
 #[inline]
-pub fn iter_blobs<F>(repo: &Repository, at: Option<Oid>, cb: F) -> Result<(), failure::Error>
-    where F: FnMut(&str, &Tree<'_>, &str, Blob<'_>) -> Result<(), failure::Error>
+pub fn iter_blobs<E, F>(repo: &Repository, at: Option<Oid>, cb: F) -> Result<(), E>
+    where F: FnMut(&str, &Tree<'_>, &str, Blob<'_>) -> Result<(), E>, E: From<Error>
 {
     let tree = if let Some(oid) = at {
-        repo.find_tree(oid)?
+        repo.find_tree(oid).map_err(Error::from)?
     } else {
-        let head = repo.head()?;
-        head.peel_to_tree()?
+        let head = repo.head().map_err(Error::from)?;
+        head.peel_to_tree().map_err(Error::from)?
     };
     iter_blobs_in_tree(repo, &tree, cb)
 }
 
 #[inline]
-pub fn iter_blobs_in_tree<F>(repo: &Repository, tree: &Tree<'_>, mut cb: F) -> Result<(), failure::Error>
-    where F: FnMut(&str, &Tree<'_>, &str, Blob<'_>) -> Result<(), failure::Error>
+pub fn iter_blobs_in_tree<E, F>(repo: &Repository, tree: &Tree<'_>, mut cb: F) -> Result<(), E>
+    where F: FnMut(&str, &Tree<'_>, &str, Blob<'_>) -> Result<(), E>, E: From<Error>
 {
     iter_blobs_recurse(repo, tree, &mut String::with_capacity(500), &mut cb)?;
     Ok(())
 }
 
-fn iter_blobs_recurse<F>(repo: &Repository, tree: &Tree<'_>, path: &mut String, cb: &mut F) -> Result<(), failure::Error>
-    where F: FnMut(&str, &Tree<'_>, &str, Blob<'_>) -> Result<(), failure::Error>
+fn iter_blobs_recurse<E, F>(repo: &Repository, tree: &Tree<'_>, path: &mut String, cb: &mut F) -> Result<(), E>
+    where F: FnMut(&str, &Tree<'_>, &str, Blob<'_>) -> Result<(), E>, E: From<Error>
 {
     for i in tree.iter() {
         let name = match i.name() {
@@ -71,7 +79,7 @@ fn iter_blobs_recurse<F>(repo: &Repository, tree: &Tree<'_>, path: &mut String, 
         };
         match i.kind() {
             Some(ObjectType::Tree) => {
-                let sub = repo.find_tree(i.id())?;
+                let sub = repo.find_tree(i.id()).map_err(Error::from)?;
                 let pre_len = path.len();
                 if !path.is_empty() {
                     path.push('/');
@@ -81,7 +89,7 @@ fn iter_blobs_recurse<F>(repo: &Repository, tree: &Tree<'_>, path: &mut String, 
                 path.truncate(pre_len);
             },
             Some(ObjectType::Blob) => {
-                cb(path, tree, name, repo.find_blob(i.id())?)?;
+                cb(path, tree, name, repo.find_blob(i.id()).map_err(Error::from)?)?;
             },
             _ => {},
         }
@@ -136,7 +144,7 @@ fn get_repo(repo: &Repo, base_path: &Path) -> Result<Repository, git2::Error> {
 }
 
 /// Returns (path, Tree Oid, Cargo.toml)
-pub fn find_manifests(repo: &Repository) -> Result<(Vec<(String, Oid, Manifest)>, Vec<ParseError>), failure::Error> {
+pub fn find_manifests(repo: &Repository) -> Result<(Vec<(String, Oid, Manifest)>, Vec<ParseError>), Error> {
     let head = repo.head()?;
     let tree = head.peel_to_tree()?;
     find_manifests_in_tree(repo, &tree)
@@ -180,10 +188,10 @@ impl GitFS<'_, '_> {
 }
 
 /// Path, tree Oid, parsed TOML
-fn find_manifests_in_tree(repo: &Repository, start_tree: &Tree<'_>) -> Result<(Vec<(String, Oid, Manifest)>, Vec<ParseError>), failure::Error> {
+fn find_manifests_in_tree(repo: &Repository, start_tree: &Tree<'_>) -> Result<(Vec<(String, Oid, Manifest)>, Vec<ParseError>), Error> {
     let mut tomls = Vec::with_capacity(8);
     let mut warnings = Vec::new();
-    iter_blobs_in_tree(repo, start_tree, |inner_path, inner_tree, name, blob| {
+    iter_blobs_in_tree::<Error, _>(repo, start_tree, |inner_path, inner_tree, name, blob| {
         if name == "Cargo.toml" {
             match Manifest::from_slice(blob.content()) {
                 Ok(mut toml) => {
@@ -202,13 +210,13 @@ fn find_manifests_in_tree(repo: &Repository, start_tree: &Tree<'_>) -> Result<(V
     Ok((tomls, warnings))
 }
 
-pub fn path_in_repo(repo: &Repository, crate_name: &str) -> Result<Option<(String, Oid, Manifest)>, failure::Error> {
+pub fn path_in_repo(repo: &Repository, crate_name: &str) -> Result<Option<(String, Oid, Manifest)>, Error> {
     let head = repo.head()?;
     let tree = head.peel_to_tree()?;
     path_in_repo_in_tree(repo, &tree, crate_name)
 }
 
-fn path_in_repo_in_tree(repo: &Repository, tree: &Tree<'_>, crate_name: &str) -> Result<Option<(String, Oid, Manifest)>, failure::Error> {
+fn path_in_repo_in_tree(repo: &Repository, tree: &Tree<'_>, crate_name: &str) -> Result<Option<(String, Oid, Manifest)>, Error> {
     Ok(find_manifests_in_tree(repo, tree)?.0
         .into_iter()
         .find(|(_, _, manifest)| manifest.package.as_ref().map_or(false, |p| p.name == crate_name)))
@@ -222,7 +230,7 @@ struct State {
 
 pub type PackageVersionTimestamps = HashMap<String, HashMap<String, i64>>;
 
-pub fn find_versions(repo: &Repository) -> Result<PackageVersionTimestamps, failure::Error> {
+pub fn find_versions(repo: &Repository) -> Result<PackageVersionTimestamps, Error> {
     let mut package_versions: PackageVersionTimestamps = HashMap::with_capacity(4);
     for commit in repo.tag_names(None)?.iter()
         .flatten()
@@ -262,7 +270,7 @@ fn add_package(package_versions: &mut PackageVersionTimestamps, pkg: Package, co
 }
 
 /// Callback gets added, removed, number of commits ago.
-pub fn find_dependency_changes(repo: &Repository, mut cb: impl FnMut(HashSet<String>, HashSet<String>, usize)) -> Result<PackageVersionTimestamps, failure::Error> {
+pub fn find_dependency_changes(repo: &Repository, mut cb: impl FnMut(HashSet<String>, HashSet<String>, usize)) -> Result<PackageVersionTimestamps, Error> {
     let head = repo.head()?;
 
     let mut newer_deps: HashMap<String, State> = HashMap::with_capacity(100);
@@ -317,7 +325,7 @@ pub fn find_dependency_changes(repo: &Repository, mut cb: impl FnMut(HashSet<Str
 }
 
 // FIXME: buggy, barely works
-pub fn find_readme(repo: &Repository, package: &Package) -> Result<Option<(String, Markup)>, failure::Error> {
+pub fn find_readme(repo: &Repository, package: &Package) -> Result<Option<(String, Markup)>, Error> {
     let head = repo.head()?;
     let tree = head.peel_to_tree()?;
     let mut readme = None;
@@ -331,7 +339,7 @@ pub fn find_readme(repo: &Repository, package: &Package) -> Result<Option<(Strin
     }
     let prefix = prefix.as_ref().map(|(s, ..)| s.as_str()).unwrap_or("");
 
-    iter_blobs_in_tree(repo, &tree, |base, _inner_tree, name, blob| {
+    iter_blobs_in_tree::<Error, _>(repo, &tree, |base, _inner_tree, name, blob| {
         if found_best {
             return Ok(()); // done
         }
@@ -375,6 +383,6 @@ fn is_readme_filename(path: &Path, package: Option<&Package>) -> bool {
 fn git_fs() {
     let repo = Repository::open("../.git").expect("own git repo");
     let (m, w) = find_manifests(&repo).expect("has manifests");
-    assert_eq!(25, m.len());
+    assert_eq!(26, m.len());
     assert_eq!(0, w.len());
 }

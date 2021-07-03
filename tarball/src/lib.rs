@@ -11,26 +11,16 @@ use tar::{Archive, Entry, EntryType};
 
 use udedokei::LanguageExt;
 
-#[derive(Debug, Fail)]
+#[derive(Debug, thiserror::Error)]
 pub enum UnarchiverError {
-    #[fail(display = "Cargo.toml not found. Got files: {}", _0)]
+    #[error("Cargo.toml not found. Got files: {0}")]
     TomlNotFound(String),
-    #[fail(display = "I/O error during unarchiving: {}", _0)]
-    Io(io::Error),
-    #[fail(display = "Cargo.toml parsing error: {}", _0)]
-    Toml(cargo_toml::Error),
-}
-
-impl From<io::Error> for UnarchiverError {
-    fn from(i: io::Error) -> Self {
-        UnarchiverError::Io(i)
-    }
-}
-
-impl From<cargo_toml::Error> for UnarchiverError {
-    fn from(i: cargo_toml::Error) -> Self {
-        UnarchiverError::Toml(i)
-    }
+    #[error("I/O error during unarchiving")]
+    Io(#[from] #[source] io::Error),
+    #[error("Cargo.toml parsing error")]
+    Toml(#[from] #[source] cargo_toml::Error),
+    #[error("Git checkout failure")]
+    Checkout(#[from] #[source] crate_git_checkout::Error),
 }
 
 fn read_archive_files<R: Read>(archive: R, mut cb: impl FnMut(Entry<'_, Decoder<R>>) -> Result<(), UnarchiverError>) -> Result<(), UnarchiverError> {
@@ -54,9 +44,9 @@ enum ReadAs {
 
 const MAX_FILE_SIZE: u64 = 50_000_000;
 
-pub fn read_repo(repo: &crate_git_checkout::Repository, path_in_tree: crate_git_checkout::Oid) -> Result<CrateFile, failure::Error> {
+pub fn read_repo(repo: &crate_git_checkout::Repository, path_in_tree: crate_git_checkout::Oid) -> Result<CrateFile, UnarchiverError> {
     let mut collect = Collector::new();
-    crate_git_checkout::iter_blobs(repo, Some(path_in_tree), |path, _, name, blob| {
+    crate_git_checkout::iter_blobs::<UnarchiverError, _>(repo, Some(path_in_tree), |path, _, name, blob| {
         // FIXME: skip directories that contain other crates
         let mut blob_content = blob.content();
         collect.add(Path::new(path).join(name), blob_content.len() as u64, &mut blob_content)?;

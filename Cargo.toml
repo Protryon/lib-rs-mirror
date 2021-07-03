@@ -26,6 +26,7 @@ members = [
 "search_index",
 "ranking",
 "server",
+"tarball",
 "feat_extractor",
 "deps_index",
 "debcargo_list",

@@ -13,5 +13,4 @@ path = "src/lib_user_db.rs"
 rusqlite = "0.25"
 github_info = { path = "../github_info", version = "0.9" }
 repo_url = { path = "../repo_url" }
-failure = "0.1.8"
 parking_lot = "0.11"

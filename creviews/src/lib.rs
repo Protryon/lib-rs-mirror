@@ -4,7 +4,6 @@ pub use crev_data::Level;
 pub use crev_data::Rating;
 pub use crev_data::Version;
 use crev_lib::*;
-use failure::Error;
 
 pub struct Creviews {
     local: Local,

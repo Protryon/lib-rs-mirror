@@ -20,6 +20,10 @@ use std::io::BufWriter;
 use std::marker::PhantomData;
 use std::path::PathBuf;
 use tempfile::NamedTempFile;
+#[cfg(target_os = "macos")]
+use std::os::macos::fs::MetadataExt;
+#[cfg(target_os = "linux")]
+use std::os::linux::fs::MetadataExt;
 
 type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 
@@ -27,6 +31,7 @@ struct Inner<K> {
     data: Option<FxHashMap<K, Box<[u8]>>>,
     writes: usize,
     next_autosave: usize,
+    expected_size: u64,
 }
 
 pub struct TempCacheJson<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeOwned + Clone + Send + Eq + Hash = Box<str>> {
@@ -65,6 +70,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
                 data,
                 writes: 0,
                 next_autosave: 10,
+                expected_size: 0,
             }),
             _ty: PhantomData,
             cache_only: false,
@@ -79,7 +85,11 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
     fn lock_for_write(&self) -> Result<RwLockWriteGuard<'_, Inner<K>>, Error> {
         let mut inner = self.data.write();
         if inner.data.is_none() {
-            inner.data = Some(self.load_data()?);
+            let (size, data) = self.load_data()?;
+            inner.data = Some(data);
+            inner.writes = 0;
+            inner.expected_size = size;
+            inner.next_autosave = 10;
         }
         Ok(inner)
     }
@@ -95,12 +105,14 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
         }
     }
 
-    fn load_data(&self) -> Result<FxHashMap<K, Box<[u8]>>, Error> {
-        let mut f = BufReader::new(File::open(&self.path)?);
-        Ok(rmp_serde::from_read(&mut f).map_err(|e| {
+    fn load_data(&self) -> Result<(u64, FxHashMap<K, Box<[u8]>>), Error> {
+        let mut f = File::open(&self.path)?;
+        let file_size = f.metadata()?.st_size();
+        let mut f = BufReader::new(f);
+        Ok((file_size, rmp_serde::from_read(&mut f).map_err(|e| {
             eprintln!("File {} is broken: {}", self.path.display(), e);
             e
-        })?)
+        })?))
     }
 
     pub fn set_(&self, key: K, value: &T) -> Result<(), Error> {
@@ -127,7 +139,11 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
             w.next_autosave *= 2;
             drop(w); // unlock writes
             let d = self.lock_for_read()?;
-            self.save_unlocked(&d)?;
+            if !self.save_unlocked(&d)? {
+                eprintln!("Data write race; discarding");
+                let mut w = self.lock_for_write()?;
+                w.data = None;
+            }
         }
         Ok(())
     }
@@ -167,14 +183,19 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
         Ok(())
     }
 
-    fn save_unlocked(&self, d: &Inner<K>) -> Result<(), Error> {
+    fn save_unlocked(&self, d: &Inner<K>) -> Result<bool, Error> {
         if let Some(data) = d.data.as_ref() {
             let tmp_path = NamedTempFile::new_in(self.path.parent().expect("tmp"))?;
             let mut file = BufWriter::new(File::create(&tmp_path)?);
             rmp_serde::encode::write(&mut file, data)?;
+            let on_disk_size = std::fs::metadata(&self.path).ok().map(|m| m.st_size());
+            if on_disk_size.map_or(false, |s| s != d.expected_size) {
+                return false;
+            }
             tmp_path.persist(&self.path).map_err(|e| e.error)?;
+            return true;
         }
-        Ok(())
+        Ok(true)
     }
 }
 

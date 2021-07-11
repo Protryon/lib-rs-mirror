@@ -40,6 +40,10 @@ debug = false
 opt-level = 2
 debug = 1
 
+[profile.dev.package.brotli]
+opt-level = 3
+debug = false
+
 [profile.dev.package.miniz_oxide]
 opt-level = 3
 debug = false
@@ -53,6 +57,14 @@ opt-level = 3
 debug = false
 
 [profile.dev.package.rmp-serde]
+opt-level = 3
+debug = false
+
+[profile.dev.package.rmp]
+opt-level = 3
+debug = false
+
+[profile.dev.package.byteorder]
 opt-level = 3
 debug = false
 

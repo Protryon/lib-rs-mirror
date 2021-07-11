@@ -3,7 +3,7 @@ use render_readme::ImageFilter;
 use simple_cache::{Error, TempCacheJson};
 use tokio::time::timeout;
 use std::borrow::Cow;
-use std::path::PathBuf;
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -24,7 +24,7 @@ pub struct ImageOptimAPIFilter {
 }
 
 impl ImageOptimAPIFilter {
-    pub async fn new(api_id: &str, cache_path: impl Into<PathBuf>) -> Result<Self, Error> {
+    pub async fn new(api_id: &str, cache_path: impl AsRef<Path>) -> Result<Self, Error> {
         Ok(Self {
             img_prefix: format!("https://img.gs/{}/full/", api_id),
             img2x_prefix: format!("https://img.gs/{}/full,2x/", api_id),

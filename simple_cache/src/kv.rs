@@ -1,8 +1,9 @@
+use std::sync::atomic::Ordering::SeqCst;
+use std::sync::atomic::AtomicU64;
+use std::path::Path;
 use crate::error::Error;
 use fetcher::Fetcher;
 use flate2::read::DeflateDecoder;
-use flate2::write::DeflateEncoder;
-use flate2::Compression;
 use parking_lot::RwLock;
 use parking_lot::RwLockReadGuard;
 use parking_lot::RwLockWriteGuard;
@@ -28,10 +29,11 @@ use std::os::linux::fs::MetadataExt;
 type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 
 struct Inner<K> {
+    convert_gz: bool,
     data: Option<FxHashMap<K, Box<[u8]>>>,
     writes: usize,
     next_autosave: usize,
-    expected_size: u64,
+    expected_size: AtomicU64,
 }
 
 pub struct TempCacheJson<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeOwned + Clone + Send + Eq + Hash = Box<str>> {
@@ -41,13 +43,13 @@ pub struct TempCacheJson<T: Serialize + DeserializeOwned + Clone + Send, K: Seri
 
 pub struct TempCache<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeOwned + Clone + Send + Eq + Hash = Box<str>> {
     path: PathBuf,
-    data: RwLock<Inner<K>>,
+    inner: RwLock<Inner<K>>,
     _ty: PhantomData<T>,
     pub cache_only: bool,
 }
 
 impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeOwned + Clone + Send + Eq + Hash> TempCacheJson<T, K> {
-    pub fn new(path: impl Into<PathBuf>, fetcher: Arc<Fetcher>) -> Result<Self, Error> {
+    pub fn new(path: impl AsRef<Path>, fetcher: Arc<Fetcher>) -> Result<Self, Error> {
         Ok(Self {
             fetcher,
             cache: TempCache::new(path)?,
@@ -56,21 +58,27 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
 }
 
 impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeOwned + Clone + Send + Eq + Hash> TempCache<T, K> {
-    pub fn new(path: impl Into<PathBuf>,) -> Result<Self, Error> {
-        let path = path.into().with_extension("rmpz");
-        let data = if path.exists() {
-            None
+    pub fn new(path: impl AsRef<Path>) -> Result<Self, Error> {
+        let base_path = path.as_ref();
+        let br = base_path.with_extension("mpbr");
+        let gz = base_path.with_extension("rmpz");
+
+        let (data, path, convert_gz) = if br.exists() {
+            (None, br, false)
+        } else if gz.exists() {
+            (None, gz, true)
         } else {
-            Some(FxHashMap::default())
+            (Some(FxHashMap::default()), br, false)
         };
 
         Ok(Self {
             path,
-            data: RwLock::new(Inner {
+            inner: RwLock::new(Inner {
+                convert_gz,
                 data,
                 writes: 0,
                 next_autosave: 10,
-                expected_size: 0,
+                expected_size: AtomicU64::new(0),
             }),
             _ty: PhantomData,
             cache_only: false,
@@ -83,20 +91,32 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
     }
 
     fn lock_for_write(&self) -> Result<RwLockWriteGuard<'_, Inner<K>>, Error> {
-        let mut inner = self.data.write();
+        let mut inner = self.inner.write();
         if inner.data.is_none() {
-            let (size, data) = self.load_data()?;
+            let (size, mut data) = self.load_data()?;
+            if inner.convert_gz {
+                eprintln!("Migrating {} to brotli {}", data.len(), self.path.display());
+                for v in data.values_mut() {
+                    let out = Self::serialize(&Self::old_ungz(&v)?)?;
+                    *v = out.into_boxed_slice();
+                }
+            }
             inner.data = Some(data);
             inner.writes = 0;
-            inner.expected_size = size;
+            inner.expected_size = AtomicU64::new(size);
             inner.next_autosave = 10;
+            if inner.convert_gz {
+                inner.expected_size = AtomicU64::new(0);
+                inner.convert_gz = false;
+                self.save_unlocked(&inner)?;
+            }
         }
         Ok(inner)
     }
 
     fn lock_for_read(&self) -> Result<RwLockReadGuard<'_, Inner<K>>, Error> {
         loop {
-            let inner = self.data.read();
+            let inner = self.inner.read();
             if inner.data.is_some() {
                 return Ok(inner);
             }
@@ -106,7 +126,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
     }
 
     fn load_data(&self) -> Result<(u64, FxHashMap<K, Box<[u8]>>), Error> {
-        let mut f = File::open(&self.path)?;
+        let f = File::open(&self.path)?;
         let file_size = f.metadata()?.st_size();
         let mut f = BufReader::new(f);
         Ok((file_size, rmp_serde::from_read(&mut f).map_err(|e| {
@@ -115,22 +135,24 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
         })?))
     }
 
-    pub fn set_(&self, key: K, value: &T) -> Result<(), Error> {
-        let mut e = DeflateEncoder::new(Vec::new(), Compression::best());
+    fn serialize(value: &T) -> Result<Vec<u8>, Error> {
+        let mut e = brotli::CompressorWriter::new(Vec::new(), 1<<16, 7, 18);
         rmp_serde::encode::write_named(&mut e, value)?;
-        let compr = e.finish()?;
+        Ok(e.into_inner())
+    }
 
-        debug_assert!(Self::ungz(&compr).is_ok()); // sanity check
+    pub fn set_(&self, key: K, value: &T) -> Result<(), Error> {
+        let compr = Self::serialize(value)?;
+        debug_assert!(Self::unbr(&compr).is_ok()); // sanity check
 
         let mut w = self.lock_for_write()?;
-        let compr = compr.into_boxed_slice();
         match w.data.as_mut().unwrap().entry(key) {
-            Entry::Vacant(e) => { e.insert(compr); },
+            Entry::Vacant(e) => { e.insert(compr.into_boxed_slice()); },
             Entry::Occupied(mut e) => {
-                if e.get() == &compr {
+                if &**e.get() == compr.as_slice() {
                     return Ok(());
                 }
-                e.insert(compr);
+                e.insert(compr.into_boxed_slice());
             },
         }
         w.writes += 1;
@@ -159,8 +181,8 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
     pub fn get<Q>(&self, key: &Q) -> Result<Option<T>, Error> where K: Borrow<Q>, Q: Eq + Hash + std::fmt::Debug + ?Sized {
         let kw = self.lock_for_read()?;
         Ok(match kw.data.as_ref().unwrap().get(key) {
-            Some(gz) => Some(Self::ungz(gz).map_err(|e| {
-                eprintln!("ungz of {:?} failed in {}", key, self.path.display());
+            Some(gz) => Some(Self::unbr(gz).map_err(|e| {
+                eprintln!("unbr of {:?} failed in {}", key, self.path.display());
                 drop(kw);
                 let _ = self.delete(key);
                 e
@@ -169,13 +191,18 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
         })
     }
 
-    fn ungz(data: &[u8]) -> Result<T, Error> {
+    fn old_ungz(data: &[u8]) -> Result<T, Error> {
         let ungz = DeflateDecoder::new(data);
         Ok(rmp_serde::decode::from_read(ungz)?)
     }
 
+    fn unbr(data: &[u8]) -> Result<T, Error> {
+        let unbr = brotli::Decompressor::new(data, 1<<16);
+        Ok(rmp_serde::decode::from_read(unbr)?)
+    }
+
     pub fn save(&self) -> Result<(), Error> {
-        let mut data = self.data.write();
+        let mut data = self.inner.write();
         if data.writes > 0 {
             self.save_unlocked(&data)?;
             data.data = None; // Flush mem
@@ -188,12 +215,17 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
             let tmp_path = NamedTempFile::new_in(self.path.parent().expect("tmp"))?;
             let mut file = BufWriter::new(File::create(&tmp_path)?);
             rmp_serde::encode::write(&mut file, data)?;
+            // checked after encode to minimize race condition time window
             let on_disk_size = std::fs::metadata(&self.path).ok().map(|m| m.st_size());
-            if on_disk_size.map_or(false, |s| s != d.expected_size) {
-                return false;
+            let expected_size = d.expected_size.load(SeqCst);
+            if expected_size > 0 && on_disk_size.map_or(false, |s| s != expected_size) {
+                return Ok(false);
             }
-            tmp_path.persist(&self.path).map_err(|e| e.error)?;
-            return true;
+            let new_size = file.into_inner()
+                .map_err(|e| Error::Other(e.error().to_string()))? // uuuuugh
+                .metadata()?.st_size();
+            d.expected_size.store(new_size, SeqCst);
+            tmp_path.persist(self.path.with_extension("mpbr")).map_err(|e| e.error)?;
         }
         Ok(true)
     }
@@ -256,7 +288,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
 
 impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeOwned + Clone + Send + Eq + Hash> Drop for TempCache<T, K> {
     fn drop(&mut self) {
-        let d = self.data.read();
+        let d = self.inner.read();
         if d.writes > 0 {
             if let Err(err) = self.save_unlocked(&d) {
                 eprintln!("Temp db save failed: {}", err);

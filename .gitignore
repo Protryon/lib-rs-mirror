@@ -21,3 +21,4 @@ data/docker/
 /git_crates.txt
 /data/debcargo-conf/
 data/tarballs
+*.mpbr

@@ -30,22 +30,28 @@ RUN rustup toolchain add 1.47.0
 RUN rustup toolchain add 1.48.0
 RUN rustup toolchain add 1.49.0
 RUN rustup toolchain add 1.50.0
-RUN rustup toolchain list
 RUN cargo install libc --vers 99.9.9 || true # force index update
+RUN rustup toolchain add 1.30.0
+RUN rustup toolchain add 1.31.0
+RUN rustup toolchain add 1.29.0
+RUN rustup toolchain list
 # RUN cargo new lts-dummy; cd lts-dummy; cargo lts setup; echo 'itoa = "*"' >> Cargo.toml; cargo update;
 "##;
 
 const TEMP_JUNK_DIR: &str = "/var/tmp/crates_env";
 
-const RUST_VERSIONS: [&str; 10] = [
+const RUST_VERSIONS: [&str; 9] = [
+    "1.29.0",
+    "1.30.0",
+    "1.31.0",
     "1.32.0",
     "1.37.0",
     "1.41.0",
     "1.43.0",
-    "1.45.0",
-    "1.47.0",
-    "1.48.0",
-    "1.49.0",
+    // "1.45.0",
+    // "1.47.0",
+    // "1.48.0",
+    // "1.49.0",
     "1.50.0",
     "1.53.0",
 ];
@@ -92,17 +98,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (s, r) = crossbeam_channel::bounded::<Vec<_>>(25);
 
     let builds = std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(300)); // wait for more data
         let mut candidates: Vec<ToCheck> = Vec::new();
         let mut rng = rand::thread_rng();
 
         while let Ok(mut next_batch) = r.recv() {
-            std::thread::sleep(std::time::Duration::from_millis(200)); // wait for more data
+            std::thread::sleep(std::time::Duration::from_millis(150)); // wait for more data
             if stopped() || out_of_disk_space() {
                 break;
             }
 
             candidates.append(&mut next_batch);
-            for mut tmp in r.try_iter().take(10) {
+            for mut tmp in r.try_iter().take(5) {
                 candidates.append(&mut tmp);
             }
 
@@ -121,7 +128,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 let upper_limit = x.rustc.oldest_ok.unwrap_or(53);
                 // don't pick 1.29 as the first choice
-                let lower_limit = x.rustc.newest_bad.unwrap_or(37).max(x.rustc.newest_bad_raw.unwrap_or(30));
+                let lower_limit = x.rustc.newest_bad.unwrap_or(40).max(x.rustc.newest_bad_raw.unwrap_or(30));
                 let best_ver = (upper_limit * 5 + lower_limit * 11)/16; // bias towards lower ver, because lower versions see features from newer versions
 
 
@@ -161,6 +168,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 eprintln!("•• {}", e);
             }
         }
+        eprintln!("builder end");
     });
 
     let filter = std::env::args().nth(1);
@@ -189,7 +197,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     drop(s);
+    eprintln!("sender end");
     builds.join().unwrap();
+    eprintln!("bye");
     Ok(())
 }
 
@@ -197,14 +207,13 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
     let crate_name: Arc<str> = all.name().into();
     let origin = &Origin::from_crates_io_name(&crate_name);
 
-    println!("checking https://lib.rs/compat/{}", crate_name);
-
     let mut compat_info = crates.rustc_compatibility(crates.rich_crate_async(origin).await?).await.map_err(|_| "rustc_compatibility")?;
 
     let has_anything_built_ok_yet = compat_info.values().any(|c| c.oldest_ok_raw.is_some());
     let mut rng = rand::thread_rng();
-    let mut candidates: Vec<_> = all.versions().iter().rev().take(50) // rev() starts from most recent
+    let mut candidates: Vec<_> = all.versions().iter().rev() // rev() starts from most recent
         .filter(|v| !v.is_yanked())
+        .take(2)
         .filter_map(|v| SemVer::parse(v.version()).ok())
         .map(|v| {
             let c = compat_info.remove(&v).unwrap_or_default();
@@ -260,18 +269,19 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
         c.score = (c.score as f32 * popularity_factor) as u32;
     }
 
-    // biggest gap, then latest ver
-    candidates.sort_unstable_by(|a,b| b.score.cmp(&a.score).then(b.ver.cmp(&a.ver)));
+    if has_anything_built_ok_yet {
+        // biggest gap, then latest ver
+        candidates.sort_unstable_by(|a,b| b.score.cmp(&a.score).then(b.ver.cmp(&a.ver)));
+        candidates.truncate(10);
+    } else {
+        candidates.shuffle(&mut rng); // dunno which versions will build
+        candidates.truncate(4); // don't waste time on broken crates
+    }
 
     for c in &candidates {
         println!("{} {}\t^{}\t{}~{} r{}~{}", crate_name, c.ver, c.score,
             c.rustc.oldest_ok.unwrap_or(0), c.rustc.newest_bad.unwrap_or(0),
             c.rustc.oldest_ok_raw.unwrap_or(0), c.rustc.newest_bad_raw.unwrap_or(0));
-    }
-
-    if !has_anything_built_ok_yet {
-        candidates.shuffle(&mut rng); // dunno which versions will build
-        candidates.truncate(2); // don't waste time on broken crates
     }
 
     Ok(candidates)
@@ -381,7 +391,7 @@ fn do_builds(docker_root: &Path, versions: &[(&'static str, Arc<str>, SemVer)]) 
             touch src/lib.rs
             printf > Cargo.toml '[package]\nname="_____"\nversion="0.0.0"\n[profile.dev]\ndebug=false\n[dependencies]\n%s = "=%s"\n' "$crate_name" "$libver";
             export CARGO_TARGET_DIR=/home/rustyuser/cargo_target/$rustver;
-            if (( RANDOM%25 == 0 )); then
+            if [[ "$rustver" == "1.29.0" || "$rustver" == "1.30.0" || "$rustver" == "1.31.0" || "$rustver" == "1.32.0" ]]; then
                 # mkdir .cargo
                 # cp /home/rustyuser/lts-dummy/.cargo/config .cargo/
                 RUSTC_BOOTSTRAP=1 timeout 20 cargo +$rustver -Z minimal-versions generate-lockfile || timeout 40 cargo +$rustver fetch

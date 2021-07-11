@@ -1,6 +1,5 @@
 use crate::writer::*;
 use actix_web::body::Body;
-use actix_web::dev::Server;
 use actix_web::dev::Url;
 use actix_web::http::header::HeaderValue;
 use actix_web::http::StatusCode;

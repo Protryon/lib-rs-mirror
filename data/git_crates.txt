@@ -83,6 +83,7 @@ github:diem/diem/diem-client
 github:diem/diem/diem-crypto
 github:diem/diem/diemdb
 github:droundy/sad-monte-carlo/sad-monte-carlo
+github:dwisiswant0/ppfuzz/ppfuzz
 github:eirproject/eir/libeir_diagnostics
 github:eirproject/eir/libeir_intern
 github:eirproject/eir/libeir_interpreter

@@ -119,6 +119,7 @@ pub fn is_deprecated(k: &RichCrateVersion) -> bool {
         let desc = orig_desc.to_ascii_lowercase();
         return orig_desc.starts_with("WIP") || orig_desc.ends_with("WIP") ||
             desc.starts_with("deprecated") ||
+            desc.starts_with("obsolete") ||
             desc.starts_with("unfinished") ||
             desc.starts_with("an unfinished") ||
             desc.starts_with("unsafe and deprecated") ||

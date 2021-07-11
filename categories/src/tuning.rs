@@ -424,7 +424,7 @@ lazy_static! {
             ("network-programming", 0.9, 0.), ("web-programming", 0.8, 0.), ("web-programming::http-server", 0.7, 0.)]),
         (Cond::Any(&["gettext"]), &[("internationalization", 1.3, 0.2)]),
         (Cond::Any(&["math"]), &[("rendering", 0.75, 0.), ("command-line-utilities", 0.75, 0.)]),
-        (Cond::Any(&["rendering"]), &[("rendering::data-formats", 0.2, 0.), ("caching", 0.8, 0.), ("value-formatting", 0.8, 0.), ("hardware-support", 0.7, 0.)]),
+        (Cond::Any(&["rendering", "sql"]), &[("rendering::data-formats", 0.2, 0.), ("caching", 0.8, 0.), ("value-formatting", 0.8, 0.), ("hardware-support", 0.7, 0.)]),
 
         (Cond::Any(&["speech-recognition"]), &[("science", 1.3, 0.1),("multimedia::audio", 1.3, 0.1)]),
         (Cond::Any(&["tts", "speech"]), &[("multimedia::audio", 1.1, 0.), ("internationalization", 0.6, 0.)]),
@@ -456,7 +456,7 @@ lazy_static! {
         (Cond::All(&["image", "processing"]), &[("multimedia::images", 1.2, 0.), ("no-std", 0.7, 0.)]),
         (Cond::All(&["qr", "code"]), &[("multimedia::images", 1.15, 0.)]),
         (Cond::Any(&["qr-code", "qrcode"]), &[("multimedia::images", 1.2, 0.05)]),
-        (Cond::Any(&["flif", "png", "jpeg2000", "jpeg", "heif", "heic", "avif", "avic", "exif", "svg", "pixel"]), &[
+        (Cond::Any(&["flif", "png", "jpeg2000", "jpeg", "heif", "heic", "avif", "avic", "exif", "ocr", "svg", "pixel"]), &[
             ("multimedia::images", 1.3, 0.15), ("encoding", 0.8, 0.), ("parsing", 0.8, 0.), ("rust-patterns", 0.6, 0.), ("data-structures", 0.9, 0.)]),
         (Cond::Any(&["imagemagick", "gamma", "photo", "openexr"]), &[
             ("multimedia::images", 1.3, 0.15), ("encoding", 0.5, 0.), ("parsing", 0.6, 0.), ("data-structures", 0.8, 0.)]),
@@ -973,7 +973,7 @@ lazy_static! {
         (Cond::Any(&["fun", "quake", "doom", "play", "steam", "asteroids"]), &[("games", 1.2, 0.1)]),
 
         (Cond::Any(&["vector", "openai", "client"]), &[("games", 0.7, 0.), ("emulators", 0.8, 0.), ("config", 0.8, 0.), ("development-tools::cargo-plugins", 0.7, 0.)]),
-        (Cond::NotAny(&["gamedev", "game", "bevy", "games", "sdl", "ecs", "specs", "game-dev", "dep:allegro", "dice", "bounding", "library", "utils", "format", "polygon", "amethyst", "piston", "chess", "board", "ai"]),
+        (Cond::NotAny(&["gamedev", "game", "bevy", "godot", "games", "sdl", "ecs", "specs", "game-dev", "dep:allegro", "dice", "bounding", "library", "utils", "format", "polygon", "amethyst", "piston", "chess", "board", "ai"]),
             &[("game-development", 0.5, 0.)]),
         (Cond::NotAny(&["game", "games", "gamedev", "bevy", "game-dev", "tetris", "conway", "level", "dice", "roguelike", "tic-tac-toe", "board-game", "save", "fantasy", "rpg", "rts", "play", "fun", "xbox", "gamepad", "voxel", "puzzle", "toy", "cards", "sudoku", "puzzle", "bounding", "chess", "amethyst", "piston"]),
             &[("game-development", 0.8, 0.), ("games", 0.8, 0.)]),
@@ -1003,7 +1003,7 @@ lazy_static! {
         (Cond::All(&["visa", "card"]), &[("games", 0.5, 0.), ("parsing", 0.6, 0.), ("filesystem", 0.5, 0.)]),
         (Cond::All(&["card", "number"]), &[("games", 0.8, 0.), ("filesystem", 0.5, 0.)]),
         (Cond::All(&["validate", "numbers"]), &[("games", 0.3, 0.)]),
-        (Cond::Any(&["engine", "amethyst"]), &[("game-development", 1.3, 0.1), ("games", 0.7, 0.)]),
+        (Cond::Any(&["engine", "godot", "amethyst"]), &[("game-development", 1.3, 0.1), ("games", 0.7, 0.)]),
         (Cond::Any(&["game-engine", "game-engines", "ecs", "game-loop", "game-development"]), &[("game-development", 1.5, 0.2), ("rendering::engine", 0.8, 0.), ("games", 0.95, 0.), ("command-line-utilities", 0.75, 0.), ("rendering::data-formats", 0.2, 0.)]),
         (Cond::All(&["game", "engine"]), &[("game-development", 1.5, 0.3), ("games", 0.3, 0.), ("rendering::data-formats", 0.2, 0.), ("filesystem", 0.7, 0.), ("no-std", 0.8, 0.), ("filesystem", 0.8, 0.), ("command-line-interface", 0.8, 0.)]),
         (Cond::All(&["game", "development"]), &[("game-development", 1.3, 0.2), ("games", 0.3, 0.)]),

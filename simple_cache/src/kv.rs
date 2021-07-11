@@ -170,6 +170,15 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
         Ok(())
     }
 
+    pub fn for_each(&self, mut cb: impl FnMut(&K, T)) -> Result<(), Error> {
+        let kw = self.lock_for_read()?;
+        kw.data.as_ref().unwrap().iter().try_for_each(|(k, v)| {
+            let v = Self::unbr(v)?;
+            cb(k, v);
+            Ok(())
+        })
+    }
+
     pub fn delete<Q>(&self, key: &Q) -> Result<(), Error> where K: Borrow<Q>, Q: Eq + Hash + ?Sized {
         let mut d = self.lock_for_write()?;
         if d.data.as_mut().unwrap().remove(key).is_some() {

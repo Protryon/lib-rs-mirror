@@ -1,4 +1,5 @@
 github:1password/typeshare/typeshare
+github:adilhasan/catalogue/catalogue
 github:advancedresearch/path_semantics/basic_theorem_prover
 github:advancedresearch/path_semantics/boolalg
 github:advancedresearch/path_semantics/boolean_paths

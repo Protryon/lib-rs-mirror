@@ -367,6 +367,10 @@ impl KitchenSink {
         self.index.crates_io_crates()
     }
 
+    pub fn total_year_downloads(&self, year: u16) -> CResult<[u64; 366]> {
+        Ok(self.yearly.total_year_downloads(year)?)
+    }
+
     #[inline]
     fn summed_year_downloads(&self, crate_name: &str, curr_year: u16) -> CResult<[u32; 366]> {
         let curr_year_data = self.yearly.get_crate_year(crate_name, curr_year)?.unwrap_or_default();
@@ -2695,6 +2699,7 @@ impl KitchenSink {
         let _ = self.depender_changes.save();
         let _ = self.url_check_cache.save();
         let _ = self.readme_check_cache.save();
+        let _ = self.yearly.save();
         self.loaded_rich_crate_version_cache.write().clear();
         self.crate_rustc_compat_cache.write().clear();
         self.crates_io.cleanup();
@@ -2704,6 +2709,12 @@ impl KitchenSink {
     pub async fn author_by_login(&self, login: &str) -> CResult<RichAuthor> {
         let github = self.gh.user_by_login(login).await?.ok_or_else(|| KitchenSinkErr::AuthorNotFound(login.to_owned()))?;
         Ok(RichAuthor { github })
+    }
+}
+
+impl Drop for KitchenSink {
+    fn drop(&mut self) {
+        self.cleanup()
     }
 }
 

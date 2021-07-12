@@ -5,6 +5,7 @@ use std::collections::hash_map::Entry::*;
 use std::collections::HashMap;
 use std::fmt;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 /// Downloads each day of the year
 #[derive(Serialize, Deserialize, Clone)]
@@ -14,9 +15,10 @@ pub struct DailyDownloads(
 );
 
 type PerVersionDownloads = HashMap<MiniVer, DailyDownloads>;
+type ByYearCache = HashMap<u16, Arc<TempCache<PerVersionDownloads>>>;
 
 pub struct AllDownloads {
-    by_year: Mutex<HashMap<u16, TempCache<PerVersionDownloads>>>,
+    by_year: Mutex<ByYearCache>,
     base_path: PathBuf,
 }
 
@@ -29,28 +31,33 @@ impl AllDownloads {
         }
     }
 
+    fn get_cache<'t>(&self, t: &'t mut parking_lot::MutexGuard<ByYearCache>, year: u16) -> Result<&'t mut Arc<TempCache<HashMap<MiniVer, DailyDownloads>>>, crates_io_client::Error> {
+        Ok(match t.entry(year) {
+            Occupied(e) => e.into_mut(),
+            Vacant(e) => {
+                e.insert(Arc::new(TempCache::new(self.base_path.join(format!("{}-big.rmpz", year)))?))
+            },
+        })
+    }
+
     /// Crates.io crate name
     pub fn get_crate_year(&self, crate_name: &str, year: u16) -> Result<Option<PerVersionDownloads>, simple_cache::Error> {
         let mut t = self.by_year.lock();
-        let cache = match t.entry(year) {
-            Occupied(e) => e.into_mut(),
-            Vacant(e) => {
-                e.insert(TempCache::new(self.base_path.join(format!("{}-big.rmpz", year)))?)
-            },
-        };
+        let cache = self.get_cache(&mut t, year)?;
         cache.get(crate_name)
     }
 
     pub fn set_crate_year(&self, crate_name: &str, year: u16, v: &PerVersionDownloads) -> Result<(), simple_cache::Error> {
         let mut t = self.by_year.lock();
-        let cache = match t.entry(year) {
-            Occupied(e) => e.into_mut(),
-            Vacant(e) => {
-                e.insert(TempCache::new(self.base_path.join(format!("{}-big.rmpz", year)))?)
-            },
-        };
+        let cache = self.get_cache(&mut t, year)?;
         cache.set(crate_name, v)?;
         Ok(())
+    }
+
+    pub fn get_full_year(&self, year: u16) -> Result<Arc<TempCache<PerVersionDownloads>>, simple_cache::Error> {
+        let mut t = self.by_year.lock();
+        let cache = self.get_cache(&mut t, year)?;
+        Ok(Arc::clone(&cache))
     }
 }
 

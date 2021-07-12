@@ -207,6 +207,35 @@ pub async fn render_crate_reviews(out: &mut impl Write, reviews: &[Review], ver:
     Ok(())
 }
 
+pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), anyhow::Error> {
+    let urler = Urler::new(None);
+
+    let now = Utc::now();
+    let this_year = now.year();
+    let days_this_year = now.ordinal0();
+    let year_range = 2015..=this_year;
+
+    let mut dl_by_day = Vec::with_capacity(366 * year_range.clone().count());
+
+    for year in year_range {
+        let daily = kitchen_sink.total_year_downloads(year as _)?;
+        dl_by_day.extend_from_slice(&daily[..if year < this_year {365} else {days_this_year as usize}]);
+    }
+
+    let max = dl_by_day.iter().copied().max().unwrap_or(0);
+
+    templates::global_stats(out, &Page {
+        title: "State of the Rust/Cargo crates ecosystem".to_owned(),
+        description: Some("Package statistics".to_owned()),
+        noindex: false,
+        search_meta: true,
+        critical_css_data: Some(include_str!("../../style/public/home.css")),
+        critical_css_dev_url: Some("/home.css"),
+        ..Default::default()
+    }, &dl_by_day, max, &urler, renderer)?;
+    Ok(())
+}
+
 pub async fn render_trending_crates(out: &mut impl Write, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), anyhow::Error> {
     let (top, upd) = futures::join!(kitchen_sink.trending_crates(55), Box::pin(kitchen_sink.notable_recently_updated_crates(70)));
     let upd = upd?;

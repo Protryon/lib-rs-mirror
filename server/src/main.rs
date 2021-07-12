@@ -217,6 +217,7 @@ async fn run_server(rt: Handle) -> Result<(), anyhow::Error> {
             .route("/index", web::get().to(handle_search)) // old crates.rs/index url
             .route("/categories/{rest:.*}", web::get().to(handle_redirect))
             .route("/new", web::get().to(handle_new_trending))
+            .route("/stats", web::get().to(handle_global_stats))
             .route("/keywords/{keyword}", web::get().to(handle_keyword))
             .route("/crates/{crate}", web::get().to(handle_crate))
             .route("/crates/{crate}/versions", web::get().to(handle_crate_all_versions))
@@ -656,6 +657,23 @@ async fn handle_new_trending(req: HttpRequest) -> Result<HttpResponse, ServerErr
                 let crates = state.crates.load();
                 let mut page: Vec<u8> = Vec::with_capacity(32000);
                 front_end::render_trending_crates(&mut page, &crates, &state.markup).await?;
+                minify_html(&mut page);
+                Ok::<_, anyhow::Error>((page, None))
+            })
+        })
+        .await?,
+    ))
+}
+
+async fn handle_global_stats(req: HttpRequest) -> Result<HttpResponse, ServerError> {
+    let state: &AServerState = req.app_data().expect("appdata");
+    Ok(serve_cached(
+        with_file_cache(state, state.page_cache_dir.join("_stats_.html"), 24 * 3600, {
+            let state = state.clone();
+            run_timeout("trendpage", 90, async move {
+                let crates = state.crates.load();
+                let mut page: Vec<u8> = Vec::with_capacity(32000);
+                front_end::render_global_stats(&mut page, &crates, &state.markup).await?;
                 minify_html(&mut page);
                 Ok::<_, anyhow::Error>((page, None))
             })

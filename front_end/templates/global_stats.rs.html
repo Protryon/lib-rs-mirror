@@ -1,0 +1,42 @@
+@use crate::Page;
+@use crate::templates::base;
+@use crate::templates::simple_list_html;
+@use crate::Urler;
+@use kitchen_sink::ArcRichCrateVersion;
+@use kitchen_sink::RichCrate;
+@use render_readme::Renderer;
+
+@(page: &Page, dl_by_day: &[u64], dl_max: u64, url: &Urler, markup: &Renderer)
+
+@:base(page, {
+    <header id="home">
+        <div class="inner-col" role="banner">
+            <h1><a href="/">Lib.rs</a> › New</h1>
+            <p>Rust crates ecosystem stats.</p>
+            <form role="search" id=search method="get" action="/search">
+                <input placeholder="name, keywords, description" autocapitalize="off" autocorrect="off" autocomplete="off" tabindex="1" type=search name=q><button type=submit>Search</button>
+            </form>
+            <nav>
+                <ul><li><a href="/">Categories</a></li>
+                <li><a href="/new">New and trending</a></li>
+                <li class="active">Stats</li>
+            </ul></nav>
+        </div>
+    </header>
+
+    <main id="trending">
+        <div class="inner-col">
+        <svg viewBox="0 0 1000 100" width=1000 height=100 style="width:100%">
+            <path d="M0 100
+@for (i, dl) in dl_by_day.iter().copied().enumerate() {
+L@(i as f64 / (dl_by_day.len() as f64 / 1000.)) @(100. - dl as f64 / (dl_max as f64 / 100.))
+}
+V100" fill="red" stroke-width="1" stroke="black" />
+
+        </svg>
+    </main>
+
+    <footer>
+        <div class="inner-col" role="contentinfo">
+        <p><a href="/">All categories</a>. <a href="/about">About the site</a>. <a href="/atom.xml">Feed</a>. <a href="https://gitlab.com/crates.rs/crates.rs/issues/new">Feedback and feature requests</a> are welcome!</p> By <a href=https://kornel.ski>kornelski</a>.</div></footer>
+})

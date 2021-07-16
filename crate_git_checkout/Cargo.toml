@@ -14,6 +14,6 @@ git2 = "0.13"
 cargo_toml = "0.9.1"
 render_readme = { path = "../render_readme" }
 repo_url = { path = "../repo_url" }
-urlencoding = "1.3.3"
+urlencoding = "2.0.0"
 lazy_static = "1.4.0"
 thiserror = "1.0.26"

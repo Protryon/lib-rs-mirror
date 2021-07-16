@@ -105,7 +105,7 @@ fn get_repo(repo: &Repo, base_path: &Path) -> Result<Repository, git2::Error> {
     let shallow = false;
     let url = &*repo.canonical_git_url();
 
-    let repo_path = base_path.join(urlencoding::encode(url));
+    let repo_path = base_path.join(&*urlencoding::encode(url));
 
     match Repository::open(&repo_path) {
         Ok(repo) => Ok(repo),

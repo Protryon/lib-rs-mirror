@@ -91,7 +91,7 @@ impl CratesIoClient {
 
     pub async fn crate_meta(&self, crate_name: &str, as_of_version: &str) -> Result<Option<CrateMetaFile>, Error> {
         let encoded_name = encode(crate_name);
-        let cache_key = (encoded_name.as_str(), as_of_version);
+        let cache_key = (&*encoded_name, as_of_version);
 
         let url = format!("https://crates.io/api/v1/crates/{}", encoded_name);
         self.metacache.fetch_cached_deserialized(cache_key, url).await

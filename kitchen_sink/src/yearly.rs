@@ -3,7 +3,7 @@ use parking_lot::Mutex;
 use simple_cache::TempCache;
 use std::collections::hash_map::Entry::*;
 use std::collections::HashMap;
-use std::fmt;
+use serde_big_array::BigArray;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -14,20 +14,29 @@ pub struct DailyDownloads(
     pub [u32; 366]
 );
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct AnnualDownloads(
+    #[serde(with = "BigArray")]
+    pub [u64; 366]
+);
+
 type PerVersionDownloads = HashMap<MiniVer, DailyDownloads>;
 type ByYearCache = HashMap<u16, Arc<TempCache<PerVersionDownloads>>>;
 
 pub struct AllDownloads {
     by_year: Mutex<ByYearCache>,
     base_path: PathBuf,
+    sum_cache: TempCache<AnnualDownloads, u16>,
 }
 
 impl AllDownloads {
     /// Dir where to store years
     pub fn new(base_path: impl Into<PathBuf>) -> Self {
+        let base_path = base_path.into();
         Self {
+            sum_cache: TempCache::new(base_path.join("yearlydownloads")).unwrap(),
             by_year: Mutex::new(HashMap::new()),
-            base_path: base_path.into(),
+            base_path,
         }
     }
 
@@ -48,115 +57,44 @@ impl AllDownloads {
     }
 
     pub fn set_crate_year(&self, crate_name: &str, year: u16, v: &PerVersionDownloads) -> Result<(), simple_cache::Error> {
+        self.sum_cache.delete(&year)?;
         let mut t = self.by_year.lock();
         let cache = self.get_cache(&mut t, year)?;
         cache.set(crate_name, v)?;
         Ok(())
     }
 
-    pub fn get_full_year(&self, year: u16) -> Result<Arc<TempCache<PerVersionDownloads>>, simple_cache::Error> {
+    fn get_full_year(&self, year: u16) -> Result<Arc<TempCache<PerVersionDownloads>>, simple_cache::Error> {
         let mut t = self.by_year.lock();
         let cache = self.get_cache(&mut t, year)?;
         Ok(Arc::clone(&cache))
     }
-}
 
-// Serde workaround
-use serde::de::{Deserializer, Error, SeqAccess, Visitor};
-use serde::ser::{SerializeTuple, Serializer};
-
-trait BigArray<'de>: Sized {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer;
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: Deserializer<'de>;
-}
-
-impl<'de> BigArray<'de> for [u32; 366] {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
-    {
-        let mut seq = serializer.serialize_tuple(self.len())?;
-        for elem in &self[..] {
-            seq.serialize_element(elem)?;
+    pub fn total_year_downloads(&self, year: u16) -> Result<[u64; 366], simple_cache::Error> {
+        if let Some(res) = self.sum_cache.get(&year)? {
+            return Ok(res.0);
         }
-        seq.end()
-    }
-
-    fn deserialize<D>(deserializer: D) -> Result<[u32; 366], D::Error>
-        where D: Deserializer<'de>
-    {
-        struct ArrayVisitor;
-
-        impl<'de> Visitor<'de> for ArrayVisitor {
-            type Value = [u32; 366];
-
-            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str(concat!("an array of length ", 366))
-            }
-
-            fn visit_seq<A>(self, mut seq: A) -> Result<[u32; 366], A::Error>
-                where A: SeqAccess<'de>
-            {
-                let mut arr = [u32::default(); 366];
-                for (i, a) in arr.iter_mut().enumerate() {
-                    *a = seq.next_element()?
-                        .ok_or_else(|| Error::invalid_length(i, &self))?;
+        let mut summed_days = [0u64; 366];
+        if let Ok(year) = self.get_full_year(year) {
+            year.for_each(|_, crate_year| {
+                for (_, days) in crate_year {
+                    for (sd, vd) in summed_days.iter_mut().zip(days.0.iter().copied()) {
+                        *sd += vd as u64;
+                    }
                 }
-                Ok(arr)
-            }
+            })?;
         }
-
-        let visitor = ArrayVisitor;
-        deserializer.deserialize_tuple(366, visitor)
-    }
-}
-
-trait BigArrayBool<'de>: Sized {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer;
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where D: Deserializer<'de>;
-}
-
-impl<'de> BigArrayBool<'de> for [bool; 366]
-{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
-    {
-        let mut seq = serializer.serialize_tuple(self.len())?;
-        for elem in &self[..] {
-            seq.serialize_element(elem)?;
-        }
-        seq.end()
+        self.sum_cache.set(year, AnnualDownloads(summed_days))?;
+        Ok(summed_days)
     }
 
-    fn deserialize<D>(deserializer: D) -> Result<[bool; 366], D::Error>
-        where D: Deserializer<'de>
-    {
-        struct ArrayVisitor;
-
-        impl<'de> Visitor<'de> for ArrayVisitor {
-            type Value = [bool; 366];
-
-            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str(concat!("an array of length ", 366))
-            }
-
-            fn visit_seq<A>(self, mut seq: A) -> Result<[bool; 366], A::Error>
-                where A: SeqAccess<'de>
-            {
-                let mut arr = [bool::default(); 366];
-                for i in 0..366 {
-                    arr[i] = seq.next_element()?
-                        .ok_or_else(|| Error::invalid_length(i, &self))?;
-                }
-                Ok(arr)
-            }
+    pub fn save(&self) -> Result<(), simple_cache::Error> {
+        self.sum_cache.save()?;
+        let t = self.by_year.lock();
+        for y in t.values() {
+            y.save()?;
         }
-
-        let visitor = ArrayVisitor;
-        deserializer.deserialize_tuple(366, visitor)
+        Ok(())
     }
 }
 

@@ -1,12 +1,11 @@
 @use crate::Page;
+@use crate::format_downloads;
+@use crate::GlobalStats;
 @use crate::templates::base;
-@use crate::templates::simple_list_html;
 @use crate::Urler;
-@use kitchen_sink::ArcRichCrateVersion;
-@use kitchen_sink::RichCrate;
 @use render_readme::Renderer;
 
-@(page: &Page, dl_by_day: &[u64], dl_max: u64, url: &Urler, markup: &Renderer)
+@(page: &Page, dl_by_week: &[(u64, u64)], stats: &GlobalStats, _url: &Urler)
 
 @:base(page, {
     <header id="home">
@@ -24,16 +23,45 @@
         </div>
     </header>
 
-    <main id="trending">
-        <div class="inner-col">
-        <svg viewBox="0 0 1000 100" width=1000 height=100 style="width:100%">
-            <path d="M0 100
-@for (i, dl) in dl_by_day.iter().copied().enumerate() {
-L@(i as f64 / (dl_by_day.len() as f64 / 1000.)) @(100. - dl as f64 / (dl_max as f64 / 100.))
-}
-V100" fill="red" stroke-width="1" stroke="black" />
+    <main id="global-stats">
+        <style>p.legend @{ text-align: center; margin-top: 0; @}</style>
 
-        </svg>
+        <div class="inner-col">
+        <div>
+            <svg viewBox="0 -5 1030 116" width=1040 height=116 style="width:100%; margin: 1em auto 0">
+                @for y in (0..stats.max_downloads_per_week).step_by(stats.dl_grid_line_every as _) {
+                    <line x1=0 x2=1000 y1="@(100. - y as f64 / (stats.max_downloads_per_week as f64 / 100.))" y2="@(100. - y as f64 / (stats.max_downloads_per_week as f64 / 100.))"
+                        stroke="black" stroke-width=1 stroke-linecap="butt" stroke-opacity=0.1 />
+                    @if y > 0 {
+                        <text opacity=0.5 font-size="11" x="1003" y="@(103. - y as f64 / (stats.max_downloads_per_week as f64 / 100.))">@(y / 7_000_000)M</text>
+                    }
+                }
+                <path d="M0 100
+    @for (i, (weekday, weekend)) in dl_by_week.iter().copied().enumerate() {
+    L@(i as f64 / (dl_by_week.len() as f64 / 1000.)) @(100. - (weekday + weekend) as f64 / (stats.max_downloads_per_week as f64 / 100.))
+    }
+    V100" fill="#FCBC4A" stroke-width="1" stroke="black" />
+                @for x in (0..dl_by_week.len() as u32).step_by(52).skip(1) {
+                    <line y1=100 y2=105
+                    x1="@((x - stats.start_week_offset) as f64 / (dl_by_week.len() as f64 / 1000.))"
+                    x2="@((x - stats.start_week_offset) as f64 / (dl_by_week.len() as f64 / 1000.))"
+                        stroke="black" stroke-width=1 stroke-linecap="butt" stroke-opacity=0.1 />
+                }
+                @for x in (0..(dl_by_week.len() as u32 - 26)).step_by(52) {
+                    <text opacity=0.5 text-anchor=middle font-size="11" y="111"
+                    x="@((x + 26_u32.saturating_sub(stats.start_week_offset)) as f64 / (dl_by_week.len() as f64 / 1000.))">@(x / 52 + 2015)</text>
+                }
+            </svg>
+            <p class=legend>Daily downloads since Rust 1.0, 7-day average.</p>
+    </div>
+<p>Downloads are growing at a rate of
+@GlobalStats::relative_increase((stats.dl_per_day_this_year.0 + stats.dl_per_day_this_year.1, stats.dl_per_day_last_year.0 + stats.dl_per_day_last_year.1)) per year.</p>
+
+<p>At peak crates.io has served @if let Some((val, unit)) = Some(format_downloads(stats.max_daily_downloads_rate)) { @val<b>@unit</b> } downloads per <em>day</em>,
+    which is more than all downloads in the first <em>@((stats.weeks_to_reach_max_downloads as f32 / (365./12./7.)).floor()) months</em> since the release of Rust 1.0 in May 2015.</p>
+
+<p>Traffic during weekdays is typically @GlobalStats::relative_increase(stats.dl_per_day_this_year) higher than during weekends
+    (@if stats.dl_ratio_up() {up} else {down} from @GlobalStats::relative_increase(stats.dl_per_day_last_year) a year before).</p>
     </main>
 
     <footer>

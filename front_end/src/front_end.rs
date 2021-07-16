@@ -207,22 +207,113 @@ pub async fn render_crate_reviews(out: &mut impl Write, reviews: &[Review], ver:
     Ok(())
 }
 
-pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), anyhow::Error> {
-    let urler = Urler::new(None);
+#[derive(Debug)]
+pub struct GlobalStats {
+    pub(crate) max_daily_downloads_rate: u32,
+    pub(crate) max_downloads_per_week: u64,
+    pub(crate) start_week_offset: u32,
+    pub(crate) dl_grid_line_every: u64,
+    pub(crate) weeks_to_reach_max_downloads: u32,
+    pub(crate) dl_per_day_this_year: (u64, u64),
+    pub(crate) dl_per_day_last_year: (u64, u64),
+}
 
-    let now = Utc::now();
-    let this_year = now.year();
-    let days_this_year = now.ordinal0();
-    let year_range = 2015..=this_year;
-
-    let mut dl_by_day = Vec::with_capacity(366 * year_range.clone().count());
-
-    for year in year_range {
-        let daily = kitchen_sink.total_year_downloads(year as _)?;
-        dl_by_day.extend_from_slice(&daily[..if year < this_year {365} else {days_this_year as usize}]);
+impl GlobalStats {
+    pub fn relative_increase(val: (u64, u64)) -> String {
+        format!("{:.1}×", val.0 as f64 / val.1 as f64)
     }
 
-    let max = dl_by_day.iter().copied().max().unwrap_or(0);
+    pub fn dl_ratio_up(&self) -> bool {
+        let r1 = self.dl_per_day_this_year.0 as f64 / self.dl_per_day_this_year.1 as f64;
+        let r2 = self.dl_per_day_last_year.0 as f64 / self.dl_per_day_last_year.1 as f64;
+        r1 > r2
+    }
+}
+
+pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSink, _renderer: &Renderer) -> Result<(), anyhow::Error> {
+    let urler = Urler::new(None);
+
+
+    // eprintln!("start");
+    // for o in kitchen_sink.all_crates() {
+    //     if !o.is_crates_io() {
+    //         continue;
+    //     }
+    //     let r = kitchen_sink.rich_crate_async(&o).await;
+    // }
+    // eprintln!("end");
+
+    let start = Utc.ymd(2015, 5, 15); // Rust 1.0
+    let start_week_offset = start.ordinal0()/7;
+    let mut day = Utc::today() - chrono::Duration::days(2);
+
+    let mut current_year = 0;
+    let mut current = [0; 366];
+
+    let mut dl = Vec::new();
+
+    // skip over potentially missing data
+    while day > start {
+        let year = day.year() as u16;
+        if year != current_year {
+            current_year = year;
+            current = kitchen_sink.total_year_downloads(current_year)?;
+        }
+        let n = current[day.ordinal0() as usize];
+        if n > 0 {
+            break;
+        }
+        day = day - chrono::Duration::days(1);
+    }
+
+    // going from the end ensures last data point always has a full week
+    while day > start {
+        let mut weekday_sum = 0;
+        let mut weekend_sum = 0;
+        for _ in 0..7 {
+            let year = day.year() as u16;
+            if year != current_year {
+                current_year = year;
+                current = kitchen_sink.total_year_downloads(current_year)?;
+            }
+            let n = current[day.ordinal0() as usize];
+            match day.weekday() {
+                // this sucks a bit due to mon/fri being UTC, and overlapping with the weekend
+                // in the rest of the world.
+                Weekday::Sat | Weekday::Sun => weekend_sum += n,
+                _ => weekday_sum += n,
+            };
+            day = day - chrono::Duration::days(1);
+        }
+        dl.push((weekday_sum, weekend_sum));
+    }
+    dl.reverse();
+
+    let this_year = &dl[dl.len()-52..];
+    let last_year = &dl[dl.len()-52*2..dl.len()-52];
+
+    fn sum2(s: &[(u64, u64)]) -> (u64, u64) {
+        let mut a_sum = 0;
+        let mut b_sum = 0;
+        s.iter().for_each(|&(a, b)| { a_sum += a; b_sum += b; });
+        (a_sum, b_sum)
+    }
+    let max_daily_downloads_rate = this_year.iter().map(move |(d, e)| (d/5).max(e/2)).max().unwrap_or(0) as u32;
+    let mut tmp_sum = 0;
+    let downloads_this_year = sum2(this_year);
+    let downloads_last_year = sum2(last_year);
+    let max_downloads_per_week = dl.iter().map(|(a, b)| a + b).max().unwrap_or(0);
+    let dl_grid_line_every = (max_downloads_per_week / 6_000_000) * 1_000_000;
+    let stats = GlobalStats {
+        max_daily_downloads_rate,
+        start_week_offset,
+        weeks_to_reach_max_downloads: dl.iter().copied().take_while(move |(d, e)| { tmp_sum += (d + e) as u32; tmp_sum < max_daily_downloads_rate }).count() as u32,
+        dl_per_day_this_year: (downloads_this_year.0 / 5, downloads_this_year.1 / 2),
+        dl_per_day_last_year: (downloads_last_year.0 / 5, downloads_last_year.1 / 2),
+        max_downloads_per_week,
+        dl_grid_line_every,
+    };
+    println!("{:?}", stats);
 
     templates::global_stats(out, &Page {
         title: "State of the Rust/Cargo crates ecosystem".to_owned(),
@@ -232,7 +323,7 @@ pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSin
         critical_css_data: Some(include_str!("../../style/public/home.css")),
         critical_css_dev_url: Some("/home.css"),
         ..Default::default()
-    }, &dl_by_day, max, &urler, renderer)?;
+    }, &dl, &stats, &urler)?;
     Ok(())
 }
 

@@ -182,6 +182,9 @@ pub struct DownloadWeek {
     pub downloads: HashMap<Option<usize>, usize>,
 }
 
+/// bucket (like age, number of releases) -> (number of crates in the bucket, sample of those crate names)
+pub type StatsHistogram = HashMap<u32, (u32, Vec<String>)>;
+
 /// This is a collection of various data sources. It mostly acts as a starting point and a factory for other objects.
 pub struct KitchenSink {
     pub index: Index,
@@ -202,6 +205,7 @@ pub struct KitchenSink {
     category_overrides: HashMap<String, Vec<Cow<'static, str>>>,
     crates_io_owners_cache: TempCache<Vec<CrateOwner>>,
     depender_changes: TempCache<Vec<DependerChanges>>,
+    stats_histograms: TempCache<StatsHistogram>,
     throttle: tokio::sync::Semaphore,
     auto_indexing_throttle: tokio::sync::Semaphore,
     crev: Arc<Creviews>,
@@ -260,6 +264,7 @@ impl KitchenSink {
             author_shitlist: Self::load_author_shitlist(&data_path.join("author_shitlist.txt"))?,
             crates_io_owners_cache: TempCache::new(&data_path.join("cio-owners.tmp"))?,
             depender_changes: TempCache::new(&data_path.join("deps-changes2.tmp"))?,
+            stats_histograms: TempCache::new(&data_path.join("stats-histograms.tmp"))?,
             throttle: tokio::sync::Semaphore::new(40),
             auto_indexing_throttle: tokio::sync::Semaphore::new(4),
             crate_rustc_compat_cache: RwLock::new(HashMap::new()),
@@ -2389,6 +2394,14 @@ impl KitchenSink {
         }
     }
 
+    pub fn index_stats_histogram(&self, kind: &str, data: StatsHistogram) -> CResult<()> {
+        Ok(self.stats_histograms.set(kind, data)?)
+    }
+
+    pub fn get_stats_histogram(&self, kind: &str) -> CResult<Option<StatsHistogram>> {
+        Ok(self.stats_histograms.get(kind)?)
+    }
+
     /// Direct reverse dependencies, but with release dates (when first seen or last used)
     pub fn index_dependers_liveness_ranges(&self, origin: &Origin, ranges: Vec<DependerChanges>) -> CResult<()> {
         self.depender_changes.set(origin.to_str(), ranges)?;
@@ -2697,6 +2710,7 @@ impl KitchenSink {
         self.index.clear_cache();
         let _ = self.crates_io_owners_cache.save();
         let _ = self.depender_changes.save();
+        let _ = self.stats_histograms.save();
         let _ = self.url_check_cache.save();
         let _ = self.readme_check_cache.save();
         let _ = self.yearly.save();
@@ -2817,6 +2831,12 @@ impl MiniDate {
             y: from.year() as u16,
             o: from.ordinal0() as u16,
         }
+    }
+
+    pub fn days_since(self, other: Self) -> i32 {
+        let a = self.y as i32 * 365 + self.o as i32;
+        let b = other.y as i32 * 365 + other.o as i32;
+        a - b
     }
 
     /// Screw leap years

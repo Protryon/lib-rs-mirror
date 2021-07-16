@@ -108,7 +108,8 @@ async fn main() -> Result<(), BoxErr> {
                     if let (Some(crates), Some(versions)) = (&crates, &versions) {
                         if let Some(dependencies) = dependencies.take() {
                             eprintln!("Indexing dependencies for {} crates", dependencies.len());
-                            index_dependencies(crates, versions, &dependencies, &ksink)?;
+                            index_active_rev_dependencies(crates, versions, &dependencies, &ksink)?;
+                            versions_histogram(crates, versions, &dependencies, &ksink)?;
                         }
                     }
 
@@ -159,10 +160,71 @@ fn index_downloads(crates: &CratesMap, versions: &VersionsMap, downloads: &Versi
     Ok(())
 }
 
+const EXAMPLES_PER_BUCKET: usize = 5;
+
+fn versions_histogram(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDepsMap, ksink: &KitchenSink) -> Result<(), BoxErr> {
+    let mut num_releases = HashMap::new();
+    let mut crate_sizes = HashMap::new();
+    let mut licenses = HashMap::new();
+    let mut num_deps = HashMap::new();
+
+    // hopefully the hashmap is randomizing examples
+    for (crate_id, name) in crates {
+        if let Some(v) = versions.get(crate_id) {
+            if let Some(latest) = v.iter().max_by_key(|v| v.id) {
+                if let Some(size) = latest.crate_size {
+                    let size_kib = if size > 5_000_000 {
+                        size / 1024 / 256 * 256 // coarser buckets
+                    } else {
+                        size / 1024
+                    };
+                    let t = crate_sizes.entry(size_kib as u32).or_insert((0, Vec::<String>::new()));
+                    t.0 += 1;
+                    if t.1.len() < EXAMPLES_PER_BUCKET {
+                        t.1.push(name.clone());
+                    }
+                }
+                if let Some(t) = licenses.get_mut(&latest.license) {
+                    *t += 1;
+                } else {
+                    licenses.insert(latest.license.clone(), 1);
+                }
+
+                if let Some(dep) = deps.get(&latest.id) {
+                    let t = num_deps.entry(dep.len() as u32).or_insert((0, Vec::<String>::new()));
+                    t.0 += 1;
+                    if t.1.len() < EXAMPLES_PER_BUCKET {
+                        t.1.push(name.clone());
+                    }
+                }
+            }
+            let t = num_releases.entry(v.len() as u32).or_insert((0, Vec::<String>::new()));
+            t.0 += 1;
+            if t.1.len() < EXAMPLES_PER_BUCKET {
+                t.1.push(name.clone());
+            }
+        }
+    }
+    ksink.index_stats_histogram("releases", num_releases);
+    ksink.index_stats_histogram("sizes", crate_sizes);
+    ksink.index_stats_histogram("deps", num_deps);
+
+    // histogram cache doesn't support string keys
+    let fudge = licenses.into_iter().enumerate().map(|(i, (lic, num))| {
+        (i as u32, (num, vec![lic])) // TODO: normalize license names/parse spdx
+    }).collect();
+    ksink.index_stats_histogram("licenses-hack", fudge);
+
+    Ok(())
+}
+
 /// Direct reverse dependencies, but with release dates (when first seen or last used)
 #[inline(never)]
-fn index_dependencies(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDepsMap, ksink: &KitchenSink) -> Result<(), BoxErr> {
+fn index_active_rev_dependencies(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDepsMap, ksink: &KitchenSink) -> Result<(), BoxErr> {
     let mut deps_changes = HashMap::with_capacity(crates.len());
+
+    let mut age_histogram = HashMap::with_capacity(52*5);
+    // let mut global_active_crate_changes = HashMap::with_capacity(365*10);
 
     for (crate_id, name) in crates {
 
@@ -170,7 +232,19 @@ fn index_dependencies(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDe
             let mut releases_from_oldest: Vec<_> = vers.iter().filter_map(|v| {
                 date_from_str(&v.created_at).ok().map(|date| (v.id, MiniDate::new(date), &v.num))
             }).collect();
+            if releases_from_oldest.is_empty() {
+                continue; // shouldn't happen
+            }
             releases_from_oldest.sort_unstable_by_key(|a| a.0);
+
+            // begin little side quest for histogram stats
+            let crate_age_weeks = releases_from_oldest.last().unwrap().1.days_since(releases_from_oldest[0].1) / 7;
+            let t = age_histogram.entry(crate_age_weeks.abs() as u32).or_insert((0, Vec::<String>::new()));
+            t.0 += 1;
+            if t.1.len() < EXAMPLES_PER_BUCKET {
+                t.1.push(name.clone());
+            }
+            // end little side quest for histogram stats
 
             let mut over_time = HashMap::new();
             let mut releases = releases_from_oldest.iter().peekable();
@@ -196,7 +270,7 @@ fn index_dependencies(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDe
                         30 * 2
                     } else if unstable && releases_from_oldest.len() < 3 {
                         30 * 6
-                    } else if unstable {
+                    } else if unstable || releases_from_oldest.len() < 3 {
                         365
                     } else {
                         365 * 2
@@ -210,8 +284,10 @@ fn index_dependencies(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDe
                         continue;
                     }
                     let e = over_time.entry(dep_id).or_insert((release_date, end_date, expired));
-                    e.1 = end_date;
-                    e.2 = expired;
+                    if e.1 < end_date {
+                        e.1 = end_date;
+                        e.2 = expired;
+                    }
                 }
             }
 
@@ -222,6 +298,8 @@ fn index_dependencies(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDe
             eprintln!("Bad crate? {} {}", crate_id, name);
         }
     }
+
+    ksink.index_stats_histogram("age", age_histogram)?;
 
     for (crate_id, uses) in deps_changes {
         let name = crates.get(&crate_id).expect("bork crate");
@@ -250,7 +328,7 @@ fn index_dependencies(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDe
 fn process_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users: &Users) -> Vec<(Origin, Vec<CrateOwner>)> {
     owners.into_par_iter()
     .filter_map(move |(crate_id, owners)| {
-        crates.get(&crate_id).map(|k| (crate_id, owners, Origin::from_crates_io_name(k)))
+        crates.get(&crate_id).map(move |k| (crate_id, owners, Origin::from_crates_io_name(k)))
     })
     .map(move |(crate_id, owners, origin)| {
         let mut owners: Vec<_> = owners
@@ -281,7 +359,7 @@ fn process_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users:
                         let u = match teams.get(&o.owner_id) {
                             Some(t) => t,
                             None => {
-                                eprintln!("error: id {} is not in {} teams. Bad obj: {:?}", o.owner_id, teams.len(), o);
+                                eprintln!("warning: id {} is not in teams (len={}). Bad obj: {:?} {:?}", o.owner_id, teams.len(), o, origin);
                                 return None;
                             },
                         };

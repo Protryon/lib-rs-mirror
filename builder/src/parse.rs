@@ -722,7 +722,7 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
             last_broken_manifest_crate = None;
         }
         else if let Some(rest) = line.strip_prefix("  failed to parse manifest at `/home/rustyuser/.cargo/registry/src/github.com-1ecc6299db9ec823/") {
-            let pattern = regex::Regex::new(r"([^.+/; ]+)-([0-9]+\.[^/; ]+)/Cargo.toml").expect("regex syntax");
+            let pattern = regex::Regex::new(r"([^.+/; ]+?)-([0-9]+\.[^/; ]+)/Cargo.toml").expect("regex syntax");
             if let Some(cap) = pattern.captures(rest) {
                 last_broken_manifest_crate = Some((cap[1].to_string(), cap[2].to_string()));
             } else {

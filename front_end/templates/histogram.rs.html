@@ -1,0 +1,29 @@
+@use crate::global_stats::Histogram;
+
+@(hs: &Histogram, max_examples: usize)
+<table class="histogram">
+    <tr>
+        @for l in &hs.bucket_labels {
+            <th width="@(100. / hs.bucket_labels.len() as f64)%">
+                @l
+            </th>
+        }
+    </tr>
+    <tr class="bars">
+        @for b in &hs.buckets {
+            <td>
+                @if hs.perc(b.count) <= 19.0 {@b.count}
+                <div style="height: @hs.perc(b.count)px;">@if hs.perc(b.count) > 19.0 {@b.count}</div>
+            </td>
+        }
+    </tr>
+    @if max_examples > 0 { <tr>
+        @for b in &hs.buckets {
+            <td>
+                @for name in b.examples.iter().take(max_examples) {
+                    <a href="/crates/@name#FIXME">@name</a>
+                }
+            </td>
+        }
+    </tr> }
+</table>

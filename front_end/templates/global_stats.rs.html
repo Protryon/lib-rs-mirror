@@ -1,9 +1,9 @@
 @use crate::Page;
-@use crate::format_downloads;
+@use crate::format_downloads_verbose;
 @use crate::GlobalStats;
 @use crate::templates::base;
+@use crate::templates::histogram;
 @use crate::Urler;
-@use render_readme::Renderer;
 
 @(page: &Page, dl_by_week: &[(u64, u64)], stats: &GlobalStats, _url: &Urler)
 
@@ -24,16 +24,26 @@
     </header>
 
     <main id="global-stats">
-        <style>p.legend @{ text-align: center; margin-top: 0; @}</style>
+        <style>
+            #global-stats h2 @{ margin-top: 1.5em; @}
+            p.legend @{ text-align: center; margin-top: 0; @}
+            table.histogram @{ margin: 0.5em auto 2em; width: 100%; @}
+            table.histogram td @{ vertical-align: bottom; vertical-align: top; text-align: center; font-size: 0.8em; @}
+            table.histogram .bars td @{ vertical-align: bottom; @}
+            table.histogram .bars div @{ background: #c60808; color: white; @}
+            table.histogram a @{ display: block; text-align: left; max-width: 11em; overflow: hidden; text-overflow: ellipsis; max-height: 2.3em; line-height: 1.1; margin: 0.4em 0; @}
+        </style>
 
         <div class="inner-col">
-        <div>
+        <section>
+            <h2>History</h2>
             <svg viewBox="0 -5 1030 116" width=1040 height=116 style="width:100%; margin: 1em auto 0">
+                <title>Download history of all crates since 2015</title>
                 @for y in (0..stats.max_downloads_per_week).step_by(stats.dl_grid_line_every as _) {
                     <line x1=0 x2=1000 y1="@(100. - y as f64 / (stats.max_downloads_per_week as f64 / 100.))" y2="@(100. - y as f64 / (stats.max_downloads_per_week as f64 / 100.))"
                         stroke="black" stroke-width=1 stroke-linecap="butt" stroke-opacity=0.1 />
                     @if y > 0 {
-                        <text opacity=0.5 font-size="11" x="1003" y="@(103. - y as f64 / (stats.max_downloads_per_week as f64 / 100.))">@(y / 7_000_000)M</text>
+                        <text opacity=0.5 font-size="11" x="1003" y="@(103. - y as f64 / (stats.max_downloads_per_week as f64 / 100.))">@((y as f64 / 7_000_000.).round())M</text>
                     }
                 }
                 <path d="M0 100
@@ -53,15 +63,44 @@
                 }
             </svg>
             <p class=legend>Daily downloads since Rust 1.0, 7-day average.</p>
-    </div>
 <p>Downloads are growing at a rate of
 @GlobalStats::relative_increase((stats.dl_per_day_this_year.0 + stats.dl_per_day_this_year.1, stats.dl_per_day_last_year.0 + stats.dl_per_day_last_year.1)) per year.</p>
 
-<p>At peak crates.io has served @if let Some((val, unit)) = Some(format_downloads(stats.max_daily_downloads_rate)) { @val<b>@unit</b> } downloads per <em>day</em>,
+<p>At peak crates.io has served @if let Some((val, unit)) = Some(format_downloads_verbose(stats.max_daily_downloads_rate)) { @val @unit } downloads per <em>day</em>,
     which is more than all downloads in the first <em>@((stats.weeks_to_reach_max_downloads as f32 / (365./12./7.)).floor()) months</em> since the release of Rust 1.0 in May 2015.</p>
 
 <p>Traffic during weekdays is typically @GlobalStats::relative_increase(stats.dl_per_day_this_year) higher than during weekends
     (@if stats.dl_ratio_up() {up} else {down} from @GlobalStats::relative_increase(stats.dl_per_day_last_year) a year before).</p>
+
+    </section>
+    <section>
+        <h2>Histograms</h2>
+        <section>
+            <h3>Number of direct dependencies</h3>
+            <p>Including dev and build deps.</p>
+            @:histogram(&stats.hs_deps1, 0)</section>
+            @:histogram(&stats.hs_deps2, 5)</section>
+        <section>
+            <h3>Crate size (KB)</h3>
+            <p>Amount of data downloaded as a compressed tarball. Size of code + bundled data files.</p>
+            @:histogram(&stats.hs_sizes, 5)</section>
+        <section>
+            <h3>Number of releases per crate</h3>
+            <p>Number of unique versions of each crate, excluding yanked versions.</p>
+            @:histogram(&stats.hs_releases, 5)</section>
+        <section>
+            <h3>Age</h3>
+            <p>Time since crate's first release.</p>
+            @:histogram(&stats.hs_age, 5)</section>
+        <section>
+            <h3>How long a crate has been updated for</h3>
+            <p>Time between its oldest and newest release.</p>
+            @:histogram(&stats.hs_maintenance, 5)</section>
+        <section>
+            <h3>Time without any updates</h3>
+            <p>Time since crate's most recent release.</p>
+            @:histogram(&stats.hs_languish, 5)</section>
+    </section>
     </main>
 
     <footer>

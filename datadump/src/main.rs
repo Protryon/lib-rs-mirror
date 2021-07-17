@@ -7,6 +7,7 @@ use kitchen_sink::KitchenSink;
 use kitchen_sink::MiniDate;
 use kitchen_sink::Origin;
 use kitchen_sink::OwnerKind;
+use kitchen_sink::StatsHistogram;
 use libflate::gzip::Decoder;
 use rayon::prelude::*;
 use serde_derive::Deserialize;
@@ -167,22 +168,37 @@ fn versions_histogram(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDe
     let mut crate_sizes = HashMap::new();
     let mut licenses = HashMap::new();
     let mut num_deps = HashMap::new();
+    let mut age = HashMap::new();
+    let mut maintenance = HashMap::new();
+    let mut languish = HashMap::new();
+    let today = Utc::today();
 
     // hopefully the hashmap is randomizing examples
     for (crate_id, name) in crates {
         if let Some(v) = versions.get(crate_id) {
+            let non_yanked_releases = v.iter().filter(|d| d.yanked != 't').count() as u32;
+            if non_yanked_releases == 0 {
+                continue;
+            }
+
             if let Some(latest) = v.iter().max_by_key(|v| v.id) {
+                if let Some(oldest) = v.iter().min_by_key(|v| v.id) {
+                    let latest_date = date_from_str(&latest.created_at);
+                    let oldest_date = date_from_str(&oldest.created_at);
+                    if let (Ok(latest_date), Ok(oldest_date)) = (latest_date, oldest_date) {
+                        insert_hist_item(&mut age, today.signed_duration_since(oldest_date).num_weeks() as u32, &name);
+                        insert_hist_item(&mut languish, today.signed_duration_since(latest_date).num_weeks() as u32, &name);
+                        insert_hist_item(&mut maintenance, latest_date.signed_duration_since(oldest_date).num_weeks() as u32, &name);
+                    }
+                }
+
                 if let Some(size) = latest.crate_size {
                     let size_kib = if size > 5_000_000 {
-                        size / 1024 / 256 * 256 // coarser buckets
+                        size / (1000 * 500) * 500 // coarser buckets
                     } else {
-                        size / 1024
+                        size / 1000
                     };
-                    let t = crate_sizes.entry(size_kib as u32).or_insert((0, Vec::<String>::new()));
-                    t.0 += 1;
-                    if t.1.len() < EXAMPLES_PER_BUCKET {
-                        t.1.push(name.clone());
-                    }
+                    insert_hist_item(&mut crate_sizes, size_kib as u32, &name);
                 }
                 if let Some(t) = licenses.get_mut(&latest.license) {
                     *t += 1;
@@ -190,24 +206,17 @@ fn versions_histogram(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDe
                     licenses.insert(latest.license.clone(), 1);
                 }
 
-                if let Some(dep) = deps.get(&latest.id) {
-                    let t = num_deps.entry(dep.len() as u32).or_insert((0, Vec::<String>::new()));
-                    t.0 += 1;
-                    if t.1.len() < EXAMPLES_PER_BUCKET {
-                        t.1.push(name.clone());
-                    }
-                }
+                insert_hist_item(&mut num_deps, deps.get(&latest.id).map(|d| d.as_slice()).unwrap_or_default().len() as u32, &name);
             }
-            let t = num_releases.entry(v.len() as u32).or_insert((0, Vec::<String>::new()));
-            t.0 += 1;
-            if t.1.len() < EXAMPLES_PER_BUCKET {
-                t.1.push(name.clone());
-            }
+            insert_hist_item(&mut num_releases, non_yanked_releases, &name);
         }
     }
     ksink.index_stats_histogram("releases", num_releases);
     ksink.index_stats_histogram("sizes", crate_sizes);
     ksink.index_stats_histogram("deps", num_deps);
+    ksink.index_stats_histogram("age", age);
+    ksink.index_stats_histogram("maintenance", maintenance);
+    ksink.index_stats_histogram("languish", languish);
 
     // histogram cache doesn't support string keys
     let fudge = licenses.into_iter().enumerate().map(|(i, (lic, num))| {
@@ -218,13 +227,18 @@ fn versions_histogram(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDe
     Ok(())
 }
 
+fn insert_hist_item(histogram: &mut StatsHistogram, val: u32, name: &str) {
+    let t = histogram.entry(val).or_insert((0, Vec::<String>::new()));
+    t.0 += 1;
+    if t.1.len() < EXAMPLES_PER_BUCKET {
+        t.1.push(name.to_owned());
+    }
+}
+
 /// Direct reverse dependencies, but with release dates (when first seen or last used)
 #[inline(never)]
 fn index_active_rev_dependencies(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDepsMap, ksink: &KitchenSink) -> Result<(), BoxErr> {
     let mut deps_changes = HashMap::with_capacity(crates.len());
-
-    let mut age_histogram = HashMap::with_capacity(52*5);
-    // let mut global_active_crate_changes = HashMap::with_capacity(365*10);
 
     for (crate_id, name) in crates {
 
@@ -236,15 +250,6 @@ fn index_active_rev_dependencies(crates: &CratesMap, versions: &VersionsMap, dep
                 continue; // shouldn't happen
             }
             releases_from_oldest.sort_unstable_by_key(|a| a.0);
-
-            // begin little side quest for histogram stats
-            let crate_age_weeks = releases_from_oldest.last().unwrap().1.days_since(releases_from_oldest[0].1) / 7;
-            let t = age_histogram.entry(crate_age_weeks.abs() as u32).or_insert((0, Vec::<String>::new()));
-            t.0 += 1;
-            if t.1.len() < EXAMPLES_PER_BUCKET {
-                t.1.push(name.clone());
-            }
-            // end little side quest for histogram stats
 
             let mut over_time = HashMap::new();
             let mut releases = releases_from_oldest.iter().peekable();
@@ -298,8 +303,6 @@ fn index_active_rev_dependencies(crates: &CratesMap, versions: &VersionsMap, dep
             eprintln!("Bad crate? {} {}", crate_id, name);
         }
     }
-
-    ksink.index_stats_histogram("age", age_histogram)?;
 
     for (crate_id, uses) in deps_changes {
         let name = crates.get(&crate_id).expect("bork crate");

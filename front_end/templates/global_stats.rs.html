@@ -1,6 +1,7 @@
 @use crate::Page;
 @use crate::format_downloads_verbose;
 @use crate::GlobalStats;
+@use crate::global_stats::format_number;
 @use crate::templates::base;
 @use crate::templates::histogram;
 @use crate::Urler;
@@ -10,8 +11,8 @@
 @:base(page, {
     <header id="home">
         <div class="inner-col" role="banner">
-            <h1><a href="/">Lib.rs</a> › New</h1>
-            <p>Rust crates ecosystem stats.</p>
+            <h1><a href="/">Lib.rs</a> › Stats</h1>
+            <p>Rust crates ecosystem statistics.</p>
             <form role="search" id=search method="get" action="/search">
                 <input placeholder="name, keywords, description" autocapitalize="off" autocorrect="off" autocomplete="off" tabindex="1" type=search name=q><button type=submit>Search</button>
             </form>
@@ -31,7 +32,11 @@
             table.histogram td @{ vertical-align: bottom; vertical-align: top; text-align: center; font-size: 0.8em; @}
             table.histogram .bars td @{ vertical-align: bottom; @}
             table.histogram .bars div @{ background: #c60808; color: white; @}
-            table.histogram a @{ display: block; text-align: left; max-width: 11em; overflow: hidden; text-overflow: ellipsis; max-height: 2.3em; line-height: 1.1; margin: 0.4em 0; @}
+            table.histogram a @{ display: block; text-align: left; max-width: 11em; overflow: hidden; text-overflow: ellipsis;
+display: -webkit-box;
+-webkit-box-orient: vertical;
+-webkit-line-clamp: 2;
+  max-height: 2.3em; line-height: 1.1; margin: 0.4em 0; @}
         </style>
 
         <div class="inner-col">
@@ -50,7 +55,7 @@
     @for (i, (weekday, weekend)) in dl_by_week.iter().copied().enumerate() {
     L@(i as f64 / (dl_by_week.len() as f64 / 1000.)) @(100. - (weekday + weekend) as f64 / (stats.max_downloads_per_week as f64 / 100.))
     }
-    V100" fill="#FCBC4A" stroke-width="1" stroke="black" />
+    V100" fill="#fcbc4a" stroke-width="1" stroke="black" />
                 @for x in (0..dl_by_week.len() as u32).step_by(52).skip(1) {
                     <line y1=100 y2=105
                     x1="@((x - stats.start_week_offset) as f64 / (dl_by_week.len() as f64 / 1000.))"
@@ -62,7 +67,13 @@
                     x="@((x + 26_u32.saturating_sub(stats.start_week_offset)) as f64 / (dl_by_week.len() as f64 / 1000.))">@(x / 52 + 2015)</text>
                 }
             </svg>
-            <p class=legend>Daily downloads since Rust 1.0, 7-day average.</p>
+            <p class=legend>Daily downloads since Rust 1.0, 7-day average</p>
+
+
+
+
+
+
 <p>Downloads are growing at a rate of
 @GlobalStats::relative_increase((stats.dl_per_day_this_year.0 + stats.dl_per_day_this_year.1, stats.dl_per_day_last_year.0 + stats.dl_per_day_last_year.1)) per year.</p>
 
@@ -71,6 +82,41 @@
 
 <p>Traffic during weekdays is typically @GlobalStats::relative_increase(stats.dl_per_day_this_year) higher than during weekends
     (@if stats.dl_ratio_up() {up} else {down} from @GlobalStats::relative_increase(stats.dl_per_day_last_year) a year before).</p>
+
+
+            <svg viewBox="0 -5 1030 116" width=1040 height=116 style="width:100%; margin: 1em auto 0">
+                <title>@stats.max_total_owners crate owners registered on crates.io</title>
+                @for y in (0..stats.max_total_owners).step_by((stats.max_total_owners as usize / 6_000 * 1_000).max(1)) {
+                    <line x1=0 x2=1000 y1="@(100. - y as f64 / (stats.max_total_owners as f64 / 100.))" y2="@(100. - y as f64 / (stats.max_total_owners as f64 / 100.))"
+                        stroke="black" stroke-width=1 stroke-linecap="butt" stroke-opacity=0.1 />
+                    @if y > 0 {
+                        <text opacity=0.5 font-size="11" x="1003" y="@(103. - y as f64 / (stats.max_total_owners as f64 / 100.))">@((y as f64 / 1_000.).round())K</text>
+                    }
+                }
+                @for (i, num) in stats.total_owners_at_month.iter().copied().enumerate() {
+                    <rect
+                        x="@((0.1 + i as f64) / (stats.total_owners_at_month.len() as f64 / 1000.))"
+                        width="@(0.8 / (stats.total_owners_at_month.len() as f64 / 1000.))"
+                        y="@(100. - num as f64 / (stats.max_total_owners as f64 / 100.))"
+                        height="@(num as f64 / (stats.max_total_owners as f64 / 100.))"
+                        fill="#4aa9fc"
+                    />
+                }
+                @for x in (0..stats.total_owners_at_month.len() as u32).step_by(12).skip(1) {
+                    <line y1=100 y2=105
+                    x1="@((x - 5) as f64 / (stats.total_owners_at_month.len() as f64 / 1000.))"
+                    x2="@((x - 5) as f64 / (stats.total_owners_at_month.len() as f64 / 1000.))"
+                        stroke="black" stroke-width=1 stroke-linecap="butt" stroke-opacity=0.1 />
+                }
+                @for x in (0..(stats.total_owners_at_month.len() as u32 - 5)).step_by(12) {
+                    <text opacity=0.5 text-anchor=middle font-size="11" y="111"
+                    x="@((x + 6 - 5) as f64 / (stats.total_owners_at_month.len() as f64 / 1000.))">@(x / 12 + 2015)</text>
+                }
+            </svg>
+            <p class=legend>Number of users/teams owning a crate on crates.io</p>
+
+<p>There are @format_number(stats.max_total_owners) users or teams that have a crate on crates.io. The number of owners is growing at a rate of
+@GlobalStats::relative_increase((stats.max_total_owners as _, stats.total_owners_at_month[stats.total_owners_at_month.len()-12] as _)) per year.</p>
 
     </section>
     <section>
@@ -100,6 +146,10 @@
             <h3>Time without any updates</h3>
             <p>Time since crate's most recent release.</p>
             @:histogram(&stats.hs_languish, 5)</section>
+        <section>
+            <h3>Number of crates per user</h3>
+            <p>How many crates a single account (user or team) owns. Excluding all other people in the world who have 0 crates.</p>
+            @:histogram(&stats.hs_owner_crates, 5)</section>
     </section>
     </main>
 

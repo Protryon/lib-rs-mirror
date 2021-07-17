@@ -1468,6 +1468,11 @@ impl KitchenSink {
         Ok(res)
     }
 
+    #[inline]
+    pub async fn crate_all_owners(&self) -> CResult<Vec<crate_db::CrateOwnerStat>> {
+        Ok(self.crate_db.crate_all_owners().await?)
+    }
+
     /// "See also"
     #[inline]
     pub async fn related_categories(&self, slug: &str) -> CResult<Vec<String>> {
@@ -1817,6 +1822,11 @@ impl KitchenSink {
         self.crate_db.index_repo_changes(repo, &changes).await?;
 
         Ok(())
+    }
+
+    #[inline]
+    pub fn login_by_github_id(&self, id: u64) -> CResult<String> {
+        Ok(self.user_db.login_by_github_id(id)?)
     }
 
     #[inline]
@@ -2855,11 +2865,6 @@ impl MiniDate {
         }
     }
 
-    pub fn days_since(self, other: Self) -> i32 {
-        let a = self.y as i32 * 365 + self.o as i32;
-        let b = other.y as i32 * 365 + other.o as i32;
-        a - b
-    }
 
     /// Screw leap years
     pub fn days_later(self, days: i32) -> Self {

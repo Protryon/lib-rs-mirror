@@ -21,6 +21,7 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 use thread_local::ThreadLocal;
+use log::error;
 use tokio::sync::{Mutex, RwLock};
 type FResult<T, E = Error> = std::result::Result<T, E>;
 
@@ -66,6 +67,12 @@ pub struct CrateVersionData<'a> {
     pub repository: Option<&'a Repo>,
     pub extracted_auto_keywords: Vec<(f32, String)>,
     pub cache_key: u64,
+}
+
+pub struct CrateOwnerStat {
+    pub github_id: u64,
+    pub created_at: (u16, u8, u8),
+    pub num_crates: u32,
 }
 
 impl CrateDb {
@@ -479,7 +486,7 @@ impl CrateDb {
             let q = q.query_map(&[&repo.canonical_git_url()], |r| {
                 let s = r.get_ref_unwrap(0).as_str()?;
                 crates_io_name(s)
-            })?.filter_map(|r| r.ok());
+            })?.filter_map(|r| r.map_err(|e| error!("crepo: {}", e)).ok());
             Ok(q.collect())
         }).await
     }
@@ -595,6 +602,31 @@ impl CrateDb {
             Ok(())
         }).await
     }
+/*
+2020-05-06 13:50:44
+*/
+    /// github_id, created_at, number of crates
+    pub async fn crate_all_owners(&self) -> FResult<Vec<CrateOwnerStat>> {
+        self.with_read("all_owners", |tx| {
+            let mut query = tx.prepare_cached("SELECT github_id, min(invited_at), count(*) FROM author_crates GROUP BY github_id")?;
+            let q = query.query_map([], |row| {
+                let s = row.get_ref(1)?.as_str()?;
+                let y = s[0..4].parse().map_err(|e| error!("{} = {}", s, e)).ok();
+                let m = s[5..7].parse().map_err(|e| error!("{} = {}", s, e)).ok();
+                let d = s[8..10].parse().map_err(|e| error!("{} = {}", s, e)).ok();
+                Ok((row.get(0)?, (y,m,d), row.get(2)?))
+            })?;
+            let res: Vec<_> = q.filter_map(|row| row.map_err(|e| error!("owner: {}", e)).ok()).filter_map(|row| {
+                Some(CrateOwnerStat {
+                    github_id: row.0,
+                    created_at: ((row.1).0?, (row.1).1?, (row.1).2?),
+                    num_crates: row.2,
+                })
+            }).collect();
+            assert!(res.len() > 1000);
+            Ok(res)
+        }).await
+    }
 
     /// Replaces entire author_crates table
     pub async fn index_crate_all_owners(&self, all_owners: &[(Origin, Vec<CrateOwner>)]) -> FResult<bool> {
@@ -652,7 +684,7 @@ impl CrateDb {
                     latest_release: DateTime::from_utc(NaiveDateTime::from_timestamp(latest_timestamp as _, 0), Utc),
                 })
             })?;
-            Ok(q.filter_map(|x| x.ok()).collect())
+            Ok(q.filter_map(|x| x.map_err(|e| error!("by owner: {}", e)).ok()).collect())
         }).await
     }
 
@@ -841,7 +873,7 @@ impl CrateDb {
                     limit 12
             "#)?;
             let q = query.query_map(&[&slug], |row| row.get(1))?;
-            let q = q.filter_map(|r| r.ok());
+            let q = q.filter_map(|r| r.map_err(|e| error!("kw: {}", e)).ok());
             Ok(q.collect())
         }).await
     }
@@ -864,7 +896,7 @@ impl CrateDb {
             let q = query.query_map(args, |row| {
                 Ok((Origin::from_str(row.get_ref_unwrap(0).as_str()?), row.get_unwrap(1)))
             })?;
-            let q = q.filter_map(|r| r.ok());
+            let q = q.filter_map(|r| r.map_err(|e| error!("top: {}", e)).ok());
             Ok(q.collect())
         }).await
     }
@@ -885,7 +917,7 @@ impl CrateDb {
             let q = query.query_map(args, |row| {
                 Ok((Origin::from_str(row.get_ref_unwrap(0).as_str()?), row.get_unwrap(1)))
             })?;
-            let q = q.filter_map(|r| r.ok());
+            let q = q.filter_map(|r| r.map_err(|e| error!("top: {}", e)).ok());
             Ok(q.collect())
         }).await
     }
@@ -911,7 +943,7 @@ impl CrateDb {
             let q = query.query_map(&[&slug], |row| {
                 Ok(Origin::from_str(row.get_ref_unwrap(1).as_str()?))
             })?;
-            let q = q.filter_map(|r| r.ok());
+            let q = q.filter_map(|r| r.map_err(|e| error!("upd: {}", e)).ok());
             Ok(q.collect())
         }).await
     }
@@ -936,7 +968,7 @@ impl CrateDb {
                 let origin = Origin::from_str(row.get_ref_unwrap(2).as_str()?);
                 Ok((origin, row.get(1)?))
             })?;
-            let q = q.filter_map(|r| r.ok());
+            let q = q.filter_map(|r| r.map_err(|e| error!("upd2: {}", e)).ok());
             Ok(q.collect())
         }).await
     }
@@ -962,7 +994,7 @@ impl CrateDb {
             "#)?;
             let q = q.query_map([], |row| -> Result<(Origin, f64, i64)> {
                 Ok((Origin::from_str(row.get_ref_unwrap(0).as_str()?), row.get_unwrap(1), row.get_unwrap(2)))
-            })?.filter_map(|r| r.ok());
+            })?.filter_map(|r| r.map_err(|e| error!("sitemap: {}", e)).ok());
             Ok(q.collect())
         }).await
     }
@@ -975,7 +1007,7 @@ impl CrateDb {
             "#)?;
             let q = q.query_map([], |row| -> Result<(String, u32)> {
                 Ok((row.get_unwrap(0), row.get_unwrap(1)))
-            })?.filter_map(|r| r.ok());
+            })?.filter_map(|r| r.map_err(|e| error!("counts: {}", e)).ok());
             Ok(q.collect())
         }).await
     }
@@ -988,7 +1020,7 @@ impl CrateDb {
             let q = q.query_map(&[&timestamp], |r| {
                 let s = r.get_ref_unwrap(0).as_str()?;
                 Ok(Origin::from_str(s))
-            })?.filter_map(|r| r.ok());
+            })?.filter_map(|r| r.map_err(|e| error!("reindx: {}", e)).ok());
             Ok(q.collect())
         }).await
     }

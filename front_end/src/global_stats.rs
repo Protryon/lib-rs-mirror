@@ -5,11 +5,14 @@ use crate::templates;
 use crate::Urler;
 use kitchen_sink::KitchenSink;
 use render_readme::Renderer;
+use std::collections::HashMap;
 use std::io::Write;
 use peeking_take_while::PeekableExt;
 
 #[derive(Debug)]
 pub struct GlobalStats {
+    pub(crate) total_owners_at_month: Vec<u32>,
+    pub(crate) max_total_owners: u32,
     pub(crate) max_daily_downloads_rate: u32,
     pub(crate) max_downloads_per_week: u64,
     pub(crate) start_week_offset: u32,
@@ -26,6 +29,7 @@ pub struct GlobalStats {
     pub(crate) hs_maintenance: Histogram,
     pub(crate) hs_age: Histogram,
     pub(crate) hs_languish: Histogram,
+    pub(crate) hs_owner_crates: Histogram,
 }
 
 impl GlobalStats {
@@ -42,8 +46,8 @@ impl GlobalStats {
 
 pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSink, _renderer: &Renderer) -> Result<(), anyhow::Error> {
     let urler = Urler::new(None);
-
     let start = Utc.ymd(2015, 5, 15); // Rust 1.0
+
     let start_week_offset = start.ordinal0()/7;
     let mut day = Utc::today() - chrono::Duration::days(2);
 
@@ -89,6 +93,9 @@ pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSin
     }
     dl.reverse();
 
+    let (total_owners_at_month, hs_owner_crates) = owner_stats(kitchen_sink, start).await?;
+    eprintln!("{:?} {:?}", total_owners_at_month, hs_owner_crates);
+
     let this_year = &dl[dl.len()-52..];
     let last_year = &dl[dl.len()-52*2..dl.len()-52];
 
@@ -103,8 +110,9 @@ pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSin
     let downloads_this_year = sum2(this_year);
     let downloads_last_year = sum2(last_year);
     let max_downloads_per_week = dl.iter().map(|(a, b)| a + b).max().unwrap_or(0);
+    let max_total_owners = total_owners_at_month.iter().copied().max().unwrap_or(0);
     let dl_grid_line_every = (max_downloads_per_week / 6_000_000) * 1_000_000;
-    let mut hs_deps1 = Histogram::new(dbg!(kitchen_sink.get_stats_histogram("deps")?.expect("hs_deps")), &[0,1,2,3,4,5,6,7,8,9,10,11,12,14,16,18,20,25,30,40,60,80,100,120,150], |n, _| n.to_string());
+    let mut hs_deps1 = Histogram::new(kitchen_sink.get_stats_histogram("deps")?.expect("hs_deps"), &[0,1,2,3,4,5,6,7,8,9,10,11,12,14,16,18,20,25,30,40,60,80,100,120,150], |n, _| n.to_string());
     let hs_deps2 = Histogram {
         max: hs_deps1.max,
         buckets: hs_deps1.buckets.split_off(10),
@@ -121,6 +129,8 @@ pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSin
     };
 
     let stats = GlobalStats {
+        total_owners_at_month,
+        max_total_owners,
         max_daily_downloads_rate,
         start_week_offset,
         weeks_to_reach_max_downloads: dl.iter().copied().take_while(move |(d, e)| { tmp_sum += (d + e) as u32; tmp_sum < max_daily_downloads_rate }).count() as u32,
@@ -143,12 +153,12 @@ pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSin
         }),
         hs_age: Histogram::new(kitchen_sink.get_stats_histogram("age")?.expect("hs_age"), &[5, 13, 26, 52, 52*2, 52*3, 52*4, 52*5, 52*6, 52*8], age_label),
         hs_languish: Histogram::new(kitchen_sink.get_stats_histogram("languish")?.expect("hs_languish"), &[5, 13, 26, 52, 52*2, 52*3, 52*4, 52*5, 52*6, 52*8], age_label),
+        hs_owner_crates,
     };
-    println!("{:?}", stats);
 
     templates::global_stats(out, &Page {
         title: "State of the Rust/Cargo crates ecosystem".to_owned(),
-        description: Some("Package statistics".to_owned()),
+        description: Some("How many packages there are? How many dependencies they have? Which crate is the oldest or biggest? Is Rust usage growing?".to_owned()),
         noindex: false,
         search_meta: true,
         critical_css_data: Some(include_str!("../../style/public/home.css")),
@@ -156,6 +166,45 @@ pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSin
         ..Default::default()
     }, &dl, &stats, &urler)?;
     Ok(())
+}
+
+async fn owner_stats(kitchen_sink: &KitchenSink, start: Date<Utc>) -> Result<(Vec<u32>, Histogram), anyhow::Error> {
+    let all_owners = kitchen_sink.crate_all_owners().await?;
+    eprintln!("got {} owners", all_owners.len());
+    assert!(all_owners.len() > 1000);
+    let mut owner_crates = HashMap::new();
+    let mut total_owners_at_month = vec![0u32; (Utc::today().signed_duration_since(start).num_days() as usize + 29) / 30];
+    let mut sum = 0;
+    for o in &all_owners {
+        // account creation history
+        let (y,m,_d) = o.created_at;
+        if y < 2015 || (y == 2015 && m < 5) {
+            sum += 1;
+            continue;
+        }
+        let mon_num = (y as usize - 2015) * 12 + m as usize - 5;
+        if mon_num < total_owners_at_month.len() {
+            total_owners_at_month[mon_num as usize] += 1;
+        }
+        // update histogram
+        let t = owner_crates.entry(o.num_crates).or_insert((0, Vec::new()));
+        t.0 += 1;
+        if t.1.len() < 5 {
+            if let Ok(login) = kitchen_sink.login_by_github_id(o.github_id) {
+                t.1.push(login);
+            }
+        }
+    }
+    // trim empty end
+    while total_owners_at_month.last().map_or(false, |&l| l == 0) {
+        total_owners_at_month.pop();
+    }
+    total_owners_at_month.iter_mut().for_each(|n| {
+        sum += *n;
+        *n = sum;
+    });
+    let hs_owner_crates = Histogram::new(owner_crates, &[1,2,3,5,10,20,50,100,500,1000,2000], |n, _| n.to_string());
+    Ok((total_owners_at_month, hs_owner_crates))
 }
 
 #[derive(Debug)]
@@ -189,7 +238,9 @@ impl Histogram {
     pub fn new(data: kitchen_sink::StatsHistogram, bucket_thresholds: &[u32], label: fn(u32, Option<u32>) -> String) -> Self {
         let mut s = Self::make(data, bucket_thresholds);
         s.bucket_labels = s.buckets.windows(2).map(|w| label(w[0].threshold, Some(w[1].threshold))).collect();
-        s.bucket_labels.push(label(s.buckets.last().unwrap().threshold, None));
+        if let Some(last) = s.buckets.last() {
+            s.bucket_labels.push(label(last.threshold, None));
+        }
         s
     }
 
@@ -235,6 +286,10 @@ impl Histogram {
             bucket_labels: Vec::new(),
         }
     }
+}
+
+pub fn format_number(num: u32) -> String {
+    Numeric::english().format_int(num)
 }
 
 pub fn format_bytes(bytes: u32) -> String {

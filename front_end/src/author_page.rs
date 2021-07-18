@@ -44,13 +44,10 @@ pub struct AuthorPage<'a> {
 }
 
 impl<'a> AuthorPage<'a> {
-    pub async fn new(aut: &'a RichAuthor, kitchen_sink: &'a KitchenSink, markup: &'a Renderer) -> CResult<AuthorPage<'a>> {
+    pub async fn new(aut: &'a RichAuthor, rows: Vec<CrateOwnerRow>, kitchen_sink: &'a KitchenSink, markup: &'a Renderer) -> CResult<AuthorPage<'a>> {
         let rustacean = kitchen_sink.rustacean_for_github_login(&aut.github.login);
 
-        let (rows, orgs) = futures::try_join!(
-            kitchen_sink.crates_of_author(aut),
-            kitchen_sink.user_github_orgs(&aut.github.login),
-        )?;
+        let orgs = kitchen_sink.user_github_orgs(&aut.github.login).await?;
         let orgs = futures::stream::iter(orgs.unwrap_or_default()).map(|org| async move {
             kitchen_sink.github_org(&org.login).await
                 .map_err(|e| eprintln!("org: {} {}", &org.login, e))

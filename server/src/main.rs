@@ -556,6 +556,11 @@ async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     if aut.github.login != login {
         return Ok(HttpResponse::PermanentRedirect().insert_header(("Location", format!("/~{}", Encoded(&aut.github.login)))).body(""));
     }
+    let aut2 = aut.clone();
+    let rows = rt_run_timeout(&state.rt, "authorpage1", 60, async move { crates.crates_of_author(&aut2).await }).await?;
+    if rows.is_empty() {
+        return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", format!("https://github.com/{}", Encoded(&aut.github.login)))).body(""));
+    }
     let cache_file = state.page_cache_dir.join(format!("@{}.html", login));
     Ok(serve_cached(
         with_file_cache(state, cache_file, 3600, {
@@ -563,7 +568,7 @@ async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
             run_timeout("authorpage", 60, async move {
                 let crates = state.crates.load();
                 let mut page: Vec<u8> = Vec::with_capacity(32000);
-                front_end::render_author_page(&mut page, &aut, &crates, &state.markup).await?;
+                front_end::render_author_page(&mut page, rows, &aut, &crates, &state.markup).await?;
                 minify_html(&mut page);
                 mark_server_still_alive(&state);
                 Ok::<_, anyhow::Error>((page, None))

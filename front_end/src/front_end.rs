@@ -23,7 +23,7 @@ pub use crate::not_found_page::*;
 pub use crate::search_page::*;
 pub use crate::global_stats::*;
 use futures::future::try_join_all;
-
+use kitchen_sink::CrateOwnerRow;
 use crate::author_page::*;
 use crate::crate_page::*;
 use crate::urler::Urler;
@@ -142,13 +142,13 @@ pub async fn render_sitemap(sitemap: &mut impl Write, crates: &KitchenSink) -> R
 }
 
 /// See `author.rs.html`
-pub async fn render_author_page<W: Write>(out: &mut W, aut: &RichAuthor, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), anyhow::Error> {
+pub async fn render_author_page<W: Write>(out: &mut W, rows: Vec<CrateOwnerRow>, aut: &RichAuthor, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), anyhow::Error> {
     if stopped() {
         return Err(KitchenSinkErr::Stopped.into());
     }
 
     let urler = Urler::new(None);
-    let c = AuthorPage::new(aut, kitchen_sink, renderer).await.context("Can't load data for author page")?;
+    let c = AuthorPage::new(aut, rows, kitchen_sink, renderer).await.context("Can't load data for author page")?;
     templates::author(out, &urler, &c).context("author page io")?;
     Ok(())
 }

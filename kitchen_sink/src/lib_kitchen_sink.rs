@@ -526,7 +526,7 @@ impl KitchenSink {
         // normalize data sample to be proportional to montly downloads
         let actual_downloads_per_month = self.downloads_per_month(origin).await?.unwrap_or(total as usize * 30 / days as usize);
         Ok(out.into_iter().map(|(k,v)|
-            (k.clone(), (v as usize * actual_downloads_per_month / total as usize) as u32)
+            (k.clone(), (v as usize * actual_downloads_per_month / total.max(1) as usize) as u32)
         ).collect())
     }
 
@@ -2346,14 +2346,14 @@ impl KitchenSink {
 
     pub async fn crate_owners(&self, origin: &Origin, include_maybe_past_owners: bool) -> CResult<Vec<CrateOwner>> {
         match origin {
-            Origin::CratesIo(name) => {
+            Origin::CratesIo(crate_name) => {
                 let current_owners = async {
-                    Ok(match self.crates_io_owners_cache.get(name)? {
+                    Ok(match self.crates_io_owners_cache.get(crate_name)? {
                         Some(o) => o,
-                        None => timeout("owners-fallback", 3, self.crates_io.crate_owners(name, "fallback").map(|r| r.map_err(CError::from))).await?.unwrap_or_default(),
+                        None => timeout("owners-fallback", 3, self.crates_io.crate_owners(crate_name, "fallback").map(|r| r.map_err(CError::from))).await?.unwrap_or_default(),
                     })
                 };
-                let (mut current_owners, meta) = futures::try_join!(current_owners, self.crates_io_meta(name))?;
+                let (mut current_owners, meta) = futures::try_join!(current_owners, self.crates_io_meta(crate_name))?;
                 if include_maybe_past_owners {
                     let mut current_owners_by_login: HashMap<_, _> = current_owners.into_iter().map(|o| (o.login.clone(), o)).collect();
 

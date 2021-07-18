@@ -2506,6 +2506,28 @@ impl KitchenSink {
 
     pub async fn index_crates_io_crate_all_owners(&self, all_owners: Vec<(Origin, Vec<CrateOwner>)>) -> CResult<()> {
         self.crate_db.index_crate_all_owners(&all_owners).await?;
+        let users = all_owners.iter().flat_map(|(_, owners)| owners.iter().filter_map(|o| {
+            let login = if o.login.starts_with("github:") {
+                o.login.split(':').nth(1).unwrap().to_owned()
+            } else {
+                o.login.clone()
+            };
+            Some(User {
+                id: o.github_id?,
+                login,
+                name: o.name.clone(),
+                avatar_url: o.avatar.clone(),
+                gravatar_id: None,
+                html_url: o.url.as_deref().unwrap_or("").to_owned(),
+                blog: None,
+                user_type: match o.kind {
+                    OwnerKind::Team => UserType::Org,
+                    OwnerKind::User => UserType::User,
+                },
+                created_at: None,
+            })
+        })).collect::<Vec<_>>();
+        self.user_db.index_users(&users)?;
         for (origin, owners) in all_owners {
             if let Origin::CratesIo(name) = origin {
                 self.crates_io_owners_cache.set(name, owners)?;

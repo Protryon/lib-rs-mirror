@@ -102,14 +102,35 @@ impl UserDb {
         })
     }
 
+    pub fn index_users(&self, users: &[User]) -> Result<()> {
+        let mut conn = self.conn.lock();
+        let tx = conn.transaction()?;
+        {
+            let mut insert_user = tx.prepare_cached("INSERT OR REPLACE INTO github_users (
+                id, login, name, avatar_url, gravatar_id, html_url, type)
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)")?;
+            for user in users {
+                let t = match user.user_type {
+                    UserType::User => "user",
+                    UserType::Org => "org",
+                    UserType::Bot => "bot",
+                };
+                let args: &[&dyn ToSql] = &[&user.id, &user.login.to_ascii_lowercase(), &user.name, &user.avatar_url, &user.gravatar_id, &user.html_url, &t];
+                insert_user.execute(args)?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
     pub fn index_user(&self, user: &User, email: Option<&str>, name: Option<&str>) -> Result<()> {
         let mut conn = self.conn.lock();
         let tx = conn.transaction()?;
         {
-            let mut insert_user = tx.prepare_cached("INSERT OR IGNORE INTO github_users (
+            let mut insert_user = tx.prepare_cached("INSERT OR REPLACE INTO github_users (
                 id, login, name, avatar_url, gravatar_id, html_url, type)
                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)")?;
-            let mut insert_email = tx.prepare_cached("INSERT OR IGNORE INTO github_emails (
+            let mut insert_email = tx.prepare_cached("INSERT OR REPLACE INTO github_emails (
                 github_id, email, name) VALUES (?1, ?2, ?3)")?;
 
             let t = match user.user_type {

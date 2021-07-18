@@ -162,7 +162,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
             drop(w); // unlock writes
             let d = self.lock_for_read()?;
             if !self.save_unlocked(&d)? {
-                eprintln!("Data write race; discarding");
+                eprintln!("Data write race; discarding {}", self.path.display());
                 let mut w = self.lock_for_write()?;
                 w.data = None;
             }

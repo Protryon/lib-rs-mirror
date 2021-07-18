@@ -573,10 +573,10 @@ preference = 1
 
 [os.categories.macos-apis]
 name = "macOS and iOS APIs"
-title = "Rust API for macOS/iOS/iPadOS"
+title = "Rust API for macOS/iOS"
 obvious-keywords = ["macos", "apple", "mac", "osx"]
 description = """
-Interfacing with macOS or iOS APIs, and other Apple-specific technologies.\
+Interfacing with macOS or iOS/iPadOS APIs, and other Apple-specific technologies.\
 """
 short-description = """
 Bindings to Apple-specific APIs."""
@@ -859,13 +859,13 @@ Communicate over the WebSocket protocol."""
 obvious-keywords = ["websocket", "websockets", "ws", "web"]
 preference = 1.2
 
-# [uncategorized]
-# name = "Uncategorized"
-# title = "Miscellaneous crates"
-# description = """
-# Crates that don't have enough metadata to be assigned to any category. Please fix them!
-# """
-# short-description = """
-# Everything else goes here."""
-# preference = 0.01
-# obvious-keywords = []
+[uncategorized]
+name = "Uncategorized"
+title = "Miscellaneous crates"
+description = """
+Crates that don't have enough metadata to be assigned to any category. Please fix them!
+"""
+short-description = """
+Everything else goes here."""
+preference = 0.01
+obvious-keywords = []

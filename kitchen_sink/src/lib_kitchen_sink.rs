@@ -343,10 +343,14 @@ impl KitchenSink {
         Ok(out)
     }
 
+    pub fn is_github_login_on_shitlist(&self, login: &str) -> bool {
+        self.author_shitlist.get(&login.to_ascii_lowercase()).is_some()
+    }
+
     pub fn is_crate_on_shitlist(&self, k: &RichCrate) -> bool {
         k.owners().iter()
             .any(|owner| {
-                self.author_shitlist.get(&owner.login.to_ascii_lowercase()).is_some()
+                self.is_github_login_on_shitlist(&owner.login)
             })
     }
 
@@ -1888,6 +1892,22 @@ impl KitchenSink {
         Ok(self.rustc_compatibility_inner(all, in_progress).await?.unwrap())
     }
 
+    pub fn all_crate_compat(&self) -> CResult<HashMap<Origin, CompatByCrateVersion>> {
+        tokio::task::block_in_place(|| {
+            let db = self.build_db()?;
+            let mut all = db.get_all_compat_by_crate()?;
+            // TODO: apply rustc_release_from_date
+            all.iter_mut().for_each(|(_, v)| BuildDb::postprocess_compat(v));
+            Ok(all)
+        })
+    }
+
+    fn build_db(&self) -> Result<&BuildDb, KitchenSinkErr> {
+        self.crate_rustc_compat_db
+            .get_or_try_init(|| BuildDb::new(self.main_cache_dir().join("builds.db")))
+            .map_err(|_| KitchenSinkErr::BadRustcCompatData)
+    }
+
     fn rustc_compatibility_inner<'a>(&'a self, all: RichCrate, in_progress: Arc<Mutex<HashSet<Origin>>>) -> BoxFuture<'a, Result<Option<CompatByCrateVersion>, KitchenSinkErr>> { async move {
         if let Some(cached) = self.crate_rustc_compat_get_cached(all.origin()) {
             return Ok(Some(cached));
@@ -1896,10 +1916,7 @@ impl KitchenSink {
             return Ok(None);
         }
 
-        let db = self.crate_rustc_compat_db
-            .get_or_try_init(|| BuildDb::new(self.main_cache_dir().join("builds.db")))
-            .map_err(|_| KitchenSinkErr::BadRustcCompatData)?;
-
+        let db = self.build_db()?;
         let mut c = self.rustc_compatibility_inner_non_recursive(&all, db)?;
 
         // crates most often fail to compile because their dependencies fail

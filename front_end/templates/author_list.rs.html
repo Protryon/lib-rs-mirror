@@ -15,11 +15,11 @@
       <a href="@url.krate(&k)">
         <div class=h>
           <h4>
-            @k.short_name()
+            @if !k.is_yanked() { @k.short_name() } else { <del>@k.short_name()</del> }
           </h4>
         </div>
         <div class=meta>
-          @if *dl > 1000 {
+          @if *dl > 1000 && !k.is_yanked() {
             <span class=downloads title="@dl recent downloads">@if let Some((num,unit)) = Some(format_downloads(*dl)) {@num<b>@unit</b>}</span>
           }
 

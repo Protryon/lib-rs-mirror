@@ -1,2 +1,3 @@
 yuulive: crate name squatting
 mahkoh: crate name squatting
+andres-roman: squatting crates using fake descriptions and stolen code

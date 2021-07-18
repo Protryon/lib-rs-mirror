@@ -1000,13 +1000,13 @@ impl CrateDb {
     }
 
     /// Number of crates in every category
-    pub async fn category_crate_counts(&self) -> FResult<HashMap<String, u32>> {
+    pub async fn category_crate_counts(&self) -> FResult<HashMap<String, (u32, f64)>> {
         self.with_read("category_crate_counts", |conn| {
             let mut q = conn.prepare(r#"
-                select c.slug, count(*) as cnt from categories c group by c.slug
+                select c.slug, count(*), sum(relevance_weight) from categories c group by c.slug
             "#)?;
-            let q = q.query_map([], |row| -> Result<(String, u32)> {
-                Ok((row.get_unwrap(0), row.get_unwrap(1)))
+            let q = q.query_map([], |row| -> Result<(String, (u32, f64))> {
+                Ok((row.get_unwrap(0), (row.get_unwrap(1), row.get_unwrap(2))))
             })?.filter_map(|r| r.map_err(|e| error!("counts: {}", e)).ok());
             Ok(q.collect())
         }).await

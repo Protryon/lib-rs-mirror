@@ -1,3 +1,5 @@
+use categories::CategoryMap;
+use categories::CATEGORIES;
 use kitchen_sink::Origin;
 use locale::Numeric;
 use chrono::prelude::*;
@@ -24,7 +26,6 @@ pub struct GlobalStats {
     pub(crate) dl_per_day_this_year: (u64, u64),
     pub(crate) dl_per_day_last_year: (u64, u64),
 
-
     pub(crate) hs_releases: Histogram,
     pub(crate) hs_sizes: Histogram,
     pub(crate) hs_deps1: Histogram,
@@ -33,6 +34,8 @@ pub struct GlobalStats {
     pub(crate) hs_age: Histogram,
     pub(crate) hs_languish: Histogram,
     pub(crate) hs_owner_crates: Histogram,
+
+    pub(crate) categories: Vec<TreeBox>,
 }
 
 pub type CallbackFn = fn(&Urler, &str) -> String;
@@ -90,6 +93,8 @@ fn downloads_over_time(start: Date<Utc>, mut day: Date<Utc>, kitchen_sink: &Kitc
 }
 
 pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSink, _renderer: &Renderer) -> Result<(), anyhow::Error> {
+    let categories = category_stats(kitchen_sink).await?;
+
     let urler = Urler::new(None);
     let start = Utc.ymd(2015, 5, 15); // Rust 1.0
 
@@ -168,6 +173,7 @@ pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSin
         hs_age: Histogram::new(kitchen_sink.get_stats_histogram("age")?.expect("hs_age"), false, &[5, 13, 26, 52, 52*2, 52*3, 52*4, 52*5, 52*6, 52*8], age_label),
         hs_languish: Histogram::new(kitchen_sink.get_stats_histogram("languish")?.expect("hs_languish"), false, &[5, 13, 26, 52, 52*2, 52*3, 52*4, 52*5, 52*6, 52*8], age_label),
         hs_owner_crates,
+        categories,
     };
 
     templates::global_stats(out, &Page {
@@ -180,6 +186,211 @@ pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSin
         ..Default::default()
     }, &dl, &stats, &urler)?;
     Ok(())
+}
+
+fn cat_slugs(sub: &CategoryMap) -> Vec<TreeBox> {
+    let mut out = Vec::with_capacity(sub.len());
+    for c in sub.values() {
+        out.push(TreeBox {
+            slug: c.slug.to_owned(),
+            label: c.name.clone(),
+            count: 0,
+            weight: 0.,
+            bounds: treemap::Rect::new(),
+            color: String::new(),
+            font_size: 11.,
+            sub: cat_slugs(&c.sub),
+        });
+    }
+    out
+}
+
+#[derive(Debug, Clone)]
+pub struct TreeBox {
+    pub slug: String,
+    pub label: String,
+    pub font_size: f64,
+    /// SVG fill
+    pub color: String,
+    pub count: u32,
+    pub weight: f64,
+    pub bounds: treemap::Rect,
+    pub sub: Vec<TreeBox>,
+}
+
+impl treemap::Mappable for TreeBox {
+    fn size(&self) -> f64 { self.count as f64 }
+    fn bounds(&self) -> &treemap::Rect { &self.bounds }
+    fn set_bounds(&mut self, b: treemap::Rect) { self.bounds = b; }
+}
+
+async fn category_stats(kitchen_sink: &KitchenSink) -> Result<Vec<TreeBox>, anyhow::Error> {
+    use treemap::*;
+
+    let mut roots = cat_slugs(&CATEGORIES.root);
+    #[track_caller]
+    fn take_cat(slug: &str, items: &mut Vec<TreeBox>) -> TreeBox {
+        let pos = items.iter().position(|i| i.slug == slug).unwrap_or_else(|| panic!("{} in {:?}", slug, items));
+        items.swap_remove(pos)
+    }
+    #[track_caller]
+    fn find_cat<'a>(slug: &str, items: &'a mut Vec<TreeBox>) -> &'a mut TreeBox {
+        let pos = items.iter().position(|i| i.slug == slug).unwrap_or_else(|| panic!("{} in {:?}", slug, items));
+        &mut items[pos]
+    }
+    fn new_cat(sub: Vec<TreeBox>) -> TreeBox {
+        TreeBox {
+            slug: String::new(),
+            label: String::new(),
+            font_size: 0.,
+            color: String::new(),
+            count: 0,
+            weight: 0.,
+            bounds: Rect::new(),
+            sub,
+        }
+    }
+
+    // names don't fit
+    find_cat("database-implementations", &mut roots).label = "Database".into();
+    find_cat("simulation", &mut roots).label = "Sim".into();
+    find_cat("caching", &mut roots).label = "Cache".into();
+    find_cat("config", &mut roots).label = "Config".into();
+    find_cat("cryptography", &mut roots).sub[0].label = "Crypto Magic Beans".into();
+    find_cat("os", &mut roots).label = "OS".into();
+    find_cat("internationalization", &mut roots).label = "i18n".into();
+
+    // group them in a more sensible way
+    let parsers = vec![take_cat("parsing", &mut roots), take_cat("parser-implementations", &mut roots)];
+    roots.push(new_cat(parsers));
+
+    let hw = vec![take_cat("embedded", &mut roots), take_cat("hardware-support", &mut roots), take_cat("no-std", &mut roots)];
+    roots.push(new_cat(hw));
+
+    let db = vec![take_cat("database", &mut roots), take_cat("database-implementations", &mut roots)];
+    roots.push(new_cat(db));
+
+    let gg = vec![take_cat("game-development", &mut roots), take_cat("games", &mut roots)];
+    roots.push(new_cat(gg));
+
+    let int = take_cat("command-line-interface", &mut roots);
+    let cli = vec![int, take_cat("command-line-utilities", &mut roots)];
+    roots.push(new_cat(cli));
+
+    let mut editors = take_cat("text-editors", &mut roots);
+    editors.label = "Editors".into();
+    let txt = vec![
+        take_cat("text-processing", &mut roots),
+        editors,
+        take_cat("template-engine", &mut roots),
+        take_cat("value-formatting", &mut roots),
+    ];
+    roots.push(new_cat(txt));
+
+    let wasm = take_cat("wasm", &mut roots);
+    find_cat("web-programming", &mut roots).sub.push(wasm);
+
+    let mut asyn = take_cat("asynchronous", &mut roots);
+    asyn.label = "Async".into();
+    find_cat("network-programming", &mut roots).sub.push(asyn);
+
+    let mut proc = take_cat("development-tools::procedural-macro-helpers", &mut find_cat("development-tools", &mut roots).sub);
+    proc.label = "Proc macros".into();
+    find_cat("rust-patterns", &mut roots).sub.push(proc);
+
+    let concurrency = take_cat("concurrency", &mut roots);
+    find_cat("rust-patterns", &mut roots).sub.push(concurrency);
+
+    // first layout of top-level boxes (won't be used for anything other than second layout)
+    for top in roots.iter_mut() {
+        let (count, weight) = if top.slug == "" { (0, 0.) } else { kitchen_sink.category_crate_count(&top.slug).await? };
+        top.count = count;
+        top.weight = weight;
+
+        let mut top_copy = top.clone();
+        top_copy.sub = Vec::new();
+
+        for i in top.sub.iter_mut() {
+            let (count, weight) = kitchen_sink.category_crate_count(&i.slug).await?;
+            i.count = count;
+            i.weight = weight;
+            top.count += i.count;
+            top.weight += i.weight;
+            assert!(i.sub.is_empty());
+        }
+        if top_copy.count > 0 {
+            top.sub.insert(0, top_copy);
+        }
+    }
+
+    let mut items_flattened = Vec::new();
+    let layout = TreemapLayout::new();
+    layout.layout_items(&mut roots, Rect::from_points(0.0, 0.0, 1000., 600.));
+
+    for parent in roots.iter_mut() {
+        let layout = TreemapLayout::new();
+        layout.layout_items(&mut parent.sub, parent.bounds);
+        items_flattened.append(&mut parent.sub);
+    }
+
+    postprocess_treebox_items(&mut items_flattened);
+
+    Ok(items_flattened)
+}
+
+fn postprocess_treebox_items(items: &mut Vec<TreeBox>) {
+    let colors = [
+        [0xff, 0xf1, 0xe6],
+        [0xe2, 0xec, 0xe9],
+        [0xDC, 0xED, 0xC1],
+        [0xcd, 0xda, 0xfd],
+        [0xbe, 0xe1, 0xe6],
+        [0xfd, 0xe2, 0xe4],
+        [0xdf, 0xe7, 0xfd],
+        [0xFF, 0xD3, 0xB6],
+        [0xea, 0xe4, 0xe9],
+        [0xd0, 0xd1, 0xff],
+        [0xf4, 0xda, 0xe2],
+        [0xde, 0xc3, 0xe1],
+        [0xd4, 0xe0, 0xf9],
+        [0xFF, 0xD3, 0xB6],
+        [0xDF, 0xCB, 0xD2],
+    ];
+    let len = items.len() as f32;
+    for (i, item) in &mut items.iter_mut().enumerate() {
+        let x = 0.8 + (i as f32 / len) * 0.2;
+        let c = colors[i % colors.len()];
+        let c = [
+            (c[0] as f32 * x + (1. - x) * 200.) as u8,
+            (c[1] as f32 * x + (1. - x) * 100.) as u8,
+            (c[2] as f32 * x + (1. - x) * 200.) as u8
+        ];
+        let mut l = dbg!(lab::Lab::from_rgb(&c));
+        l.l = (l.l + 90.) * 0.5; // fix my bad palette
+        let c = l.to_rgb();
+        item.color = format!("#{:02x}{:02x}{:02x}", c[0], c[1], c[2]);
+
+        let max_width = (item.bounds.w * 1.2 / (item.font_size / 1.7)) as usize;
+        let maybe_label = textwrap::wrap(&item.label, textwrap::Options::new(max_width).break_words(false));
+
+        let chars = maybe_label.iter().map(|w| w.len()).max().unwrap_or(1);
+        let lines = maybe_label.len();
+        let try_font_size = item.font_size
+            .min(item.bounds.h / (lines as f64 * 1.05) - 4.)
+            .min(item.bounds.w * 1.7 / chars as f64)
+            .max(4.);
+
+        let max_width = (item.bounds.w / (try_font_size / 1.7)) as usize;
+
+        let label = textwrap::wrap(&item.label, textwrap::Options::new(max_width).break_words(false));
+        let chars = label.iter().map(|w| w.len()).max().unwrap_or(1);
+        let lines = label.len();
+        item.label = label.join("\n");
+        item.font_size = item.font_size
+            .min(item.bounds.h / (lines as f64 * 1.05) - 4.)
+            .min(item.bounds.w * 1.7 / chars as f64)
+            .max(4.);
+    }
 }
 
 async fn owner_stats(kitchen_sink: &KitchenSink, start: Date<Utc>) -> Result<(Vec<u32>, Histogram), anyhow::Error> {

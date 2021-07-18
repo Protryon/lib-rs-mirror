@@ -33,7 +33,7 @@ impl<'a> CatPage<'a> {
             crates.related_categories(&cat.slug),
         );
         Ok(Self {
-            count: count? as usize,
+            count: count?.0 as usize,
             keywords: keywords?,
             related: related?,
             crates: futures::stream::iter(crates

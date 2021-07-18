@@ -38,3 +38,5 @@ log = "0.4.11"
 anyhow = "1.0.41"
 peeking_take_while = "0.1.2"
 rand = "0.8.4"
+treemap = { git = "https://github.com/kornelski/treemap-rs", rev = "4a0beac18a61780b5f9e5910851c7b94c45be8b3" }
+textwrap = "0.14.2"

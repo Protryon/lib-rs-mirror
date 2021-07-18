@@ -197,7 +197,7 @@ pub struct KitchenSink {
     user_db: user_db::UserDb,
     gh: github_info::GitHub,
     loaded_rich_crate_version_cache: RwLock<FxHashMap<Origin, ArcRichCrateVersion>>,
-    category_crate_counts: DoubleCheckedCell<Option<HashMap<String, u32>>>,
+    category_crate_counts: DoubleCheckedCell<Option<HashMap<String, (u32, f64)>>>,
     top_crates_cached: Mutex<FxHashMap<String, Arc<DoubleCheckedCell<Arc<Vec<Origin>>>>>>,
     git_checkout_path: PathBuf,
     main_cache_dir: PathBuf,
@@ -2564,7 +2564,7 @@ impl KitchenSink {
 
         let res = cell.get_or_try_init(async {
             watch("topcc", async {
-                let total_count = self.category_crate_count(slug).await?;
+                let (total_count, _) = self.category_crate_count(slug).await?;
                 let wanted_num = ((total_count / 2 + 25) / 50 * 50).max(100);
 
                 let mut crates = if slug == "uncategorized" {
@@ -2710,9 +2710,10 @@ impl KitchenSink {
         Ok(crates)
     }
 
-    pub async fn category_crate_count(&self, slug: &str) -> Result<u32, KitchenSinkErr> {
+    /// raw number, despammed weight
+    pub async fn category_crate_count(&self, slug: &str) -> Result<(u32, f64), KitchenSinkErr> {
         if slug == "uncategorized" {
-            return Ok(300);
+            return Ok((300, 0.));
         }
         self.category_crate_counts
             .get_or_init(async {match self.crate_db.category_crate_counts().await {

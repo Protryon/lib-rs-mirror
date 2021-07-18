@@ -136,7 +136,7 @@ impl<'a> HomePage<'a> {
                 let (sub, own_pop) = futures::join!(
                         self.make_all_categories(&cat.sub, seen, deadline),
                         self.crates.category_crate_count(&cat.slug));
-                let own_pop = own_pop.unwrap_or(0) as usize;
+                let own_pop = own_pop.unwrap_or((0, 0.)).0 as usize; // FIXME: use despammed value?
 
                 c.push(HomeCategory {
                     // make container as popular as its best child (already sorted), because homepage sorts by top-level only

@@ -34,6 +34,9 @@
             table.histogram td @{ vertical-align: bottom; vertical-align: top; text-align: center; font-size: 0.8em; @}
             table.histogram .bars td @{ vertical-align: bottom; @}
             table.histogram .bars div @{ background: #c60808; color: white; @}
+            @@media (prefers-color-scheme: dark) @{
+                table.histogram .bars div @{ color: black; @}
+            @}
             table.histogram a @{ display: block; text-align: left; max-width: 11em; overflow: hidden; text-overflow: ellipsis;
 display: -webkit-box;
 -webkit-box-orient: vertical;
@@ -44,15 +47,15 @@ display: -webkit-box;
         <div class="inner-col">
         <section>
             <h2>crates.io growth</h2>
-            <p>We have indexed {} crates.</p>
+            <p>We have indexed @stats.total_crate_num crates.</p>
 
             <svg viewBox="0 -5 1030 116" width=1040 height=116 style="width:100%; margin: 1em auto 0">
                 <title>Download history of all crates since 2015</title>
                 @for y in (0..stats.max_downloads_per_week).step_by(stats.dl_grid_line_every as _) {
                     <line x1=0 x2=1000 y1="@(100. - y as f64 / (stats.max_downloads_per_week as f64 / 100.))" y2="@(100. - y as f64 / (stats.max_downloads_per_week as f64 / 100.))"
-                        stroke="black" stroke-width=1 stroke-linecap="butt" stroke-opacity=0.1 />
+                        stroke-width=1 stroke-linecap="butt" stroke="#aaaaaa" stroke-opacity=0.5 />
                     @if y > 0 {
-                        <text opacity=0.5 font-size="11" x="1003" y="@(103. - y as f64 / (stats.max_downloads_per_week as f64 / 100.))">@((y as f64 / 7_000_000.).round())M</text>
+                        <text stroke="none" fill="#999999" font-size="11" x="1003" y="@(103. - y as f64 / (stats.max_downloads_per_week as f64 / 100.))">@((y as f64 / 7_000_000.).round())M</text>
                     }
                 }
                 <path d="M0 100
@@ -64,10 +67,10 @@ display: -webkit-box;
                     <line y1=100 y2=105
                     x1="@((x - stats.start_week_offset) as f64 / (dl_by_week.len() as f64 / 1000.))"
                     x2="@((x - stats.start_week_offset) as f64 / (dl_by_week.len() as f64 / 1000.))"
-                        stroke="black" stroke-width=1 stroke-linecap="butt" stroke-opacity=0.1 />
+                        stroke-width=1 stroke-linecap="butt" stroke="#aaaaaa" stroke-opacity=0.5 />
                 }
                 @for x in (0..(dl_by_week.len() as u32 - 26)).step_by(52) {
-                    <text opacity=0.5 text-anchor=middle font-size="11" y="111"
+                    <text stroke="none" fill="#999999" text-anchor=middle font-size="11" y="111"
                     x="@((x + 26_u32.saturating_sub(stats.start_week_offset)) as f64 / (dl_by_week.len() as f64 / 1000.))">@(x / 52 + 2015)</text>
                 }
             </svg>
@@ -87,9 +90,9 @@ display: -webkit-box;
                 <title>@stats.max_total_owners crate owners registered on crates.io</title>
                 @for y in (0..stats.max_total_owners).step_by((stats.max_total_owners as usize / 6_000 * 1_000).max(1)) {
                     <line x1=0 x2=1000 y1="@(100. - y as f64 / (stats.max_total_owners as f64 / 100.))" y2="@(100. - y as f64 / (stats.max_total_owners as f64 / 100.))"
-                        stroke="black" stroke-width=1 stroke-linecap="butt" stroke-opacity=0.1 />
+                        stroke-width=1 stroke-linecap="butt" stroke="#aaaaaa" stroke-opacity=0.5 />
                     @if y > 0 {
-                        <text opacity=0.5 font-size="11" x="1003" y="@(103. - y as f64 / (stats.max_total_owners as f64 / 100.))">@((y as f64 / 1_000.).round())K</text>
+                        <text fill="#999999" font-size="11" x="1003" y="@(103. - y as f64 / (stats.max_total_owners as f64 / 100.))">@((y as f64 / 1_000.).round())K</text>
                     }
                 }
                 @for (i, num) in stats.total_owners_at_month.iter().copied().enumerate() {
@@ -98,17 +101,17 @@ display: -webkit-box;
                         width="@(0.8 / (stats.total_owners_at_month.len() as f64 / 1000.))"
                         y="@(100. - num as f64 / (stats.max_total_owners as f64 / 100.))"
                         height="@(num as f64 / (stats.max_total_owners as f64 / 100.))"
-                        fill="#4aa9fc"
+                        fill="#4aa9fc" stroke="none"
                     />
                 }
                 @for x in (0..stats.total_owners_at_month.len() as u32).step_by(12).skip(1) {
                     <line y1=100 y2=105
                     x1="@((x - 5) as f64 / (stats.total_owners_at_month.len() as f64 / 1000.))"
                     x2="@((x - 5) as f64 / (stats.total_owners_at_month.len() as f64 / 1000.))"
-                        stroke="black" stroke-width=1 stroke-linecap="butt" stroke-opacity=0.1 />
+                        stroke-width=1 stroke-linecap="butt" stroke="#aaaaaa" stroke-opacity=0.5 />
                 }
                 @for x in (0..(stats.total_owners_at_month.len() as u32 - 5)).step_by(12) {
-                    <text opacity=0.5 text-anchor=middle font-size="11" y="111"
+                    <text stroke="none" fill="#999999" text-anchor=middle font-size="11" y="111"
                     x="@((x + 6 - 5) as f64 / (stats.total_owners_at_month.len() as f64 / 1000.))">@(x / 12 + 2015)</text>
                 }
             </svg>
@@ -149,6 +152,26 @@ display: -webkit-box;
             <h3>Number of crates per user</h3>
             <p>How many crates a single account (user or team) owns. Excluding all other people in the world who have 0 crates.</p>
             @:histogram(&stats.hs_owner_crates, 8, url, Urler::crates_io_user_by_github_login)</section>
+    </section>
+
+    <section>
+        <h2>Categories</h2>
+        <p>Area is proportional to number of crates in each category. Colors don't mean anything.</p>
+        <svg viewBox="0 0 1000 600" width=1000 height=600 style="width:100%; margin: 1em auto 0">
+            <style>
+            rect.cat @{stroke: white;@}
+            @@media (prefers-color-scheme: dark) @{
+                rect.cat @{stroke: black;@}
+            @}
+            </style>
+            @for b in &stats.categories {
+                <rect class="cat" fill="@b.color" fill-opacity="0.7" x=@b.bounds.x y=@b.bounds.y width=@b.bounds.w height=@b.bounds.h>
+                    <title>@b.label (@b.count)</title></rect>
+                @for (i, w) in b.label.lines().enumerate() {<text
+                    font-size="@b.font_size" fill="black" stroke="none" x="@(b.bounds.x + 3.)" y="@(b.bounds.y + 1. + b.font_size * 1.1 * (i+1) as f64)"
+                    text-anchor=start><title>@b.label (@b.count)</title>@w</rect></text>}
+            }
+        </svg>
     </section>
     </main>
 

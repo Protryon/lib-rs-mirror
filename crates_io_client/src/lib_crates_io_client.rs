@@ -10,6 +10,7 @@ use simple_cache::SimpleFetchCache;
 use simple_cache::TempCacheJson;
 
 use std::path::Path;
+use urlencoding::Encoded;
 use urlencoding::encode;
 mod crate_deps;
 mod crate_meta;
@@ -85,7 +86,7 @@ impl CratesIoClient {
 
     pub async fn readme(&self, crate_name: &str, version: &str) -> Result<Option<Vec<u8>>, Error> {
         let key = format!("{}.html", crate_name);
-        let url = format!("https://crates.io/api/v1/crates/{}/{}/readme", encode(crate_name), encode(version));
+        let url = format!("https://crates.io/api/v1/crates/{}/{}/readme", Encoded(crate_name), Encoded(version));
         self.readmes.get_cached((&key, version), &url).await
     }
 
@@ -98,8 +99,8 @@ impl CratesIoClient {
     }
 
     pub async fn crate_owners(&self, crate_name: &str, as_of_version: &str) -> Result<Option<Vec<CrateOwner>>, Error> {
-        let url1 = format!("{}/owner_user", encode(crate_name));
-        let url2 = format!("{}/owner_team", encode(crate_name));
+        let url1 = format!("{}/owner_user", Encoded(crate_name));
+        let url2 = format!("{}/owner_team", Encoded(crate_name));
         let (res1, res2) = futures::join!(
             self.get_json_from(&self.ownerscache1, (&url1, as_of_version), &url1),
             self.get_json_from(&self.ownerscache2, (&url2, as_of_version), &url2)

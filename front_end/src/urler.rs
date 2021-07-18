@@ -7,7 +7,7 @@ use rich_crate::Repo;
 use rich_crate::RepoHost;
 use rich_crate::RichCrateVersion;
 use rich_crate::RichDep;
-use urlencoding::encode;
+use urlencoding::Encoded;
 
 /// One thing responsible for link URL scheme on the site.
 /// Should be used for every internal `<a href>`.
@@ -25,39 +25,39 @@ impl Urler {
         if let Some(git) = dep.dep.git() {
             if let Ok(repo) = Repo::new(git) {
                 return match repo.host() {
-                    RepoHost::GitHub(repo) => format!("/gh/{}/{}/{}", encode(&repo.owner), encode(&repo.repo), encode(&dep.package)),
-                    RepoHost::GitLab(repo) => format!("/lab/{}/{}/{}", encode(&repo.owner), encode(&repo.repo), encode(&dep.package)),
+                    RepoHost::GitHub(repo) => format!("/gh/{}/{}/{}", Encoded(&*repo.owner), Encoded(&*repo.repo), Encoded(&*dep.package)),
+                    RepoHost::GitLab(repo) => format!("/lab/{}/{}/{}", Encoded(&*repo.owner), Encoded(&*repo.repo), Encoded(&*dep.package)),
                     _ => repo.canonical_http_url("").into_owned(),
                 };
             }
         } else if dep.dep.detail().map_or(false, |d| d.path.is_some()) {
             if let Some(Origin::GitHub { ref repo, .. }) = self.own_crate {
-                return format!("/gh/{}/{}/{}", encode(&repo.owner), encode(&repo.repo), encode(&dep.package));
+                return format!("/gh/{}/{}/{}", Encoded(&*repo.owner), Encoded(&*repo.repo), Encoded(&*dep.package));
             }
             if let Some(Origin::GitLab { ref repo, .. }) = self.own_crate {
-                return format!("/lab/{}/{}/{}", encode(&repo.owner), encode(&repo.repo), encode(&dep.package));
+                return format!("/lab/{}/{}/{}", Encoded(&*repo.owner), Encoded(&*repo.repo), Encoded(&*dep.package));
             }
         }
-        format!("/crates/{}", encode(&dep.package))
+        format!("/crates/{}", Encoded(&*dep.package))
     }
 
     /// Summary of all dependencies
     pub fn deps(&self, krate: &RichCrateVersion) -> Option<String> {
         match krate.origin() {
             Origin::CratesIo(_) => None,
-            Origin::GitHub { repo, .. } => Some(format!("https://deps.rs/repo/github/{}/{}", encode(&repo.owner), encode(&repo.repo))),
-            Origin::GitLab { repo, .. } => Some(format!("https://deps.rs/repo/gitlab/{}/{}", encode(&repo.owner), encode(&repo.repo))),
+            Origin::GitHub { repo, .. } => Some(format!("https://deps.rs/repo/github/{}/{}", Encoded(&*repo.owner), Encoded(&*repo.repo))),
+            Origin::GitLab { repo, .. } => Some(format!("https://deps.rs/repo/gitlab/{}/{}", Encoded(&*repo.owner), Encoded(&*repo.repo))),
         }
     }
 
     pub fn install(&self, origin: &Origin) -> String {
         match origin {
             Origin::CratesIo(lowercase_name) => {
-                format!("/install/{}", encode(lowercase_name))
+                format!("/install/{}", Encoded::str(&lowercase_name))
             }
             Origin::GitHub { repo, package } | Origin::GitLab { repo, package } => {
                 let host = if let Origin::GitHub { .. } = origin { "gh" } else { "lab" };
-                format!("/install/{}/{}/{}/{}", host, encode(&repo.owner), encode(&repo.repo), encode(package))
+                format!("/install/{}/{}/{}/{}", host, Encoded(&*repo.owner), Encoded(&*repo.repo), Encoded::str(&package))
             }
         }
     }
@@ -65,11 +65,11 @@ impl Urler {
     pub fn all_versions(&self, origin: &Origin) -> Option<String> {
         match origin {
             Origin::CratesIo(lowercase_name) => {
-                Some(format!("/crates/{}/versions", encode(lowercase_name)))
+                Some(format!("/crates/{}/versions", Encoded::str(&lowercase_name)))
             }
             Origin::GitHub { repo: _, package: _ } | Origin::GitLab { repo: _, package: _ } => {
                 // let host = if let Origin::GitHub { .. } = origin { "gh" } else { "lab" };
-                // format!("/{}/{}/{}/{}/versions", host, encode(&repo.owner), encode(&repo.repo), encode(package))
+                // format!("/{}/{}/{}/{}/versions", host, Encoded(&*repo.owner), Encoded(&*repo.repo), Encoded::str(&package))
                 None
             }
         }
@@ -78,7 +78,7 @@ impl Urler {
     pub fn reviews(&self, origin: &Origin) -> String {
         match origin {
             Origin::CratesIo(lowercase_name) => {
-                format!("/crates/{}/crev", encode(lowercase_name))
+                format!("/crates/{}/crev", Encoded::str(&lowercase_name))
             },
             _ => unreachable!(),
         }
@@ -86,7 +86,7 @@ impl Urler {
 
     pub fn reverse_deps(&self, origin: &Origin) -> Option<String> {
         match origin {
-            Origin::CratesIo(lowercase_name) => Some(format!("/crates/{}/rev", encode(lowercase_name))),
+            Origin::CratesIo(lowercase_name) => Some(format!("/crates/{}/rev", Encoded::str(&lowercase_name))),
             Origin::GitHub { .. } | Origin::GitLab { .. } => None,
         }
     }
@@ -100,13 +100,13 @@ impl Urler {
 
     pub fn crates_io_crate_at_version(&self, origin: &Origin, version: &str) -> Option<String> {
         match origin {
-            Origin::CratesIo(lowercase_name) => Some(format!("https://crates.io/crates/{}/{}", encode(lowercase_name), encode(version))),
+            Origin::CratesIo(lowercase_name) => Some(format!("https://crates.io/crates/{}/{}", Encoded::str(&lowercase_name), Encoded(version))),
             _ => None,
         }
     }
 
     fn crates_io_crate_by_lowercase_name(&self, crate_name: &str) -> String {
-        format!("https://crates.io/crates/{}", encode(crate_name))
+        format!("https://crates.io/crates/{}", Encoded(crate_name))
     }
 
     /// Link to crate individual page
@@ -125,19 +125,19 @@ impl Urler {
     pub fn crate_abs_path_by_origin(&self, o: &Origin) -> String {
         match o {
             Origin::CratesIo(lowercase_name) => {
-                format!("/crates/{}", encode(lowercase_name))
+                format!("/crates/{}", Encoded::str(&lowercase_name))
             }
             Origin::GitHub { repo, package } => {
-                format!("/gh/{}/{}/{}", encode(&repo.owner), encode(&repo.repo), encode(package))
+                format!("/gh/{}/{}/{}", Encoded(&*repo.owner), Encoded(&*repo.repo), Encoded::str(&package))
             }
             Origin::GitLab { repo, package } => {
-                format!("/lab/{}/{}/{}", encode(&repo.owner), encode(&repo.repo), encode(package))
+                format!("/lab/{}/{}/{}", Encoded(&*repo.owner), Encoded(&*repo.repo), Encoded::str(&package))
             }
         }
     }
 
     pub fn keyword(&self, name: &str) -> String {
-        format!("/keywords/{}", encode(&name.to_kebab_case()))
+        format!("/keywords/{}", Encoded(&name.to_kebab_case()))
     }
 
     /// First page of category listing
@@ -166,7 +166,7 @@ impl Urler {
             Some(match (gh.user_type, author.owner) {
                 (UserType::User, true) => self.crates_io_user_by_github_login(&gh.login),
                 (UserType::User, _) |
-                (UserType::Org, _) | (UserType::Bot, _) => format!("https://github.com/{}", encode(&gh.login)),
+                (UserType::Org, _) | (UserType::Bot, _) => format!("https://github.com/{}", Encoded(&gh.login)),
             })
         } else if let Some(ref info) = author.info {
             if let Some(ref em) = info.email {
@@ -187,18 +187,18 @@ impl Urler {
     }
 
     pub fn crates_io_user_by_github_login(&self, login: &str) -> String {
-        format!("/~{}", encode(login))
+        format!("/~{}", Encoded(login))
     }
 
     pub fn search_crates_io(&self, query: &str) -> String {
-        format!("https://crates.io/search?q={}", encode(query))
+        format!("https://crates.io/search?q={}", Encoded(query))
     }
 
     pub fn search_crates_rs(&self, query: &str) -> String {
-        format!("https://lib.rs/search?q={}", encode(query))
+        format!("https://lib.rs/search?q={}", Encoded(query))
     }
 
     pub fn search_ddg(&self, query: &str) -> String {
-        format!("https://duckduckgo.com/?q=site%3Alib.rs+{}", encode(query))
+        format!("https://duckduckgo.com/?q=site%3Alib.rs+{}", Encoded(query))
     }
 }

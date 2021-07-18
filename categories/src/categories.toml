@@ -572,21 +572,21 @@ obvious-keywords = ["os", "system", "platform"]
 preference = 1
 
 [os.categories.macos-apis]
-name = "macOS APIs"
-title = "Rust API for macOS"
+name = "macOS and iOS APIs"
+title = "Rust API for macOS/iOS/iPadOS"
 obvious-keywords = ["macos", "apple", "mac", "osx"]
 description = """
-Bindings to macOS-specific APIs.\
+Interfacing with macOS or iOS APIs, and other Apple-specific technologies.\
 """
 short-description = """
-Bindings to macOS-specific APIs."""
+Bindings to Apple-specific APIs."""
 preference = 1
 
 [os.categories.unix-apis]
 name = "Unix APIs"
 title = "Rust API for Unix"
 description = """
-Bindings to Unix-specific APIs.\
+Bindings to Unix-specific APIs, including Linux and *BSD systems.\
 """
 short-description = """
 Bindings to Unix-specific APIs."""
@@ -597,7 +597,7 @@ preference = 1.1
 name = "Windows APIs"
 title = "Rust API Windows"
 description = """
-Bindings to Windows-specific APIs.\
+Bindings to Microsoft Windows-specific APIs.\
 """
 short-description = """
 Bindings to Windows-specific APIs."""

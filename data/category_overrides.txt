@@ -48,6 +48,13 @@ anvil-region: games, encoding
 anybar_rs: os::macos-apis
 aocl: command-line-utilities
 apis: asynchronous
+apple-bundle: os::macos-apis, encoding
+apple-business-chat-api: os::macos-apis, web-programming
+apple-classkit-catalog-api: os::macos-apis
+apple-iad: os::macos-apis, web-programming
+apple-itc-reporter: os::macos-apis, web-programming
+apple-itunes-search-api: os::macos-apis, web-programming
+apple-maps-web-snapshots: os::macos-apis, web-programming
 apple-wallet-passes: os::macos-apis
 apply_attr: rust-patterns
 approvals: development-tools::testing
@@ -80,6 +87,7 @@ async-broadcast: asynchronous
 async-codec: asynchronous
 async-minecraft-ping: asynchronous, game-development
 async-recursion: asynchronous, rust-patterns
+async-trait: rust-patterns, asynchronous
 async_command: asynchronous
 atelier_core: web-programming
 atelier_json: web-programming, encoding
@@ -364,6 +372,10 @@ crunchy: development-tools
 crw-client: cryptography::cryptocurrencies
 crw-types: cryptography::cryptocurrencies
 cryptoballot: cryptography, authentication, gui
+cryptonote-account: cryptography::cryptocurrencies
+cryptonote-base58: cryptography::cryptocurrencies
+cryptonote-varint: cryptography::cryptocurrencies
+cryptonote-wallet: cryptography::cryptocurrencies
 cryptonote-wallet: cryptography::cryptocurrencies
 crystal_packing: algorithms, science
 csound: multimedia::audio
@@ -574,6 +586,7 @@ extract-frontmatter: parser-implementations, web-programming
 extsort: algorithms
 fabric-support: cryptography::cryptocurrencies
 fabric-system: cryptography::cryptocurrencies
+facebook-signed-request: web-programming
 factom: web-programming
 failsafe: rust-patterns, asynchronous
 failure: rust-patterns
@@ -600,6 +613,7 @@ fastqc-rs: science
 fastx: science, parser-implementations
 favy: multimedia::images
 fawkes-crypto-phase2: cryptography, wasm
+fbthrift-git: encoding
 fc-db: cryptography::cryptocurrencies
 fc-mapping-sync: cryptography::cryptocurrencies
 fc-rpc-core: cryptography::cryptocurrencies
@@ -613,6 +627,7 @@ fedora-prime: os::unix-apis, command-line-utilities
 ferrum-plugin: rust-patterns
 ferrum: web-programming::http-server
 festive: development-tools::testing
+ff-uint: cryptography
 ff: algorithms
 ffcli: command-line-utilities, multimedia
 fff: cryptography
@@ -635,6 +650,7 @@ fin_data: value-formatting
 finality-grandpa:cryptography::cryptocurrencies
 finchers-core: web-programming::http-server
 find-files: filesystem
+finder_info: os::macos-apis, parser-implementations, filesystem
 findomain: command-line-utilities, network-programming
 findomain: network-programming
 findomain: network-programming, command-line-utilities
@@ -645,6 +661,7 @@ fitrs: parser-implementations
 fixed_width: parser-implementations
 fixedstep: game-development
 fixedvec: no-std, data-structures
+fixity: data-structures
 flats: data-structures
 flexbuffers: encoding
 flexpolyline: data-structures, compression
@@ -680,6 +697,7 @@ fp-core: development-tools
 fp-evm: cryptography::cryptocurrencies
 fr32: cryptography::cryptocurrencies
 fractal-matrix-api: network-programming
+fractal-utils: cryptography::cryptocurrencies
 framing: multimedia::video
 freeimage: multimedia::images, os::unix-apis
 frotate: command-line-utilities, os
@@ -688,6 +706,7 @@ fse: algorithms
 fsevent-sys: os::macos-apis
 fsevent: os::macos-apis
 fsm_gen: development-tools
+ftab-dump: hardware-support, os::macos-apis
 ftml: parser-implementations, text-processing
 ftoa: value-formatting
 ftp-cmd-list-parse: parser-implementations, network-programming
@@ -807,6 +826,7 @@ habitica-cli: command-line-utilities
 hackernews_tui: command-line-utilities
 hamlrs: template-engines, parser-implementations
 handlr: os
+hap: os::macos-apis, network-programming
 hash-db: rust-patterns, databases, no-std
 hash256-std-hasher: rust-patterns, no-std
 hashmap_core: data-structures
@@ -838,6 +858,7 @@ hlua: development-tools
 hoi4save: game-development
 holo_hash: cryptography::cryptocurrencies
 holochain:cryptography::cryptocurrencies
+holochain_cli_bundle: cryptography::cryptocurrencies
 holochain_cli_sandbox: cryptography::cryptocurrencies
 holochain_common:cryptography::cryptocurrencies
 holochain_conductor_lib:cryptography::cryptocurrencies
@@ -850,10 +871,12 @@ holochain_keystore: cryptography::cryptocurrencies
 holochain_locksmith:cryptography::cryptocurrencies
 holochain_logging:cryptography::cryptocurrencies
 holochain_metrics:cryptography::cryptocurrencies
+holochain_p2p: cryptography::cryptocurrencies
 holochain_persistence_api:cryptography::cryptocurrencies
 holochain_serialized_bytes: cryptography::cryptocurrencies
 holochain_serialized_bytes_derive: cryptography::cryptocurrencies
 holochain_state: cryptography::cryptocurrencies
+holochain_wasm_test_utils: cryptography::cryptocurrencies
 howtocards: web-programming
 ht: web-programming::http-client, command-line-utilities
 html-index: web-programming, text-processing
@@ -951,6 +974,7 @@ json-pointer: encoding
 json-tools: parser-implementations
 json2cbor: encoding, command-line-utilities
 json2pb: encoding, command-line-utilities
+json_derive: cryptography::cryptocurrencies
 jsonapi: web-programming
 jsonc-parser: parser-implementations
 jsonpath: parser-implementations
@@ -959,6 +983,7 @@ jsonrpc-client-core: parser-implementations
 jsonrpc-codec: web-programming
 jsonrpc-core-client: web-programming
 jsonrpc-core: web-programming
+jsonrpc-macros-plus: encoding
 jsonrpc-parse: parser-implementations, web-programming
 jsonrpc-stdio-server: web-programming::http-server
 jsonrpc-v2: web-programming::http-server
@@ -1022,6 +1047,11 @@ leptonica-plumbing: multimedia::images
 letter-avatar: multimedia::images
 leveldb-sys: databases
 lib-ruby-parser: parser-implementations
+lib3h: cryptography::cryptocurrencies
+lib3h_p2p_protocol: cryptography::cryptocurrencies
+lib3h_persistence_file: cryptography::cryptocurrencies
+lib3h_persistence_mem: cryptography::cryptocurrencies
+lib3h_protocol: cryptography::cryptocurrencies
 lib_sens: game-development
 lib_tcstring: parser-implementations
 libass: web-programming
@@ -1054,6 +1084,7 @@ libswe-sys: science
 libthemis-src: cryptography
 libtimew: parser-implementations
 libudis86-sys: hardware-support, development-tools
+libusbmuxd-sys: os::macos-apis, hardware-support
 libxml: parser-implementations
 license-exprs: parser-implementations
 ligen-core: development-tools
@@ -1107,6 +1138,7 @@ lychee-lib: web-programming
 lychee: web-programming, command-line-utilities
 lyon_core: multimedia::images, rendering::graphics-api
 lyra2: text-processing
+m3u8-rs: multimedia::video, parser-implementations
 mac: rust-patterns
 mac_utun: os::macos-apis, network-programming
 macchanger: os, network-programming
@@ -1253,6 +1285,7 @@ near-vm-errors: cryptography::cryptocurrencies
 near-vm-errors:cryptography::cryptocurrencies
 near-vm-logic: cryptography::cryptocurrencies
 near-vm-runner-standalone:cryptography::cryptocurrencies
+nebula-fbthrift-storage: encoding
 needletail: parser-implementations, science
 needletail: science, parser-implementations
 neighbor: web-programming, database-implementations
@@ -1347,6 +1380,7 @@ ops: development-tools::debugging, web-programming::http-server
 optbuilder: rust-patterns, development-tools::procedural-macro-helpers
 orbtk-tree: gui
 orgize: parser-implementations
+oslog: os::macos-apis, development-tools::debugging
 osmesa-sys: multimedia, os::unix-apis
 osmgpsmap: science, gui
 ostrich-core: asynchronous
@@ -1388,6 +1422,7 @@ parse_float_radix: parser-implementations
 paseto: authentication
 passclip: command-line-utilities
 passman: authentication
+password-rules-parser: authentication, web-programming
 pastemyst: web-programming
 path-matchers: filesystem
 pathfinder_geometry: science::math
@@ -1411,6 +1446,7 @@ pickpocket: web-programming
 pico-args: command-line-interface
 pico-sys: web-programming
 pid: hardware-support
+pikmin-aggregator: cryptography::cryptocurrencies
 pin-utils: rust-patterns, asynchronous
 pinentry: command-line-interface, authentication
 piston_meta: parser-implementations
@@ -1423,6 +1459,7 @@ plasma-cash-tokens: cryptography::cryptocurrencies
 playlist-decoder: parser-implementations, multimedia::audio
 playlist-duration: command-line-utilities, multimedia::audio
 pledge: os::unix-apis
+plonk_gadgets: cryptography
 plugger-core: development-tools::ffi
 plutonium: rust-patterns
 pmd_message: parser-implementations, game-development
@@ -1467,8 +1504,10 @@ psyche-core: science::machine-learning
 pt: web-programming
 pulsar: network-programming
 pumpkin: cryptography
+purple_address_gen: cryptography::cryptocurrencies
 purr: development-tools
 puzzle_cube: games
+pw: command-line-utilities, authentication
 pwasm-abi-derive: cryptography::cryptocurrencies
 pwasm-abi: cryptography::cryptocurrencies
 pwasm-ethereum: cryptography::cryptocurrencies
@@ -1531,12 +1570,14 @@ recursive_disassembler: parser-implementations, development-tools
 red_asn1: cryptography, parser-implementations
 redis-cluster: databases
 redisearch_api: databases
+reef: command-line-interface, os
 refinery-core: databases
 refinery_cli: command-line-utilities
 reign: web-programming
 releasetag: development-tools::debugging
 render_macros: template-engines
 rendy-memory: memory-management
+renvm-sig: cryptography::cryptocurrencies
 repo-backup: development-tools, command-line-utilities
 repoutil: development-tools
 reproto-backend-csharp: encoding, development-tools::ffi
@@ -1640,6 +1681,7 @@ rusk-vm: cryptography::cryptocurrencies
 rusoto_credential: authentication
 rusp: network-programming
 rust-apple-photos: databases, os::macos-apis
+rust-base58: encoding, cryptography::cryptocurrencies
 rust-bio-tools: science, command-line-utilities
 rust-bison-skeleton: parsing
 rust-code-analysis-web: development-tools, rust-patterns
@@ -1650,6 +1692,7 @@ rust-tfidf: text-processing
 rust_admob_ssv: network-programming, parser-implementations
 rust_fixed_width: data-structures
 rust_qt_binding_generator: gui, development-tools::ffi
+rust_sodium_holochain_fork-sys: cryptography::cryptocurrencies
 rusta: games, parser-implementations
 rustasm6502: emulators
 rustboot: os
@@ -1679,11 +1722,14 @@ saigon_core: web-programming
 salad: command-line-utilities, authentication
 salt: os
 saml2aws-auto: authentication
+sampi: cryptography::cryptocurrencies
 sample_planning: science::machine-learning, algorithms
 san-rs: game-development
+sapling-crypto: cryptography::cryptocurrencies
 sapp-ios: rendering
 sass-rs: web-programming
 sass-sys: web-programming
+savannah: os::macos-apis
 sc-block-builder: cryptography::cryptocurrencies
 sc-client-db: cryptography::cryptocurrencies
 sc-informant: cryptography::cryptocurrencies
@@ -1691,6 +1737,7 @@ sc-light: cryptography::cryptocurrencies
 sc-network: cryptography::cryptocurrencies
 sc-telemetry: cryptography::cryptocurrencies
 sc-tracing-proc-macro: cryptography::cryptocurrencies
+scalable_bloom_filter: data-structures
 scaleway_api_rs: web-programming
 scan4df: command-line-utilities, filesystem
 scan_fmt: parsing
@@ -1748,6 +1795,8 @@ sig-proxy: cryptography::cryptocurrencies
 signal-msg: os::unix-apis
 sigv4: command-line-utilities, web-programming
 silo: development-tools
+sim2h: cryptography::cryptocurrencies
+sim2h_server: cryptography::cryptocurrencies
 similar: text-processing
 simpath: os
 simple-ssl-acme-cloudflare: cryptography, command-line-utilities
@@ -1762,6 +1811,7 @@ sixtyfps-corelib: gui
 sixtyfps-rendering-backend-default: gui
 sixtyfps: gui
 skeptic: development-tools::testing
+slabify: rust-patterns
 sled-native: database-implementations
 sled-search: database-implementations
 slog-extlog: development-tools::debugging
@@ -1813,6 +1863,8 @@ splinter: cryptography::cryptocurrencies
 sqa-ffmpeg: multimedia::video
 sqlparser: parser-implementations
 sqlx-core:databases
+squalo: cryptography::cryptocurrencies
+sr-std: cryptography::cryptocurrencies
 srws: web-programming::http-server, development-tools
 ssb-vanity: cryptography
 ssb_parser: parser-implementations
@@ -1846,6 +1898,7 @@ substrate-prometheus-endpoint: cryptography::cryptocurrencies
 substrate-stellar-sdk: cryptography::cryptocurrencies
 substrate-stellar-xdr: cryptography::cryptocurrencies
 substrs: rust-patterns, text-processing
+subvault: cryptography::cryptocurrencies
 sulfur: development-tools::testing
 sunshine-bounty-node: cryptography::cryptocurrencies
 sunshine-identity-utils: cryptography::cryptocurrencies
@@ -1946,6 +1999,7 @@ timezynk-bridge-models: web-programming, science
 tinkerforge: hardware-support, embedded
 tiny_die: game-development
 tk-bufstream: asynchronous
+tls-client_hello-parser: parser-implementations, cryptography
 tls_read_hancock_bin: parser-implementations, science
 tmdb_client: web-programming, databases
 tmi-parser: parser-implementations
@@ -2051,6 +2105,7 @@ v4l: multimedia::video
 v8-api: web-programming, development-tools
 v8-sys: web-programming, development-tools
 v8: web-programming, development-tools
+va: cryptography::cryptocurrencies
 vad: multimedia::audio
 validjson: encoding, command-line-utilities
 valor_bin: web-programming::http-server
@@ -2083,10 +2138,12 @@ waiter_codegen: development-tools
 waiter_di: development-tools
 wake-on-lan: os, network-programming
 warnalyzer: development-tools, rust-patterns
+wash: wasm, os
 wasi-core: wasm
 wasm-run: development-tools::build-utils, wasm
 wasmi-validation: wasm
 wasmi: wasm
+waste: wasm
 waybackrust: web-programming
 wayk_core: network-programming
 wcxhead: development-tools
@@ -2189,6 +2246,14 @@ ytnef: email, parser-implementations
 ytop: os, visualization
 yubirs: authentication
 zapper_derive: development-tools::procedural-macro-helpers
+zcash-vanity: cryptography::cryptocurrencies
+zcash: cryptography::cryptocurrencies
+zcash_client_backend: cryptography::cryptocurrencies
+zcash_client_sqlite: cryptography::cryptocurrencies
+zcash_extensions: cryptography::cryptocurrencies
+zcash_note_encryption: cryptography::cryptocurrencies
+zcash_primitives: cryptography::cryptocurrencies
+zcash_script: cryptography::cryptocurrencies
 zemeroth: games
 zeronsd: network-programming
 zfs-core-sys: os, filesystem

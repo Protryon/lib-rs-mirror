@@ -13,6 +13,7 @@ use rand::seq::SliceRandom;
 
 #[derive(Debug)]
 pub struct GlobalStats {
+    pub(crate) total_crate_num: u32,
     pub(crate) total_owners_at_month: Vec<u32>,
     pub(crate) max_total_owners: u32,
     pub(crate) max_daily_downloads_rate: u32,
@@ -48,19 +49,10 @@ impl GlobalStats {
     }
 }
 
-pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSink, _renderer: &Renderer) -> Result<(), anyhow::Error> {
-    let urler = Urler::new(None);
-    let start = Utc.ymd(2015, 5, 15); // Rust 1.0
-
-    let start_week_offset = start.ordinal0()/7;
-    let mut day = Utc::today() - chrono::Duration::days(2);
-
+fn downloads_over_time(start: Date<Utc>, mut day: Date<Utc>, kitchen_sink: &KitchenSink) -> Result<Vec<(u64, u64)>, anyhow::Error> {
     let mut current_year = 0;
     let mut current = [0; 366];
-
     let mut dl = Vec::new();
-
-    // skip over potentially missing data
     while day > start {
         let year = day.year() as u16;
         if year != current_year {
@@ -73,8 +65,6 @@ pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSin
         }
         day = day - chrono::Duration::days(1);
     }
-
-    // going from the end ensures last data point always has a full week
     while day > start {
         let mut weekday_sum = 0;
         let mut weekend_sum = 0;
@@ -96,6 +86,17 @@ pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSin
         dl.push((weekday_sum, weekend_sum));
     }
     dl.reverse();
+    Ok(dl)
+}
+
+pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSink, _renderer: &Renderer) -> Result<(), anyhow::Error> {
+    let urler = Urler::new(None);
+    let start = Utc.ymd(2015, 5, 15); // Rust 1.0
+
+    let start_week_offset = start.ordinal0()/7;
+    let end = Utc::today() - chrono::Duration::days(2);
+
+    let dl = downloads_over_time(start, end, kitchen_sink)?;
 
     let (total_owners_at_month, mut hs_owner_crates) = owner_stats(kitchen_sink, start).await?;
     hs_owner_crates.buckets.iter_mut().take(4).for_each(|c| c.examples.truncate(6)); // normal amount of crates is boring
@@ -136,7 +137,9 @@ pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSin
         _ => format!("≤{} years", (n as f64 / 52.).round()),
     };
 
+    let total_crate_num = kitchen_sink.all_crates().count() as u32;
     let stats = GlobalStats {
+        total_crate_num,
         total_owners_at_month,
         max_total_owners,
         max_daily_downloads_rate,

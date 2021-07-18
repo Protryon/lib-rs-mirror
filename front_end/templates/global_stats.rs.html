@@ -43,7 +43,9 @@ display: -webkit-box;
 
         <div class="inner-col">
         <section>
-            <h2>History</h2>
+            <h2>crates.io growth</h2>
+            <p>We have indexed {} crates.</p>
+
             <svg viewBox="0 -5 1030 116" width=1040 height=116 style="width:100%; margin: 1em auto 0">
                 <title>Download history of all crates since 2015</title>
                 @for y in (0..stats.max_downloads_per_week).step_by(stats.dl_grid_line_every as _) {
@@ -71,12 +73,7 @@ display: -webkit-box;
             </svg>
             <p class=legend>Daily downloads since Rust 1.0, 7-day average</p>
 
-
-
-
-
-
-<p>Downloads are growing at a rate of
+<p>crates.io ownloads are growing at a rate of
 @GlobalStats::relative_increase((stats.dl_per_day_this_year.0 + stats.dl_per_day_this_year.1, stats.dl_per_day_last_year.0 + stats.dl_per_day_last_year.1)) per year.</p>
 
 <p>At peak crates.io has served @if let Some((val, unit)) = Some(format_downloads_verbose(stats.max_daily_downloads_rate)) { @val @unit } downloads per <em>day</em>,

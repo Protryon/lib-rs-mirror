@@ -21,39 +21,29 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --pr
 ENV PATH="$PATH:/home/rustyuser/.cargo/bin"
 RUN cargo install lts --vers ^0.3.1
 RUN rustup set profile minimal
-RUN rustup toolchain add 1.32.0
-RUN rustup toolchain add 1.37.0
-RUN rustup toolchain add 1.41.0
-RUN rustup toolchain add 1.43.0
-RUN rustup toolchain add 1.45.0
-RUN rustup toolchain add 1.47.0
-RUN rustup toolchain add 1.48.0
-RUN rustup toolchain add 1.49.0
-RUN rustup toolchain add 1.50.0
 RUN cargo install libc --vers 99.9.9 || true # force index update
-RUN rustup toolchain add 1.30.0
-RUN rustup toolchain add 1.31.0
+RUN rustup toolchain add 1.28.0
 RUN rustup toolchain add 1.29.0
+RUN rustup toolchain add 1.33.0
+RUN rustup toolchain add 1.41.0
+RUN rustup toolchain add 1.42.0
+RUN rustup toolchain add 1.46.0
+RUN rustup toolchain add 1.51.0
 RUN rustup toolchain list
 # RUN cargo new lts-dummy; cd lts-dummy; cargo lts setup; echo 'itoa = "*"' >> Cargo.toml; cargo update;
 "##;
 
 const TEMP_JUNK_DIR: &str = "/var/tmp/crates_env";
 
-const RUST_VERSIONS: [&str; 9] = [
+const RUST_VERSIONS: [&str; 4] = [
+    "1.28.0",
     "1.29.0",
-    "1.30.0",
-    "1.31.0",
-    "1.32.0",
-    "1.37.0",
-    "1.41.0",
-    "1.43.0",
-    // "1.45.0",
-    // "1.47.0",
-    // "1.48.0",
-    // "1.49.0",
-    "1.50.0",
-    "1.53.0",
+    "1.33.0",
+    // "1.41.0",
+    // "1.42.0",
+    // "1.46.0",
+    "1.51.0",
+    // "1.53.0",
 ];
 
 use crate_db::builddb::*;
@@ -109,7 +99,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             candidates.append(&mut next_batch);
-            for mut tmp in r.try_iter().take(5) {
+            for mut tmp in r.try_iter().take(RUST_VERSIONS.len()) {
                 candidates.append(&mut tmp);
             }
 
@@ -128,7 +118,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 let upper_limit = x.rustc.oldest_ok.unwrap_or(53);
                 // don't pick 1.29 as the first choice
-                let lower_limit = x.rustc.newest_bad.unwrap_or(40).max(x.rustc.newest_bad_raw.unwrap_or(30));
+                let lower_limit = x.rustc.newest_bad.unwrap_or(40).max(x.rustc.newest_bad_raw.unwrap_or(29));
                 let best_ver = (upper_limit * 5 + lower_limit * 11)/16; // bias towards lower ver, because lower versions see features from newer versions
 
 
@@ -155,7 +145,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 Some((available_rust_versions.swap_remove(rustc_idx), x.crate_name, x.ver))
             })
-            .take((RUST_VERSIONS.len()+1)/2)
+            .take(RUST_VERSIONS.len() *2/3)
             .collect();
 
             eprintln!("running: {}/{}", versions.len(), candidates.len());
@@ -219,7 +209,7 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
             let c = compat_info.remove(&v).unwrap_or_default();
             (v, c)
         })
-        .filter(|(_, c)| c.oldest_ok.unwrap_or(999) > 29) // old crates, don't bother
+        .filter(|(_, c)| c.oldest_ok.unwrap_or(999) > 25) // old crates, don't bother
         .enumerate()
         .map(|(idx, (v, mut compat))| {
             let has_ever_built = compat.oldest_ok_raw.is_some();
@@ -236,10 +226,11 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
                 + if has_ever_built { 0 } else { 1 } // move to better ones
                 + if newest_bad < compat.newest_bad_raw.unwrap_or(0) { 5 } else { 0 } // really unusable data
                 + if compat.oldest_ok_raw.unwrap_or(999) > oldest_ok { 2 } else { 0 } // haven't really checked min ver yet
-                + if newest_bad > 30 { 1 } else { 0 } // don't want to check old crap
+                + if newest_bad > 29 { 1 } else { 0 } // don't want to check old crap
                 + if no_compat_bottom { 2 } else { 0 } // don't want to show 1.0 as compat rust
                 + if oldest_ok  > 35 { 1 } else { 0 }
                 + if oldest_ok  > 40 { 4 } else { 0 }
+                + if oldest_ok  > 47 { 2 } else { 0 }
                 + if oldest_ok  > 50 { 8 } else { 0 }
                 + if v.is_prerelease() { 0 } else { 2 } // don't waste time testing alphas
                 + 5u32.saturating_sub(idx as u32); // prefer latest
@@ -391,7 +382,7 @@ fn do_builds(docker_root: &Path, versions: &[(&'static str, Arc<str>, SemVer)]) 
             touch src/lib.rs
             printf > Cargo.toml '[package]\nname="_____"\nversion="0.0.0"\n[profile.dev]\ndebug=false\n[dependencies]\n%s = "=%s"\n' "$crate_name" "$libver";
             export CARGO_TARGET_DIR=/home/rustyuser/cargo_target/$rustver;
-            if [[ "$rustver" == "1.29.0" || "$rustver" == "1.30.0" || "$rustver" == "1.31.0" || "$rustver" == "1.32.0" ]]; then
+            if [[ "$rustver" == "1.28.0" || "$rustver" == "1.29.0" || "$rustver" == "1.30.0" || "$rustver" == "1.31.0" ]]; then
                 # mkdir .cargo
                 # cp /home/rustyuser/lts-dummy/.cargo/config .cargo/
                 RUSTC_BOOTSTRAP=1 timeout 20 cargo +$rustver -Z minimal-versions generate-lockfile || timeout 40 cargo +$rustver fetch

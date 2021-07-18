@@ -57,7 +57,7 @@ fn parse_package_id(id: Option<&str>) -> Option<(String, String)> {
     Some((name, ver))
 }
 
-const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 392] = [
+const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 425] = [
 // rg  --no-filename -o '\[stable\(feature.*\]' library/ | fgrep 1. | sort -u | sed -E 's/.*feature ?= ?"(.+)", since ?= ?"1\.(..+)\..".*/(\2, "\1"),/' | sort -V | pbcopy
 
 (17, "addr_from_into_ip"),
@@ -444,15 +444,47 @@ const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 392] = [
 (52, "partition_point"),
 (52, "proc_macro_punct_eq_flipped"),
 (52, "str_split_once"),
+(53, "array_into_iter_impl"),
+(53, "atomic_fetch_update"),
+(53, "btree_retain"),
+(53, "bufreader_seek_relative"),
 (53, "cmp_min_max_by"),
 (53, "debug_non_exhaustive"),
+(53, "duration_saturating_ops"),
+(53, "duration_zero"),
 (53, "int_bits_const"),
+(53, "is_subnormal"),
+(53, "nonzero_leading_trailing_zeros"),
+(53, "option_insert"),
+(53, "ordering_helpers"),
 (53, "osstring_ascii"),
 (53, "peekable_peek_mut"),
 (53, "rc_mutate_strong_count"),
+(53, "slice_index_with_ops_bound_pair"),
 (53, "slice_iter_mut_as_slice"),
 (53, "split_inclusive"),
-];
+(53, "unsupported_error"),
+(53, "vec_extend_from_within"),
+(54, "i8_to_string_specialization"),
+(54, "map_into_keys_values"),
+(54, "out_of_memory_error"),
+(54, "proc_macro_literal_parse"),
+(54, "u8_to_string_specialization"),
+(54, "vecdeque_binary_search"),
+(54, "wasm_simd"),
+(55, "array_map"),
+(55, "bound_cloned"),
+(55, "control_flow_enum_type"),
+(55, "int_error_matching"),
+(55, "maybe_uninit_ref"),
+(55, "maybe_uninit_write"),
+(55, "prelude_2015"),
+(55, "prelude_2018"),
+(55, "prelude_2021"),
+(55, "proc_macro_group_span"),
+(55, "seek_rewind"),
+(55, "simd_x86_bittest"),
+(55, "string_drain_as_str")];
 
 fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
     let stdout = stdout.trim();

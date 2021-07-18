@@ -1,6 +1,8 @@
+@use crate::Urler;
 @use crate::global_stats::Histogram;
+@use crate::global_stats::CallbackFn;
 
-@(hs: &Histogram, max_examples: usize)
+@(hs: &Histogram, max_examples: usize, url: &Urler, url_callback: CallbackFn)
 <table class="histogram">
     <tr>
         @for l in &hs.bucket_labels {
@@ -21,7 +23,7 @@
         @for b in &hs.buckets {
             <td>
                 @for name in b.examples.iter().take(max_examples) {
-                    <a href="/crates/@name#FIXME">@name</a>
+                    <a href="@url_callback(url, &name)">@name</a>
                 }
             </td>
         }

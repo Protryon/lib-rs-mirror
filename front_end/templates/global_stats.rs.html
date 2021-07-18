@@ -2,11 +2,13 @@
 @use crate::format_downloads_verbose;
 @use crate::GlobalStats;
 @use crate::global_stats::format_number;
+@use crate::global_stats::url_for_crate_name;
+@use crate::global_stats::versions_for_crate_name;
 @use crate::templates::base;
 @use crate::templates::histogram;
 @use crate::Urler;
 
-@(page: &Page, dl_by_week: &[(u64, u64)], stats: &GlobalStats, _url: &Urler)
+@(page: &Page, dl_by_week: &[(u64, u64)], stats: &GlobalStats, url: &Urler)
 
 @:base(page, {
     <header id="home">
@@ -124,32 +126,32 @@ display: -webkit-box;
         <section>
             <h3>Number of direct dependencies</h3>
             <p>Including dev and build deps.</p>
-            @:histogram(&stats.hs_deps1, 0)</section>
-            @:histogram(&stats.hs_deps2, 5)</section>
+            @:histogram(&stats.hs_deps1, 0, url, url_for_crate_name)</section>
+            @:histogram(&stats.hs_deps2, 5, url, url_for_crate_name)</section>
         <section>
             <h3>Crate size (KB)</h3>
-            <p>Amount of data downloaded as a compressed tarball. Size of code + bundled data files.</p>
-            @:histogram(&stats.hs_sizes, 5)</section>
+            <p>Amount of data downloaded as a compressed tarball. Size of code + bundled data files. Individual crate pages show size of uncompressed code.</p>
+            @:histogram(&stats.hs_sizes, 5, url, url_for_crate_name)</section>
         <section>
             <h3>Number of releases per crate</h3>
             <p>Number of unique versions of each crate, excluding yanked versions.</p>
-            @:histogram(&stats.hs_releases, 5)</section>
+            @:histogram(&stats.hs_releases, 5, url, versions_for_crate_name)</section>
         <section>
             <h3>Age</h3>
             <p>Time since crate's first release.</p>
-            @:histogram(&stats.hs_age, 5)</section>
+            @:histogram(&stats.hs_age, 5, url, url_for_crate_name)</section>
         <section>
             <h3>How long a crate has been updated for</h3>
             <p>Time between its oldest and newest release.</p>
-            @:histogram(&stats.hs_maintenance, 5)</section>
+            @:histogram(&stats.hs_maintenance, 5, url, versions_for_crate_name)</section>
         <section>
             <h3>Time without any updates</h3>
             <p>Time since crate's most recent release.</p>
-            @:histogram(&stats.hs_languish, 5)</section>
+            @:histogram(&stats.hs_languish, 5, url, url_for_crate_name)</section>
         <section>
             <h3>Number of crates per user</h3>
             <p>How many crates a single account (user or team) owns. Excluding all other people in the world who have 0 crates.</p>
-            @:histogram(&stats.hs_owner_crates, 5)</section>
+            @:histogram(&stats.hs_owner_crates, 8, url, Urler::crates_io_user_by_github_login)</section>
     </section>
     </main>
 

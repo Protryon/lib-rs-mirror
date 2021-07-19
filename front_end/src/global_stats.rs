@@ -1,3 +1,4 @@
+use categories::Category;
 use categories::CategoryMap;
 use categories::CATEGORIES;
 use kitchen_sink::Origin;
@@ -36,6 +37,8 @@ pub struct GlobalStats {
     pub(crate) hs_owner_crates: Histogram,
 
     pub(crate) categories: Vec<TreeBox>,
+
+    pub(crate) rustc_stats: Vec<(u32, u32, u32)>,
 }
 
 pub type CallbackFn = fn(&Urler, &str) -> String;
@@ -100,6 +103,9 @@ pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSin
 
     let start_week_offset = start.ordinal0()/7;
     let end = Utc::today() - chrono::Duration::days(2);
+
+    let latest_rustc_version = end.signed_duration_since(start).num_weeks()/6;
+    let rustc_stats = rustc_stats(kitchen_sink, latest_rustc_version as u16)?;
 
     let dl = downloads_over_time(start, end, kitchen_sink)?;
 
@@ -174,6 +180,7 @@ pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSin
         hs_languish: Histogram::new(kitchen_sink.get_stats_histogram("languish")?.expect("hs_languish"), false, &[5, 13, 26, 52, 52*2, 52*3, 52*4, 52*5, 52*6, 52*8], age_label),
         hs_owner_crates,
         categories,
+        rustc_stats,
     };
 
     templates::global_stats(out, &Page {
@@ -188,17 +195,57 @@ pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSin
     Ok(())
 }
 
-fn cat_slugs(sub: &CategoryMap) -> Vec<TreeBox> {
+fn rustc_stats(kitchen_sink: &KitchenSink, max_rust_version: u16) -> Result<Vec<(u32, u32, u32)>, anyhow::Error> {
+    let compat = kitchen_sink.all_crate_compat()?;
+    // (ok, maybe, not), [0] is unused
+    let mut rustc_versions = vec![(0,0,0); (max_rust_version+1) as usize];
+
+    for (_, c) in compat {
+        // can't compile at all
+        if c.iter().all(|(_, c)| c.oldest_ok.is_none()) {
+            continue;
+        }
+
+        // stats for latest crate version only
+        let latest_ver = match c.iter().rev().find(|(v, _)| !v.is_prerelease()).or_else(|| c.iter().rev().nth(0)) {
+            Some((_, v)) => v,
+            None => continue,
+        };
+        let newest_bad = latest_ver.newest_bad.unwrap_or(0);
+        let oldest_ok = latest_ver.oldest_ok.unwrap_or(999);
+        for (ver, c) in rustc_versions.iter_mut().enumerate() {
+            if (ver as u16) >= oldest_ok {
+                c.0 += 1;
+            } else if (ver as u16) <= newest_bad {
+                c.2 += 1;
+            } else {
+                c.1 += 1;
+            }
+        }
+    }
+
+    // resize to width
+    let width = 330;
+    for v in &mut rustc_versions {
+        let sum = v.0 + v.1 + v.2;
+        v.0 = (v.0 * width + width / 2) / sum;
+        v.2 = (v.2 * width + width / 2) / sum;
+        v.1 = width - v.0 - v.2;
+    }
+    Ok(rustc_versions)
+}
+
+fn cat_slugs(sub: &'static CategoryMap) -> Vec<TreeBox> {
     let mut out = Vec::with_capacity(sub.len());
     for c in sub.values() {
         out.push(TreeBox {
-            slug: c.slug.to_owned(),
+            cat: c,
             label: c.name.clone(),
             count: 0,
             weight: 0.,
             bounds: treemap::Rect::new(),
             color: String::new(),
-            font_size: 11.,
+            font_size: 12.,
             sub: cat_slugs(&c.sub),
         });
     }
@@ -207,7 +254,7 @@ fn cat_slugs(sub: &CategoryMap) -> Vec<TreeBox> {
 
 #[derive(Debug, Clone)]
 pub struct TreeBox {
-    pub slug: String,
+    pub cat: &'static Category,
     pub label: String,
     pub font_size: f64,
     /// SVG fill
@@ -218,8 +265,17 @@ pub struct TreeBox {
     pub sub: Vec<TreeBox>,
 }
 
+impl TreeBox {
+    pub fn line_y(&self, nth: usize) -> f64 {
+        self.bounds.y + 1. + self.font_size * 1.1 * (nth+1) as f64
+    }
+    pub fn can_fit_count(&self) -> bool {
+        self.line_y(self.label.lines().count()) + 1. - self.bounds.y < self.bounds.h
+    }
+}
+
 impl treemap::Mappable for TreeBox {
-    fn size(&self) -> f64 { self.count as f64 }
+    fn size(&self) -> f64 { self.weight }
     fn bounds(&self) -> &treemap::Rect { &self.bounds }
     fn set_bounds(&mut self, b: treemap::Rect) { self.bounds = b; }
 }
@@ -230,17 +286,17 @@ async fn category_stats(kitchen_sink: &KitchenSink) -> Result<Vec<TreeBox>, anyh
     let mut roots = cat_slugs(&CATEGORIES.root);
     #[track_caller]
     fn take_cat(slug: &str, items: &mut Vec<TreeBox>) -> TreeBox {
-        let pos = items.iter().position(|i| i.slug == slug).unwrap_or_else(|| panic!("{} in {:?}", slug, items));
+        let pos = items.iter().position(|i| i.cat.slug == slug).unwrap_or_else(|| panic!("{} in {:?}", slug, items));
         items.swap_remove(pos)
     }
     #[track_caller]
     fn find_cat<'a>(slug: &str, items: &'a mut Vec<TreeBox>) -> &'a mut TreeBox {
-        let pos = items.iter().position(|i| i.slug == slug).unwrap_or_else(|| panic!("{} in {:?}", slug, items));
+        let pos = items.iter().position(|i| i.cat.slug == slug).unwrap_or_else(|| panic!("{} in {:?}", slug, items));
         &mut items[pos]
     }
     fn new_cat(sub: Vec<TreeBox>) -> TreeBox {
         TreeBox {
-            slug: String::new(),
+            cat: CATEGORIES.root.values().nth(0).unwrap(),
             label: String::new(),
             font_size: 0.,
             color: String::new(),
@@ -256,9 +312,9 @@ async fn category_stats(kitchen_sink: &KitchenSink) -> Result<Vec<TreeBox>, anyh
     find_cat("simulation", &mut roots).label = "Sim".into();
     find_cat("caching", &mut roots).label = "Cache".into();
     find_cat("config", &mut roots).label = "Config".into();
-    find_cat("cryptography", &mut roots).sub[0].label = "Crypto Magic Beans".into();
     find_cat("os", &mut roots).label = "OS".into();
     find_cat("internationalization", &mut roots).label = "i18n".into();
+
 
     // group them in a more sensible way
     let parsers = vec![take_cat("parsing", &mut roots), take_cat("parser-implementations", &mut roots)];
@@ -301,9 +357,13 @@ async fn category_stats(kitchen_sink: &KitchenSink) -> Result<Vec<TreeBox>, anyh
     let concurrency = take_cat("concurrency", &mut roots);
     find_cat("rust-patterns", &mut roots).sub.push(concurrency);
 
+    let mut cr = find_cat("cryptography", &mut roots).sub.remove(0);
+    cr.label = "Crypto Magic Beans".into();
+    roots.push(cr);
+
     // first layout of top-level boxes (won't be used for anything other than second layout)
     for top in roots.iter_mut() {
-        let (count, weight) = if top.slug == "" { (0, 0.) } else { kitchen_sink.category_crate_count(&top.slug).await? };
+        let (count, weight) = if top.label == "" { (0, 0.) } else { kitchen_sink.category_crate_count(&top.cat.slug).await? };
         top.count = count;
         top.weight = weight;
 
@@ -311,7 +371,7 @@ async fn category_stats(kitchen_sink: &KitchenSink) -> Result<Vec<TreeBox>, anyh
         top_copy.sub = Vec::new();
 
         for i in top.sub.iter_mut() {
-            let (count, weight) = kitchen_sink.category_crate_count(&i.slug).await?;
+            let (count, weight) = kitchen_sink.category_crate_count(&i.cat.slug).await?;
             i.count = count;
             i.weight = weight;
             top.count += i.count;
@@ -370,8 +430,8 @@ fn postprocess_treebox_items(items: &mut Vec<TreeBox>) {
         let c = l.to_rgb();
         item.color = format!("#{:02x}{:02x}{:02x}", c[0], c[1], c[2]);
 
-        let max_width = (item.bounds.w * 1.2 / (item.font_size / 1.7)) as usize;
-        let maybe_label = textwrap::wrap(&item.label, textwrap::Options::new(max_width).break_words(false));
+        let ideal_max_width = (item.bounds.w * 1.2 / (item.font_size / 1.7)) as usize;
+        let maybe_label = textwrap::wrap(&item.label, textwrap::Options::new(ideal_max_width).break_words(false));
 
         let chars = maybe_label.iter().map(|w| w.len()).max().unwrap_or(1);
         let lines = maybe_label.len();
@@ -381,8 +441,9 @@ fn postprocess_treebox_items(items: &mut Vec<TreeBox>) {
             .max(4.);
 
         let max_width = (item.bounds.w / (try_font_size / 1.7)) as usize;
+        let must_break = ideal_max_width < chars * 2 / 3 && item.bounds.h > item.font_size * 2.;
 
-        let label = textwrap::wrap(&item.label, textwrap::Options::new(max_width).break_words(false));
+        let label = textwrap::wrap(&item.label, textwrap::Options::new(max_width).break_words(must_break));
         let chars = label.iter().map(|w| w.len()).max().unwrap_or(1);
         let lines = label.len();
         item.label = label.join("\n");
@@ -433,9 +494,11 @@ async fn owner_stats(kitchen_sink: &KitchenSink, start: Date<Utc>) -> Result<(Ve
         }
         for id in id_examples {
             if let Ok(login) = kitchen_sink.login_by_github_id(id) {
-                examples.push(login);
-                if examples.len() > 8 {
-                    break;
+                if !kitchen_sink.is_github_login_on_shitlist(&login) {
+                    examples.push(login);
+                    if examples.len() >= 10 {
+                        break;
+                    }
                 }
             }
         }

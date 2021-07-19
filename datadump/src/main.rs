@@ -188,7 +188,12 @@ fn versions_histogram(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDe
                     if let (Ok(latest_date), Ok(oldest_date)) = (latest_date, oldest_date) {
                         insert_hist_item(&mut age, today.signed_duration_since(oldest_date).num_weeks() as u32, &name);
                         insert_hist_item(&mut languish, today.signed_duration_since(latest_date).num_weeks() as u32, &name);
-                        insert_hist_item(&mut maintenance, latest_date.signed_duration_since(oldest_date).num_weeks() as u32, &name);
+                        let maintenance_weeks = if v.len() == 1 {
+                            0
+                        } else {
+                            latest_date.signed_duration_since(oldest_date).num_weeks().max(1) as u32
+                        };
+                        insert_hist_item(&mut maintenance, maintenance_weeks, &name);
                     }
                 }
 

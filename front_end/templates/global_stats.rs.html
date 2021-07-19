@@ -34,6 +34,9 @@
             table.histogram td @{ vertical-align: bottom; vertical-align: top; text-align: center; font-size: 0.8em; @}
             table.histogram .bars td @{ vertical-align: bottom; @}
             table.histogram .bars div @{ background: #c60808; color: white; @}
+            table.rustc-compat svg @{ display: block @}
+            table.rustc-compat th @{ vertical-align: 50%; @}
+            table.rustc-compat thead th @{ font-weight:normal; @}
             @@media (prefers-color-scheme: dark) @{
                 table.histogram .bars div @{ color: black; @}
             @}
@@ -46,14 +49,13 @@ display: -webkit-box;
 
         <div class="inner-col">
         <section>
-            <h2>crates.io growth</h2>
-            <p>We have indexed @stats.total_crate_num crates.</p>
+            <h2>Growth of the crates.io registry</h2>
 
             <svg viewBox="0 -5 1030 116" width=1040 height=116 style="width:100%; margin: 1em auto 0">
                 <title>Download history of all crates since 2015</title>
                 @for y in (0..stats.max_downloads_per_week).step_by(stats.dl_grid_line_every as _) {
                     <line x1=0 x2=1000 y1="@(100. - y as f64 / (stats.max_downloads_per_week as f64 / 100.))" y2="@(100. - y as f64 / (stats.max_downloads_per_week as f64 / 100.))"
-                        stroke-width=1 stroke-linecap="butt" stroke="#aaaaaa" stroke-opacity=0.5 />
+                        stroke-width=1 stroke-linecap="butt" stroke="#aaaaaa" stroke-opacity=0.3 />
                     @if y > 0 {
                         <text stroke="none" fill="#999999" font-size="11" x="1003" y="@(103. - y as f64 / (stats.max_downloads_per_week as f64 / 100.))">@((y as f64 / 7_000_000.).round())M</text>
                     }
@@ -67,7 +69,7 @@ display: -webkit-box;
                     <line y1=100 y2=105
                     x1="@((x - stats.start_week_offset) as f64 / (dl_by_week.len() as f64 / 1000.))"
                     x2="@((x - stats.start_week_offset) as f64 / (dl_by_week.len() as f64 / 1000.))"
-                        stroke-width=1 stroke-linecap="butt" stroke="#aaaaaa" stroke-opacity=0.5 />
+                        stroke-width=1 stroke-linecap="butt" stroke="#aaaaaa" stroke-opacity=0.3 />
                 }
                 @for x in (0..(dl_by_week.len() as u32 - 26)).step_by(52) {
                     <text stroke="none" fill="#999999" text-anchor=middle font-size="11" y="111"
@@ -76,7 +78,7 @@ display: -webkit-box;
             </svg>
             <p class=legend>Daily downloads since Rust 1.0, 7-day average</p>
 
-<p>crates.io ownloads are growing at a rate of
+<p>Crate downloads are growing at a rate of
 @GlobalStats::relative_increase((stats.dl_per_day_this_year.0 + stats.dl_per_day_this_year.1, stats.dl_per_day_last_year.0 + stats.dl_per_day_last_year.1)) per year.</p>
 
 <p>At peak crates.io has served @if let Some((val, unit)) = Some(format_downloads_verbose(stats.max_daily_downloads_rate)) { @val @unit } downloads per <em>day</em>,
@@ -85,12 +87,11 @@ display: -webkit-box;
 <p>Traffic during weekdays is typically @GlobalStats::relative_increase(stats.dl_per_day_this_year) higher than during weekends
     (@if stats.dl_ratio_up() {up} else {down} from @GlobalStats::relative_increase(stats.dl_per_day_last_year) a year before).</p>
 
-
             <svg viewBox="0 -5 1030 116" width=1040 height=116 style="width:100%; margin: 1em auto 0">
                 <title>@stats.max_total_owners crate owners registered on crates.io</title>
                 @for y in (0..stats.max_total_owners).step_by((stats.max_total_owners as usize / 6_000 * 1_000).max(1)) {
                     <line x1=0 x2=1000 y1="@(100. - y as f64 / (stats.max_total_owners as f64 / 100.))" y2="@(100. - y as f64 / (stats.max_total_owners as f64 / 100.))"
-                        stroke-width=1 stroke-linecap="butt" stroke="#aaaaaa" stroke-opacity=0.5 />
+                        stroke-width=1 stroke-linecap="butt" stroke="#aaaaaa" stroke-opacity=0.3 />
                     @if y > 0 {
                         <text fill="#999999" font-size="11" x="1003" y="@(103. - y as f64 / (stats.max_total_owners as f64 / 100.))">@((y as f64 / 1_000.).round())K</text>
                     }
@@ -108,7 +109,7 @@ display: -webkit-box;
                     <line y1=100 y2=105
                     x1="@((x - 5) as f64 / (stats.total_owners_at_month.len() as f64 / 1000.))"
                     x2="@((x - 5) as f64 / (stats.total_owners_at_month.len() as f64 / 1000.))"
-                        stroke-width=1 stroke-linecap="butt" stroke="#aaaaaa" stroke-opacity=0.5 />
+                        stroke-width=1 stroke-linecap="butt" stroke="#aaaaaa" stroke-opacity=0.3 />
                 }
                 @for x in (0..(stats.total_owners_at_month.len() as u32 - 5)).step_by(12) {
                     <text stroke="none" fill="#999999" text-anchor=middle font-size="11" y="111"
@@ -120,10 +121,12 @@ display: -webkit-box;
 <p>There are @format_number(stats.max_total_owners) users or teams that have a crate on crates.io. The number of owners is growing at a rate of
 @GlobalStats::relative_increase((stats.max_total_owners as _, stats.total_owners_at_month[stats.total_owners_at_month.len()-12] as _)) per year.</p>
 
+<p>Lib.rs has indexed @stats.total_crate_num crates.</p>
+
     </section>
     <section>
         <h2>Histograms</h2>
-        <section>
+        <section id="num-deps">
             <h3>Number of direct dependencies</h3>
             <p>Including dev and build deps.</p>
             @:histogram(&stats.hs_deps1, 0, url, url_for_crate_name)</section>
@@ -136,7 +139,7 @@ display: -webkit-box;
             <h3>Number of releases per crate</h3>
             <p>Number of unique versions of each crate, excluding yanked versions.</p>
             @:histogram(&stats.hs_releases, 5, url, versions_for_crate_name)</section>
-        <section>
+        <section id="crate-age">
             <h3>Age</h3>
             <p>Time since crate's first release.</p>
             @:histogram(&stats.hs_age, 5, url, url_for_crate_name)</section>
@@ -146,17 +149,17 @@ display: -webkit-box;
             @:histogram(&stats.hs_maintenance, 5, url, versions_for_crate_name)</section>
         <section>
             <h3>Time without any updates</h3>
-            <p>Time since crate's most recent release.</p>
+            <p>Time since crate's most recent release. Keep in mind that some crates can be "done" and not need regular updates.</p>
             @:histogram(&stats.hs_languish, 5, url, url_for_crate_name)</section>
-        <section>
+        <section id="crates-per-user">
             <h3>Number of crates per user</h3>
             <p>How many crates a single account (user or team) owns. Excluding all other people in the world who have 0 crates.</p>
             @:histogram(&stats.hs_owner_crates, 8, url, Urler::crates_io_user_by_github_login)</section>
     </section>
 
-    <section>
+    <section id="categories">
         <h2>Categories</h2>
-        <p>Area is proportional to number of crates in each category. Colors don't mean anything.</p>
+        <p>Number of crates in each category. Area is proportional to the number of crates weighed by their ranking (reduces spam). Colors are only for decoration.</p>
         <svg viewBox="0 0 1000 600" width=1000 height=600 style="width:100%; margin: 1em auto 0">
             <style>
             rect.cat @{stroke: white;@}
@@ -167,11 +170,40 @@ display: -webkit-box;
             @for b in &stats.categories {
                 <rect class="cat" fill="@b.color" fill-opacity="0.7" x=@b.bounds.x y=@b.bounds.y width=@b.bounds.w height=@b.bounds.h>
                     <title>@b.label (@b.count)</title></rect>
+                <a href="@url.category(&b.cat)">
                 @for (i, w) in b.label.lines().enumerate() {<text
-                    font-size="@b.font_size" fill="black" stroke="none" x="@(b.bounds.x + 3.)" y="@(b.bounds.y + 1. + b.font_size * 1.1 * (i+1) as f64)"
-                    text-anchor=start><title>@b.label (@b.count)</title>@w</rect></text>}
+                    font-size="@b.font_size" fill="black" stroke="none" x="@(b.bounds.x + 3.)" y="@b.line_y(i)"
+                    text-anchor=start><title>@b.label (@b.count)</title>@w</text>}
+                </a>
+                @if b.can_fit_count() {
+                    <text font-size="@(b.font_size.min(10.5))" fill="black" opacity="0.5" stroke="none"
+                    x="@(b.bounds.x + 3.)" y="@b.line_y(b.label.lines().count())"
+                                    text-anchor=start>@b.count</text>
+                }
             }
         </svg>
+    </section>
+    <section id="rustc">
+        <h2>Rustc compatibility</h2>
+        <p>Percentage of crates that can be compiled with a given Rust version. The data is approximate, based on sampling of <code>cargo check</code> on Linux/x86-64. Excludes crates that never built (e.g. because they need nightly, or Windows, or unusual C dependencies).</p>
+        <svg width=1 height=1><defs>
+        <linearGradient id="svggrad1" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" style="stop-color:#8c9f8c;stop-opacity:1" />
+          <stop offset="100%" style="stop-color:#bb7171;stop-opacity:1" />
+        </linearGradient>
+      </defs></svg>
+        <table class="rustc-compat">
+            <thead><tr><th>Rustc</th><th>Compatible / No data / Not compatible</th></tr></thead>
+        @for (ver, (yes, maybe, no)) in stats.rustc_stats.iter().copied().enumerate().skip(27).rev() {
+            <tr><th>1.@ver</th><td>
+                <svg viewbox="0 0 330 26" width=330 height=26>
+                    <rect fill="#392" stroke=none x="0" width="@yes" height=26 y=0><title>@(yes * 100 / (yes+maybe+no))% compatible</title></rect>
+                    <rect fill="url(#svggrad1)" stroke=none x="@yes" width="@maybe" height=26 y=0><title>@(maybe * 100 / (yes+maybe+no))% no data</title></rect>
+                    <rect fill="#b33" stroke=none x="@(yes + maybe)" width="@no" height=26 y=0><title>@(no * 100 / (yes+maybe+no))% not compatible</title></rect>
+                </svg>
+            </td></tr>
+        }
+        </table>
     </section>
     </main>
 

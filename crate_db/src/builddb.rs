@@ -194,7 +194,7 @@ impl BuildDb {
         }
     }
 
-    fn get_all_compat_by_crate(&self) -> Result<HashMap<Origin, CompatByCrateVersion>> {
+    pub fn get_all_compat_by_crate(&self) -> Result<HashMap<Origin, CompatByCrateVersion>> {
         let conn = self.conn.lock();
         let mut get = conn.prepare_cached(r"SELECT rustc_version, version, compat, origin FROM build_results")?;
 

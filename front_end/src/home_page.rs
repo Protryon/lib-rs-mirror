@@ -196,6 +196,8 @@ impl<'a> HomePage<'a> {
 
             // move cryptocurrencies out of cryptography for the homepage
             ranked.get_mut("cryptography").and_then(|(_, c)| c.sub.pop());
+            // this one isn't relevant either
+            ranked.remove("uncategorized");
 
             for &(slug, adjust) in CATEGORY_RANK_ADJUST.iter() {
                 if let Some(c) = ranked.get_mut(slug) {

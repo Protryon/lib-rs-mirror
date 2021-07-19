@@ -673,7 +673,7 @@ async fn handle_new_trending(req: HttpRequest) -> Result<HttpResponse, ServerErr
 async fn handle_global_stats(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let state: &AServerState = req.app_data().expect("appdata");
     Ok(serve_cached(
-        with_file_cache(state, state.page_cache_dir.join("_stats_.html"), 24 * 3600, {
+        with_file_cache(state, state.page_cache_dir.join("_stats_.html"), 12 * 3600, {
             let state = state.clone();
             run_timeout("trendpage", 90, async move {
                 let crates = state.crates.load();

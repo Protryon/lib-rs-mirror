@@ -3,7 +3,6 @@ use std::sync::atomic::AtomicU64;
 use std::path::Path;
 use crate::error::Error;
 use fetcher::Fetcher;
-use flate2::read::DeflateDecoder;
 use parking_lot::RwLock;
 use parking_lot::RwLockReadGuard;
 use parking_lot::RwLockWriteGuard;
@@ -29,7 +28,6 @@ use std::os::linux::fs::MetadataExt;
 type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 
 struct Inner<K> {
-    convert_gz: bool,
     data: Option<FxHashMap<K, Box<[u8]>>>,
     writes: usize,
     next_autosave: usize,
@@ -60,21 +58,17 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
 impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeOwned + Clone + Send + Eq + Hash> TempCache<T, K> {
     pub fn new(path: impl AsRef<Path>) -> Result<Self, Error> {
         let base_path = path.as_ref();
-        let br = base_path.with_extension("mpbr");
-        let gz = base_path.with_extension("rmpz");
+        let path = base_path.with_extension("mpbr");
 
-        let (data, path, convert_gz) = if br.exists() {
-            (None, br, false)
-        } else if gz.exists() {
-            (None, gz, true)
+        let data = if path.exists() {
+            None
         } else {
-            (Some(FxHashMap::default()), br, false)
+            Some(FxHashMap::default())
         };
 
         Ok(Self {
             path,
             inner: RwLock::new(Inner {
-                convert_gz,
                 data,
                 writes: 0,
                 next_autosave: 10,
@@ -93,23 +87,11 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
     fn lock_for_write(&self) -> Result<RwLockWriteGuard<'_, Inner<K>>, Error> {
         let mut inner = self.inner.write();
         if inner.data.is_none() {
-            let (size, mut data) = self.load_data()?;
-            if inner.convert_gz {
-                eprintln!("Migrating {} to brotli {}", data.len(), self.path.display());
-                for v in data.values_mut() {
-                    let out = Self::serialize(&Self::old_ungz(&v)?)?;
-                    *v = out.into_boxed_slice();
-                }
-            }
+            let (size, data) = self.load_data()?;
+            inner.expected_size = AtomicU64::new(size);
             inner.data = Some(data);
             inner.writes = 0;
-            inner.expected_size = AtomicU64::new(size);
             inner.next_autosave = 10;
-            if inner.convert_gz {
-                inner.expected_size = AtomicU64::new(0);
-                inner.convert_gz = false;
-                self.save_unlocked(&inner)?;
-            }
         }
         Ok(inner)
     }
@@ -198,11 +180,6 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
             })?),
             None => None,
         })
-    }
-
-    fn old_ungz(data: &[u8]) -> Result<T, Error> {
-        let ungz = DeflateDecoder::new(data);
-        Ok(rmp_serde::decode::from_read(ungz)?)
     }
 
     fn unbr(data: &[u8]) -> Result<T, Error> {

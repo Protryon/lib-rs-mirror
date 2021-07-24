@@ -1,3 +1,4 @@
+use std::time::Duration;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::atomic::AtomicU64;
 use std::path::Path;
@@ -84,8 +85,9 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
         self.set_(key.into(), value.borrow())
     }
 
+    #[track_caller]
     fn lock_for_write(&self) -> Result<RwLockWriteGuard<'_, Inner<K>>, Error> {
-        let mut inner = self.inner.write();
+        let mut inner = self.inner.try_write_for(Duration::from_secs(4)).expect("deadlock1");
         if inner.data.is_none() {
             let (size, data) = self.load_data()?;
             inner.expected_size = AtomicU64::new(size);
@@ -96,9 +98,10 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
         Ok(inner)
     }
 
+    #[track_caller]
     fn lock_for_read(&self) -> Result<RwLockReadGuard<'_, Inner<K>>, Error> {
         loop {
-            let inner = self.inner.read();
+            let inner = self.inner.try_read_for(Duration::from_secs(6)).expect("deadlock2");
             if inner.data.is_some() {
                 return Ok(inner);
             }
@@ -123,6 +126,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
         Ok(e.into_inner())
     }
 
+    #[track_caller]
     pub fn set_(&self, key: K, value: &T) -> Result<(), Error> {
         let compr = Self::serialize(value)?;
         debug_assert!(Self::unbr(&compr).is_ok()); // sanity check
@@ -152,6 +156,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
         Ok(())
     }
 
+    #[track_caller]
     pub fn for_each(&self, mut cb: impl FnMut(&K, T)) -> Result<(), Error> {
         let kw = self.lock_for_read()?;
         kw.data.as_ref().unwrap().iter().try_for_each(|(k, v)| {
@@ -169,6 +174,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
         Ok(())
     }
 
+    #[track_caller]
     pub fn get<Q>(&self, key: &Q) -> Result<Option<T>, Error> where K: Borrow<Q>, Q: Eq + Hash + std::fmt::Debug + ?Sized {
         let kw = self.lock_for_read()?;
         Ok(match kw.data.as_ref().unwrap().get(key) {

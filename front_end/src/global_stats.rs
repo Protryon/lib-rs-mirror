@@ -31,6 +31,7 @@ pub struct GlobalStats {
     pub(crate) hs_sizes: Histogram,
     pub(crate) hs_deps1: Histogram,
     pub(crate) hs_deps2: Histogram,
+    pub(crate) hs_rev_deps: Histogram,
     pub(crate) hs_maintenance: Histogram,
     pub(crate) hs_age: Histogram,
     pub(crate) hs_languish: Histogram,
@@ -139,6 +140,13 @@ pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSin
         bucket_labels: hs_deps1.bucket_labels.split_off(10),
     };
 
+    let rev_deps = kitchen_sink.crates_io_all_rev_deps_counts().await?;
+    let mut hs_rev_deps = Histogram::new(rev_deps, true,
+        &[0,1,2,5,15,50,100,250,500,750,1000,2500,5000,10000,15000,20000,50000],
+        |n| if n > 2 {format!("≥{}", n)} else {n.to_string()});
+
+    hs_rev_deps.buckets.iter_mut().take(5).for_each(|b| b.examples.truncate(5));
+
     let age_label = |n| match n {
         0..=1 => "≤1 week".to_string(),
         2..=4 => format!("≤{} weeks", n),
@@ -181,6 +189,7 @@ pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSin
         hs_owner_crates,
         categories,
         rustc_stats,
+        hs_rev_deps,
     };
 
     templates::global_stats(out, &Page {
@@ -425,7 +434,7 @@ fn postprocess_treebox_items(items: &mut Vec<TreeBox>) {
             (c[1] as f32 * x + (1. - x) * 100.) as u8,
             (c[2] as f32 * x + (1. - x) * 200.) as u8
         ];
-        let mut l = dbg!(lab::Lab::from_rgb(&c));
+        let mut l = lab::Lab::from_rgb(&c);
         l.l = (l.l + 90.) * 0.5; // fix my bad palette
         let c = l.to_rgb();
         item.color = format!("#{:02x}{:02x}{:02x}", c[0], c[1], c[2]);
@@ -604,6 +613,10 @@ impl Histogram {
 
 pub fn url_for_crate_name(url: &Urler, name: &str) -> String {
     url.crate_by_origin(&Origin::from_crates_io_name(name))
+}
+
+pub fn url_for_rev_deps(url: &Urler, name: &str) -> String {
+    url.reverse_deps(&Origin::from_crates_io_name(name)).unwrap()
 }
 
 pub fn versions_for_crate_name(url: &Urler, name: &str) -> String {

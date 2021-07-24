@@ -1439,6 +1439,25 @@ impl KitchenSink {
         self.index.update().await;
     }
 
+
+    pub async fn crates_io_all_rev_deps_counts(&self) -> Result<StatsHistogram, KitchenSinkErr> {
+        let stats = self.index.deps_stats().await.map_err(KitchenSinkErr::Deps)?;
+        let mut tmp = HashMap::new();
+        for (o, r) in stats.counts.iter() {
+            let cnt = r.runtime.all() + r.build.all() + r.dev as u32;
+            let t = tmp.entry(cnt).or_insert((0, Vec::new()));
+            t.0 += 1;
+            if t.1.len() < 50 {
+                t.1.push((r.direct.all(), o.to_string()));
+            }
+        }
+
+        Ok(tmp.into_iter().map(|(k, (cnt, mut examples))| {
+            examples.sort_by_key(|(dcnt,_)| !dcnt);
+            (k, (cnt, examples.into_iter().take(8).map(|(_, n)| n).collect()))
+        }).collect())
+    }
+
     #[inline]
     pub async fn crates_io_dependents_stats_of(&self, origin: &Origin) -> Result<Option<&RevDependencies>, KitchenSinkErr> {
         match origin {

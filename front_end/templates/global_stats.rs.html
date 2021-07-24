@@ -3,6 +3,7 @@
 @use crate::GlobalStats;
 @use crate::global_stats::format_number;
 @use crate::global_stats::url_for_crate_name;
+@use crate::global_stats::url_for_rev_deps;
 @use crate::global_stats::versions_for_crate_name;
 @use crate::templates::base;
 @use crate::templates::histogram;
@@ -128,8 +129,8 @@ display: -webkit-box;
         <h2>Histograms</h2>
         <section id="num-deps">
             <h3>Number of direct dependencies</h3>
-            <p>Including dev and build deps.</p>
-            @:histogram(&stats.hs_deps1, 0, url, url_for_crate_name)</section>
+            <p>Number of libraries explicitly used by each crate. Includes dev, build-time and optional dependencies.</p>
+            @:histogram(&stats.hs_deps1, 0, url, url_for_crate_name)
             @:histogram(&stats.hs_deps2, 5, url, url_for_crate_name)</section>
         <section>
             <h3>Crate size (KB)</h3>
@@ -151,6 +152,10 @@ display: -webkit-box;
             <h3>Time without any updates</h3>
             <p>Time since crate's most recent release. Keep in mind that some crates can be "done" and not need regular updates.</p>
             @:histogram(&stats.hs_languish, 5, url, url_for_crate_name)</section>
+        <section id="rev-deps">
+            <h3>Number of transitive reverse dependencies</h3>
+            <p>How often each library crate is used as a dependency in other crates, directly or indirectly. Includes dev, build-time, and optional dependencies.</p>
+            @:histogram(&stats.hs_rev_deps, 10, url, url_for_rev_deps)</section>
         <section id="crates-per-user">
             <h3>Number of crates per user</h3>
             <p>How many crates a single account (user or team) owns. Excluding all other people in the world who have 0 crates.</p>

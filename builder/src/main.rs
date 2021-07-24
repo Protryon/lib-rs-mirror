@@ -29,21 +29,24 @@ RUN rustup toolchain add 1.41.0
 RUN rustup toolchain add 1.42.0
 RUN rustup toolchain add 1.46.0
 RUN rustup toolchain add 1.51.0
+RUN rustup toolchain add 1.45.0
+RUN rustup toolchain add 1.40.0
+RUN rustup toolchain add 1.35.0
+RUN rustup toolchain add 1.52.0
+RUN rustup toolchain add 1.44.0
 RUN rustup toolchain list
 # RUN cargo new lts-dummy; cd lts-dummy; cargo lts setup; echo 'itoa = "*"' >> Cargo.toml; cargo update;
 "##;
 
 const TEMP_JUNK_DIR: &str = "/var/tmp/crates_env";
 
-const RUST_VERSIONS: [&str; 4] = [
+const RUST_VERSIONS: [&str; 6] = [
     "1.28.0",
     "1.29.0",
     "1.33.0",
-    // "1.41.0",
-    // "1.42.0",
-    // "1.46.0",
-    "1.51.0",
-    // "1.53.0",
+    "1.40.0",
+    "1.44.0",
+    "1.52.0",
 ];
 
 use crate_db::builddb::*;

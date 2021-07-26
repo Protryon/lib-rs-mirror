@@ -226,6 +226,14 @@ fn index_search(indexer: &mut Indexer, lines: &TempCache<(String, f64), [u8; 16]
 impl Reindexer {
 async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) -> (usize, f64) {
     let crates = &self.crates;
+
+    let mut is_repo_archived = false;
+    if let Some(repo) = k.repository() {
+        if let Some(github_repo) = crates.github_repo(repo).await.map_err(|e| log::error!("{}", e)).ok().and_then(|x| x) {
+            is_repo_archived = github_repo.archived;
+        }
+    }
+
     let contrib_info = crates.all_contributors(k).await.map_err(|e| log::error!("{}", e)).ok();
     let contributors_count = if let Some((authors, _owner_only, _, extra_contributors)) = &contrib_info {
         (authors.len() + extra_contributors) as u32
@@ -341,7 +349,7 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
         is_sys: k.is_sys(),
         is_sub_component: crates.is_sub_component(k).await,
         is_autopublished: is_autopublished(k),
-        is_deprecated: is_deprecated(k),
+        is_deprecated: is_deprecated(k) || is_repo_archived,
         is_crates_io_published: k.origin().is_crates_io(),
         is_yanked: k.is_yanked(),
         is_squatspam: is_squatspam(k) || is_on_shitlist,

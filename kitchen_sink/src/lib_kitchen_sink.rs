@@ -1213,7 +1213,7 @@ impl KitchenSink {
         }
     }
 
-    async fn github_repo(&self, crate_repo: &Repo) -> CResult<Option<GitHubRepo>> {
+    pub async fn github_repo(&self, crate_repo: &Repo) -> CResult<Option<GitHubRepo>> {
         Ok(match crate_repo.host() {
             RepoHost::GitHub(ref repo) => {
                 let cachebust = self.cachebust_string_for_repo(crate_repo).await.context("ghrepo")?;

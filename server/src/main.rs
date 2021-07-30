@@ -673,7 +673,7 @@ async fn handle_new_trending(req: HttpRequest) -> Result<HttpResponse, ServerErr
 async fn handle_global_stats(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let state: &AServerState = req.app_data().expect("appdata");
     Ok(serve_cached(
-        with_file_cache(state, state.page_cache_dir.join("_stats_.html"), 12 * 3600, {
+        with_file_cache(state, state.page_cache_dir.join("_stats_.html"), 6 * 3600, {
             let state = state.clone();
             run_timeout("trendpage", 90, async move {
                 let crates = state.crates.load();
@@ -693,11 +693,12 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
     where F: Future<Output=Result<(Vec<u8>, Option<DateTime<FixedOffset>>), anyhow::Error>> + 'static {
     if let Ok(modified) = std::fs::metadata(&cache_file).and_then(|m| m.modified()) {
         let now = SystemTime::now();
+        let cache_time = cache_time as u64;
         // rebuild in debug always
-        let is_fresh = !cfg!(debug_assertions) && modified > (now - Duration::from_secs((cache_time / 20 + 5).into()));
-        let is_acceptable = modified > (now - Duration::from_secs((3600 * 24 * 2 + cache_time * 8).into()));
+        let is_fresh = !cfg!(debug_assertions) && modified > (now - Duration::from_secs(cache_time / 20 + 5));
+        let is_acceptable = modified > (now - Duration::from_secs(3600 * 24 * 2 + cache_time * 8));
 
-        let age_secs = now.duration_since(modified).ok().map(|age| age.as_secs() as u32).unwrap_or(0);
+        let age_secs = now.duration_since(modified).ok().map(|age| age.as_secs()).unwrap_or(0);
 
         if let Ok(mut page_cached) = std::fs::read(&cache_file) {
             if !is_acceptable || page_cached.len() <= 4 {
@@ -743,7 +744,7 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
             }
             return Ok(Rendered {
                 page: page_cached,
-                cache_time: if !is_fresh { cache_time_remaining / 4 } else { cache_time_remaining }.max(2),
+                cache_time: if !is_fresh { cache_time_remaining / 4 } else { cache_time_remaining }.max(2) as u32,
                 refresh: !is_acceptable,
                 last_modified,
             });

@@ -39,7 +39,7 @@ pub struct GlobalStats {
 
     pub(crate) categories: Vec<TreeBox>,
 
-    pub(crate) rustc_stats: Vec<(u32, u32, u32)>,
+    pub(crate) rustc_stats: Vec<Compat>,
 }
 
 pub type CallbackFn = fn(&Urler, &str) -> String;
@@ -204,10 +204,25 @@ pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSin
     Ok(())
 }
 
-fn rustc_stats(kitchen_sink: &KitchenSink, max_rust_version: u16) -> Result<Vec<(u32, u32, u32)>, anyhow::Error> {
+#[derive(Default, Copy, Clone, Debug)]
+pub struct Compat {
+    pub(crate) bad: u32,
+    pub(crate) maybe_bad: u32,
+    pub(crate) unknown: u32,
+    pub(crate) maybe_ok: u32,
+    pub(crate) ok: u32,
+}
+
+impl Compat {
+    pub fn sum(&self) -> u32 {
+        self.bad + self.maybe_bad + self.unknown + self.maybe_ok + self.ok
+    }
+}
+
+fn rustc_stats(kitchen_sink: &KitchenSink, max_rust_version: u16) -> Result<Vec<Compat>, anyhow::Error> {
     let compat = kitchen_sink.all_crate_compat()?;
     // (ok, maybe, not), [0] is unused
-    let mut rustc_versions = vec![(0,0,0); (max_rust_version+1) as usize];
+    let mut rustc_versions = vec![Compat::default(); (max_rust_version+1) as usize];
 
     for (_, c) in compat {
         // can't compile at all
@@ -216,30 +231,48 @@ fn rustc_stats(kitchen_sink: &KitchenSink, max_rust_version: u16) -> Result<Vec<
         }
 
         // stats for latest crate version only
-        let latest_ver = match c.iter().rev().find(|(v, _)| !v.is_prerelease()).or_else(|| c.iter().rev().nth(0)) {
-            Some((_, v)) => v,
+        let latest_ver = match c.iter().rfind(|(v, _)| !v.is_prerelease()).or_else(|| c.iter().rev().nth(0)) {
+            Some((_, c)) => c,
             None => continue,
         };
+        let latest_ver_bad = match c.iter().rfind(|(v, c)| !v.is_prerelease() && c.newest_bad_raw.is_some()) {
+            Some((_, c)) => c,
+            None => latest_ver,
+        };
+        let newest_bad_raw = latest_ver_bad.newest_bad_raw.unwrap_or(0);
         let newest_bad = latest_ver.newest_bad.unwrap_or(0);
         let oldest_ok = latest_ver.oldest_ok.unwrap_or(999);
+        let oldest_ok_raw = latest_ver.oldest_ok_raw.unwrap_or(999);
         for (ver, c) in rustc_versions.iter_mut().enumerate() {
-            if (ver as u16) >= oldest_ok {
-                c.0 += 1;
-            } else if (ver as u16) <= newest_bad {
-                c.2 += 1;
+            let ver = ver as u16;
+            if ver >= oldest_ok {
+                if ver >= oldest_ok_raw {
+                    c.ok += 1;
+                } else {
+                    c.maybe_ok += 1;
+                }
+            } else if ver <= newest_bad {
+                if ver <= newest_bad_raw {
+                    c.bad += 1;
+                } else {
+                    c.maybe_bad += 1;
+                }
             } else {
-                c.1 += 1;
+                c.unknown += 1;
             }
         }
     }
 
     // resize to width
     let width = 330;
-    for v in &mut rustc_versions {
-        let sum = v.0 + v.1 + v.2;
-        v.0 = (v.0 * width + width / 2) / sum;
-        v.2 = (v.2 * width + width / 2) / sum;
-        v.1 = width - v.0 - v.2;
+    for c in &mut rustc_versions {
+        let sum = c.sum();
+
+        c.bad = (c.bad * width + width / 2) / sum;
+        c.ok = (c.ok * width + width / 2) / sum;
+        c.maybe_bad = (c.maybe_bad * width + width / 2) / sum;
+        c.maybe_ok = (c.maybe_ok * width + width / 2) / sum;
+        c.unknown = width - c.bad - c.ok - c.maybe_bad - c.maybe_ok;
     }
     Ok(rustc_versions)
 }

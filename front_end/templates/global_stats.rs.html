@@ -37,7 +37,7 @@
             table.histogram .bars div @{ background: #c60808; color: white; @}
             table.rustc-compat svg @{ display: block @}
             table.rustc-compat th @{ vertical-align: 50%; @}
-            table.rustc-compat thead th @{ font-weight:normal; @}
+            table.rustc-compat thead th @{ font-weight:normal; font-size: 0.8em @}
             @@media (prefers-color-scheme: dark) @{
                 table.histogram .bars div @{ color: black; @}
             @}
@@ -193,18 +193,19 @@ display: -webkit-box;
         <p>Percentage of crates that can be compiled with a given Rust version. The data is approximate, based on sampling of <code>cargo check</code> on Linux/x86-64. Excludes crates that never built (e.g. because they need nightly, or Windows, or unusual C dependencies).</p>
         <svg width=1 height=1><defs>
         <linearGradient id="svggrad1" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" style="stop-color:#8c9f8c;stop-opacity:1" />
-          <stop offset="100%" style="stop-color:#bb7171;stop-opacity:1" />
+          <stop offset="0%" style="stop-color:#8c9f8c;" />
+          <stop offset="100%" style="stop-color:#bb7171;" />
         </linearGradient>
       </defs></svg>
         <table class="rustc-compat">
-            <thead><tr><th>Rustc</th><th>Compatible / No data / Not compatible</th></tr></thead>
-        @for (ver, (yes, maybe, no)) in stats.rustc_stats.iter().copied().enumerate().skip(27).rev() {
+            <thead><tr><th>Rustc</th><th><span style="color:#392">OK</span> / No data / Incompatible deps / <span style="color:#a33">Incompatible</span></th></tr></thead>
+        @for (ver, c) in stats.rustc_stats.iter().copied().enumerate().skip(27).rev() {
             <tr><th>1.@ver</th><td>
                 <svg viewbox="0 0 330 26" width=330 height=26>
-                    <rect fill="#392" stroke=none x="0" width="@yes" height=26 y=0><title>@(yes * 100 / (yes+maybe+no))% compatible</title></rect>
-                    <rect fill="url(#svggrad1)" stroke=none x="@yes" width="@maybe" height=26 y=0><title>@(maybe * 100 / (yes+maybe+no))% no data</title></rect>
-                    <rect fill="#b33" stroke=none x="@(yes + maybe)" width="@no" height=26 y=0><title>@(no * 100 / (yes+maybe+no))% not compatible</title></rect>
+                    <rect stroke=none fill="#392" x=0 width="@(c.maybe_ok + c.ok)" height=26 y=0><title>@((c.maybe_ok + c.ok) * 100 / c.sum())% compatible</title></rect>
+                    <rect stroke=none fill="url(#svggrad1)" x="@(c.maybe_ok + c.ok)" width="@c.unknown" height=26 y=0><title>@(c.unknown * 100 / c.sum())% no data</title></rect>
+                    <rect stroke=none fill="#b55" x="@(c.maybe_ok + c.ok + c.unknown)" width="@c.maybe_bad" height=26 y=0><title>@((c.bad + c.maybe_bad) * 100 / c.sum())% not compatible because of dependencies</title></rect>
+                    <rect stroke=none fill="#a33" x="@(c.maybe_ok + c.ok + c.unknown + c.maybe_bad)" width="@c.bad" height=26 y=0><title>@(c.bad * 100 / c.sum())% not compatible</title></rect>
                 </svg>
             </td></tr>
         }

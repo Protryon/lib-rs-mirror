@@ -245,16 +245,16 @@ impl KitchenSink {
         let _ = env_logger::try_init();
 
         tokio::task::block_in_place(|| {
-        let main_cache_dir = data_path.to_owned();
+            let main_cache_dir = data_path.to_owned();
 
-        let ((crates_io, gh), (index, crev)) = rayon::join(|| rayon::join(
+            let ((crates_io, gh), (index, crev)) = rayon::join(|| rayon::join(
                 || crates_io_client::CratesIoClient::new(data_path),
                 || github_info::GitHub::new(&data_path.join("github.db"), github_token)),
             || rayon::join(
                 || Index::new(data_path),
                 Creviews::new,
             ));
-        Ok(Self {
+            Ok(Self {
             crev: Arc::new(crev?),
             crates_io: crates_io?,
             index: index?,
@@ -280,9 +280,9 @@ impl KitchenSink {
             auto_indexing_throttle: tokio::sync::Semaphore::new(4),
             crate_rustc_compat_cache: RwLock::new(HashMap::new()),
             crate_rustc_compat_db: OnceCell::new(),
-            event_log: EventLog::new(data_path.join("event_log.sled"))?,
+            event_log: EventLog::new(data_path.join("event_log.db"))?,
             data_path: data_path.into(),
-        })
+            })
         })
     }
 

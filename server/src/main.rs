@@ -383,7 +383,7 @@ async fn handle_category(req: HttpRequest, cat: &'static Category) -> Result<Htt
     let state: &AServerState = req.app_data().expect("appdata");
     let crates = state.crates.load();
     let cache_file = state.page_cache_dir.join(format!("_{}.html", cat.slug));
-    Ok(serve_cached(
+    Ok(serve_page(
         with_file_cache(state, cache_file, 1800, {
             let state = state.clone();
             rt_run_timeout(&state.clone().rt, "catrender", 30, async move {
@@ -406,7 +406,7 @@ async fn handle_home(req: HttpRequest) -> Result<HttpResponse, ServerError> {
 
     let state: &AServerState = req.app_data().expect("appdata");
     let cache_file = state.page_cache_dir.join("_.html");
-    Ok(serve_cached(
+    Ok(serve_page(
         with_file_cache(state, cache_file, 3600, {
             let state = state.clone();
             run_timeout("homepage", 300, async move {
@@ -446,7 +446,7 @@ async fn handle_game_redirect(_: HttpRequest) -> HttpResponse {
 
 async fn handle_repo_crate(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let state: &AServerState = req.app_data().expect("appdata");
-    let (origin, cache_file_name) = match get_origin_from_req_match(&req) {
+    let origin = match get_origin_from_req_match(&req) {
         Ok(res) => res,
         Err(crate_name) => return render_404_page(state, crate_name, "git crate").await,
     };
@@ -457,13 +457,13 @@ async fn handle_repo_crate(req: HttpRequest) -> Result<HttpResponse, ServerError
         return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", url.into_owned())).finish());
     }
 
-    let cache_file = state.page_cache_dir.join(cache_file_name);
-    Ok(serve_cached(with_file_cache(state, cache_file, 86400, {
+    let cache_file = state.page_cache_dir.join(cache_file_name_for_origin(&origin));
+    Ok(serve_page(with_file_cache(state, cache_file, 86400, {
         render_crate_page(state.clone(), origin)
     }).await?))
 }
 
-fn get_origin_from_req_match(req: &HttpRequest) -> Result<(Origin, String), &str> {
+fn get_origin_from_req_match(req: &HttpRequest) -> Result<Origin, &str> {
     let inf = req.match_info();
     let slug = inf.query("host");
     let owner = inf.query("owner");
@@ -473,14 +473,13 @@ fn get_origin_from_req_match(req: &HttpRequest) -> Result<(Origin, String), &str
     if !is_alnum_dot(owner) || !is_alnum_dot(repo) || !is_alnum(crate_name) {
         return Err(crate_name);
     }
-    let cache_file_name = format!("{},{},{},{}.html", slug, owner, repo, crate_name);
 
     let origin = match slug {
         "gh" => Origin::from_github(SimpleRepo::new(owner, repo), crate_name),
         "lab" => Origin::from_gitlab(SimpleRepo::new(owner, repo), crate_name),
         _ => return Err(crate_name),
     };
-    Ok((origin, cache_file_name))
+    Ok(origin)
 }
 
 fn get_origin_from_subpath(q: &actix_web::dev::Path<Url>) -> Option<Origin> {
@@ -539,7 +538,7 @@ async fn handle_install(req: HttpRequest) -> Result<HttpResponse, ServerError> {
         mark_server_still_alive(&state);
         Ok::<_, anyhow::Error>((page, None))
     }).await?;
-    Ok(serve_cached(Rendered {page, cache_time: 24 * 3600, refresh: false, last_modified}))
+    Ok(serve_page(Rendered {page, cache_time: 24 * 3600, refresh: false, last_modified}))
 }
 
 async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
@@ -562,7 +561,7 @@ async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
         return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", format!("https://github.com/{}", Encoded(&aut.github.login)))).body(""));
     }
     let cache_file = state.page_cache_dir.join(format!("@{}.html", login));
-    Ok(serve_cached(
+    Ok(serve_page(
         with_file_cache(state, cache_file, 3600, {
             let state = state.clone();
             run_timeout("authorpage", 60, async move {
@@ -578,6 +577,20 @@ async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     ))
 }
 
+fn cache_file_name_for_origin(origin: &Origin) -> String {
+    match origin {
+        Origin::CratesIo(crate_name) => {
+            assert!(!crate_name.as_bytes().iter().any(|&b| b == b'/' || b == b'.'));
+            format!("{}.html", crate_name)
+        },
+        Origin::GitHub { repo, package } | Origin::GitLab { repo, package } => {
+            assert!(!package.as_bytes().iter().any(|&b| b == b'/' || b == b'.'));
+            let slug = if let Origin::GitHub {..} = origin { "gh" } else { "lab" };
+            format!("{},{},{},{}.html", slug, repo.owner, repo.repo, package)
+        }
+    }
+}
+
 async fn handle_crate(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let crate_name = req.match_info().query("crate");
     debug!("crate page for {:?}", crate_name);
@@ -587,8 +600,8 @@ async fn handle_crate(req: HttpRequest) -> Result<HttpResponse, ServerError> {
         Some(o) => o,
         None => return render_404_page(state, crate_name, "crate").await,
     };
-    let cache_file = state.page_cache_dir.join(format!("{}.html", crate_name));
-    Ok(serve_cached(with_file_cache(state, cache_file, 600, {
+    let cache_file = state.page_cache_dir.join(cache_file_name_for_origin(&origin));
+    Ok(serve_page(with_file_cache(state, cache_file, 600, {
         render_crate_page(state.clone(), origin)
     }).await?))
 }
@@ -596,12 +609,12 @@ async fn handle_crate(req: HttpRequest) -> Result<HttpResponse, ServerError> {
 
 async fn handle_repo_crate_all_versions(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let state: &AServerState = req.app_data().expect("appdata");
-    let (origin, _) = match get_origin_from_req_match(&req) {
+    let origin = match get_origin_from_req_match(&req) {
         Ok(res) => res,
         Err(crate_name) => return render_404_page(state, crate_name, "git crate").await,
     };
 
-    Ok(serve_cached(render_crate_all_versions(state.clone(), origin).await?))
+    Ok(serve_page(render_crate_all_versions(state.clone(), origin).await?))
 }
 
 async fn handle_crate_all_versions(req: HttpRequest) -> Result<HttpResponse, ServerError> {
@@ -613,7 +626,7 @@ async fn handle_crate_all_versions(req: HttpRequest) -> Result<HttpResponse, Ser
         Some(o) => o,
         None => return render_404_page(state, crate_name, "git crate").await,
     };
-    Ok(serve_cached(render_crate_all_versions(state.clone(), origin).await?))
+    Ok(serve_page(render_crate_all_versions(state.clone(), origin).await?))
 }
 
 async fn handle_crate_reverse_dependencies(req: HttpRequest) -> Result<HttpResponse, ServerError> {
@@ -625,7 +638,7 @@ async fn handle_crate_reverse_dependencies(req: HttpRequest) -> Result<HttpRespo
         Some(o) => o,
         None => return render_404_page(state, crate_name, "crate").await,
     };
-    Ok(serve_cached(render_crate_reverse_dependencies(state.clone(), origin).await?))
+    Ok(serve_page(render_crate_reverse_dependencies(state.clone(), origin).await?))
 }
 
 async fn handle_crate_reviews(req: HttpRequest) -> Result<HttpResponse, ServerError> {
@@ -638,7 +651,7 @@ async fn handle_crate_reviews(req: HttpRequest) -> Result<HttpResponse, ServerEr
         None => return render_404_page(state, crate_name, "crate").await,
     };
     let state = state.clone();
-    Ok(serve_cached(
+    Ok(serve_page(
         rt_run_timeout(&state.clone().rt, "revpage", 30, async move {
             let crates = state.crates.load();
             let ver = crates.rich_crate_version_async(&origin).await?;
@@ -655,7 +668,7 @@ async fn handle_crate_reviews(req: HttpRequest) -> Result<HttpResponse, ServerEr
 
 async fn handle_new_trending(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let state: &AServerState = req.app_data().expect("appdata");
-    Ok(serve_cached(
+    Ok(serve_page(
         with_file_cache(state, state.page_cache_dir.join("_new_.html"), 600, {
             let state = state.clone();
             run_timeout("trendpage", 60, async move {
@@ -672,7 +685,7 @@ async fn handle_new_trending(req: HttpRequest) -> Result<HttpResponse, ServerErr
 
 async fn handle_global_stats(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let state: &AServerState = req.app_data().expect("appdata");
-    Ok(serve_cached(
+    Ok(serve_page(
         with_file_cache(state, state.page_cache_dir.join("_stats_.html"), 6 * 3600, {
             let state = state.clone();
             run_timeout("trendpage", 90, async move {
@@ -851,7 +864,7 @@ struct Rendered {
     last_modified: Option<DateTime<FixedOffset>>,
 }
 
-fn serve_cached(Rendered {page, cache_time, refresh, last_modified}: Rendered) -> HttpResponse {
+fn serve_page(Rendered {page, cache_time, refresh, last_modified}: Rendered) -> HttpResponse {
     let err_max = (cache_time * 10).max(3600 * 24 * 2);
 
     let last_modified_secs = last_modified.map(|l| Utc::now().signed_duration_since(l).num_seconds() as u32).unwrap_or(0);
@@ -913,7 +926,7 @@ async fn handle_search(req: HttpRequest) -> Result<HttpResponse, ServerError> {
                     Ok::<_, anyhow::Error>(Rendered {page, cache_time: 600, refresh: false, last_modified: None})
                 }
             }).await??;
-            Ok(serve_cached(page))
+            Ok(serve_page(page))
         },
         _ => Ok(HttpResponse::PermanentRedirect().insert_header(("Location", "/")).finish()),
     }

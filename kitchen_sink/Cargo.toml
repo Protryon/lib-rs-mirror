@@ -13,6 +13,7 @@ path = "src/lib_kitchen_sink.rs"
 crates_io_client = { path = "../crates_io_client" }
 creviews = { path = "../creviews" }
 deps_index = { path = "../deps_index" }
+event_log = { path = "../event_log" }
 feat_extractor = { path = "../feat_extractor" }
 docs_rs_client = { path = "../docs_rs_client", version = "0.4.2" }
 github_info = { path = "../github_info", version = "0.9.3" }

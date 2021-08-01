@@ -133,6 +133,33 @@ async fn run_server(rt: Handle) -> Result<(), anyhow::Error> {
 
     let timestamp = Arc::new(AtomicU32::new(0));
 
+    // event observer
+    state.rt.spawn({
+        let state = state.clone();
+        let mut subscriber = state.crates.load().event_log().subscribe("server observer").unwrap();
+        async move {
+            loop {
+                use kitchen_sink::SharedEvent::*;
+                let batch = subscriber.next_batch().await.unwrap();
+                debug!("Got events from the log");
+                for ev in batch.filter_map(|e| e.ok()) {
+                    match ev {
+                        CrateIndexed(origin_str) => {
+                            info!("Purging local cache {}", origin_str);
+                            let o = Origin::from_str(&origin_str);
+                            state.crates.load().clear_cache_of_crate(&o);
+                            let path = state.page_cache_dir.join(cache_file_name_for_origin(&o));
+                            let _ = std::fs::remove_file(path);
+                        },
+                        DailyStatsUpdated => {
+                            let _ = std::fs::remove_file(state.page_cache_dir.join("_stats_.html"));
+                        },
+                    }
+                }
+            }
+        }
+    });
+
     // refresher thread
     state.rt.spawn({
         let state = state.clone();

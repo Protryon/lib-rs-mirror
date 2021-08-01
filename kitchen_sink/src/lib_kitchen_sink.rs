@@ -5,6 +5,7 @@ extern crate serde_derive;
 extern crate log;
 
 mod yearly;
+use event_log::EventLog;
 use anyhow::Context;
 use futures::TryFutureExt;
 use tokio::time::Instant;
@@ -173,6 +174,8 @@ pub enum KitchenSinkErr {
     Deps(DepsErr),
     #[error("Bad rustc compat data")]
     BadRustcCompatData,
+    #[error("Event log error")]
+    Event(#[from] #[source] Arc<event_log::Error>),
 }
 
 #[derive(Debug, Clone)]
@@ -214,6 +217,14 @@ pub struct KitchenSink {
     data_path: PathBuf,
     /// login -> reason
     pub author_shitlist: HashMap<String, String>,
+    event_log: EventLog<SharedEvent>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum SharedEvent {
+    // Origin serialized
+    CrateIndexed(String),
+    DailyStatsUpdated,
 }
 
 impl KitchenSink {
@@ -269,6 +280,7 @@ impl KitchenSink {
             auto_indexing_throttle: tokio::sync::Semaphore::new(4),
             crate_rustc_compat_cache: RwLock::new(HashMap::new()),
             crate_rustc_compat_db: OnceCell::new(),
+            event_log: EventLog::new(data_path.join("event_log.sled"))?,
             data_path: data_path.into(),
         })
         })
@@ -280,6 +292,10 @@ impl KitchenSink {
         } else {
             Ok(path)
         }
+    }
+
+    pub fn event_log(&self) -> &EventLog<SharedEvent> {
+        &self.event_log
     }
 
     pub(crate) fn data_path() -> Result<PathBuf, KitchenSinkErr> {
@@ -1431,6 +1447,11 @@ impl KitchenSink {
         let _ = self.index.deps_stats().await;
     }
 
+    pub fn clear_cache_of_crate(&self, origin: &Origin) {
+        self.loaded_rich_crate_version_cache.write().remove(origin);
+        self.crate_rustc_compat_cache.write().remove(origin);
+    }
+
     pub async fn update(&self) {
         let crev = self.crev.clone();
         rayon::spawn(move || {
@@ -1688,6 +1709,8 @@ impl KitchenSink {
         });
         let cached = timeout("db-index", 30, db_index.map_err(anyhow::Error::from)).await?;
         self.derived_cache.set_serialize((&origin.to_str(), ""), &cached)?;
+
+        self.event_log.post(&SharedEvent::CrateIndexed(origin.to_str()))?;
         Ok(())
     }
 

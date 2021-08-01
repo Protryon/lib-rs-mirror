@@ -276,14 +276,17 @@ fn index_active_rev_dependencies(crates: &CratesMap, versions: &VersionsMap, dep
                     // FIXME: this logic should be unified with ranking
                     let junk = version_str.as_str() == "0.1.0";
                     let unstable = version_str.starts_with("0.");
+                    // a little bit of deterministic fuzzyness
+                    // to make date cut-offs less sharp
+                    let rand = (ver_id % 17) as i32;
                     let days_fresh = if junk {
-                        30 * 2
+                        30 * 2 + rand
                     } else if unstable && releases_from_oldest.len() < 3 {
-                        30 * 6
+                        30 * 6 + rand * 2
                     } else if unstable || releases_from_oldest.len() < 3 {
-                        365
+                        365 + rand * 3
                     } else {
-                        365 * 2
+                        365 * 2 + rand * 4
                     };
                     release_date.days_later(days_fresh)
                 };

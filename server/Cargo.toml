@@ -50,7 +50,7 @@ actix-threadpool = "0.3.3"
 either = "1.6.1"
 qstring = "0.7.2"
 chrono = "0.4.19"
-blake3 = { version = "0.3.7", default-features = false }
+blake3 = { version = "1.0.0", default-features = false }
 base64 = "0.13.0"
 html-minifier = "3.0.8"
 anyhow = "1.0.41"

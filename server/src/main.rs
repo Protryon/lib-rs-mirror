@@ -141,7 +141,7 @@ async fn run_server(rt: Handle) -> Result<(), anyhow::Error> {
             loop {
                 use kitchen_sink::SharedEvent::*;
                 let batch = subscriber.next_batch().await.unwrap();
-                debug!("Got events from the log");
+                debug!("Got events from the log {:?}", batch);
                 for ev in batch.filter_map(|e| e.ok()) {
                     match ev {
                         CrateIndexed(origin_str) => {
@@ -156,6 +156,7 @@ async fn run_server(rt: Handle) -> Result<(), anyhow::Error> {
                         },
                     }
                 }
+                tokio::time::sleep(Duration::from_secs(1)).await;
             }
         }
     });

@@ -2,7 +2,7 @@ use event_log::*;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let e = EventLog::<serde_json::Value>::new("../data/event_log.db")?;
+    let e = EventLog::<rmpv::Value>::new("../data/event_log.db")?;
 
     let mut s = e.subscribe("log viewer")?;
 

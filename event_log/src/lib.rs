@@ -34,6 +34,7 @@ pub struct EventLog<T> {
     _event_t: PhantomData<fn(T)>,
 }
 
+#[derive(Debug)]
 pub struct Subscription<T> {
     name: String,
     log: EventLog<T>,
@@ -87,21 +88,15 @@ impl<T: DeserializeOwned + Serialize + Clone> EventLog<T> {
     }
 }
 
+#[derive(Debug)]
 pub struct EventBatch<'sub, T: DeserializeOwned + Serialize + Clone> {
     ack: Option<u64>,
-    in_progress: Option<u64>,
     sub: &'sub Subscription<T>,
     events: Vec<(u64, Vec<u8>)>,
     _event_t: PhantomData<fn(T)>,
 }
 
 impl<T: DeserializeOwned + Serialize + Clone> EventBatch<'_, T> {
-    pub fn done(mut self) {
-        if let Some(in_progress) = self.in_progress.take() {
-            self.ack = Some(in_progress);
-        }
-    }
-
     pub fn is_empty(&mut self) -> bool {
         self.events.is_empty()
     }
@@ -111,8 +106,7 @@ impl<T: DeserializeOwned + Serialize + Clone> Iterator for EventBatch<'_, T> {
     type Item = Result<T>;
     fn next(&mut self) -> Option<Self::Item> {
         let (k, v) = self.events.pop()?;
-        self.ack = self.in_progress.take();
-        self.in_progress = Some(k);
+        self.ack = Some(k);
         Some(rmp_serde::from_slice(&v).map_err(From::from))
     }
 }
@@ -136,20 +130,20 @@ impl<T: DeserializeOwned + Serialize + Clone> Subscription<T> {
         let mut q = db.prepare_cached("INSERT OR REPLACE INTO subscribers(name, last_event_id) VALUES(?1, ?2)")?;
         let args: &[&dyn ToSql] = &[&self.name, &id];
         q.execute(args)?;
+        debug!("ACKd events of {} up to {}", self.name, id);
         Ok(())
     }
 
     fn fetch_batch(&self) -> Result<EventBatch<'_, T>> {
         // TODO: some kind of lock against concurrent access, so that last_event_id isn't messed up
-        // TODO: fetch all initially?
         let db = self.log.db()?;
-        let mut q = db.prepare_cached("SELECT e.id, e.data FROM events e WHERE e.id > (SELECT last_event_id FROM subscribers WHERE name = ?1)")?;
-        let events = q.query_map(&[&self.name], |row| Ok((row.get(0)?, row.get(1)?)))?.collect::<Result<Vec<_>, _>>()?;
+        let mut q = db.prepare_cached("SELECT e.id, e.data FROM events e WHERE e.id > (SELECT last_event_id FROM subscribers WHERE name = ?1) ORDER BY e.id LIMIT 10")?;
+        let mut events = q.query_map(&[&self.name], |row| Ok((row.get(0)?, row.get(1)?)))?.collect::<Result<Vec<_>, _>>()?;
+        events.reverse(); // batch iterator pops them!
         Ok(EventBatch {
             events,
             sub: self,
             ack: None,
-            in_progress: None,
             _event_t: PhantomData,
         })
     }
@@ -157,13 +151,13 @@ impl<T: DeserializeOwned + Serialize + Clone> Subscription<T> {
     pub async fn next_batch<'a>(&'a mut self) -> Result<EventBatch<'a, T>> {
         let mut wait = 2;
         loop {
-            let mut pending = self.fetch_batch()?;
-            if !pending.is_empty() {
-                debug!("found event batch for {}", self.name);
-                return Ok(pending);
+            let mut batch = self.fetch_batch()?;
+            if !batch.is_empty() {
+                debug!("found event batch for {} with events {}-{}", self.name, batch.events[0].0, batch.events.last().unwrap().0);
+                return Ok(batch);
             }
             tokio::time::sleep(Duration::from_secs(wait)).await;
-            if wait < 30 { wait += 1; }
+            if wait < 10 { wait += 1; }
         }
     }
 }

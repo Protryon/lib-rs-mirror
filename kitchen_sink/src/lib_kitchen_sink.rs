@@ -646,7 +646,7 @@ impl KitchenSink {
             Origin::CratesIo(name) => {
                 let meta = self.crates_io_meta(name).await?;
                 // don't parallelize with meta, it also reads meta
-                let owners = self.crate_owners(origin, false).await?;
+                let owners = self.crate_owners(origin).await?;
                 let versions = meta.versions().map(|c| CrateVersion {
                     num: c.num,
                     updated_at: c.updated_at,
@@ -683,6 +683,7 @@ impl KitchenSink {
                 invited_at: None,
                 invited_by_github_id: None,
                 last_seen_at: None,
+                contributor_only: false,
             }
         }).collect(),
         format!("github/{}/{}", repo.owner, package),
@@ -2076,7 +2077,12 @@ impl KitchenSink {
             return None;
         }
         let repo = child.repository()?;
-        self.crate_db.parent_crate(repo, child.short_name()).await.ok()?
+        let res = self.crate_db.parent_crate(repo, child.short_name()).await.ok()?;
+        if res.as_ref().map_or(false, |p| p == child.origin()) {
+            error!("Buggy parent_crate for: {:?}", child.origin());
+            return None;
+        }
+        res
     }
 
     /// Crates are spilt into foo and foo-core. The core is usually uninteresting/duplicate.
@@ -2138,7 +2144,8 @@ impl KitchenSink {
         match crate_repo.host() {
             // TODO: warn on errors?
             RepoHost::GitHub(ref repo) => {
-                if !found_crate_in_repo && !owners.iter().any(|owner| owner.login.eq_ignore_ascii_case(&repo.owner)) {
+                // don't use repo URL if it's not verified to belong to the crate
+                if !found_crate_in_repo && !owners.iter().filter(|o| !o.contributor_only).any(|owner| owner.login.eq_ignore_ascii_case(&repo.owner)) {
                     return Ok((false, HashMap::new()));
                 }
 
@@ -2187,7 +2194,7 @@ impl KitchenSink {
 
     /// Merge authors, owners, contributors
     pub async fn all_contributors<'a>(&self, krate: &'a RichCrateVersion) -> CResult<(Vec<CrateAuthor<'a>>, Vec<CrateAuthor<'a>>, bool, usize)> {
-        let owners = self.crate_owners(krate.origin(), false).await?;
+        let owners = self.crate_owners(krate.origin()).await?;
 
         let (hit_max_contributor_count, mut contributors_by_login) = match krate.repository().as_ref() {
             // Only get contributors from github if the crate has been found in the repo,
@@ -2249,7 +2256,9 @@ impl KitchenSink {
                 match authors.entry(AuthorId::GitHub(user.id)) {
                     Occupied(mut e) => {
                         let e = e.get_mut();
-                        e.owner = true;
+                        if !owner.contributor_only {
+                            e.owner = true;
+                        }
                         if e.info.is_none() {
                             e.info = Some(Cow::Owned(Author{
                                 name: Some(owner.name().to_owned()),
@@ -2275,7 +2284,7 @@ impl KitchenSink {
                                 url: owner.url.clone(),
                             })),
                             nth_author: None,
-                            owner: true,
+                            owner: !owner.contributor_only,
                         });
                     },
                 }
@@ -2403,7 +2412,8 @@ impl KitchenSink {
         Ok(self.crate_db.crates_of_author(aut.github.id).await?)
     }
 
-    pub async fn crate_owners(&self, origin: &Origin, include_maybe_past_owners: bool) -> CResult<Vec<CrateOwner>> {
+    /// true if it's verified current owner, false if may be a past owner (contributor now)
+    pub async fn crate_owners(&self, origin: &Origin) -> CResult<Vec<CrateOwner>> {
         match origin {
             Origin::CratesIo(crate_name) => {
                 let current_owners = async {
@@ -2413,34 +2423,40 @@ impl KitchenSink {
                     })
                 };
                 let (mut current_owners, meta) = futures::try_join!(current_owners, self.crates_io_meta(crate_name))?;
-                if include_maybe_past_owners {
-                    let mut current_owners_by_login: HashMap<_, _> = current_owners.into_iter().map(|o| (o.login.clone(), o)).collect();
 
-                    // audit actions contain logins which are not present in owners, probably because they're GitHub team members
-                    for a in meta.versions.into_iter().flat_map(|v| v.audit_actions) {
-                        if let Some(o) = current_owners_by_login.get_mut(&a.user.login) {
-                            if o.invited_at.as_ref().map_or(true, |l| l < &a.time) {
-                                o.invited_at = Some(a.time.clone());
-                            }
-                            if o.last_seen_at.as_ref().map_or(true, |l| l < &a.time) {
-                                o.last_seen_at = Some(a.time);
-                            }
-                        } else {
-                            current_owners_by_login.insert(a.user.login.clone(), CrateOwner {
-                                kind: OwnerKind::User,
-                                url: Some(format!("https://github.com/{}", a.user.login)),
-                                login: a.user.login,
-                                name: a.user.name,
-                                github_id: None,
-                                avatar: a.user.avatar,
-                                last_seen_at: Some(a.time.clone()),
-                                invited_at: Some(a.time),
-                                invited_by_github_id: None,
-                            });
+                let mut current_owners_by_login: HashMap<_, _> = current_owners.into_iter().map(|o| (o.login.to_ascii_lowercase(), o)).collect();
+
+                // latest first
+                let mut actions: Vec<_> = meta.versions.into_iter().flat_map(|v| v.audit_actions).collect();
+                actions.sort_by(|a,b| b.time.cmp(&a.time));
+
+                // audit actions contain logins which are not present in owners, probably because they're GitHub team members
+                for (idx, a) in actions.into_iter().enumerate() {
+                    if let Some(o) = current_owners_by_login.get_mut(&a.user.login.to_ascii_lowercase()) {
+                        if o.invited_at.as_ref().map_or(true, |l| l < &a.time) {
+                            o.invited_at = Some(a.time.clone());
                         }
+                        if o.last_seen_at.as_ref().map_or(true, |l| l < &a.time) {
+                            o.last_seen_at = Some(a.time);
+                        }
+                    } else {
+                        current_owners_by_login.insert(a.user.login.to_ascii_lowercase(), CrateOwner {
+                            kind: OwnerKind::User,
+                            url: Some(format!("https://github.com/{}", a.user.login)),
+                            login: a.user.login,
+                            name: a.user.name,
+                            github_id: None,
+                            avatar: a.user.avatar,
+                            last_seen_at: Some(a.time.clone()),
+                            invited_at: Some(a.time),
+                            invited_by_github_id: None,
+                            // most recent action is assumed to be done by an owner,
+                            // but we can't be sure about past ones
+                            contributor_only: idx > 0,
+                        });
                     }
-                    current_owners = current_owners_by_login.into_iter().map(|(_,v)| v).collect();
                 }
+                current_owners = current_owners_by_login.into_iter().map(|(_, v)| v).collect();
                 Ok(current_owners)
             },
             Origin::GitLab {..} => Ok(vec![]),
@@ -2458,6 +2474,7 @@ impl KitchenSink {
                     github_id: None,
                     invited_by_github_id: None,
                     last_seen_at: None,
+                    contributor_only: false,
                 }
             ]),
         }
@@ -2645,7 +2662,7 @@ impl KitchenSink {
         let with_owners = futures::stream::iter(crates.drain(..))
         .map(|(o, score)| async move {
             let get_crate = tokio::time::timeout_at(deadline, self.rich_crate_version_stale_is_ok(&o));
-            let (k, owners) = futures::join!(get_crate, self.crate_owners(&o, false));
+            let (k, owners) = futures::join!(get_crate, self.crate_owners(&o));
             let keywords = match k {
                 Ok(Ok(c)) => {
                     if c.is_yanked() {

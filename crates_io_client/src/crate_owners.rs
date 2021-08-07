@@ -39,6 +39,10 @@ pub struct CrateOwner {
 
     #[serde(default)]
     pub last_seen_at: Option<String>,
+
+    /// not from the API, added later
+    #[serde(default)]
+    pub contributor_only: bool,
 }
 
 impl CrateOwner {

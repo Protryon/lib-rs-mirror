@@ -48,7 +48,7 @@ impl AllVersions {
         let (changelog_url, downloads, all_owners, release_meta) = futures::join!(
             kitchen_sink.changelog_url(ver),
             kitchen_sink.recent_downloads_by_version(&origin),
-            kitchen_sink.crate_owners(&origin, true),
+            kitchen_sink.crate_owners(&origin),
             async {
                 match &origin {
                     Origin::CratesIo(name) => {

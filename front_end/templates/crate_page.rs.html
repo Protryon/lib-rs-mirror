@@ -129,7 +129,7 @@
     <nav><ul>
       @if !c.ver.is_yanked() {
         @if c.has_reviews {
-          <li><a class="button" href="@url.reviews(c.ver.origin())">Reviews</a></li>
+          <li><a class="button" href="@url.reviews(c.ver.origin())">Audit</a></li>
         }
         @if !c.is_on_shitlist {
           <li><a class="button" href="@url.install(c.ver.origin())">@if c.has_reviews {Installation} else {Install}</a></li>

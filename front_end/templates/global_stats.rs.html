@@ -198,14 +198,14 @@ display: -webkit-box;
         </linearGradient>
       </defs></svg>
         <table class="rustc-compat">
-            <thead><tr><th>Rustc</th><th><span style="color:#392">OK</span> / No data / Incompatible deps / <span style="color:#a33">Incompatible</span></th></tr></thead>
+            <thead><tr><th>Rustc</th><th><span style="color:#392">OK</span> / No data / <span style="color:#c55">Broken deps</span> / <span style="color:#933">Incompatible</span></th></tr></thead>
         @for (ver, c) in stats.rustc_stats.iter().copied().enumerate().skip(27).rev() {
             <tr><th>1.@ver</th><td>
                 <svg viewbox="0 0 330 26" width=330 height=26>
                     <rect stroke=none fill="#392" x=0 width="@(c.maybe_ok + c.ok)" height=26 y=0><title>@((c.maybe_ok + c.ok) * 100 / c.sum())% compatible</title></rect>
                     <rect stroke=none fill="url(#svggrad1)" x="@(c.maybe_ok + c.ok)" width="@c.unknown" height=26 y=0><title>@(c.unknown * 100 / c.sum())% no data</title></rect>
-                    <rect stroke=none fill="#b55" x="@(c.maybe_ok + c.ok + c.unknown)" width="@c.maybe_bad" height=26 y=0><title>@((c.bad + c.maybe_bad) * 100 / c.sum())% not compatible because of dependencies</title></rect>
-                    <rect stroke=none fill="#a33" x="@(c.maybe_ok + c.ok + c.unknown + c.maybe_bad)" width="@c.bad" height=26 y=0><title>@(c.bad * 100 / c.sum())% not compatible</title></rect>
+                    <rect stroke=none fill="#c55" x="@(c.maybe_ok + c.ok + c.unknown)" width="@c.maybe_bad" height=26 y=0><title>@((c.bad + c.maybe_bad) * 100 / c.sum())% not compatible because of dependencies</title></rect>
+                    <rect stroke=none fill="#933" x="@(c.maybe_ok + c.ok + c.unknown + c.maybe_bad)" width="@c.bad" height=26 y=0><title>@(c.bad * 100 / c.sum())% not compatible</title></rect>
                 </svg>
             </td></tr>
         }

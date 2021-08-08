@@ -1542,7 +1542,7 @@ impl KitchenSink {
     /// Returns (nth, slug)
     pub async fn top_category(&self, krate: &RichCrateVersion) -> Option<(u32, String)> {
         let crate_origin = krate.origin();
-        let cats = join_all(krate.category_slugs().map(|slug| slug.into_owned()).map(|slug| async move {
+        let cats = join_all(krate.category_slugs().iter().cloned().map(|slug| async move {
             let c = timeout("top category", 6, self.top_crates_in_category(&slug)).await?;
             Ok::<_, CError>((c, slug))
         })).await;

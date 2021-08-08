@@ -25,7 +25,7 @@
         property="position" content="1"></span>
     </h1>
      ›
-    @if c.ver.category_slugs().next().is_some() {
+    @if !c.ver.category_slugs().is_empty() {
       <span class="categories @if !c.ver.keywords().is_empty() {has-keywords}" role="navigation" aria-label="Categories">
       @for (last, (major, cat)) in c.category_slugs_unique().iter().enumerate().identify_last() {
         @for (last, (i, subcat)) in cat.iter().enumerate().identify_last() {

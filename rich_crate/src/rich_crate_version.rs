@@ -4,7 +4,6 @@ use crate::Origin;
 use crate::Readme;
 use cargo_toml::{Dependency, Manifest, Package};
 pub use cargo_toml::{DepsSet, Edition, FeatureSet, MaintenanceStatus, TargetDepsSet};
-use categories::Categories;
 use repo_url::Repo;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -75,16 +74,8 @@ impl RichCrateVersion {
         &self.derived.capitalized_name
     }
 
-    pub fn category_slugs(&self) -> impl Iterator<Item = Cow<'_, str>> {
-        let mut warnings = Vec::new();
-        let iter = Categories::fixed_category_slugs(
-            &self.derived.categories,
-            &mut warnings,
-        ).into_iter();
-        if !warnings.is_empty() {
-            eprintln!("{}: {}", self.short_name(), warnings.join("; "));
-        }
-        iter
+    pub fn category_slugs(&self) -> &[String] {
+        &self.derived.categories
     }
 
     pub fn license(&self) -> Option<&str> {

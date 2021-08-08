@@ -207,7 +207,7 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn page_title(&self) -> String {
-        let slugs: Vec<_> = self.ver.category_slugs().collect();
+        let slugs = self.ver.category_slugs();
         let kind = if self.ver.has_bin() {
             if slugs.iter().any(|s| s == "development-tools::cargo-plugins") {
                 "Rust/Cargo add-on"
@@ -692,6 +692,7 @@ impl<'a> CratePage<'a> {
         let mut seen = HashSet::new();
         self.ver
             .category_slugs()
+            .iter()
             .map(|slug| {
                 CATEGORIES
                     .from_slug(slug).0.into_iter()

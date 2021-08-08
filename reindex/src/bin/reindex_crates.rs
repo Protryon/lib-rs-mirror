@@ -267,7 +267,7 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
         has_repository_link: k.repository().is_some(),
         has_verified_repository_link: k.has_path_in_repo(),
         has_keywords: k.has_own_keywords(),
-        has_categories: k.has_own_categories(),
+        has_own_categories: k.has_own_categories(),
         has_features: !k.features().is_empty(),
         has_examples: k.has_examples(),
         has_code_of_conduct: k.has_code_of_conduct(),
@@ -353,6 +353,7 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
         is_crates_io_published: k.origin().is_crates_io(),
         is_yanked: k.is_yanked(),
         is_squatspam: is_squatspam(k) || is_on_shitlist,
+        is_unwanted_category: k.category_slugs().iter().any(|c| c == "cryptography::cryptocurrencies"),
     });
 
     (downloads_per_month as usize, score)

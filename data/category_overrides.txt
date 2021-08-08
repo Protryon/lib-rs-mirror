@@ -930,6 +930,7 @@ goblin: parser-implementations
 godot-rust-cli: game-development
 godot_rust_helper: game-development, command-line-utilities
 goertzel-filter: algorithms
+googapis: web-programming
 google_geocoding: science, web-programming
 gory: command-line-interface
 gosh-core: science
@@ -1598,6 +1599,7 @@ ocaml-sys: development-tools
 ocaml: development-tools::ffi
 octorust: development-tools, web-programming
 ocy: development-tools
+ofdb-entities: databases, web-programming
 ogg: multimedia, parser-implementations
 ogma: text-processing, parser-implementations
 oidn: multimedia::images
@@ -1911,6 +1913,7 @@ rgraph: concurrency
 rhq-core: development-tools
 ribozyme: games, command-line-utilities
 richter: games
+rify: web-programming, database-implementations
 rio_turtle: web-programming, parser-implementations
 rio_xml: parser-implementations
 risq: cryptography::cryptocurrencies
@@ -1968,6 +1971,7 @@ rslua: parser-implementations
 rsmq_async: asynchronous
 rstb: games, parser-implementations
 rsync: network-programming
+rtlola-interpreter: emulators
 rtm: concurrency, hardware-support, no-std
 rtop: os
 rtps-idl-grammar: parser-implementations
@@ -2024,6 +2028,11 @@ rxml: parser-implementations
 rxrust: asynchronous
 s3handler: web-programming
 sabre-sdk: cryptography::cryptocurrencies
+safecoin-frozen-abi-macro: cryptography::cryptocurrencies
+safecoin-logger: cryptography::cryptocurrencies
+safecoin-program: cryptography::cryptocurrencies
+safecoin-sdk-macro: cryptography::cryptocurrencies
+safecoin-sdk: cryptography::cryptocurrencies
 saigon: web-programming
 saigon_core: web-programming
 salad: command-line-utilities, authentication
@@ -2160,6 +2169,8 @@ somedoc: text-processing, template-engines, development-tools
 sonic-channel: databases
 sophia: parser-implementations, web-programming
 sophia_iri: web-programming
+sophia_jsonld: parser-implementations
+sophia_term: web-programming
 sorted-json: encoding
 sorted-vec: data-structures
 sou: web-programming::http-server

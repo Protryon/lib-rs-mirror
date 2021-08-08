@@ -28,7 +28,7 @@ pub struct CrateVersionInputs<'a> {
     pub has_repository_link: bool,
     pub has_verified_repository_link: bool,
     pub has_keywords: bool,
-    pub has_categories: bool,
+    pub has_own_categories: bool,
     pub has_features: bool,
     pub has_examples: bool,
     pub has_benches: bool,
@@ -113,7 +113,7 @@ fn cargo_toml_score(cr: &CrateVersionInputs<'_>) -> Score {
 
     // helps lib.rs show crate in the right place
     s.has("has_keywords", 10, cr.has_keywords);
-    s.has("has_categories", 5, cr.has_categories);
+    s.has("has_categories", 5, cr.has_own_categories);
 
     // probably non-trivial crate
     s.has("has_features", 5, cr.has_features);
@@ -371,6 +371,7 @@ pub struct OverallScoreInputs {
     pub is_crates_io_published: bool,
     pub is_yanked: bool,
     pub is_squatspam: bool,
+    pub is_unwanted_category: bool,
 }
 
 pub fn combined_score(base_score: Score, temp_score: Score, f: &OverallScoreInputs) -> f64 {
@@ -395,6 +396,10 @@ pub fn combined_score(base_score: Score, temp_score: Score, f: &OverallScoreInpu
 
     if f.is_deprecated {
         score *= 0.2;
+    }
+
+    if f.is_unwanted_category {
+        score *= 0.7;
     }
 
     if !f.is_crates_io_published {

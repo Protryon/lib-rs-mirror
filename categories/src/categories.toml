@@ -161,7 +161,7 @@ preference = 1
 name = "Magic Beans"
 title = "suspicious unregulated finances, in Rust"
 description = """
-A thriving market for magic beans doens't make the magic beanstalk real. Cryptocurrencies use technology to obscure that they are modern versions of pump and dump scams, ponzi schemes, investment fraud, unregulated gambling, and large-scale money laundering.
+A thriving market for magic beans doesn't make the magic beanstalk real. Cryptocurrencies use technology to obscure that they are modern versions of pump and dump scams, ponzi schemes, investment fraud, unregulated gambling, and large-scale money laundering.
 The promises are empty. The real effects are proliferation of ransomware and other criminal activity, and a huge climate-affecting energy waste. It's a great way to part VCs with their money tho.
 """
 short-description = "Blockchains and other scams."

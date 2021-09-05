@@ -307,11 +307,11 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs<'_>) -> Score {
                 Ok(ref ver) if ver.minor > 3 => 150,
                 _ => 80,
             };
-            let expected_update_interval = version_stability_interval.min(cr.versions.len() as i64 * 50) / if cr.is_nightly { 2 } else { 1 };
+            let expected_update_interval = version_stability_interval.min(cr.versions.len() as i64 * 50) / if cr.is_nightly { 4 } else { 1 };
             let age = (Utc::now() - latest_date).num_days();
             let days_past_expiration_date = (age - expected_update_interval).max(0);
             // score decays for a ~year after the crate should have been updated
-            let decay_days = expected_update_interval/2 + if cr.is_nightly {60} else if is_app_only {300} else {200};
+            let decay_days = expected_update_interval/2 + if cr.is_nightly { 30 } else if is_app_only {300} else {200};
             (decay_days - days_past_expiration_date).max(0) as f64 / (decay_days as f64)
         },
         Err(e) => {

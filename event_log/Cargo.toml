@@ -13,4 +13,4 @@ serde_json = "1.0.66"
 thiserror = "1.0.26"
 tokio = { version = "1.9.0", features = ["macros","time", "rt-multi-thread"] }
 thread_local = "1.0.1"
-rmpv = { version = "0.4.7", features = ["with-serde"] }
+rmpv = { version = "1.0.0", features = ["with-serde"] }

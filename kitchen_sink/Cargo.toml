@@ -20,7 +20,7 @@ github_info = { path = "../github_info", version = "0.9.3" }
 crate_git_checkout = { path = "../crate_git_checkout", version = "0.4.7" }
 user_db = { path = "../user_db", version = "0.3" }
 tarball = { path = "../tarball" }
-cargo_toml = "0.9.1"
+cargo_toml = "0.10.0"
 
 crate_db = { path = "../crate_db", version = "0.4.0" }
 categories = { path = "../categories" }
@@ -44,7 +44,7 @@ chrono = "0.4.11"
 semver = { version = "0.10.0", features = ["serde"] }
 ctrlc = "3.1.4"
 flate2 = "1.0.14"
-string-interner = "0.12"
+string-interner = "0.13.0"
 parking_lot = "0.11"
 ahash = "0.7.4"
 deunicode = "1.1.1"

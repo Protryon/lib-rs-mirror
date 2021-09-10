@@ -318,6 +318,7 @@ github:paritytech/polkadot/polkadot
 github:paritytech/polkadot/polkadot-cli
 github:paritytech/polkadot/polkadot-service
 github:pcwalton/sprocketnes/sprocketnes
+github:pdf-rs/font/font
 github:peltoche/vixi/vixi
 github:pingcap/talent-plan/labrpc
 github:pingcap/talent-plan/linearizability

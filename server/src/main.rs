@@ -573,8 +573,12 @@ async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let login = req.match_info().query("author");
     debug!("author page for {:?}", login);
     let state: &AServerState = req.app_data().expect("appdata");
-    let crates = state.crates.load();
-    let aut = match crates.author_by_login(login).await {
+
+    let aut = match rt_run_timeout(&state.rt, "aut1", 5, {
+        let login = login.to_owned();
+        let crates = state.crates.load();
+        async move { crates.author_by_login(&login).await }
+    }).await {
         Ok(aut) => aut,
         Err(_) => {
             return render_404_page(state, login, "user").await;
@@ -583,6 +587,7 @@ async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     if aut.github.login != login {
         return Ok(HttpResponse::PermanentRedirect().insert_header(("Location", format!("/~{}", Encoded(&aut.github.login)))).body(""));
     }
+    let crates = state.crates.load();
     let aut2 = aut.clone();
     let rows = rt_run_timeout(&state.rt, "authorpage1", 60, async move { crates.crates_of_author(&aut2).await }).await?;
     if rows.is_empty() {

@@ -57,7 +57,7 @@ fn parse_package_id(id: Option<&str>) -> Option<(String, String)> {
     Some((name, ver))
 }
 
-const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 425] = [
+const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 436] = [
 // rg  --no-filename -o '\[stable\(feature.*\]' library/ | fgrep 1. | sort -u | sed -E 's/.*feature ?= ?"(.+)", since ?= ?"1\.(..+)\..".*/(\2, "\1"),/' | sort -V | pbcopy
 
 (17, "addr_from_into_ip"),
@@ -444,6 +444,7 @@ const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 425] = [
 (52, "partition_point"),
 (52, "proc_macro_punct_eq_flipped"),
 (52, "str_split_once"),
+(53, "array_from_ref"),
 (53, "array_into_iter_impl"),
 (53, "atomic_fetch_update"),
 (53, "btree_retain"),
@@ -476,6 +477,7 @@ const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 425] = [
 (55, "bound_cloned"),
 (55, "control_flow_enum_type"),
 (55, "int_error_matching"),
+(55, "io_into_inner_error_parts"),
 (55, "maybe_uninit_ref"),
 (55, "maybe_uninit_write"),
 (55, "prelude_2015"),
@@ -484,7 +486,17 @@ const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 425] = [
 (55, "proc_macro_group_span"),
 (55, "seek_rewind"),
 (55, "simd_x86_bittest"),
-(55, "string_drain_as_str")];
+(55, "string_drain_as_str"),
+(56, "bufwriter_into_parts"),
+(56, "extend_for_tuple"),
+(56, "iter_intersperse"),
+(56, "ready_macro"),
+(56, "shrink_to"),
+(56, "std_collections_from_array"),
+(56, "try_reserve"),
+(56, "unix_chroot"),
+(56, "unsafe_cell_raw_get"),
+];
 
 fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
     let stdout = stdout.trim();

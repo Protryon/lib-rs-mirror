@@ -10,7 +10,6 @@ use std::io::BufReader;
 use std::io::Write;
 use std::sync::Arc;
 
-// sudo rm -rf /var/tmp/crates_env/target/*/debug/{.fingerprint,.cargo-lock,incremental}; sudo chown -R 4321:4321 /var/tmp/crates_env/; sudo chmod -R a+rwX /var/tmp/crates_env/
 const DOCKERFILE: &str = r##"
 FROM rustops/crates-build-env
 RUN useradd -u 4321 --create-home --user-group -s /bin/bash rustyuser
@@ -32,8 +31,8 @@ RUN rustup toolchain add 1.51.0
 RUN rustup toolchain add 1.45.0
 RUN rustup toolchain add 1.40.0
 RUN rustup toolchain add 1.35.0
-RUN rustup toolchain add 1.52.0
 RUN rustup toolchain add 1.39.0
+RUN rustup toolchain add 1.54.0
 RUN rustup toolchain list
 # RUN cargo new lts-dummy; cd lts-dummy; cargo lts setup; echo 'itoa = "*"' >> Cargo.toml; cargo update;
 "##;
@@ -45,7 +44,7 @@ const RUST_VERSIONS: [&str; 5] = [
     "1.39.0",
     "1.46.0",
     "1.52.0",
-    "1.53.0",
+    "1.54.0",
 ];
 
 use crate_db::builddb::*;

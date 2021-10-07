@@ -40,10 +40,10 @@ RUN rustup toolchain list
 const TEMP_JUNK_DIR: &str = "/var/tmp/crates_env";
 
 const RUST_VERSIONS: [&str; 5] = [
-    "1.28.0",
-    "1.39.0",
-    "1.46.0",
-    "1.52.0",
+    "1.42.0",
+    "1.45.0",
+    "1.48.0",
+    "1.50.0",
     "1.54.0",
 ];
 

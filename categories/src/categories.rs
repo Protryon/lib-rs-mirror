@@ -115,23 +115,9 @@ impl Categories {
         }).collect()
     }
 
-    pub fn filtered_category_slugs(cats: &[String]) -> impl Iterator<Item = &str> {
-        cats.iter().filter_map(|s| {
-            if s.len() < 2 {
-                return None;
-            }
-            if s == "external-ffi-bindings" { // We pretend it doesn't exist
-                return None;
-            }
-            if s == "api-bindings" { // We pretend it doesn't exist
-                return None;
-            }
-            Some(s.as_str())
-        })
-    }
 
     pub fn fixed_category_slugs<'a, 'z>(cats: &'a [String], warnings: &'z mut Vec<String>) -> Vec<Cow<'a, str>> {
-        let mut cats = Self::filtered_category_slugs(cats).enumerate()
+        let mut cats = cats.iter().enumerate()
         .filter_map(|(idx, s)| {
             let s = s.trim_matches(':');
             let mut chars = s.chars().peekable();
@@ -147,7 +133,7 @@ impl Categories {
 
                 // bad syntax! Fix!
                 let slug = s.to_ascii_lowercase().split(':').filter(|s| !s.is_empty()).collect::<Vec<_>>().join("::");
-                if s.is_empty() {
+                if slug.is_empty() {
                     return None;
                 }
                 let depth = slug.split("::").count();
@@ -157,6 +143,15 @@ impl Categories {
             Some((depth, idx, Cow::Borrowed(s)))
         })
         .filter(|(_, _, s)| {
+            if s.len() < 2 {
+                return false;
+            }
+            if s == "external-ffi-bindings" { // We pretend it doesn't exist
+                return false;
+            }
+            if s == "api-bindings" { // We pretend it doesn't exist
+                return false;
+            }
             if !CATEGORIES.from_slug(s).1 {
                 warnings.push(format!("invalid cat name {}", s));
                 return false;

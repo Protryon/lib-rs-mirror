@@ -154,9 +154,6 @@ pub struct GitHubRepo {
     #[serde(default)]
     pub topics: Vec<String>,
 
-    #[serde(default)]
-    pub is_template: Vec<String>,
-
     /// My custom addition!
     pub github_page_url: Option<String>,
 }

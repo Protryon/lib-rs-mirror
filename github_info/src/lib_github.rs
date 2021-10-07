@@ -219,7 +219,7 @@ impl GitHub {
         match body.ok_or(Error::NoBody).and_then(|stats| {
             let dbg = format!("stats={:?}", stats);
             Ok(postproc(serde_json::from_value(stats).map_err(|e| {
-                eprintln!("Error matching JSON: {}\n data: {}", e, dbg); e
+                eprintln!("Error matching JSON: {}\n {} data: {}", e, key.0, dbg); e
             })?))
         }) {
             Ok(val) => {

@@ -365,7 +365,9 @@ impl KitchenSink {
 
     pub fn is_crate_on_shitlist(&self, k: &RichCrate) -> bool {
         k.owners().iter()
-            .any(|owner| {
+            // some crates are co-owned by both legit and banned owners,
+            // so banning by "any" would interfere with legit users' usage :(
+            .all(|owner| {
                 self.is_github_login_on_shitlist(&owner.login)
             })
     }

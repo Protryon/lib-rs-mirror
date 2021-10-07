@@ -38,7 +38,7 @@ debug = false
 
 [profile.release]
 opt-level = 2
-debug = 1
+debug = true
 
 [profile.dev.package.brotli]
 opt-level = 3

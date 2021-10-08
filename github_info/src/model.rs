@@ -86,9 +86,9 @@ pub struct ContribWeek {
     #[serde(rename = "w")]
     pub week_timestamp: u32,
     #[serde(rename = "a")]
-    pub added: u32,
+    pub added_l: i32,
     #[serde(rename = "d")]
-    pub deleted: u32,
+    pub deleted_l: i32,
     #[serde(rename = "c")]
     pub commits: u32,
 }

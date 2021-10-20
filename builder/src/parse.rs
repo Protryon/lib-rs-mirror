@@ -737,6 +737,9 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                 if msg.target.as_ref().and_then(|t| t.edition.as_ref()).map_or(false, |e| e == "2018") {
                     findings.crates.insert((Some("1.30.1".into()), name.clone(), ver.clone(), Compat::Incompatible));
                 }
+                if msg.target.as_ref().and_then(|t| t.edition.as_ref()).map_or(false, |e| e == "2021") {
+                    findings.crates.insert((Some("1.55.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                }
                 if level == "error" {
                     findings.crates.insert((None, name, ver, Compat::Incompatible));
                 } else if reason == "compiler-artifact" {
@@ -791,6 +794,11 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
         else if line.starts_with("  unknown cargo feature `resolver`") || line.starts_with("  feature `resolver` is required") {
             if let Some((name, ver)) = last_broken_manifest_crate.take() {
                 findings.crates.insert((Some("1.50.0".into()), name, ver, Compat::Incompatible));
+            }
+        }
+        else if line.starts_with("  this version of Cargo is older than the `2021` edition") || line.starts_with("  feature `edition2021` is required") {
+            if let Some((name, ver)) = last_broken_manifest_crate.take() {
+                findings.crates.insert((Some("1.55.0".into()), name, ver, Compat::Incompatible));
             }
         }
         else if let Some(c) = user_time.captures(line) {

@@ -2147,7 +2147,9 @@ rxml: parser-implementations
 rxrust: asynchronous
 s3handler: web-programming
 sabre-sdk: cryptography::cryptocurrencies
+safe-associated-token-account: cryptography::cryptocurrencies
 safe-token: cryptography::cryptocurrencies
+safecoin-cli-config: cryptography::cryptocurrencies
 safecoin-frozen-abi-macro: cryptography::cryptocurrencies
 safecoin-logger: cryptography::cryptocurrencies
 safecoin-program: cryptography::cryptocurrencies
@@ -2877,6 +2879,7 @@ zcash_primitives: cryptography::cryptocurrencies
 zcash_script: cryptography::cryptocurrencies
 zemeroth: games
 zeronsd: network-programming
+zerovec: data-structures
 zfs-core-sys: os, filesystem
 zfs-core: filesystem
 zincati: os::unix-apis

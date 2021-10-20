@@ -16,35 +16,29 @@ RUN useradd -u 4321 --create-home --user-group -s /bin/bash rustyuser
 RUN chown -R 4321:4321 /home/rustyuser
 USER rustyuser
 WORKDIR /home/rustyuser
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.53.0 --verbose # wat
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.55.0 --verbose # wat
 ENV PATH="$PATH:/home/rustyuser/.cargo/bin"
 RUN cargo install lts --vers ^0.3.1
 RUN rustup set profile minimal
 RUN cargo install libc --vers 99.9.9 || true # force index update
-RUN rustup toolchain add 1.28.0
-RUN rustup toolchain add 1.29.0
-RUN rustup toolchain add 1.33.0
-RUN rustup toolchain add 1.41.0
 RUN rustup toolchain add 1.42.0
-RUN rustup toolchain add 1.46.0
-RUN rustup toolchain add 1.51.0
 RUN rustup toolchain add 1.45.0
-RUN rustup toolchain add 1.40.0
-RUN rustup toolchain add 1.35.0
-RUN rustup toolchain add 1.39.0
-RUN rustup toolchain add 1.54.0
+RUN rustup toolchain add 1.47.0
+RUN rustup toolchain add 1.52.0
+RUN rustup toolchain add 1.56.0
 RUN rustup toolchain list
 # RUN cargo new lts-dummy; cd lts-dummy; cargo lts setup; echo 'itoa = "*"' >> Cargo.toml; cargo update;
 "##;
 
 const TEMP_JUNK_DIR: &str = "/var/tmp/crates_env";
 
-const RUST_VERSIONS: [&str; 5] = [
+const RUST_VERSIONS: [&str; 6] = [
     "1.42.0",
     "1.45.0",
-    "1.48.0",
-    "1.50.0",
-    "1.54.0",
+    "1.47.0",
+    "1.52.0",
+    "1.56.0",
+    "1.55.0",
 ];
 
 use crate_db::builddb::*;
@@ -96,6 +90,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         while let Ok(mut next_batch) = r.recv() {
             std::thread::sleep(std::time::Duration::from_millis(150)); // wait for more data
             if stopped() || out_of_disk_space() {
+                eprintln!("Stopping early");
                 break;
             }
 

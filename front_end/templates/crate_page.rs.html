@@ -172,6 +172,9 @@
               @if c.ver.edition() == Edition::E2015 {
                 <p class="edition-2018">Uses old Rust 2015</p>
               }
+              @if c.ver.edition() == Edition::E2021 {
+                <p class="edition-2018">Uses new Rust 2021</p>
+              }
               <table>
                 @for (i,gr) in c.top_versions.iter().enumerate() {
                   <tr><th content="@gr.ver.num" property="@if i == 0 {softwareVersion}">

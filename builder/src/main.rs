@@ -26,19 +26,23 @@ RUN rustup toolchain add 1.45.0
 RUN rustup toolchain add 1.47.0
 RUN rustup toolchain add 1.52.0
 RUN rustup toolchain add 1.56.0
+RUN rustup toolchain add 1.41.0
+RUN rustup toolchain add 1.51.0
 RUN rustup toolchain list
 # RUN cargo new lts-dummy; cd lts-dummy; cargo lts setup; echo 'itoa = "*"' >> Cargo.toml; cargo update;
 "##;
 
 const TEMP_JUNK_DIR: &str = "/var/tmp/crates_env";
 
-const RUST_VERSIONS: [&str; 6] = [
+const RUST_VERSIONS: [&str; 8] = [
     "1.42.0",
     "1.45.0",
     "1.47.0",
     "1.52.0",
     "1.56.0",
     "1.55.0",
+    "1.41.0",
+    "1.51.0",
 ];
 
 use crate_db::builddb::*;
@@ -228,6 +232,7 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
                 + if oldest_ok  > 40 { 4 } else { 0 }
                 + if oldest_ok  > 47 { 2 } else { 0 }
                 + if oldest_ok  > 50 { 8 } else { 0 }
+                + if oldest_ok  > 53 { 8 } else { 0 }
                 + if v.is_prerelease() { 0 } else { 2 } // don't waste time testing alphas
                 + 5u32.saturating_sub(idx as u32); // prefer latest
 
@@ -372,20 +377,20 @@ fn do_builds(docker_root: &Path, versions: &[(&'static str, Arc<str>, SemVer)]) 
             local libver="$3"
             local stdoutfile="$4"
             local stderrfile="$5"
-            echo >"$stdoutfile" "CHECKING $rustver $crate_name $libver"
             mkdir -p "crate-$crate_name-$libver/src";
             cd "crate-$crate_name-$libver";
             touch src/lib.rs
             printf > Cargo.toml '[package]\nname="_____"\nversion="0.0.0"\n[profile.dev]\ndebug=false\n[dependencies]\n%s = "=%s"\n' "$crate_name" "$libver";
             export CARGO_TARGET_DIR=/home/rustyuser/cargo_target/$rustver;
-            if [[ "$rustver" == "1.28.0" || "$rustver" == "1.29.0" || "$rustver" == "1.30.0" || "$rustver" == "1.31.0" ]]; then
-                # mkdir .cargo
-                # cp /home/rustyuser/lts-dummy/.cargo/config .cargo/
-                RUSTC_BOOTSTRAP=1 timeout 20 cargo +$rustver -Z minimal-versions generate-lockfile || timeout 40 cargo +$rustver fetch
-            else
+            {{
+                echo >"$stdoutfile" "CHECKING $rustver $crate_name $libver"
                 RUSTC_BOOTSTRAP=1 timeout 20 cargo +$rustver -Z no-index-update fetch || timeout 40 cargo +$rustver fetch;
-            fi
-            timeout 60 nice cargo +$rustver check -j2 --locked --message-format=json >>"$stdoutfile" 2>"$stderrfile";
+                timeout 90 nice cargo +$rustver check -j3 --locked --message-format=json >>"$stdoutfile" 2>"$stderrfile";
+            }} || {{
+                echo >>"$stdoutfile" "CHECKING $rustver $crate_name $libver (minimal-versions)"
+                RUSTC_BOOTSTRAP=1 timeout 20 cargo +$rustver -Z minimal-versions generate-lockfile;
+                timeout 40 nice cargo +$rustver check -j3 --locked --message-format=json >>"$stdoutfile" 2>>"$stderrfile";
+            }}
         }}
         swapoff -a || true
         for job in {jobs}; do

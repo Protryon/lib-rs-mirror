@@ -781,6 +781,11 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                 findings.crates.insert((Some("1.40.0".into()), name, ver, Compat::Incompatible));
             }
         }
+        else if line.starts_with("  invalid type: boolean `true`, expected a string for key `package.readme`") {
+            if let Some((name, ver)) = last_broken_manifest_crate.take() {
+                findings.crates.insert((Some("1.45.0".into()), name, ver, Compat::Incompatible)); // not sure which version, may be a later one
+            }
+        }
         else if line.starts_with("  feature `default-run` is required") {
             if let Some((name, ver)) = last_broken_manifest_crate.take() {
                 findings.crates.insert((Some("1.36.0".into()), name, ver, Compat::Incompatible));
@@ -796,7 +801,9 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                 findings.crates.insert((Some("1.50.0".into()), name, ver, Compat::Incompatible));
             }
         }
-        else if line.starts_with("  this version of Cargo is older than the `2021` edition") || line.starts_with("  feature `edition2021` is required") {
+        else if line.starts_with("  this version of Cargo is older than the `2021` edition") ||
+        line.starts_with("  supported edition values are `2015` or `2018`, but `2021` is unknown") ||
+        line.starts_with("  feature `edition2021` is required") {
             if let Some((name, ver)) = last_broken_manifest_crate.take() {
                 findings.crates.insert((Some("1.55.0".into()), name, ver, Compat::Incompatible));
             }

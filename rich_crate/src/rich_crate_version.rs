@@ -169,7 +169,7 @@ impl RichCrateVersion {
     }
 
     pub fn has_buildrs(&self) -> bool {
-        self.derived.has_buildrs || self.package().build.is_some()
+        self.derived.has_buildrs || self.package().build.as_ref().map_or(false, |v| v.as_str().is_some() || v.as_bool().unwrap_or(false))
     }
 
     pub fn has_code_of_conduct(&self) -> bool {

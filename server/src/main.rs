@@ -801,12 +801,16 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
         debug!("Cache miss {} no file", cache_file.display());
     }
 
-    let (page, last_modified) = state.rt.spawn({
+    let (mut page, last_modified) = state.rt.spawn({
         let state = state.clone();
         async move {
             let _s = tokio::time::timeout(Duration::from_secs(10), state.foreground_job.acquire()).await?;
             generate.await
         }}).await??;
+
+    let timestamp = last_modified.map(|a| a.timestamp() as u32).unwrap_or(0);
+    page.extend_from_slice(&timestamp.to_le_bytes()); // The worst data format :)
+
     if let Err(e) = std::fs::write(&cache_file, &page) {
         error!("warning: Failed writing to {}: {}", cache_file.display(), e);
     }

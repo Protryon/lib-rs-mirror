@@ -90,7 +90,7 @@ pub struct Env {
 fn cargo_toml_score(cr: &CrateVersionInputs<'_>) -> Score {
     let mut s = Score::new();
 
-    s.frac("description len", 20, (cr.description.len() as f64 / 300.).min(1.));
+    s.frac("description len", 30, (cr.description.len() as f64 / 300.).min(1.));
 
     // build.rs slows compilation down, so better not use it unless necessary (links means a sys create, so somewhat justified)
     s.n("build.rs", 10, if !cr.has_build_rs && !cr.has_links {10} else if cr.has_links {5} else {0});
@@ -121,8 +121,8 @@ fn cargo_toml_score(cr: &CrateVersionInputs<'_>) -> Score {
     // it's the best practice, may help building old versions of the project
     // s.has("has_lockfile", 5, cr.has_lockfile);
     // assume it's CI, which helps improve quality
-    // TODO: detect travis, etc. without badges
-    s.has("has_badges", 15, cr.has_badges);
+    // TODO: detect travis, etc. without badges, since they're deprecated now
+    s.has("has_badges", 5, cr.has_badges);
 
     s.n("maintenance status", 30, match cr.maintenance {
         MaintenanceStatus::ActivelyDeveloped => 30,
@@ -241,7 +241,10 @@ fn versions_score(ver: &[CrateVersion]) -> Score {
     let newest = ver.iter().map(|v| &v.created_at).max().and_then(|s| s.parse::<DateTime<Utc>>().ok());
     if let (Some(oldest), Some(newest)) = (oldest, newest) {
         s.n("development history", 40, (newest - oldest).num_days() / 11);
+
+        s.has("not ancient", 10, newest.year() > 2016); // such old Rust crates are all suspicious
     }
+
     // don't count 0.0.x
     s.n("number of non-experimental releases", 15, semver.iter().filter(|v| (v.major > 0 || v.minor > 0) && v.pre.is_empty()).count() as u32);
 
@@ -281,9 +284,9 @@ pub fn crate_score_version(cr: &CrateVersionInputs<'_>) -> Score {
     let mut score = Score::new();
 
     score.group("Cargo.toml", 2, cargo_toml_score(cr));
-    score.group("README", 4, readme_score(cr.readme, cr.is_app));
-    score.group("Code", 1, code_score(cr));
-    score.group("Versions", 4, versions_score(cr.versions));
+    score.group("README", 5, readme_score(cr.readme, cr.is_app));
+    score.group("Code", 2, code_score(cr));
+    score.group("Versions", 5, versions_score(cr.versions));
     score.group("Authors/Owners", 3, authors_score(cr.authors, cr.owners, cr.contributors));
 
     score
@@ -300,11 +303,11 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs<'_>) -> Score {
             // Assume higher versions, and especially patch versions, mean the crate is more mature
             // and needs fewer updates
             let version_stability_interval = match SemVer::parse(&newest.num) {
-                Ok(ref ver) if ver.patch > 3 && ver.major > 0 => 500,
-                Ok(ref ver) if ver.patch > 3 => 350,
-                Ok(ref ver) if ver.patch > 0 => 250,
+                Ok(ref ver) if ver.patch > 3 && ver.major > 0 => 700,
+                Ok(ref ver) if ver.patch > 3 => 450,
+                Ok(ref ver) if ver.patch > 0 => 300,
                 Ok(ref ver) if ver.major > 0 => 200,
-                Ok(ref ver) if ver.minor > 3 => 150,
+                Ok(ref ver) if ver.minor > 3 => 140,
                 _ => 80,
             };
             let expected_update_interval = version_stability_interval.min(cr.versions.len() as i64 * 50) / if cr.is_nightly { 4 } else { 1 };
@@ -319,8 +322,8 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs<'_>) -> Score {
             0.
         },
     };
-    score.frac("Freshness of latest release", 8, freshness_score);
-    score.frac("Freshness of deps", 8, cr.dependency_freshness.iter()
+    score.frac("Freshness of latest release", 10, freshness_score);
+    score.frac("Freshness of deps", 10, cr.dependency_freshness.iter()
         .map(|d| 0.2 + d * 0.8) // one bad dep shouldn't totally kill the score
         .product::<f32>());
 

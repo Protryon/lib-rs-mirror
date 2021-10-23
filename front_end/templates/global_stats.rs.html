@@ -7,6 +7,7 @@
 @use crate::global_stats::versions_for_crate_name;
 @use crate::templates::base;
 @use crate::templates::histogram;
+@use crate::templates::global_stats_rustc;
 @use crate::Urler;
 
 @(page: &Page, dl_by_week: &[(u64, u64)], stats: &GlobalStats, url: &Urler)
@@ -30,6 +31,8 @@
     <main id="global-stats">
         <style>
             #global-stats h2 @{ margin-top: 1.5em; @}
+            #rustc .breakdowns @{ display: flex; flex-wrap: wrap; @}
+            #rustc .breakdowns section:not(:last-child) @{ margin-right: 3em; @}
             p.legend @{ text-align: center; margin-top: 0; @}
             table.histogram @{ margin: 0.5em auto 2em; width: 100%; @}
             table.histogram td @{ vertical-align: bottom; vertical-align: top; text-align: center; font-size: 0.8em; @}
@@ -197,19 +200,17 @@ display: -webkit-box;
           <stop offset="100%" style="stop-color:#bb8282;" />
         </linearGradient>
       </defs></svg>
-        <table class="rustc-compat">
-            <thead><tr><th>Rustc</th><th><span style="color:#392">OK</span> / No data / <span style="color:#b44">Broken deps</span> / <span style="color:#933">Incompatible</span></th></tr></thead>
-        @for (ver, c) in stats.rustc_stats.iter().copied().enumerate().skip(27).rev() {
-            <tr><th>1.@ver</th><td>
-                <svg viewbox="0 0 330 26" width=330 height=26>
-                    <rect stroke=none fill="#392" x=0 width="@(c.maybe_ok + c.ok)" height=26 y=0><title>@((c.maybe_ok + c.ok) * 100 / c.sum())% compatible</title></rect>
-                    <rect stroke=none fill="url(#svggrad1)" x="@(c.maybe_ok + c.ok)" width="@c.unknown" height=26 y=0><title>@(c.unknown * 100 / c.sum())% no data</title></rect>
-                    <rect stroke=none fill="#b44" x="@(c.maybe_ok + c.ok + c.unknown)" width="@c.maybe_bad" height=26 y=0><title>@((c.bad + c.maybe_bad) * 100 / c.sum())% not compatible because of dependencies</title></rect>
-                    <rect stroke=none fill="#933" x="@(c.maybe_ok + c.ok + c.unknown + c.maybe_bad)" width="@c.bad" height=26 y=0><title>@(c.bad * 100 / c.sum())% not compatible</title></rect>
-                </svg>
-            </td></tr>
-        }
-        </table>
+      <div class="breakdowns">
+        <section>
+            <h3>All crates</h3>
+            @:global_stats_rustc(&stats.rustc_stats_all)
+        </section>
+        <section>
+            <h3>@stats.rustc_stats_recent_num most recently updated crates</h3>
+            @:global_stats_rustc(&stats.rustc_stats_recent)
+        </section>
+      </div>
+    </td></tr>
     </section>
     </main>
 

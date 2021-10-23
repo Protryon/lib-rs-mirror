@@ -2784,8 +2784,15 @@ impl KitchenSink {
     #[inline]
     pub async fn notable_recently_updated_crates(&self, limit: u32) -> CResult<Vec<(Origin, f64)>> {
         let mut crates = self.crate_db.recently_updated_crates(limit).await?;
-        self.knock_duplicates(&mut crates).await;
+        if limit < 750 {
+            self.knock_duplicates(&mut crates).await;
+        }
         Ok(crates)
+    }
+
+    #[inline]
+    pub async fn most_downloaded_crates(&self, limit: u32) -> CResult<Vec<(Origin, u32)>> {
+        Ok(self.crate_db.most_downloaded_crates(limit).await?)
     }
 
     /// raw number, despammed weight

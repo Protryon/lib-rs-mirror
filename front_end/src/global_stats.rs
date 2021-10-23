@@ -1,18 +1,19 @@
+use categories::CATEGORIES;
 use categories::Category;
 use categories::CategoryMap;
-use categories::CATEGORIES;
-use kitchen_sink::Origin;
-use locale::Numeric;
 use chrono::prelude::*;
 use crate::Page;
 use crate::templates;
 use crate::Urler;
+use kitchen_sink::CompatByCrateVersion;
 use kitchen_sink::KitchenSink;
+use kitchen_sink::Origin;
+use locale::Numeric;
+use peeking_take_while::PeekableExt;
+use rand::seq::SliceRandom;
 use render_readme::Renderer;
 use std::collections::HashMap;
 use std::io::Write;
-use peeking_take_while::PeekableExt;
-use rand::seq::SliceRandom;
 
 #[derive(Debug)]
 pub struct GlobalStats {
@@ -39,7 +40,9 @@ pub struct GlobalStats {
 
     pub(crate) categories: Vec<TreeBox>,
 
-    pub(crate) rustc_stats: Vec<Compat>,
+    pub(crate) rustc_stats_all: Vec<Compat>,
+    pub(crate) rustc_stats_recent: Vec<Compat>,
+    pub(crate) rustc_stats_recent_num: usize,
 }
 
 pub type CallbackFn = fn(&Urler, &str) -> String;
@@ -106,14 +109,26 @@ pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSin
     let end = Utc::today() - chrono::Duration::days(2);
 
     let latest_rustc_version = end.signed_duration_since(start).num_weeks()/6;
-    let rustc_stats = rustc_stats(kitchen_sink, latest_rustc_version as u16)?;
+    let mut compat_data = kitchen_sink.all_crate_compat()?;
+    let recent_crates = kitchen_sink.notable_recently_updated_crates(3100).await?;
+    let rustc_stats_all = rustc_stats(&compat_data, latest_rustc_version as u16)?;
+    let mut recent_compat = HashMap::with_capacity(recent_crates.len());
+    let mut rustc_stats_recent_num = 0;
+    for (o, _) in recent_crates {
+        if let Some(v) = compat_data.remove(&o) {
+            recent_compat.insert(o, v);
+            rustc_stats_recent_num += 1;
+            if rustc_stats_recent_num >= 3000 {
+                break;
+            }
+        }
+    }
+    let rustc_stats_recent = rustc_stats(&recent_compat, latest_rustc_version as u16)?;
 
     let dl = downloads_over_time(start, end, kitchen_sink)?;
 
     let (total_owners_at_month, mut hs_owner_crates) = owner_stats(kitchen_sink, start).await?;
     hs_owner_crates.buckets.iter_mut().take(4).for_each(|c| c.examples.truncate(6)); // normal amount of crates is boring
-
-    eprintln!("{:?} {:?}", total_owners_at_month, hs_owner_crates);
 
     let this_year = &dl[dl.len()-52..];
     let last_year = &dl[dl.len()-52*2..dl.len()-52];
@@ -188,7 +203,9 @@ pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSin
         hs_languish: Histogram::new(kitchen_sink.get_stats_histogram("languish")?.expect("hs_languish"), false, &[5, 13, 26, 52, 52*2, 52*3, 52*4, 52*5, 52*6, 52*8], age_label),
         hs_owner_crates,
         categories,
-        rustc_stats,
+        rustc_stats_all,
+        rustc_stats_recent,
+        rustc_stats_recent_num,
         hs_rev_deps,
     };
 
@@ -219,8 +236,7 @@ impl Compat {
     }
 }
 
-fn rustc_stats(kitchen_sink: &KitchenSink, max_rust_version: u16) -> Result<Vec<Compat>, anyhow::Error> {
-    let compat = kitchen_sink.all_crate_compat()?;
+fn rustc_stats(compat: &HashMap<Origin, CompatByCrateVersion>, max_rust_version: u16) -> Result<Vec<Compat>, anyhow::Error> {
     // (ok, maybe, not), [0] is unused
     let mut rustc_versions = vec![Compat::default(); (max_rust_version+1) as usize];
 

@@ -968,7 +968,24 @@ impl CrateDb {
                 let origin = Origin::from_str(row.get_ref_unwrap(2).as_str()?);
                 Ok((origin, row.get(1)?))
             })?;
-            let q = q.filter_map(|r| r.map_err(|e| error!("upd2: {}", e)).ok());
+            let q = q.filter_map(|r| r.map_err(|e| error!("ruc: {}", e)).ok());
+            Ok(q.collect())
+        }).await
+    }
+
+    /// Newly added or updated crates in any category
+    ///
+    /// Returns `origin` strings
+    pub async fn most_downloaded_crates(&self, limit: u32) -> FResult<Vec<(Origin, u32)>> {
+        self.with_read("recently_updated_crates", |conn| {
+            let mut query = conn.prepare_cached(r#"
+                select recent_downloads, origin from crates order by 1 desc limit ?1
+            "#)?;
+            let q = query.query_map(&[&limit], |row| {
+                let origin = Origin::from_str(row.get_ref_unwrap(1).as_str()?);
+                Ok((origin, row.get(0)?))
+            })?;
+            let q = q.filter_map(|r| r.map_err(|e| error!("mdc: {}", e)).ok());
             Ok(q.collect())
         }).await
     }

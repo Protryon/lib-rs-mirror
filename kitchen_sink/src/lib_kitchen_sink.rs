@@ -1890,7 +1890,11 @@ impl KitchenSink {
             }
         }
         debug!("gh user cache miss {}", github_login);
-        Ok(Box::pin(self.gh.user_by_login(github_login)).await?) // errs on 404
+        let u = Box::pin(self.gh.user_by_login(github_login)).await?; // errs on 404
+        if let Some(u) = &u {
+            self.user_db.index_user(&u, None, None)?;
+        }
+        Ok(u)
     }
 
     fn rustc_compatibility_inner_non_recursive(&self, all: &RichCrate, db: &BuildDb) -> Result<CompatByCrateVersion, KitchenSinkErr> {
@@ -2176,7 +2180,7 @@ impl KitchenSink {
                         use std::collections::hash_map::Entry;
                         match by_login.entry(author.login.to_ascii_lowercase()) {
                             Entry::Vacant(e) => {
-                                if let Ok(Some(user)) = self.gh.user_by_login(&author.login).await {
+                                if let Ok(Some(user)) = self.user_by_github_login(&author.login).await {
                                     e.insert((count, user));
                                 }
                             },
@@ -2226,7 +2230,7 @@ impl KitchenSink {
                     let gh_url = "https://github.com/";
                     if url.to_ascii_lowercase().starts_with(gh_url) {
                         let login = url[gh_url.len()..].splitn(2, '/').next().expect("can't happen");
-                        if let Ok(Some(gh)) = self.gh.user_by_login(login).await {
+                        if let Ok(Some(gh)) = self.user_by_github_login(login).await {
                             let id = gh.id;
                             ca.github = Some(gh);
                             authors.insert(AuthorId::GitHub(id), ca);
@@ -2403,7 +2407,7 @@ impl KitchenSink {
     #[inline]
     async fn owners_github(&self, owner: &CrateOwner) -> CResult<User> {
         // This is a bit weak, since logins are not permanent
-        if let Some(user) = self.gh.user_by_login(owner.github_login().ok_or(KitchenSinkErr::OwnerWithoutLogin)?).await? {
+        if let Some(user) = self.user_by_github_login(owner.github_login().ok_or(KitchenSinkErr::OwnerWithoutLogin)?).await? {
             return Ok(user);
         }
         Err(KitchenSinkErr::OwnerWithoutLogin.into())
@@ -2613,6 +2617,7 @@ impl KitchenSink {
                     OwnerKind::User => UserType::User,
                 },
                 created_at: None,
+                two_factor_authentication: None,
             })
         })).collect::<Vec<_>>();
         self.user_db.index_users(&users)?;
@@ -2839,7 +2844,7 @@ impl KitchenSink {
 
     #[inline]
     pub async fn author_by_login(&self, login: &str) -> CResult<RichAuthor> {
-        let github = self.gh.user_by_login(login).await?.ok_or_else(|| KitchenSinkErr::AuthorNotFound(login.to_owned()))?;
+        let github = self.user_by_github_login(login).await?.ok_or_else(|| KitchenSinkErr::AuthorNotFound(login.to_owned()))?;
         Ok(RichAuthor { github })
     }
 }

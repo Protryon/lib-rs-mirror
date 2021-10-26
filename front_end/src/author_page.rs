@@ -41,6 +41,7 @@ pub struct AuthorPage<'a> {
     pub(crate) rustacean: Option<Rustacean>,
     // If Some, it's banned
     pub(crate) shitlist_reason: Option<&'a str>,
+    pub(crate) two_factor_authentication: Option<bool>,
 }
 
 impl<'a> AuthorPage<'a> {
@@ -124,6 +125,7 @@ impl<'a> AuthorPage<'a> {
             collab,
             rustacean,
             shitlist_reason,
+            two_factor_authentication: aut.github.two_factor_authentication,
         })
     }
 

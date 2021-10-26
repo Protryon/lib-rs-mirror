@@ -14,7 +14,8 @@ impl UserDb {
                 avatar_url    TEXT,
                 gravatar_id   TEXT,
                 html_url      TEXT,
-                type          TEXT NOT NULL DEFAULT 'user'
+                type          TEXT NOT NULL DEFAULT 'user',
+                two_factor_authentication INTEGER
             );
             DROP INDEX IF EXISTS "github_users_idx";
             CREATE UNIQUE INDEX IF NOT EXISTS github_users_idx2 on github_users(id, login); -- not just unique login, logins change!

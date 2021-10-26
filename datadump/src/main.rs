@@ -129,6 +129,7 @@ async fn main() -> Result<(), BoxErr> {
                     handle.spawn(async move {
                         eprintln!("Indexing owners of {} crates", crate_owners.len());
                         let owners = process_owners(&crates, crate_owners, &teams, &users);
+                        eprintln!("Upserting {} owners", owners.len());
                         ksink.index_crates_io_crate_all_owners(owners).await.unwrap();
                     });
                 }

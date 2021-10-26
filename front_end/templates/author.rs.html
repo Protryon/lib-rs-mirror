@@ -43,6 +43,9 @@
       @if let Some(d) = p.joined_github() {
         Joined GitHub @HumanTime::from(d).to_text_en(Accuracy::Rough, Tense::Past).
       }
+      @if p.two_factor_authentication.unwrap_or(false) {
+        Uses <abbr title="safer 2-factor authentication">2FA</abbr>.
+      }
     </p>
 
     <nav><ul>

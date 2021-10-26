@@ -63,6 +63,7 @@ pub struct User {
     pub gravatar_id: Option<String>, // "",
     pub html_url: String,            // "https://github.com/zzzz",
     pub blog: Option<String>,        // "https://example.com
+    pub two_factor_authentication: Option<bool>,
     #[serde(rename = "type")]
     pub user_type: UserType,
     pub created_at: Option<String>,

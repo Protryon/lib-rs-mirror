@@ -738,6 +738,7 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                     findings.crates.insert((Some("1.30.1".into()), name.clone(), ver.clone(), Compat::Incompatible));
                 }
                 if msg.target.as_ref().and_then(|t| t.edition.as_ref()).map_or(false, |e| e == "2021") {
+                    findings.crates.insert((Some("1.56.0".into()), name.clone(), ver.clone(), Compat::VerifiedWorks)); // FIXME: remove when 1.57 is released
                     findings.crates.insert((Some("1.55.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
                 }
                 if level == "error" {
@@ -805,6 +806,7 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
         line.starts_with("  supported edition values are `2015` or `2018`, but `2021` is unknown") ||
         line.starts_with("  feature `edition2021` is required") {
             if let Some((name, ver)) = last_broken_manifest_crate.take() {
+                findings.crates.insert((Some("1.56.0".into()), name.clone(), ver.clone(), Compat::VerifiedWorks)); // FIXME: remove when 1.57 is released
                 findings.crates.insert((Some("1.55.0".into()), name, ver, Compat::Incompatible));
             }
         }

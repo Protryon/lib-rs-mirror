@@ -28,21 +28,27 @@ RUN rustup toolchain add 1.52.0
 RUN rustup toolchain add 1.56.0
 RUN rustup toolchain add 1.41.0
 RUN rustup toolchain add 1.51.0
+RUN rustup toolchain add 1.53.0
+RUN rustup toolchain add 1.33.0
+RUN rustup toolchain add 1.31.0
 RUN rustup toolchain list
 # RUN cargo new lts-dummy; cd lts-dummy; cargo lts setup; echo 'itoa = "*"' >> Cargo.toml; cargo update;
 "##;
 
 const TEMP_JUNK_DIR: &str = "/var/tmp/crates_env";
 
-const RUST_VERSIONS: [&str; 8] = [
+const RUST_VERSIONS: [&str; 11] = [
+    "1.31.0",
+    "1.41.0",
     "1.42.0",
     "1.45.0",
+    "1.33.0",
     "1.47.0",
-    "1.52.0",
-    "1.56.0",
-    "1.55.0",
-    "1.41.0",
     "1.51.0",
+    "1.52.0",
+    "1.53.0",
+    "1.55.0",
+    "1.56.0",
 ];
 
 use crate_db::builddb::*;
@@ -84,15 +90,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("starting…");
     prepare_docker(&docker_root)?;
 
-    let (s, r) = crossbeam_channel::bounded::<Vec<_>>(25);
+    let (s, r) = crossbeam_channel::bounded::<Vec<_>>(200);
 
     let builds = std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_millis(300)); // wait for more data
+        std::thread::sleep(std::time::Duration::from_millis(600)); // wait for more data
         let mut candidates: Vec<ToCheck> = Vec::new();
         let mut rng = rand::thread_rng();
 
         while let Ok(mut next_batch) = r.recv() {
-            std::thread::sleep(std::time::Duration::from_millis(150)); // wait for more data
+            std::thread::sleep(std::time::Duration::from_millis(250)); // wait for more data
             if stopped() || out_of_disk_space() {
                 eprintln!("Stopping early");
                 break;
@@ -172,9 +178,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 continue;
             }
         }
-        if all.versions().len() == 1 || all.versions().len() > 500 {
-            continue; // junk?
-        }
+        // if all.versions().len() == 1 || all.versions().len() > 500 {
+        //     continue; // junk?
+        // }
 
         match find_versions_to_build(all, &crates).await {
             Ok(vers) => {
@@ -203,7 +209,7 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
     let mut rng = rand::thread_rng();
     let mut candidates: Vec<_> = all.versions().iter().rev() // rev() starts from most recent
         .filter(|v| !v.is_yanked())
-        .take(2)
+        .take(5)
         .filter_map(|v| SemVer::parse(v.version()).ok())
         .map(|v| {
             let c = compat_info.remove(&v).unwrap_or_default();

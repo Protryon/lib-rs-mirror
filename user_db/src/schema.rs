@@ -2,6 +2,7 @@ use crate::UserDb;
 use rusqlite::*;
 use std::path::Path;
 
+
 impl UserDb {
     pub(crate) fn db(path: &Path) -> Result<Connection> {
         let conn = Connection::open(path)?;
@@ -15,10 +16,13 @@ impl UserDb {
                 gravatar_id   TEXT,
                 html_url      TEXT,
                 type          TEXT NOT NULL DEFAULT 'user',
-                two_factor_authentication INTEGER
+                two_factor_authentication INTEGER,
+                created_at TEXT,
+                blog TEXT,
+                PRIMARY KEY(id, login)
             );
             DROP INDEX IF EXISTS "github_users_idx";
-            CREATE UNIQUE INDEX IF NOT EXISTS github_users_idx2 on github_users(id, login); -- not just unique login, logins change!
+            DROP INDEX IF EXISTS "github_users_idx2";
 
             CREATE TABLE IF NOT EXISTS github_emails (
                 github_id     INTEGER NOT NULL,
@@ -30,3 +34,4 @@ impl UserDb {
         Ok(conn)
     }
 }
+

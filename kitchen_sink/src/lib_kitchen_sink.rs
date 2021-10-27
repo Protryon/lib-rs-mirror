@@ -1884,16 +1884,24 @@ impl KitchenSink {
     }
 
     pub async fn user_by_github_login(&self, github_login: &str) -> CResult<Option<User>> {
-        if let Some(gh) = self.user_db.user_by_github_login(github_login)? {
-            if gh.name.is_some() {
+        let db_fetched = tokio::task::block_in_place(|| self.user_db.user_by_github_login(github_login));
+        if let Ok(Some(gh)) = db_fetched.map_err(|e| eprintln!("db user {}: {}", github_login, e)) {
+            if gh.name.is_some() && gh.created_at.is_some() {
                 return Ok(Some(gh));
+            } else {
+                debug!("db gh user missing columns {}", github_login);
             }
+        } else {
+            debug!("gh user cache miss {}", github_login);
         }
-        debug!("gh user cache miss {}", github_login);
-        let u = Box::pin(self.gh.user_by_login(github_login)).await?; // errs on 404
+        let u = Box::pin(self.gh.user_by_login(github_login)).await.map_err(|e| {eprintln!("gh user {}: {}", github_login, e); e})?; // errs on 404
         if let Some(u) = &u {
-            self.user_db.index_user(&u, None, None)?;
+            let _ = tokio::task::block_in_place(|| {
+                self.user_db.index_user(&u, None, None)
+                    .map_err(|e| eprintln!("index user {}: {} {:?}", github_login, e, u))
+            });
         }
+        debug!("fetched user {:?}", u);
         Ok(u)
     }
 

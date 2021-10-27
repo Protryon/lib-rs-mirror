@@ -667,7 +667,7 @@ impl<'a> CratePage<'a> {
                     if self.ver.has_path_in_repo() {
                         format!("{} ({})", label_prefix, host.owner)
                     } else {
-                        "Repository".to_owned()
+                        "Repository link".to_owned()
                     }
                 },
                 RepoHost::Other => url_domain(&url).map(|host| format!("{} ({})", label_prefix, host)).unwrap_or_else(|| label_prefix.to_string()),

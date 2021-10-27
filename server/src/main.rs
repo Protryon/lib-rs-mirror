@@ -580,7 +580,8 @@ async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
         async move { crates.author_by_login(&login).await }
     }).await {
         Ok(aut) => aut,
-        Err(_) => {
+        Err(e) => {
+            debug!("user fetch {} failed: {}", login, e);
             return render_404_page(state, login, "user").await;
         }
     };

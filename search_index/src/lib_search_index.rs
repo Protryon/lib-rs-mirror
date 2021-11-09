@@ -93,6 +93,9 @@ impl CrateSearchIndex {
             self.crate_name_field, self.keywords_field, self.description_field, self.readme_field,
         ]);
         query_parser.set_conjunction_by_default();
+        query_parser.set_field_boost(self.crate_name_field, 2.0);
+        query_parser.set_field_boost(self.keywords_field, 1.5);
+        query_parser.set_field_boost(self.readme_field, 0.5);
 
         let query = query_parser.parse_query(query_text)
             .or_else(|_| {

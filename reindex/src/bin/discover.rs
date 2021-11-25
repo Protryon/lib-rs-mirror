@@ -7,38 +7,34 @@ use std::io::Write;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let handle = tokio::runtime::Handle::current();
-    handle.spawn(async {
-        let crates = KitchenSink::new_default().await?;
+    let crates = KitchenSink::new_default().await?;
 
-        for line in io::stdin().lock().lines() {
-            let mut line = line?;
-            if line.trim().is_empty() {
-                continue;
-            }
-            if !line.starts_with("https://") {
-                line = format!("https://github.com/{}", line.trim_start_matches('/'));
-            }
-            if let Err(e) = check_repo(&line, &crates) {
-                eprintln!("{}: {}", line, e);
-                let mut src = e.source();
-                while let Some(e) = src {
-                    eprintln!(" {}", e);
-                    src = e.source();
-                }
+    for line in io::stdin().lock().lines() {
+        let mut line = line?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        if !line.starts_with("https://") {
+            line = format!("https://github.com/{}", line.trim_start_matches('/'));
+        }
+        if let Err(e) = check_repo(&line, &crates).await {
+            eprintln!("{}: {}", line, e);
+            let mut src = e.source();
+            while let Some(e) = src {
+                eprintln!(" {}", e);
+                src = e.source();
             }
         }
-        Ok::<_, Box<dyn std::error::Error + Send + Sync>>(())
-    }).await??;
+    }
     Ok(())
 }
 
-fn check_repo(line: &str, crates: &KitchenSink) -> Result<(), Box<dyn std::error::Error>> {
+async fn check_repo(line: &str, crates: &KitchenSink) -> Result<(), Box<dyn std::error::Error>> {
     let repo = Repo::new(line)?;
     if let RepoHost::GitHub(gh) | RepoHost::GitLab(gh) = repo.host() {
         print!("\nFetching {}/{}…", gh.owner, gh.repo);
         std::io::stdout().flush()?;
-        let manifests = crates.inspect_repo_manifests(&repo)?;
+        let manifests = crates.inspect_repo_manifests(&repo).await?;
         println!(" {} found", manifests.len());
         for (path, _, manif) in manifests {
             if let Some(pkg) = &manif.package {

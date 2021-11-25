@@ -739,12 +739,11 @@ impl KitchenSink {
         }
         let _f = self.throttle.acquire().await;
         info!("Need to scan repo {:?}", repo);
-        let git_checkout_path = self.git_checkout_path.clone();
         let origin = origin.clone();
         let repo = repo.clone();
         let package = package.clone();
+        let checkout = self.checkout_repo(repo.clone()).await?;
         spawn_blocking(move || {
-            let checkout = crate_git_checkout::checkout(&repo, &git_checkout_path)?;
             let mut pkg_ver = crate_git_checkout::find_versions(&checkout)?;
             if let Some(v) = pkg_ver.remove(&*package) {
                 let versions: Vec<_> = v.into_iter().map(|(num, timestamp)| {
@@ -913,10 +912,8 @@ impl KitchenSink {
             Origin::GitLab { repo, package } => (RepoHost::GitLab(repo.clone()).try_into().expect("repohost"), package.clone()),
             _ => unreachable!(),
         };
-        let git_checkout_path = self.git_checkout_path.clone();
-
-        tokio::task::spawn(timeout("checkout", 600, async move {
-            let checkout = crate_git_checkout::checkout(&repo, &git_checkout_path)?;
+        let checkout = self.checkout_repo(repo.clone()).await?;
+        spawn_blocking(move || {
             let (path_in_repo, tree_id, manifest) = crate_git_checkout::path_in_repo(&checkout, &package)?
                 .ok_or_else(|| {
                     let (has, err) = crate_git_checkout::find_manifests(&checkout).unwrap_or_default();
@@ -937,7 +934,7 @@ impl KitchenSink {
             // Allowing any other URL would allow spoofing
             package.repository = Some(repo.canonical_git_url().into_owned());
             Ok::<_, CError>((meta, path_in_repo))
-        })).await?
+        }).await?
     }
 
     async fn rich_crate_version_from_repo(&self, origin: &Origin) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
@@ -951,7 +948,7 @@ impl KitchenSink {
         if !has_readme {
             let maybe_repo = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
             warnings.insert(Warning::NoReadmeProperty);
-            warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()));
+            warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()).await);
         }
         self.rich_crate_version_data_common(origin.clone(), meta, 0, false, path_in_repo, warnings).await
     }
@@ -1027,7 +1024,7 @@ impl KitchenSink {
             watch("readme", self.add_readme_from_crates_io(&mut meta, name, ver)).await;
             let has_readme = meta.readme.is_some();
             if !has_readme {
-                warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()));
+                warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()).await);
             }
         }
 
@@ -1268,7 +1265,7 @@ impl KitchenSink {
         .unwrap_or((false, false)))
     }
 
-    fn add_readme_from_repo(&self, meta: &mut CrateFile, maybe_repo: Option<&Repo>) -> Warnings {
+    async fn add_readme_from_repo(&self, meta: &mut CrateFile, maybe_repo: Option<&Repo>) -> Warnings {
         let mut warnings = HashSet::new();
         let package = match meta.manifest.package.as_ref() {
             Some(p) => p,
@@ -1278,11 +1275,10 @@ impl KitchenSink {
             },
         };
         if let Some(repo) = maybe_repo {
-            let res = crate_git_checkout::checkout(repo, &self.git_checkout_path)
-                .map_err(From::from)
-                .and_then(|checkout| crate_git_checkout::find_readme(&checkout, package));
+            let res = self.checkout_repo(repo.clone()).await
+                .map(|checkout| crate_git_checkout::find_readme(&checkout, package));
             match res {
-                Ok(Some(mut readme)) => {
+                Ok(Ok(Some(mut readme))) => {
                     // Make the path absolute, because the readme is now absolute relative to repo root,
                     // rather than relative to crate's dir within the repo
                     if !readme.0.starts_with('/') {
@@ -1290,8 +1286,12 @@ impl KitchenSink {
                     }
                     meta.readme = Some(readme);
                 },
-                Ok(None) => {
+                Ok(Ok(None)) => {
                     warnings.insert(Warning::NoReadmeInRepo(repo.canonical_git_url().to_string()));
+                },
+                Ok(Err(err)) => {
+                    warnings.insert(Warning::ErrorCloning(repo.canonical_git_url().to_string()));
+                    error!("Search of {} ({}) failed: {}", package.name, repo.canonical_git_url(), err);
                 },
                 Err(err) => {
                     warnings.insert(Warning::ErrorCloning(repo.canonical_git_url().to_string()));
@@ -1779,22 +1779,26 @@ impl KitchenSink {
         }
     }
 
-    pub fn inspect_repo_manifests(&self, repo: &Repo) -> CResult<Vec<(String, crate_git_checkout::Oid, Manifest)>> {
-        let checkout = crate_git_checkout::checkout(repo, &self.git_checkout_path)?;
-        let (has, _) = crate_git_checkout::find_manifests(&checkout)?;
+    pub async fn inspect_repo_manifests(&self, repo: &Repo) -> CResult<Vec<(String, crate_git_checkout::Oid, Manifest)>> {
+        let checkout = self.checkout_repo(repo.clone()).await?;
+        let (has, _) = tokio::task::block_in_place(|| crate_git_checkout::find_manifests(&checkout))?;
         Ok(has)
+    }
+
+    async fn checkout_repo(&self, repo: Repo) -> Result<crate_git_checkout::Repository, KitchenSinkErr> {
+        let git_checkout_path = self.git_checkout_path.clone();
+        timeout("checkout", 300, spawn_blocking(move || {
+            crate_git_checkout::checkout(&repo, &git_checkout_path)
+                .map_err(|e| { eprintln!("{}", e); KitchenSinkErr::GitCheckoutFailed })
+        }).map_err(|_| KitchenSinkErr::GitCheckoutFailed)).await?
     }
 
     pub async fn index_repo(&self, repo: &Repo, as_of_version: &str) -> CResult<()> {
         let _f = self.throttle.acquire().await;
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
-        let (checkout, manif) = tokio::task::spawn_blocking({
-            let git_checkout_path = self.git_checkout_path.clone();
-            let repo = repo.clone();
-            move || {
-            let url = repo.canonical_git_url();
-            let checkout = crate_git_checkout::checkout(&repo, &git_checkout_path)?;
-
+        let checkout = self.checkout_repo(repo.clone()).await?;
+        let url = repo.canonical_git_url().into_owned();
+        let (checkout, manif) = spawn_blocking(move || {
             let (manif, warnings) = crate_git_checkout::find_manifests(&checkout)
                 .with_context(|| format!("find manifests in {}", url))?;
             for warn in warnings {
@@ -1803,7 +1807,7 @@ impl KitchenSink {
             Ok::<_, CError>((checkout, manif.into_iter().filter_map(|(subpath, _, manifest)| {
                 manifest.package.map(|p| (subpath, p.name))
             })))
-        }}).await??;
+        }).await??;
         self.crate_db.index_repo_crates(repo, manif).await.context("index rev repo")?;
 
         if let Repo { host: RepoHost::GitHub(ref repo), .. } = repo {

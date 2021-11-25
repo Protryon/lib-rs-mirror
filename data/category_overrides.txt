@@ -1,5 +1,4 @@
 abci-storage: cryptography::cryptocurrencies
-sp-ropey: cryptography::cryptocurrencies
 abi_stable_shared: rust-patterns
 abortable_parser: parsing
 acari-lib: web-programming
@@ -2416,6 +2415,7 @@ sp-cid: cryptography::cryptocurrencies
 sp-database: cryptography::cryptocurrencies
 sp-externalities: cryptography::cryptocurrencies
 sp-multihash: cryptography::cryptocurrencies
+sp-ropey: cryptography::cryptocurrencies
 sp-runtime-interface-proc-macro: cryptography::cryptocurrencies
 sp-runtime-interface: cryptography::cryptocurrencies
 sp-staking: cryptography::cryptocurrencies
@@ -2446,6 +2446,7 @@ ssz-derive: cryptography::cryptocurrencies
 ssz-json: cryptography::cryptocurrencies
 sszt: value-formatting, cryptography::cryptocurrencies
 stable-pattern: rust-patterns, parser-implementations
+stable_borrow: rust-patterns
 stack_dst: rust-patterns
 stamm: science::machine-learning
 star-history: command-line-utilities
@@ -2500,6 +2501,7 @@ sup: cryptography::cryptocurrencies
 supervisor-rs: os
 suspicious-pods: development-tools
 susy-codec-derive:cryptography::cryptocurrencies
+susywasmi: cryptography::cryptocurrencies
 sutro: cryptography::cryptocurrencies
 suzy: gui
 sv-parser-error: parser-implementations, hardware-support

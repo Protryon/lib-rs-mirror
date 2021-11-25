@@ -40,6 +40,7 @@ lazy_static! {
         ("game-dev", Some(&["game", "games"])),
         ("gamedev", Some(&["game", "games"])),
         ("game", Some(&["wasm", "webassembly"])), // wasm games are nice, but should be in games category
+        ("contract", Some(&["wasm", "webassembly"])), // that's crypto-babble-nothingburger
         ("opengl", Some(&["terminal", "console"])),
         ("protocol", Some(&["game", "games", "container"])),
         ("framework", Some(&["game", "games"])),

@@ -1,4 +1,5 @@
 abci-storage: cryptography::cryptocurrencies
+sp-ropey: cryptography::cryptocurrencies
 abi_stable_shared: rust-patterns
 abortable_parser: parsing
 acari-lib: web-programming
@@ -133,6 +134,7 @@ awabi: text-processing
 awmpde_structs: web-programming
 axon_parseast_parser: parser-implementations
 axon_parser: parser-implementations
+az: rust-patterns, no-std
 azul-simplecss: parser-implementations, web-programming
 babycat: multimedia::audio, wasm
 background-jobs-core: asynchronous
@@ -179,6 +181,7 @@ bee-storage: cryptography::cryptocurrencies
 bee-tangle: cryptography::cryptocurrencies
 bee-ternary: cryptography::cryptocurrencies
 bee-transaction: cryptography::cryptocurrencies
+beef: rust-patterns, no-std
 begonia: command-line-interface
 belay: development-tools
 below-model: os, visualization
@@ -212,6 +215,7 @@ bitconch-jsonrpc-http-server: cryptography::cryptocurrencies
 bitconch-jsonrpc-macros: cryptography::cryptocurrencies
 bitconch-jsonrpc-server-utils: cryptography::cryptocurrencies
 bitconch-jsonrpc-tcp-server: cryptography::cryptocurrencies
+bitflags: rust-patterns, no-std
 bitgo_api: cryptography::cryptocurrencies
 bitstream_reader: parsing
 bitvector: data-structures
@@ -1098,6 +1102,7 @@ hdk_derive: cryptography::cryptocurrencies
 hdlc: network-programming
 hdwallet-bitcoin: cryptography::cryptocurrencies
 hdwallet: cryptography::cryptocurrencies
+heapless: no-std, memory-management
 heif-sys: multimedia::images
 heliometer: emulators
 helix: development-tools::ffi
@@ -1521,6 +1526,7 @@ meilisearch-core: database-implementations
 meilisearch-sdk: databases
 melnet: cryptography::cryptocurrencies
 membership-token-client: cryptography::cryptocurrencies
+memoffset: rust-patterns, no-std
 memorydb: database-implementations
 mepple: text-processing
 mermer-rs: text-processing, science
@@ -1629,17 +1635,32 @@ nd_lib: web-programming
 ndk-sys: os::unix-apis, development-tools
 ndk: os::unix-apis, development-tools
 ndless-static-vars: rust-patterns
+near-account-id: cryptography::cryptocurrencies
+near-actix-test-utils: cryptography::cryptocurrencies
 near-bindgen-core: cryptography::cryptocurrencies
 near-bindgen-core:cryptography::cryptocurrencies
 near-bindgen-macros:cryptography::cryptocurrencies
 near-bindgen-promise: cryptography::cryptocurrencies
 near-bindgen: cryptography::cryptocurrencies
 near-bindgen:cryptography::cryptocurrencies
+near-chain-configs: cryptography::cryptocurrencies
+near-chain-primitives: cryptography::cryptocurrencies
+near-chain: cryptography::cryptocurrencies
+near-chunks-primitives: cryptography::cryptocurrencies
 near-contract-standards: cryptography::cryptocurrencies
 near-crypto: cryptography::cryptocurrencies
+near-delay-detector: cryptography::cryptocurrencies
 near-env: cryptography::cryptocurrencies
+near-jsonrpc-client: cryptography::cryptocurrencies
+near-jsonrpc-primitives: cryptography::cryptocurrencies
 near-ledger: cryptography::cryptocurrencies
+near-logger-utils: cryptography::cryptocurrencies
 near-metrics: cryptography::cryptocurrencies
+near-network-primitives: cryptography::cryptocurrencies
+near-network: cryptography::cryptocurrencies
+near-performance-metrics-macros: cryptography::cryptocurrencies
+near-performance-metrics: cryptography::cryptocurrencies
+near-pool-v01: cryptography::cryptocurrencies
 near-primitives-core: cryptography::cryptocurrencies
 near-primitives: cryptography::cryptocurrencies
 near-rpc-error-macro:cryptography::cryptocurrencies
@@ -1647,15 +1668,24 @@ near-runtime-fees: cryptography::cryptocurrencies
 near-runtime-fees:cryptography::cryptocurrencies
 near-runtime-utils: cryptography::cryptocurrencies
 near-runtime: cryptography::cryptocurrencies
+near-rust-allocator-proxy: cryptography::cryptocurrencies
 near-sdk-core: cryptography::cryptocurrencies
 near-sdk-macros: cryptography::cryptocurrencies
 near-sdk-sim: cryptography::cryptocurrencies
 near-sdk: cryptography::cryptocurrencies
+near-stable-hasher: cryptography::cryptocurrencies
+near-store-v01: cryptography::cryptocurrencies
 near-store: cryptography::cryptocurrencies
+near-syn: cryptography::cryptocurrencies
+near-sys: cryptography::cryptocurrencies
+near-units-core: cryptography::cryptocurrencies
+near-units: cryptography::cryptocurrencies
+near-units: cryptography::cryptocurrencies
 near-vm-errors: cryptography::cryptocurrencies
 near-vm-errors:cryptography::cryptocurrencies
 near-vm-logic: cryptography::cryptocurrencies
 near-vm-runner-standalone:cryptography::cryptocurrencies
+near: cryptography::cryptocurrencies
 nebula-fbthrift-storage: encoding
 needletail: parser-implementations, science
 needletail: science, parser-implementations
@@ -1841,6 +1871,7 @@ paseto: authentication
 passclip: command-line-utilities
 passman: authentication
 password-rules-parser: authentication, web-programming
+paste: rust-patterns, development-tools::procedural-macro-helpers
 pastemyst: web-programming
 path-matchers: filesystem
 pathfinder_geometry: science::math
@@ -2093,6 +2124,7 @@ richter: games
 rify: web-programming, database-implementations
 rio_turtle: web-programming, parser-implementations
 rio_xml: parser-implementations
+riptun: network-programming
 risq: cryptography::cryptocurrencies
 ritual_build: development-tools, command-line-utilities
 ritual_common: development-tools::ffi
@@ -2102,6 +2134,7 @@ rliron: game-development
 rlp-compress: cryptography::cryptocurrencies
 rmatrix: command-line-utilities
 rna: games, parser-implementations
+rnix-lsp: development-tools, text-editors
 rnix: parser-implementations
 roadmap: data-structures
 roads-from-nd: multimedia::images
@@ -2403,6 +2436,7 @@ sqlx-core:databases
 squalo: cryptography::cryptocurrencies
 sr-std: cryptography::cryptocurrencies
 srws: web-programming::http-server, development-tools
+ss58-registry: cryptography::cryptocurrencies
 ssb-vanity: cryptography
 ssb_parser: parser-implementations
 sscanf: parser-implementations, text-processing
@@ -2451,6 +2485,8 @@ substrate-prometheus-endpoint: cryptography::cryptocurrencies
 substrate-runtime-hasher: cryptography::cryptocurrencies
 substrate-stellar-sdk: cryptography::cryptocurrencies
 substrate-stellar-xdr: cryptography::cryptocurrencies
+substrate-wasmtime-profiling: cryptography::cryptocurrencies
+substrate-wasmtime-runtime: cryptography::cryptocurrencies
 substrs: rust-patterns, text-processing
 subvault: cryptography::cryptocurrencies
 subwasm: cryptography::cryptocurrencies
@@ -2617,6 +2653,7 @@ thrift_codec: encoding, web-programming
 thud: games
 thumbs: command-line-interface
 time-parse: date-and-time, parser-implementations
+time: date-and-time, parser-implementations, value-formatting, no-std
 timeago: date-and-time
 timely: algorithms
 timely_bytes: rust-patterns
@@ -2711,6 +2748,7 @@ twitter-stream: web-programming
 typeable: rust-patterns
 typedb: database-implementations
 typename: rust-patterns
+typenum: rust-patterns, no-std
 typestate: rust-patterns
 u-siem-windns: os::windows-apis, network-programming
 u-siem: network-programming
@@ -2750,6 +2788,7 @@ using-queue: cryptography::cryptocurrencies
 utf-8: text-processing, algorithms
 utime: filesystem
 uucore: command-line-interface
+uuid: parser-implementations, value-formatting, no-std
 v4l: multimedia::video
 v8-api: web-programming, development-tools
 v8-sys: web-programming, development-tools
@@ -2819,6 +2858,10 @@ wasm-builder-runner: cryptography::cryptocurrencies
 wasm-builder: cryptography::cryptocurrencies
 wasm-run: development-tools::build-utils, wasm
 wasm-testbed: cryptography::cryptocurrencies, wasm
+wasmer-derive-near: cryptography::cryptocurrencies
+wasmer-near: cryptography::cryptocurrencies
+wasmer-runtime-core-near: cryptography::cryptocurrencies
+wasmer-singlepass-backend-near: cryptography::cryptocurrencies
 wasmi-validation: wasm
 wasmi: wasm
 waste: wasm
@@ -2909,6 +2952,7 @@ wrc: memory-management
 wstring: rust-patterns
 wy: algorithms
 x86: hardware-support, os
+x86_64: hardware-support, no-std
 x86test-types: development-tools::testing
 x86test: development-tools::testing
 xch-ceb: science

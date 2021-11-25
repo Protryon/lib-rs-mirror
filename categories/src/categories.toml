@@ -215,7 +215,7 @@ dimension.\
 """
 short-description = """
 Dealing with the fourth dimension."""
-preference = 1.1
+preference = 1.15
 
 [development-tools]
 name = "Development tools"
@@ -558,7 +558,7 @@ Libraries that function without the Rust standard library.
 """
 siblings = ["embedded"]
 obvious-keywords = ["no_std", "no-std"]
-preference = 0.6
+preference = 0.2
 
 [os]
 name = "Operating systems"

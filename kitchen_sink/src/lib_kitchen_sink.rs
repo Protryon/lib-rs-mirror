@@ -1660,6 +1660,8 @@ impl KitchenSink {
             },
         };
 
+        let _ = tokio::task::block_in_place(|| self.index_msrv_from_manifest(origin, &manifest)).map_err(|e| error!("{}", e));
+
         // direct deps are used as extra keywords for similarity matching,
         // but we're taking only niche deps to group similar niche crates together
         let raw_deps_stats = self.index.deps_stats().await?;
@@ -1942,6 +1944,37 @@ impl KitchenSink {
             w.clear();
         }
         w.insert(origin, val);
+    }
+
+    pub fn index_msrv_from_manifest(&self, origin: &Origin, manifest: &Manifest) -> CResult<()> {
+        let db = self.build_db()?;
+        let package = manifest.package();
+        let mut msrv = match package.edition {
+            Edition::E2015 => 1u16,
+            Edition::E2018 => 31,
+            Edition::E2021 => 56,
+        };
+
+        if package.default_run.is_some() {
+            msrv = msrv.max(37);
+        }
+
+        // uses Option as iter
+        let mut profiles = manifest.profile.release.iter().chain(&manifest.profile.dev).chain(&manifest.profile.test).chain(&manifest.profile.bench).chain(&manifest.profile.doc);
+        if profiles.any(|p| p.build_override.is_some() || !p.package.is_empty()) {
+            msrv = msrv.max(41);
+        }
+
+        if matches!(package.resolver, Some(rich_crate::Resolver::V2)) {
+            msrv = msrv.max(51);
+        }
+
+        if msrv > 1 {
+            debug!("Detected {:?} as msrv 1.{}", origin, msrv);
+            let latest_bad_rustc = format!("1.{}.0", msrv - 1);
+            db.set_compat(origin, &package.version, &latest_bad_rustc, Compat::Incompatible)?;
+        }
+        Ok(())
     }
 
     pub async fn rustc_compatibility(&self, all: RichCrate) -> Result<CompatByCrateVersion, KitchenSinkErr> {

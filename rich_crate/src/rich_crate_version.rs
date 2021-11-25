@@ -3,7 +3,7 @@ use crate::Markup;
 use crate::Origin;
 use crate::Readme;
 use cargo_toml::{Dependency, Manifest, Package};
-pub use cargo_toml::{DepsSet, Edition, FeatureSet, MaintenanceStatus, TargetDepsSet};
+pub use cargo_toml::{DepsSet, Edition, Resolver, FeatureSet, MaintenanceStatus, TargetDepsSet};
 use repo_url::Repo;
 use std::borrow::Cow;
 use std::collections::BTreeMap;

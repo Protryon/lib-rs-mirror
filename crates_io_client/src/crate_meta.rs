@@ -44,8 +44,8 @@ pub struct CrateMeta {
     #[serde(default)]
     pub badges: Vec<CrateMetaBadge>,
     pub created_at: String, // "2017-07-31T23:46:03.490855+00:00",
-    #[serde(default)]
-    pub downloads: usize, // 3393,
+    // #[serde(default)]
+    // pub downloads: usize, // 3393, // this meta is updated once per release, not frequently enough to keep downloads relevant
     #[serde(default)]
     pub recent_downloads: Option<usize>, // 1314,
     pub max_version: String, // "1.10.0",

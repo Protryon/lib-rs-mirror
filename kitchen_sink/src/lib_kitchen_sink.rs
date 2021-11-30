@@ -561,7 +561,7 @@ impl KitchenSink {
         let mut summed_days = self.summed_year_downloads(k.name(), curr_year)?;
 
         let day_of_year = now.ordinal0();
-        let missing_data_days = summed_days[0..day_of_year as usize].iter().cloned().rev().take_while(|&s| s == 0).count();
+        let missing_data_days = summed_days[0..day_of_year as usize].iter().cloned().rev().take_while(|&s| s == 0).count().min(7);
 
         if missing_data_days > 0 {
             now = now - chrono::Duration::days(missing_data_days as _);
@@ -765,7 +765,41 @@ impl KitchenSink {
 
     #[inline]
     pub async fn downloads_per_month(&self, origin: &Origin) -> CResult<Option<usize>> {
-        self.downloads_recent_90_days(origin).await.map(|dl| dl.map(|n| n / 3))
+        Ok(match origin {
+            Origin::CratesIo(name) => {
+                let mut now = Utc::today();
+
+                let mut curr_year = now.year() as u16;
+                let mut summed_days = self.summed_year_downloads(name, curr_year)?;
+
+                let day_of_year = now.ordinal0();
+                let missing_data_days = summed_days[0..day_of_year as usize].iter().cloned().rev().take_while(|&s| s == 0).count().min(7);
+
+                if missing_data_days > 0 {
+                    now = now - chrono::Duration::days(missing_data_days as _);
+                }
+
+                // TODO: make it an iterator
+                let mut total = 0;
+                for i in 0..30 {
+                    let this_date = now - chrono::Duration::days(i);
+                    let year = this_date.year() as u16;
+                    if year != curr_year {
+                        curr_year = year;
+                        summed_days = self.summed_year_downloads(name, curr_year)?;
+                    }
+                    let day_of_year = this_date.ordinal0() as usize;
+                    total += summed_days[day_of_year] as usize;
+                }
+                if total > 0 {
+                    return Ok(Some(total));
+                }
+                // Downloads are scraped daily, so <1 day crates need a fallback
+                let meta = timeout("download counts fallback", 5, self.crates_io_meta(name)).await?;
+                Some(meta.krate.recent_downloads.unwrap_or(0) / 3) // 90 days
+            },
+            _ => None,
+        })
     }
 
     pub async fn downloads_per_month_or_equivalent(&self, origin: &Origin) -> CResult<Option<usize>> {
@@ -786,17 +820,6 @@ impl KitchenSink {
             }
         }
         Ok(None)
-    }
-
-    #[inline]
-    async fn downloads_recent_90_days(&self, origin: &Origin) -> CResult<Option<usize>> {
-        Ok(match origin {
-            Origin::CratesIo(name) => {
-                let meta = timeout("download counts", 5, self.crates_io_meta(name)).await?;
-                meta.krate.recent_downloads
-            },
-            _ => None,
-        })
     }
 
     pub async fn crates_io_meta(&self, name: &str) -> CResult<CrateMetaFile> {

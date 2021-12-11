@@ -1,5 +1,5 @@
 use crate::writer::*;
-use actix_web::body::Body;
+use actix_web::body::BoxBody;
 use actix_web::dev::Url;
 use actix_web::http::header::HeaderValue;
 use actix_web::http::StatusCode;
@@ -1079,7 +1079,7 @@ impl actix_web::ResponseError for ServerError {
         StatusCode::INTERNAL_SERVER_ERROR
     }
 
-    fn error_response(&self) -> HttpResponse<Body> {
+    fn error_response(&self) -> HttpResponse<BoxBody> {
         let mut page = Vec::with_capacity(20000);
         front_end::render_error(&mut page, &self.err);
         HttpResponse::InternalServerError()

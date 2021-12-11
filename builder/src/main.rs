@@ -21,34 +21,36 @@ ENV PATH="$PATH:/home/rustyuser/.cargo/bin"
 RUN cargo install lts --vers ^0.3.1
 RUN rustup set profile minimal
 RUN cargo install libc --vers 99.9.9 || true # force index update
-RUN rustup toolchain add 1.42.0
-RUN rustup toolchain add 1.45.0
-RUN rustup toolchain add 1.47.0
-RUN rustup toolchain add 1.52.0
 RUN rustup toolchain add 1.56.0
-RUN rustup toolchain add 1.41.0
-RUN rustup toolchain add 1.51.0
+RUN rustup toolchain add 1.54.0
 RUN rustup toolchain add 1.53.0
-RUN rustup toolchain add 1.33.0
-RUN rustup toolchain add 1.31.0
+RUN rustup toolchain add 1.50.0
+RUN rustup toolchain add 1.49.0
+RUN rustup toolchain add 1.46.0
+RUN rustup toolchain add 1.43.0
+RUN rustup toolchain add 1.40.0
+RUN rustup toolchain add 1.37.0
+RUN rustup toolchain add 1.30.0
+RUN rustup toolchain add 1.52.0
 RUN rustup toolchain list
 # RUN cargo new lts-dummy; cd lts-dummy; cargo lts setup; echo 'itoa = "*"' >> Cargo.toml; cargo update;
 "##;
 
 const TEMP_JUNK_DIR: &str = "/var/tmp/crates_env";
 
-const RUST_VERSIONS: [&str; 11] = [
-    "1.31.0",
-    "1.41.0",
-    "1.42.0",
-    "1.45.0",
-    "1.33.0",
-    "1.47.0",
-    "1.51.0",
-    "1.52.0",
-    "1.53.0",
-    "1.55.0",
+const RUST_VERSIONS: [&str; 12] = [
     "1.56.0",
+    "1.54.0",
+    "1.53.0",
+    "1.50.0",
+    "1.49.0",
+    "1.46.0",
+    "1.43.0",
+    "1.40.0",
+    "1.37.0",
+    "1.30.0",
+    "1.52.0",
+    "1.55.0",
 ];
 
 use crate_db::builddb::*;
@@ -209,7 +211,7 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
     let mut rng = rand::thread_rng();
     let mut candidates: Vec<_> = all.versions().iter().rev() // rev() starts from most recent
         .filter(|v| !v.is_yanked())
-        .take(5)
+        .take(10)
         .filter_map(|v| SemVer::parse(v.version()).ok())
         .map(|v| {
             let c = compat_info.remove(&v).unwrap_or_default();

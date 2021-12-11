@@ -57,7 +57,7 @@ fn parse_package_id(id: Option<&str>) -> Option<(String, String)> {
     Some((name, ver))
 }
 
-const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 436] = [
+const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 447] = [
 // rg  --no-filename -o '\[stable\(feature.*\]' library/ | fgrep 1. | sort -u | sed -E 's/.*feature ?= ?"(.+)", since ?= ?"1\.(..+)\..".*/(\2, "\1"),/' | sort -V | pbcopy
 
 (17, "addr_from_into_ip"),
@@ -489,13 +489,24 @@ const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 436] = [
 (55, "string_drain_as_str"),
 (56, "bufwriter_into_parts"),
 (56, "extend_for_tuple"),
-(56, "iter_intersperse"),
-(56, "ready_macro"),
 (56, "shrink_to"),
 (56, "std_collections_from_array"),
-(56, "try_reserve"),
 (56, "unix_chroot"),
 (56, "unsafe_cell_raw_get"),
+(57, "array_as_slice"),
+(57, "command_access"),
+(57, "is_symlink"),
+(57, "iter_map_while"),
+(57, "proc_macro_is_available"),
+(57, "try_reserve"),
+(58, "copy_clone_array_lib"),
+(58, "cstring_from_vec_with_nul"),
+(58, "option_result_unwrap_unchecked"),
+(58, "rc_ref_unwind_safe"),
+(58, "saturating_div"),
+(58, "unix_process_wait_more"),
+(58, "with_options"),
+(59, "nonzero_is_power_of_two"),
 ];
 
 fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
@@ -738,7 +749,6 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                     findings.crates.insert((Some("1.30.1".into()), name.clone(), ver.clone(), Compat::Incompatible));
                 }
                 if msg.target.as_ref().and_then(|t| t.edition.as_ref()).map_or(false, |e| e == "2021") {
-                    findings.crates.insert((Some("1.56.0".into()), name.clone(), ver.clone(), Compat::VerifiedWorks)); // FIXME: remove when 1.57 is released
                     findings.crates.insert((Some("1.55.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
                 }
                 if level == "error" {
@@ -806,7 +816,6 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
         line.starts_with("  supported edition values are `2015` or `2018`, but `2021` is unknown") ||
         line.starts_with("  feature `edition2021` is required") {
             if let Some((name, ver)) = last_broken_manifest_crate.take() {
-                findings.crates.insert((Some("1.56.0".into()), name.clone(), ver.clone(), Compat::VerifiedWorks)); // FIXME: remove when 1.57 is released
                 findings.crates.insert((Some("1.55.0".into()), name, ver, Compat::Incompatible));
             }
         }

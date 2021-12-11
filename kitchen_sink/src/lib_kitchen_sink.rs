@@ -900,7 +900,7 @@ impl KitchenSink {
                 }
                 debug!("Getting/indexing {:?}", origin);
                 let _th = timeout("autoindex", 30, self.auto_indexing_throttle.acquire().map(|e| e.map_err(CError::from))).await?;
-                let reindex = timeout("reindex", 60, self.index_crate_highest_version(origin));
+                let reindex = timeout("reindex", 60, self.index_crate_highest_version(origin)).map_err(|e| {error!("{:?} reindex: {}", origin, e); e});
                 watch("reindex", reindex).await.with_context(|| format!("reindexing {:?}", origin))?; // Pin to lower stack usage
                 timeout("reindexed data", 10, self.rich_crate_version_data_cached(origin)).await?.ok_or(KitchenSinkErr::CacheExpired)?
             },

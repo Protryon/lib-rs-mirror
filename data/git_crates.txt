@@ -298,7 +298,6 @@ github:nokia/memory-profiler/memory-profiler
 github:nokia/memory-profiler/memory-profiler-cli
 github:nokia/not-perf/nperf
 github:nokia/not-perf/nwind
-github:non-binary/http-cache-semantics/http-cache-semantics
 github:notriddle/rust-unified-diff/unified-diff
 github:oakes/solidoak/solidoak
 github:oam-dev/rudr/healthscope

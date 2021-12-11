@@ -110,6 +110,7 @@ ast_node: parser-implementations
 astrology: science
 async-broadcast: asynchronous
 async-codec: asynchronous
+async-injector: asynchronous, rust-patterns
 async-minecraft-ping: asynchronous, game-development
 async-recursion: asynchronous, rust-patterns
 async-stripe: web-programming
@@ -523,6 +524,7 @@ css-color: parser-implementations, web-programming
 css3: web-programming
 cssifier: parser-implementations, web-programming
 cssparser: parser-implementations, web-programming
+cstree: parsing
 csvsc: text-processing
 cuckoocache: concurrency, caching, data-structures
 curiosity: development-tools
@@ -673,6 +675,7 @@ drm: os::unix-apis
 dsf-core: network-programming
 dsf-rpc: network-programming
 dst: rust-patterns, data-structures
+dtrace-parser: parser-implementations, development-tools::debugging
 du2: filesystem, command-line-utilities
 dubp-common: cryptography::cryptocurrencies
 duct: development-tools, command-line-utilities
@@ -789,6 +792,7 @@ exonum-cryptocurrency-advanced: cryptography::cryptocurrencies
 exonum-testkit: cryptography::cryptocurrencies
 exonum-time: cryptography::cryptocurrencies
 exonum: cryptography::cryptocurrencies
+ext-php-rs: development-tools::ffi
 extfg-sigma: encoding
 extindex: data-structures
 extrablatt: parser-implementations, web-programming
@@ -829,6 +833,7 @@ fastqc-rs: science
 fastx: science, parser-implementations
 favy: multimedia::images
 fawkes-crypto-phase2: cryptography, wasm
+fbnc: cryptography::cryptocurrencies
 fbthrift-git: encoding
 fc-db: cryptography::cryptocurrencies
 fc-mapping-sync: cryptography::cryptocurrencies
@@ -939,6 +944,7 @@ fresh: cryptography::cryptocurrencies
 frotate: command-line-utilities, os
 frugalos_core: os
 fruity: os::macos-apis
+frum: development-tools, command-line-utilities
 fse: algorithms
 fsevent-sys: os::macos-apis
 fsevent: os::macos-apis
@@ -1071,6 +1077,7 @@ gsk4-sys: gui
 gsk4: gui
 gsm: emulators
 gspell: text-processing
+gst-plugin-rspng: multimedia::images
 gsuite-api: web-programming
 gtfs-structures: parser-implementations
 gtk-macros: development-tools, gui
@@ -1541,6 +1548,7 @@ mfkart: multimedia
 microkelvin: data-structures
 microserde: encoding
 microservices: cryptography::cryptocurrencies
+mieli: databases, command-line-utilities
 migrator: cryptography::cryptocurrencies
 mil: cryptography::cryptocurrencies
 mindjuice: emulators
@@ -1679,7 +1687,6 @@ near-syn: cryptography::cryptocurrencies
 near-sys: cryptography::cryptocurrencies
 near-units-core: cryptography::cryptocurrencies
 near-units: cryptography::cryptocurrencies
-near-units: cryptography::cryptocurrencies
 near-vm-errors: cryptography::cryptocurrencies
 near-vm-errors:cryptography::cryptocurrencies
 near-vm-logic: cryptography::cryptocurrencies
@@ -1776,6 +1783,7 @@ ocaml-sys: development-tools
 ocaml: development-tools::ffi
 octorust: development-tools, web-programming
 ocy: development-tools
+odht: data-structures, caching, filesystem
 ofdb-entities: databases, web-programming
 ogg: multimedia, parser-implementations
 ogma: text-processing, parser-implementations
@@ -1837,6 +1845,7 @@ ovmi: emulators
 owasm-abi: cryptography::cryptocurrencies
 oxygengine-core: game-development, wasm
 p0w: cryptography::cryptocurrencies
+p12: cryptography
 packapp: os::macos-apis, command-line-utilities
 packetcrypt: cryptography::cryptocurrencies
 pact_verifier: development-tools::testing
@@ -2292,6 +2301,7 @@ scriptful: emulators, parser-implementations
 sdf: parser-implementations, rendering
 sdkms: hardware-support
 seahorse: command-line-interface
+seccompiler: os::unix-apis
 secp256k1: cryptography
 secured_linked_list: data-structures
 sekai: science
@@ -2465,6 +2475,7 @@ storage-proofs-post: cryptography::cryptocurrencies
 storage-proofs: cryptography::cryptocurrencies
 stork-search: database-implementations, wasm
 storyboard: games
+stream-reconnect: asynchronous, rust-patterns
 streamline: asynchronous, algorithms
 streamson-extra-matchers: parser-implementations
 streamson-lib: encoding

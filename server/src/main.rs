@@ -237,7 +237,7 @@ async fn run_server(rt: Handle) -> Result<(), anyhow::Error> {
         App::new()
             .app_data(state.clone())
             .wrap(middleware::Compress::default())
-            .wrap(middleware::DefaultHeaders::new().header("x-powered-by", HeaderValue::from_static(concat!("actix-web/2 lib.rs/", env!("CARGO_PKG_VERSION")))))
+            .wrap(middleware::DefaultHeaders::new().add(("x-powered-by", HeaderValue::from_static(concat!("actix-web lib.rs/", env!("CARGO_PKG_VERSION"))))))
             .wrap(middleware::Logger::default())
             .route("/", web::get().to(handle_home))
             .route("/search", web::get().to(handle_search))

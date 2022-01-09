@@ -171,11 +171,13 @@ pub enum KitchenSinkErr {
     #[error("Git crate '{:?}' can't be indexed, because it's not on the list", _0)]
     GitCrateNotAllowed(Origin),
     #[error("Deps err: {}", _0)]
-    Deps(DepsErr),
+    Deps(#[from] DepsErr),
     #[error("Bad rustc compat data")]
     BadRustcCompatData,
     #[error("Event log error")]
     Event(#[from] #[source] Arc<event_log::Error>),
+    #[error("Internal error: {}", _0)]
+    Internal(std::sync::Arc<dyn std::error::Error + Send + Sync>)
 }
 
 #[derive(Debug, Clone)]
@@ -899,10 +901,10 @@ impl KitchenSink {
                     return Err(KitchenSinkErr::CacheExpired.into());
                 }
                 debug!("Getting/indexing {:?}", origin);
-                let _th = timeout("autoindex", 30, self.auto_indexing_throttle.acquire().map(|e| e.map_err(CError::from))).await?;
-                let reindex = timeout("reindex", 60, self.index_crate_highest_version(origin)).map_err(|e| {error!("{:?} reindex: {}", origin, e); e});
+                let _th = timeout("autoindex", 29, self.auto_indexing_throttle.acquire().map(|e| e.map_err(CError::from))).await?;
+                let reindex = timeout("reindex", 59, self.index_crate_highest_version(origin)).map_err(|e| {error!("{:?} reindex: {}", origin, e); e});
                 watch("reindex", reindex).await.with_context(|| format!("reindexing {:?}", origin))?; // Pin to lower stack usage
-                timeout("reindexed data", 10, self.rich_crate_version_data_cached(origin)).await?.ok_or(KitchenSinkErr::CacheExpired)?
+                timeout("reindexed data", 9, self.rich_crate_version_data_cached(origin)).await?.ok_or(KitchenSinkErr::CacheExpired)?
             },
         };
 
@@ -984,7 +986,7 @@ impl KitchenSink {
     async fn rich_crate_version_data_from_crates_io(&self, latest: &CratesIndexVersion) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
         debug!("Building whole crate {}", latest.name());
 
-        let _f = self.throttle.acquire().await;
+        let _f = timeout("data-throttle", 28, self.throttle.acquire().map_err(|_| KitchenSinkErr::DataTimedOut)).await;
 
         let mut warnings = HashSet::new();
 
@@ -994,19 +996,20 @@ impl KitchenSink {
         let origin = Origin::from_crates_io_name(name);
 
         let (crate_tarball, crates_io_meta) = futures::join!(
-            self.tarball(name, ver),
-            self.crates_io_meta(&name_lower));
+            timeout("tarball fetch", 16, self.tarball(name, ver)),
+            timeout("cio meta fetch", 16, self.crates_io_meta(&name_lower)),
+        );
 
         let crates_io_krate = crates_io_meta?.krate;
         let crate_tarball = crate_tarball?;
         let crate_compressed_size = crate_tarball.len();
-        let mut meta = spawn_blocking({
+        let mut meta = timeout("untar", 10, spawn_blocking({
             let name = name.to_owned();
             let ver = ver.to_owned();
             move || {
                 tarball::read_archive(&crate_tarball[..], &name, &ver)
             }
-        }).await??;
+        }).map_err(|e| KitchenSinkErr::Internal(std::sync::Arc::new(e)))).await??;
 
         let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
 
@@ -1056,7 +1059,7 @@ impl KitchenSink {
             None => None,
         }.unwrap_or_default();
 
-        self.rich_crate_version_data_common(origin, meta, crate_compressed_size as u32, latest.is_yanked(), path_in_repo, warnings).await
+        watch("data-common", self.rich_crate_version_data_common(origin, meta, crate_compressed_size as u32, latest.is_yanked(), path_in_repo, warnings)).await
     }
 
     ///// Fixing and faking the data
@@ -1687,7 +1690,7 @@ impl KitchenSink {
 
         // direct deps are used as extra keywords for similarity matching,
         // but we're taking only niche deps to group similar niche crates together
-        let raw_deps_stats = self.index.deps_stats().await?;
+        let raw_deps_stats = timeout("raw-r-deps", 14, self.index.deps_stats().map_err(KitchenSinkErr::Deps)).await?;
         let mut weighed_deps = Vec::<(&str, f32)>::new();
         let all_deps = manifest.direct_dependencies();
         let all_deps = [(all_deps.0, 1.0), (all_deps.2, 0.33)];
@@ -1735,7 +1738,7 @@ impl KitchenSink {
             source_data: &source_data,
             extracted_auto_keywords,
         });
-        let cached = timeout("db-index", 30, db_index.map_err(anyhow::Error::from)).await?;
+        let cached = timeout("db-index", 16, db_index.map_err(anyhow::Error::from)).await?;
         self.derived_cache.set_serialize((&origin.to_str(), ""), &cached)?;
 
         self.event_log.post(&SharedEvent::CrateIndexed(origin.to_str()))?;

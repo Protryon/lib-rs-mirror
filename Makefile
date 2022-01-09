@@ -3,7 +3,7 @@ CACHE_FILES=data/crate_data.db data/users.db data/2019.rmpz
 
 all: website
 
-website: download-caches data/index/1 styles Cargo.lock
+website: data/index/1 styles Cargo.lock
 	cd front_end && cargo run --release --bin website
 	cd style && npm start
 
@@ -11,7 +11,8 @@ Cargo.lock: Cargo.toml
 	rm Cargo.lock; git submodule update --init --recursive
 	cargo update
 
-download-caches: $(CACHE_FILES)
+backup:
+	rsync -Praz librs:/var/lib/crates-server/ data/ --exclude=tarballs --exclude=git --exclude=index --exclude=event_log.db --exclude='.*' --exclude=data
 
 $(CACHE_FILES):
 	if [ ! -d data/data.tar.xz -a -f data.tar.xz ]; then mv data.tar.xz data/; fi
@@ -44,5 +45,3 @@ clean:
 	git submodule update --init --recursive
 	git submodule sync
 
-clean-cache: clean
-	rm data/*rmpz data/users.db

@@ -397,13 +397,10 @@ preference = 1.2
 name = "Games"
 title = "game in Rust"
 description = """
-Applications for fun and entertainment. If Rust the video game were \
-implemented in Rust the programming language, it would belong in this \
-category. Libraries to help create video games are in the \
-Game engines category.\
+Applications for fun and entertainment. Games written in Rust, and tools and mods for exisitng games.
 """
 short-description = """
-Fun and entertainment. Games implemented in the Rust programming language."""
+Fun and entertainment. Games and mods implemented in Rust."""
 obvious-keywords = ["game", "games", "play"]
 preference = 1
 

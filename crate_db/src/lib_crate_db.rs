@@ -106,7 +106,6 @@ impl CrateDb {
     #[inline]
     async fn with_read<F, T>(&self, context: &'static str, cb: F) -> FResult<T> where F: FnOnce(&mut Connection) -> FResult<T> {
         let mut _sqlite_sucks = self.concurrency_control.read().await;
-
         tokio::task::block_in_place(|| {
             let conn = self.conn.get_or(|| self.connect().map(|conn| {
                 let _ = conn.busy_timeout(std::time::Duration::from_secs(4));
@@ -607,7 +606,7 @@ impl CrateDb {
 */
     /// github_id, created_at, number of crates
     pub async fn crate_all_owners(&self) -> FResult<Vec<CrateOwnerStat>> {
-        self.with_read("all_owners", |tx| {
+        self.with_read_spawn("all_owners", |tx| {
             let mut query = tx.prepare_cached("SELECT github_id, min(invited_at), count(*) FROM author_crates GROUP BY github_id")?;
             let q = query.query_map([], |row| {
                 let s = row.get_ref(1)?.as_str()?;
@@ -658,7 +657,7 @@ impl CrateDb {
     }
 
     pub async fn crates_of_author(&self, github_id: u32) -> FResult<Vec<CrateOwnerRow>> {
-        self.with_read("crates_of_author", |conn| {
+        self.with_read_spawn("crates_of_author", move |conn| {
             let mut query = conn.prepare_cached(r#"SELECT c.origin, ac.invited_by_github_id, ac.invited_at, max(cv.created), c.ranking
                 FROM author_crates ac
                 JOIN crate_versions cv USING(crate_id)
@@ -722,7 +721,8 @@ impl CrateDb {
     ///
     /// Returns (top n-th for the keyword, the keyword)
     pub async fn top_keyword(&self, origin: &Origin) -> FResult<Option<(u32, String)>> {
-        self.with_read("top_keyword", |conn| {
+        let origin = origin.to_str();
+        self.with_read_spawn("top_keyword", move |conn| {
             let mut query = conn.prepare_cached(r#"
             select top, keyword from (
                 select count(*) as total, sum(case when oc.ranking >= c.ranking then 1 else 0 end) as top, k.keyword from crates c
@@ -739,7 +739,7 @@ impl CrateDb {
                 ) as tmp
             order by top + (top+30.0)/total
             "#)?;
-            Ok(none_rows(query.query_row(&[&origin.to_str()], |row| Ok((row.get_unwrap(0), row.get_unwrap(1)))))?)
+            Ok(none_rows(query.query_row(&[&origin], |row| Ok((row.get_unwrap(0), row.get_unwrap(1)))))?)
         }).await
     }
 
@@ -794,7 +794,8 @@ impl CrateDb {
     }
 
     pub async fn related_crates(&self, origin: &Origin, min_recent_downloads: u32) -> FResult<Vec<Origin>> {
-        self.with_read("related_crates", |conn| {
+        let origin = origin.to_str();
+        self.with_read_spawn("related_crates", move |conn| {
             let mut query = conn.prepare_cached(r#"
                 SELECT sum(k2.weight * k1.weight) as w, c2.origin
                 FROM crates c1
@@ -809,7 +810,7 @@ impl CrateDb {
                 ORDER by 1 desc
                 LIMIT 6
             "#)?;
-            let args: &[&dyn ToSql] = &[&origin.to_str(), &min_recent_downloads];
+            let args: &[&dyn ToSql] = &[&origin, &min_recent_downloads];
             let res = query.query_map(args, |row| {
                 Ok(Origin::from_str(row.get_ref_unwrap(1).as_str()?))
             })?;
@@ -926,7 +927,8 @@ impl CrateDb {
     ///
     /// Returns `origin` strings
     pub async fn recently_updated_crates_in_category(&self, slug: &str) -> FResult<Vec<Origin>> {
-        self.with_read("recently_updated_crates_in_category", |conn| {
+        let slug = slug.to_owned();
+        self.with_read_spawn("recently_updated_crates_in_category", move |conn| {
             let mut query = conn.prepare_cached(r#"
                 select max(created) + 3600*24*7 * c.rank_weight * k.ranking, -- week*rank ~= best this week
                     k.origin

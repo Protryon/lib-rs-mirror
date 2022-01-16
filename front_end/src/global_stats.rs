@@ -2,6 +2,7 @@ use categories::CATEGORIES;
 use categories::Category;
 use categories::CategoryMap;
 use chrono::prelude::*;
+use futures::future::try_join;
 use crate::Page;
 use crate::templates;
 use crate::Urler;
@@ -100,7 +101,9 @@ fn downloads_over_time(start: Date<Utc>, mut day: Date<Utc>, kitchen_sink: &Kitc
 }
 
 pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSink, _renderer: &Renderer) -> Result<(), anyhow::Error> {
-    let categories = category_stats(kitchen_sink).await?;
+    let (categories, recent_crates) = try_join(
+        category_stats(kitchen_sink),
+        kitchen_sink.notable_recently_updated_crates(3100)).await?;
 
     let urler = Urler::new(None);
     let start = Utc.ymd(2015, 5, 15); // Rust 1.0
@@ -109,8 +112,7 @@ pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSin
     let end = Utc::today() - chrono::Duration::days(2);
 
     let latest_rustc_version = end.signed_duration_since(start).num_weeks()/6;
-    let mut compat_data = kitchen_sink.all_crate_compat()?;
-    let recent_crates = kitchen_sink.notable_recently_updated_crates(3100).await?;
+    let mut compat_data = tokio::task::block_in_place(|| kitchen_sink.all_crate_compat())?;
     let rustc_stats_all = rustc_stats(&compat_data, latest_rustc_version as u16)?;
     let mut recent_compat = HashMap::with_capacity(recent_crates.len());
     let mut rustc_stats_recent_num = 0;

@@ -825,6 +825,7 @@ impl KitchenSink {
     }
 
     pub async fn crates_io_meta(&self, name: &str) -> CResult<CrateMetaFile> {
+        tokio::task::yield_now().await;
         let krate = tokio::task::block_in_place(|| {
             self.index.crates_io_crate_by_lowercase_name(name).context("rich_crate")
         })?;
@@ -1667,6 +1668,7 @@ impl KitchenSink {
     pub async fn index_crate_highest_version(&self, origin: &Origin) -> CResult<()> {
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
         info!("Indexing {:?}", origin);
+        tokio::task::yield_now().await;
 
         timeout("before-index", 5, self.crate_db.before_index_latest(origin).map_err(anyhow::Error::from)).await?;
 
@@ -1916,6 +1918,7 @@ impl KitchenSink {
     }
 
     pub async fn user_by_github_login(&self, github_login: &str) -> CResult<Option<User>> {
+        tokio::task::yield_now().await;
         let db_fetched = tokio::task::block_in_place(|| self.user_db.user_by_github_login(github_login));
         if let Ok(Some(gh)) = db_fetched.map_err(|e| eprintln!("db user {}: {}", github_login, e)) {
             if gh.name.is_some() && gh.created_at.is_some() {
@@ -2013,13 +2016,11 @@ impl KitchenSink {
     }
 
     pub fn all_crate_compat(&self) -> CResult<HashMap<Origin, CompatByCrateVersion>> {
-        tokio::task::block_in_place(|| {
-            let db = self.build_db()?;
-            let mut all = db.get_all_compat_by_crate()?;
-            // TODO: apply rustc_release_from_date
-            all.iter_mut().for_each(|(_, v)| BuildDb::postprocess_compat(v));
-            Ok(all)
-        })
+        let db = self.build_db()?;
+        let mut all = db.get_all_compat_by_crate()?;
+        // TODO: apply rustc_release_from_date
+        all.iter_mut().for_each(|(_, v)| BuildDb::postprocess_compat(v));
+        Ok(all)
     }
 
     fn build_db(&self) -> Result<&BuildDb, KitchenSinkErr> {

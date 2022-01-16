@@ -19,6 +19,18 @@ use std::io::BufReader;
 use std::io::Read;
 use tar::Archive;
 
+// start end crates affected
+const DOWNLOAD_SPAM_INCIDENTS: [(&str, &str, &[&str]); 1] = [
+    ("2021-12-21", "2022-01-18", &[
+        "vsdb", "btm", "vsdbsled", "vsdb_derive", "ppv-lite86", "serde_cbor","ruc","time","fast-math","ieee754","time-macros","once_cell", "clap", "serde", "memoffset",
+        "rand", "rand_core", "lazy_static", "half", "nix","cfg-if", "log", "libc", "num-traits", "serde_derive", "getrandom", "rand_chacha", "parking_lot", "lock_api",
+        "instant", "parking_lot_core", "smallvec", "scopeguard", "sha3", "digest", "keccak", "proc-macro2", "unicode-xid", "quote", "syn", "fs2", "crc32fast", "fxhash",
+        "byteorder", "crossbeam-epoch", "crossbeam-utils", "memoffset", "autocfg", "const_fn", "rio", "bitflags",
+        "rocksdb", "librocksdb-sys", "zstd", "zstd-safe", "zstd-sys", "cc", "jobserver", "crypto-common", "generic-array", "version_check", "typenum", "block-buffer",
+        "unicode-width", "atty", "itoa",
+    ]),
+];
+
 const NUM_CRATES: usize = 42000;
 type BoxErr = Box<dyn std::error::Error + Sync + Send>;
 
@@ -116,7 +128,9 @@ async fn main() -> Result<(), BoxErr> {
 
 
                     if let (Some(crates), Some(versions)) = (&crates, &versions) {
-                        if let Some(downloads) = downloads.take() {
+                        if let Some(mut downloads) = downloads.take() {
+                            eprintln!("Despamming");
+                            filter_download_spam(crates, versions, &mut downloads);
                             eprintln!("Indexing {} crates, {} downloads", versions.len(), downloads.len());
                             index_downloads(crates, versions, &downloads, &ksink)?;
                         }
@@ -139,6 +153,49 @@ async fn main() -> Result<(), BoxErr> {
     })
     .await
     .unwrap()
+}
+
+// Cap spammed download data to ~prev week's max during incident period
+// TODO: it'd be nice to interpolate week prior to week after
+#[inline(never)]
+fn filter_download_spam(crates: &CratesMap, versions: &VersionsMap, downloads: &mut VersionDownloads) {
+    let incidents = DOWNLOAD_SPAM_INCIDENTS.map(|(start,end,names)| {
+        (date_from_str(start).unwrap(), date_from_str(end).unwrap(), names.iter().copied().collect::<HashSet<_>>())
+    });
+    for (crate_id, name) in crates.iter() {
+        for (start, end, names) in incidents.iter().filter(|(_, _, names)| names.contains(name.as_str())) {
+            let versions = versions.get(crate_id).expect(name);
+
+            let min_date = *start - chrono::Duration::weeks(1);
+            let any_version_max_dl = 4000 + versions.iter()
+                .filter_map(|row| downloads.get(&row.id))
+                .flatten()
+                .filter(|(day, _, _)| *day >= min_date && day < start)
+                .map(|&(_, dl, _)| dl)
+                .max()
+                .unwrap_or(0);
+
+            for version_id in versions.iter().map(|row| row.id) {
+                if let Some(mut dl) = downloads.get_mut(&version_id) {
+                    // per-version cap leaves more data untouched
+                    // but needs to include some max of any verison for new releases
+                    let max_dl = any_version_max_dl / 4 + dl.iter()
+                        .filter(|(day, _, _)| *day >= min_date && day < start)
+                        .map(|&(_, dl, _)| dl)
+                        .max()
+                        .unwrap_or(5000); // new release?
+
+                    dl.iter_mut()
+                        .filter(|(day, dl, _)| *dl > max_dl && day >= start && day <= end)
+                        .for_each(|(day, dl, ovr)| {
+                            eprintln!("cut {} {} to {}", day, dl, max_dl);
+                            *dl = max_dl;
+                            *ovr = true;
+                        });
+                }
+            }
+        }
+    }
 }
 
 #[inline(never)]
@@ -510,7 +567,7 @@ fn parse_versions(mut file: impl Read) -> Result<VersionsMap, BoxErr> {
     Ok(out)
 }
 
-type VersionDownloads = HashMap<u32, Vec<(Date<Utc>, u32)>>;
+type VersionDownloads = HashMap<u32, Vec<(Date<Utc>, u32, bool)>>;
 
 fn date_from_str(date: &str) -> Result<Date<Utc>, std::num::ParseIntError> {
     let y = date[0..4].parse()?;
@@ -529,7 +586,7 @@ fn parse_version_downloads(mut file: impl Read) -> Result<VersionDownloads, BoxE
         let date = date_from_str(r.next().ok_or("no date")?)?;
         let downloads = r.next().and_then(|s| s.parse().ok()).ok_or("bad dl")?;
         let version_id = r.next().and_then(|s| s.parse().ok()).ok_or("bad dl")?;
-        out.entry(version_id).or_insert_with(|| Vec::with_capacity(365 * 4)).push((date, downloads));
+        out.entry(version_id).or_insert_with(|| Vec::with_capacity(365 * 4)).push((date, downloads, false));
     }
     Ok(out)
 }

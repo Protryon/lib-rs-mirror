@@ -1636,12 +1636,12 @@ impl KitchenSink {
         Ok(())
     }
 
-    pub fn index_crate_downloads(&self, crates_io_name: &str, by_ver: &HashMap<&str, &[(Date<Utc>, u32)]>) -> CResult<()> {
+    pub fn index_crate_downloads(&self, crates_io_name: &str, by_ver: &HashMap<&str, &[(Date<Utc>, u32, bool)]>) -> CResult<()> {
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
         let mut year_data = HashMap::new();
         for (version, date_dls) in by_ver {
             let version = MiniVer::from(semver::Version::parse(version)?);
-            for (day, dls) in date_dls.iter() {
+            for (day, dls, overwrite) in date_dls.iter() {
                 let curr_year = day.year() as u16;
                 let mut curr_year_data = match year_data.entry(curr_year) {
                     Vacant(e) => {
@@ -1652,7 +1652,7 @@ impl KitchenSink {
 
                 let day_of_year = day.ordinal0() as usize;
                 let year_dls = curr_year_data.1.entry(version.clone()).or_insert_with(Default::default);
-                if year_dls.0[day_of_year] < *dls {
+                if year_dls.0[day_of_year] < *dls || *overwrite {
                     curr_year_data.0 = true;
                     year_dls.0[day_of_year] = *dls;
                 }

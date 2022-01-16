@@ -457,14 +457,15 @@ impl KitchenSink {
 
     // actually gives 2*top_n…
     fn trending_crates_raw(&self, top_n: usize) -> Vec<(Origin, f64)> {
-        let now = Utc::today();
-        let curr_year = now.year() as u16;
-        let day_of_year = now.ordinal0() as usize;
-        if day_of_year < 14 {
-            return Vec::new(); // December stats are useless anyway
+        let mut now = Utc::today();
+        let mut day_of_year = now.ordinal0() as usize;
+        if day_of_year < 15 {
+            now = Utc::today() - chrono::Duration::days(15);
+            day_of_year = now.ordinal0() as usize;
         }
-        let shortlen = (day_of_year / 2).min(14);
-        let longerlen = (day_of_year / 2).min(6 * 7);
+        let curr_year = now.year() as u16;
+        let shortlen = (day_of_year / 2).min(10);
+        let longerlen = (day_of_year / 2).min(3 * 7);
 
         fn average_nonzero(slice: &[u32], min_days: u32) -> f32 {
             let mut sum = 0u32;

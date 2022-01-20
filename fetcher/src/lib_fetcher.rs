@@ -49,10 +49,10 @@ impl Fetcher {
             },
         };
 
-        let res = timeout(Duration::from_secs(20), self.client.get(url)
+        let res = timeout(Duration::from_secs(21), self.client.get(url)
             .header(reqwest::header::USER_AGENT, "lib.rs/1.1")
             .send()).await??
             .error_for_status()?;
-        Ok(timeout(Duration::from_secs(60), res.bytes()).await??.to_vec())
+        Ok(timeout(Duration::from_secs(61), res.bytes()).await??.to_vec())
     }
 }

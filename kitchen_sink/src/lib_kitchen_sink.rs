@@ -834,6 +834,8 @@ impl KitchenSink {
 
     pub async fn crates_io_meta(&self, name: &str) -> CResult<CrateMetaFile> {
         tokio::task::yield_now().await;
+        if stopped() {return Err(KitchenSinkErr::Stopped.into());}
+
         let krate = tokio::task::block_in_place(|| {
             self.index.crates_io_crate_by_lowercase_name(name).context("rich_crate")
         })?;
@@ -974,6 +976,8 @@ impl KitchenSink {
     async fn rich_crate_version_from_repo(&self, origin: &Origin) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
         tokio::task::yield_now().await;
         let _f = self.throttle.acquire().await;
+        if stopped() {return Err(KitchenSinkErr::Stopped.into());}
+
         let (mut meta, path_in_repo) = self.package_in_repo_host(origin.clone()).await?;
 
         let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
@@ -1003,6 +1007,9 @@ impl KitchenSink {
         let name_lower = name.to_ascii_lowercase();
         let ver = latest.version();
         let origin = Origin::from_crates_io_name(name);
+
+
+        if stopped() {return Err(KitchenSinkErr::Stopped.into());}
 
         let (crate_tarball, crates_io_meta) = futures::join!(
             timeout("tarball fetch", 16, self.tarball(name, ver)),
@@ -1063,6 +1070,8 @@ impl KitchenSink {
             }
         }
 
+        if stopped() {return Err(KitchenSinkErr::Stopped.into());}
+
         let path_in_repo = match maybe_repo.as_ref() {
             Some(r) => self.crate_db.path_in_repo(r, name).await?,
             None => None,
@@ -1073,6 +1082,8 @@ impl KitchenSink {
 
     ///// Fixing and faking the data
     async fn rich_crate_version_data_common(&self, origin: Origin, mut meta: CrateFile, crate_compressed_size: u32, is_yanked: bool, path_in_repo: String, mut warnings: Warnings) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
+        if stopped() {return Err(KitchenSinkErr::Stopped.into());}
+
         Self::override_bad_categories(&mut meta.manifest);
 
         let mut github_keywords = None;
@@ -1674,9 +1685,9 @@ impl KitchenSink {
     }
 
     pub async fn index_crate_highest_version(&self, origin: &Origin) -> CResult<()> {
+        tokio::task::yield_now().await;
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
         info!("Indexing {:?}", origin);
-        tokio::task::yield_now().await;
 
         timeout("before-index", 5, self.crate_db.before_index_latest(origin).map_err(anyhow::Error::from)).await?;
 
@@ -1822,6 +1833,8 @@ impl KitchenSink {
     }
 
     async fn checkout_repo(&self, repo: Repo) -> Result<crate_git_checkout::Repository, KitchenSinkErr> {
+        if stopped() {return Err(KitchenSinkErr::Stopped.into());}
+
         let git_checkout_path = self.git_checkout_path.clone();
         timeout("checkout", 300, spawn_blocking(move || {
             crate_git_checkout::checkout(&repo, &git_checkout_path)
@@ -1859,10 +1872,10 @@ impl KitchenSink {
             }
         }
 
+        tokio::task::yield_now().await;
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
 
         let mut changes = Vec::new();
-        tokio::task::yield_now().await;
         tokio::task::block_in_place(|| {
             let url = repo.canonical_git_url();
             crate_git_checkout::find_dependency_changes(&checkout, |added, removed, age| {
@@ -2032,6 +2045,8 @@ impl KitchenSink {
     }
 
     fn build_db(&self) -> Result<&BuildDb, KitchenSinkErr> {
+        if stopped() {return Err(KitchenSinkErr::Stopped.into());}
+
         self.crate_rustc_compat_db
             .get_or_try_init(|| BuildDb::new(self.main_cache_dir().join("builds.db")))
             .map_err(|_| KitchenSinkErr::BadRustcCompatData)
@@ -2195,6 +2210,8 @@ impl KitchenSink {
     }
 
     async fn cachebust_string_for_repo(&self, crate_repo: &Repo) -> CResult<String> {
+        if stopped() {return Err(KitchenSinkErr::Stopped.into());}
+
         Ok(self.crate_db.crates_in_repo(crate_repo).await
             .context("db crates_in_repo")?
             .into_iter()

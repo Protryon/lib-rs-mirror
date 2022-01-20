@@ -1,7 +1,6 @@
 use anyhow::anyhow;
 use debcargo_list::DebcargoList;
 use feat_extractor::*;
-use futures::future::FutureExt;
 use futures::future::join_all;
 use futures::Future;
 use futures::stream::StreamExt;
@@ -99,63 +98,47 @@ fn main() {
     })).unwrap();
 }
 
-async fn main_indexing_loop(r: Arc<Reindexer>, crate_origins: Box<dyn Iterator<Item=Origin> + Send>, tx: mpsc::Sender<(Arc<RichCrateVersion>, usize, f64)>, repos: bool) {
-    let renderer = Arc::new(Renderer::new(None));
-    let waiting = futures::stream::FuturesUnordered::new();
-    let handle = Arc::new(tokio::runtime::Handle::current());
-    let seen_repos = Arc::new(Mutex::new(HashSet::new()));
-    let concurrency = Arc::new(tokio::sync::Semaphore::new(16));
-    let repo_concurrency = Arc::new(tokio::sync::Semaphore::new(4));
-    for (i, origin) in crate_origins.enumerate() {
-        if stopped() {
-            return;
-        }
-        let r = Arc::clone(&r);
-        let handle = Arc::clone(&handle);
-        let concurrency = Arc::clone(&concurrency);
-        let repo_concurrency = Arc::clone(&repo_concurrency);
-        let renderer = Arc::clone(&renderer);
-        let seen_repos = Arc::clone(&seen_repos);
+async fn main_indexing_loop(ref r: Arc<Reindexer>, crate_origins: Box<dyn Iterator<Item=Origin> + Send>, tx: mpsc::Sender<(Arc<RichCrateVersion>, usize, f64)>, repos: bool) {
+    let ref renderer = Renderer::new(None);
+    let ref seen_repos = Mutex::new(HashSet::new());
+    let ref repo_concurrency = tokio::sync::Semaphore::new(4);
+    futures::stream::iter(crate_origins.enumerate()).map(move |(i, origin)| {
         let mut tx = tx.clone();
-        waiting.push(handle.clone().spawn(async move {
-            let index_finished = concurrency.acquire().await;
-            if stopped() {return;}
-            println!("{}…", i);
-            match run_timeout(62, r.crates.index_crate_highest_version(&origin)).await {
-                Ok(()) => {},
-                err => {
-                    print_res(err);
-                    return;
-                },
-            }
-            if stopped() {return;}
-            match run_timeout(70, r.index_crate(&origin, &renderer, &mut tx)).await {
-                Ok(v) => {
-                    drop(index_finished);
-                    if repos {
-                        if let Some(repo) = v.repository() {
-                            {
-                                let mut s = seen_repos.lock();
-                                let url = repo.canonical_git_url().to_string();
-                                if s.contains(&url) {
-                                    return;
-                                }
-                                println!("Indexing {}", url);
-                                s.insert(url);
+        async move {
+        if stopped() {return;}
+        println!("{}…", i);
+        match run_timeout(62, r.crates.index_crate_highest_version(&origin)).await {
+            Ok(()) => {},
+            err => {
+                print_res(err);
+                return;
+            },
+        }
+        if stopped() {return;}
+        match run_timeout(70, r.index_crate(&origin, &renderer, &mut tx)).await {
+            Ok(v) => {
+                if repos {
+                    if let Some(repo) = v.repository() {
+                        {
+                            let mut s = seen_repos.lock();
+                            let url = repo.canonical_git_url().to_string();
+                            if s.contains(&url) {
+                                return;
                             }
-                            let _finished = repo_concurrency.acquire().await;
-                            if stopped() {return;}
-                            print_res(run_timeout(600, r.crates.index_repo(repo, v.version())).await);
+                            println!("Indexing {}", url);
+                            s.insert(url);
                         }
+                        let _finished = repo_concurrency.acquire().await;
+                        if stopped() {return;}
+                        print_res(run_timeout(600, r.crates.index_repo(repo, v.version())).await);
                     }
-                },
-                err => print_res(err),
-            }
-        }).map(drop));
-    }
-    drop(tx);
-    if stopped() {return;}
-    waiting.collect::<()>().await;
+                }
+            },
+            err => print_res(err),
+        }
+    }})
+    .buffer_unordered(16)
+    .collect::<()>().await;
 }
 
 impl Reindexer {

@@ -1257,6 +1257,23 @@ impl KitchenSink {
                 }) {
                 *cat = "game-development".into();
             }
+
+            if cat == "aerospace::simulation" {
+                *cat = "simulation".to_string();
+            }
+            if cat == "aerospace::drones" {
+                *cat = "science::robotics".to_string();
+            }
+            if cat == "aerospace::unmanned-aerial-vehicles" {
+                *cat = "science::robotics".to_string();
+            }
+            if cat == "os::linix-apis" {
+                *cat = "os::unix-apis".to_string();
+            }
+            if cat == "os::freebsd-apis" {
+                *cat = "os::unix-apis".to_string();
+            }
+
             // got out of sync with crates-io
             if cat == "mathematics" {
                 *cat = "science::math".to_string();

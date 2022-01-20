@@ -87,7 +87,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
 
     #[track_caller]
     fn lock_for_write(&self) -> Result<RwLockWriteGuard<'_, Inner<K>>, Error> {
-        let mut inner = self.inner.try_write_for(Duration::from_secs(4)).expect("deadlock1");
+        let mut inner = self.inner.try_write_for(Duration::from_secs(4)).ok_or(Error::KvPoison)?;
         if inner.data.is_none() {
             let (size, data) = self.load_data()?;
             inner.expected_size = AtomicU64::new(size);
@@ -101,7 +101,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
     #[track_caller]
     fn lock_for_read(&self) -> Result<RwLockReadGuard<'_, Inner<K>>, Error> {
         loop {
-            let inner = self.inner.try_read_for(Duration::from_secs(6)).expect("deadlock2");
+            let inner = self.inner.try_read_for(Duration::from_secs(6)).ok_or(Error::KvPoison)?;
             if inner.data.is_some() {
                 return Ok(inner);
             }

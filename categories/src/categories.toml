@@ -26,6 +26,56 @@
 #   `@`, `:`, or `.`. They should be all lowercase.
 #
 
+[accessibility]
+name = "Accessibility"
+description = """
+Making your creations usable by as many people as possible. \
+"""
+title = "a11y"
+short-description = "Assistive technologies"
+preference = 0.5
+
+# [aerospace]
+# name = "Aerospace"
+# description = """
+# Crates for aeronautics (within the atmosphere) and astronautics \
+# (in outer space) implications.\
+# """
+
+# [aerospace.categories.drones]
+# name = "Drones"
+# description = """
+# Crates related to Multicopters, Fixed wing, VTOL (Vertical Takeoff and Landing) \
+# and Airships/Balloons.\
+# """
+
+# [aerospace.categories.protocols]
+# name = "Aerospace protocols"
+# description = """
+# Crates of protocol implementations for aerospace implications.\
+# """
+
+# [aerospace.categories.simulation]
+# name = "Aerospace simulations"
+# description = """
+# Crates related to any kind of simulations used in aerospace - fluids, \
+# aerodynamics, etc.\
+# """
+
+# [aerospace.categories.space-protocols]
+# name = "Space protocols"
+# description = """
+# Protocol implementations for implicatoins in space like CCSDS.\
+# """
+
+# [aerospace.categories.unmanned-aerial-vehicles]
+# name = "Unmanned aerial vehicles"
+# description = """
+# Crates related to Unmanned aerial vehicles like Multicopters, Fixed wing, \
+# VTOL (Vertical Takeoff and Landing), Airships/Balloons, Rovers, Boats, \
+# Submersibles.\
+# """
+
 [algorithms]
 name = "Algorithms"
 # string to use in page titles
@@ -90,6 +140,12 @@ Store the results of previous computations."""
 obvious-keywords = ["cache", "caching"]
 preference = 1.1
 
+[compilers]
+name = "Compilers"
+description = """
+Compiler implementations, including interpreters and transpilers.\
+"""
+
 [command-line-interface]
 name = "Command-line interface"
 title = "CLI for Rust"
@@ -123,6 +179,12 @@ short-description = """
 Algorithms for making data smaller."""
 obvious-keywords = ["compression", "decompression"]
 preference = 1.1
+
+# [computer-vision]
+# name = "Computer vision"
+# description = """
+# Crates for comprehending the world from video or images.\
+# """
 
 [config]
 name = "Configuration"
@@ -381,6 +443,13 @@ short-description = """
 Crates for dealing with files and filesystems."""
 obvious-keywords = ["filesystem", "file", "fs", "directory"]
 preference = 1.1
+
+# [game-engines]
+# name = "Game engines"
+# description = """
+# For crates that try to provide a \"one-stop-shop\" for \
+# all of your game development needs.\
+# """
 
 [game-development]
 name = "Game dev"
@@ -701,10 +770,10 @@ obvious-keywords = ["science"]
 [science.categories.robotics]
 name = "Robotics"
 title = "Robotics"
-short-description = "Crates related to robotics"
+short-description = "Robotics and vehicle engineering"
 siblings = ["embedded"]
 description = """
-Crates related to robotics. Build firmware for robots, drones and autonomous machines."""
+Crates related to robotics. Build firmware for robots, drones, and autonomous machines."""
 preference = 0.2
 
 [science.categories.math]

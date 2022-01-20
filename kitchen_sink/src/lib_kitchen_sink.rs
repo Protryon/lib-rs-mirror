@@ -459,13 +459,16 @@ impl KitchenSink {
     fn trending_crates_raw(&self, top_n: usize) -> Vec<(Origin, f64)> {
         let mut now = Utc::today();
         let mut day_of_year = now.ordinal0() as usize;
-        if day_of_year < 15 {
-            now = Utc::today() - chrono::Duration::days(15);
+        if day_of_year < 7 {
+            now = Utc::today() - chrono::Duration::days(7);
             day_of_year = now.ordinal0() as usize;
         }
         let curr_year = now.year() as u16;
         let shortlen = (day_of_year / 2).min(10);
         let longerlen = (day_of_year / 2).min(3 * 7);
+
+        let missing_data_factor = longerlen as f32 / (3 * 7) as f32;
+        let missing_data_factor = missing_data_factor.powi(2);
 
         fn average_nonzero(slice: &[u32], min_days: u32) -> f32 {
             let mut sum = 0u32;
@@ -482,24 +485,24 @@ impl KitchenSink {
                 Origin::CratesIo(crate_name) => {
                     let d = self.summed_year_downloads(crate_name, curr_year).ok()?;
                     let prev_week_avg = average_nonzero(&d[day_of_year-shortlen*2 .. day_of_year-shortlen], 7);
-                    if prev_week_avg < 80. { // it's too easy to trend from zero downloads!
+                    if prev_week_avg < 70. * missing_data_factor { // it's too easy to trend from zero downloads!
                         return None;
                     }
 
                     let this_week_avg = average_nonzero(&d[day_of_year-shortlen .. day_of_year], 8);
-                    if prev_week_avg >= this_week_avg {
+                    if prev_week_avg * missing_data_factor >= this_week_avg {
                         return None;
                     }
 
                     let prev_4w_avg = average_nonzero(&d[day_of_year-longerlen*2 .. day_of_year-longerlen], 7).max(average_nonzero(&d[.. day_of_year-longerlen*2], 7));
                     let this_4w_avg = average_nonzero(&d[day_of_year-longerlen .. day_of_year], 14);
-                    if prev_4w_avg >= this_4w_avg || prev_4w_avg >= prev_week_avg || prev_4w_avg >= this_week_avg {
+                    if prev_4w_avg * missing_data_factor >= this_4w_avg || prev_4w_avg * missing_data_factor >= prev_week_avg || prev_4w_avg * missing_data_factor >= this_week_avg {
                         return None;
                     }
 
                     let ratio1 = (800. + this_week_avg) / (900. + prev_week_avg) * prev_week_avg.sqrt().min(10.);
-                    // 0.9, because it's less interesting
-                    let ratio4 = 0.9 * (700. + this_4w_avg) / (600. + prev_4w_avg) * prev_4w_avg.sqrt().min(9.);
+                    // 0.8, because it's less interesting
+                    let ratio4 = 0.8 * (700. + this_4w_avg) / (600. + prev_4w_avg) * prev_4w_avg.sqrt().min(9.);
 
                     // combine short term and long term trends
                     Some((origin, ratio1, ratio4))
@@ -508,6 +511,10 @@ impl KitchenSink {
             }
         }).collect::<Vec<_>>();
 
+        if ratios.is_empty() {
+            warn!("no trending crates");
+            return Vec::new();
+        }
         ratios.sort_unstable_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(Ordering::Equal));
         let len = ratios.len();
         let mut top: Vec<_> = ratios.drain(len.saturating_sub(top_n)..).map(|(o, s, _)| (o, s as f64)).collect();

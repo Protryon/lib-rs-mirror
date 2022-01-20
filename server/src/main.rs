@@ -77,6 +77,8 @@ fn main() {
         .build()
         .unwrap();
 
+    console_subscriber::init();
+
     let res = sys.block_on(run_server(rt.handle().clone()));
 
     rt.shutdown_timeout(Duration::from_secs(1));

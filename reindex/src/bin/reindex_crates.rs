@@ -46,6 +46,8 @@ fn main() {
         .build()
         .unwrap();
 
+    console_subscriber::init();
+
     let crates = rt.block_on(kitchen_sink::KitchenSink::new_default()).unwrap();
     let deblist = DebcargoList::new(crates.main_cache_dir()).expect("deblist");
     if everything {

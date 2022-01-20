@@ -9,6 +9,8 @@ use std::{
 
 #[tokio::main]
 async fn main() {
+    console_subscriber::init();
+
     let handle = Arc::new(tokio::runtime::Handle::current());
     handle.clone().spawn(async move {
         let crates = Arc::new(match KitchenSink::new_default().await {

@@ -351,7 +351,7 @@ impl CrateDb {
             // so knock all keywords' importance if it's yanked
             insert_keyword.commit(tx, crate_id, if c.source_data.is_yanked {0.1} else {1.})?;
 
-            let mut keywords: Vec<_> = package.keywords.iter().filter(|k| !k.is_empty()).map(|s| s.to_kebab_case()).collect();
+            let mut keywords: Vec<_> = package.keywords.iter().filter(|k| !k.is_empty()).map(|k| normalize_keyword(k)).collect();
             if keywords.is_empty() {
                 keywords = Self::keywords_tx(tx, c.origin)?;
             }
@@ -1145,6 +1145,16 @@ impl KeywordInsert {
         }
         Ok(())
     }
+}
+
+fn normalize_keyword(k: &str) -> String {
+    if k == "iOS" {
+        return "ios".into(); // silly i-os
+    }
+    if !k.is_ascii() { // heck messes up CJK
+        return k.to_lowercase();
+    }
+    k.to_kebab_case()
 }
 
 fn crates_io_name(name: &str) -> std::result::Result<Origin, rusqlite::Error> {

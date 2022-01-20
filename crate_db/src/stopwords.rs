@@ -29,7 +29,7 @@ lazy_static! {
     "very", "via", "want", "way", "well", "we'll", "what", "when", "where", "which",
     "while", "will", "wip", "with", "without", "working", "works", "writing",
     "written", "yet", "you", "your", "build status", "meritbadge", "common",
-    "file was generated", "easy to use",
+    "file was generated", "easy to use", "general-purpose", "fundamental",
     ].iter().copied().collect();
 
     /// If one is present, ignore the others
@@ -144,6 +144,7 @@ lazy_static! {
         ("websocket", Some(&["http", "cli", "tokio", "client", "io", "network", "servo", "web"])), // there's a separate category for it
         ("rest", Some(&["api"])),
         ("cargo-subcommand", None),
+        ("substrate", None),
 
         ("google", None), // there's a ton of auto-generated crates
         ("ethereum", None), // there's a ton of auto-generated crates

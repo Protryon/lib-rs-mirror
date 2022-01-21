@@ -20,9 +20,12 @@ use std::io::Read;
 use tar::Archive;
 
 // start end crates affected
-const DOWNLOAD_SPAM_INCIDENTS: [(&str, &str, &[&str]); 1] = [
-    ("2021-12-21", "2022-01-18", &[
-        "vsdb", "btm", "vsdbsled", "vsdb_derive", "ppv-lite86", "serde_cbor","ruc","time","fast-math","ieee754","time-macros","once_cell", "clap", "serde", "memoffset",
+const DOWNLOAD_SPAM_INCIDENTS: [(&str, &str, &[&str]); 2] = [
+    ("2021-12-10", "2022-02-10", &[
+        "vsdb", "btm", "vsdbsled", "vsdb_derive","ruc",
+    ]),
+    ("2021-12-21", "2022-01-22", &[
+        "ppv-lite86", "serde_cbor","time","fast-math","ieee754","time-macros","once_cell", "clap", "serde", "memoffset",
         "rand", "rand_core", "lazy_static", "half", "nix","cfg-if", "log", "libc", "num-traits", "serde_derive", "getrandom", "rand_chacha", "parking_lot", "lock_api",
         "instant", "parking_lot_core", "smallvec", "scopeguard", "sha3", "digest", "keccak", "proc-macro2", "unicode-xid", "quote", "syn", "fs2", "crc32fast", "fxhash",
         "byteorder", "crossbeam-epoch", "crossbeam-utils", "memoffset", "autocfg", "const_fn", "rio", "bitflags",

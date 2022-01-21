@@ -141,10 +141,13 @@ obvious-keywords = ["cache", "caching"]
 preference = 1.1
 
 [compilers]
-name = "Compilers"
+name = "Programming languages"
 description = """
-Compiler implementations, including interpreters and transpilers.\
+Tools for programming languages: compilers, interpreters, transpilers, and virtual machines.\
 """
+short-description = "Programming languages"
+title = "Rust-lang"
+preference = 0.1
 
 [command-line-interface]
 name = "Command-line interface"
@@ -227,7 +230,7 @@ A thriving market for magic beans doesn't make the magic beanstalk real. Cryptoc
 The promises are empty. The real effects are proliferation of ransomware and other criminal activity, and a huge climate-affecting energy waste. It's a great way to part VCs with their money tho.
 """
 short-description = "Blockchains and other scams."
-obvious-keywords = ["cryptography", "crypto"]
+obvious-keywords = ["cryptography", "crypto", "cryptocurrency"]
 preference = 1.2
 
 [database]
@@ -905,12 +908,12 @@ preference = 1
 
 [web-programming.categories.http-server]
 name = "HTTP server"
-title = "Rust HTTP server"
+title = "server-side Rust"
 description = """
 Crates to serve data over HTTP.\
 """
 short-description = """
-Serve data over HTTP."""
+Server-side programming"""
 obvious-keywords = ["web", "http", "server", "http-server"]
 preference = 1
 

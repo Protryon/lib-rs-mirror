@@ -18,6 +18,10 @@ github:amethyst/space-menace/space-menace
 github:amethyst/space_shooter_rs/space_shooter
 github:andars/pebble.rs/pebble
 github:andschwa/rust-genetic-algorithm/rust-genetic-algorithm
+github:appflowy-io/appflowy/dart-ffi
+github:appflowy-io/appflowy/flowy-core
+github:appflowy-io/appflowy/flowy-core-data-model
+github:appflowy-io/appflowy/flowy-document
 github:arkworks-rs/pcd/ark-pcd
 github:arthrp/consoletimer/consoletimer
 github:arthrp/quick-skeleton/quickskeleton
@@ -54,8 +58,12 @@ github:comprakt/comprakt/compiler-shared
 github:comprakt/comprakt/lowering
 github:comprakt/comprakt/mjrt
 github:comprakt/comprakt/type-checking
+github:copy/v86/v86
 github:cormac-obrien/richter/richter
 github:cristicbz/rust-doom/rs_doom
+github:cube-js/cube.js/cubeclient
+github:cube-js/cube.js/cubesql
+github:cube-js/cube.js/cubestore
 github:curlpipe/ox/ox
 github:dabreegster/abstreet/ezgui
 github:dabreegster/abstreet/map_editor
@@ -96,6 +104,11 @@ github:eirproject/eir/libeir_syntax_erl
 github:eirproject/eir/libeir_tests
 github:electric-capital/crypto-ecosystems/crypto-ecosystems
 github:elkowar/eww/eww
+github:embarkstudios/kajiya/kajiya-asset
+github:embarkstudios/kajiya/kajiya-imgui
+github:embarkstudios/kajiya/kajiya-rg
+github:embarkstudios/kajiya/kajiya-simple
+github:embarkstudios/kajiya/ngx_dlss
 github:embarkstudios/rust-gpu/rustc_codegen_spirv
 github:embarkstudios/rust-gpu/spirv-builder
 github:embarkstudios/rust-gpu/spirv-std
@@ -127,7 +140,9 @@ github:firecracker-microvm/firecracker/rate_limiter
 github:firecracker-microvm/firecracker/seccomp
 github:firecracker-microvm/firecracker/virtio_gen
 github:firecracker-microvm/firecracker/vmm
+github:flaneur2020/pua-lang/pua-lang
 github:florob/rustyxml/RustyXML
+github:flxzt/rnote/rnote
 github:foxboxpdx/macrotis/macrotis
 github:fraunhofer-aisec/rabe/rabe
 github:freaky/compactor/compactor
@@ -191,6 +206,7 @@ github:kuy/elevato-rs/elevators
 github:kvakvs/erlangrt/erlangrt
 github:kylewlacy/sorbet-cocoa/sorbet-cocoa
 github:kzen-networks/multi-party-eddsa/multi-party-ed25519
+github:lapce/lapce/lapce
 github:lemmynet/lemmy/lemmy_server
 github:libra/libra/libra-node
 github:libra/libra/libra-swarm
@@ -226,8 +242,15 @@ github:makepad/makepad/makepad_wasm
 github:maps4print/azul/azul-core
 github:maps4print/azul/azul-css
 github:maringa-gamedev/rust-igmc-2018/rust-igmc-2018
+github:materializeinc/materialize/billing-demo
+github:materializeinc/materialize/dataflowd
+github:materializeinc/materialize/kafka-util
 github:materializeinc/materialize/materialized
+github:materializeinc/materialize/metabase
+github:materializeinc/materialize/pgwire
+github:materializeinc/materialize/prof
 github:materializeinc/materialize/sql-parser
+github:materializeinc/materialize/walkabout
 github:mathall/rim/rim
 github:mbround18/valheim-docker/odin
 github:meilisearch/meilisearch/meilisearch-core
@@ -329,6 +352,7 @@ github:pop-os/apt-fetcher/apt-fetcher
 github:pop-os/apt-keyring/apt-keyring
 github:pop-os/apt-repo-crawler/apt-repo-crawler
 github:pop-os/apt-sources-lists/apt-sources-lists
+github:pop-os/cosmic-panel/pop-cosmic-panel
 github:pop-os/debrepbuild/debrepobuilder
 github:pop-os/desktop-widget/pop-desktop-widget
 github:pop-os/distinst/distinst-bootloader

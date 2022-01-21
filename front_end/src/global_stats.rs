@@ -103,7 +103,7 @@ fn downloads_over_time(start: Date<Utc>, mut day: Date<Utc>, kitchen_sink: &Kitc
 pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSink, _renderer: &Renderer) -> Result<(), anyhow::Error> {
     let (categories, recent_crates) = try_join(
         category_stats(kitchen_sink),
-        kitchen_sink.notable_recently_updated_crates(3100)).await?;
+        kitchen_sink.notable_recently_updated_crates(4100)).await?;
 
     let urler = Urler::new(None);
     let start = Utc.ymd(2015, 5, 15); // Rust 1.0
@@ -120,7 +120,7 @@ pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSin
         if let Some(v) = compat_data.remove(&o) {
             recent_compat.insert(o, v);
             rustc_stats_recent_num += 1;
-            if rustc_stats_recent_num >= 3000 {
+            if rustc_stats_recent_num >= 4000 {
                 break;
             }
         }
@@ -132,6 +132,7 @@ pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSin
     let (total_owners_at_month, mut hs_owner_crates) = owner_stats(kitchen_sink, start).await?;
     hs_owner_crates.buckets.iter_mut().take(4).for_each(|c| c.examples.truncate(6)); // normal amount of crates is boring
 
+    assert!(dl.len() >= 52*2);
     let this_year = &dl[dl.len()-52..];
     let last_year = &dl[dl.len()-52*2..dl.len()-52];
 
@@ -301,6 +302,7 @@ fn cat_slugs(sub: &'static CategoryMap) -> Vec<TreeBox> {
         out.push(TreeBox {
             cat: c,
             label: c.name.clone(),
+            title: c.name.clone(),
             count: 0,
             weight: 0.,
             bounds: treemap::Rect::new(),
@@ -315,6 +317,7 @@ fn cat_slugs(sub: &'static CategoryMap) -> Vec<TreeBox> {
 #[derive(Debug, Clone)]
 pub struct TreeBox {
     pub cat: &'static Category,
+    pub title: String,
     pub label: String,
     pub font_size: f64,
     /// SVG fill
@@ -357,6 +360,7 @@ async fn category_stats(kitchen_sink: &KitchenSink) -> Result<Vec<TreeBox>, anyh
     fn new_cat(sub: Vec<TreeBox>) -> TreeBox {
         TreeBox {
             cat: CATEGORIES.root.values().nth(0).unwrap(),
+            title: String::new(),
             label: String::new(),
             font_size: 0.,
             color: String::new(),
@@ -374,7 +378,13 @@ async fn category_stats(kitchen_sink: &KitchenSink) -> Result<Vec<TreeBox>, anyh
     find_cat("config", &mut roots).label = "Config".into();
     find_cat("os", &mut roots).label = "OS".into();
     find_cat("internationalization", &mut roots).label = "i18n".into();
-
+    find_cat("authentication", &mut roots).label = "Auth".into();
+    find_cat("visualization", &mut roots).label = "Visualize".into();
+    find_cat("accessibility", &mut roots).label = "a11y".into();
+    find_cat("compilers", &mut roots).label = "Lang".into();
+    find_cat("os::macos-apis", &mut find_cat("os", &mut roots).sub).label = "Apple".into();
+    find_cat("rendering::engine", &mut find_cat("rendering", &mut roots).sub).label = "Engine".into();
+    find_cat("rendering::data-formats", &mut find_cat("rendering", &mut roots).sub).label = "Formats".into();
 
     // group them in a more sensible way
     let parsers = vec![take_cat("parsing", &mut roots), take_cat("parser-implementations", &mut roots)];
@@ -497,7 +507,7 @@ fn postprocess_treebox_items(items: &mut Vec<TreeBox>) {
         let lines = maybe_label.len();
         let try_font_size = item.font_size
             .min(item.bounds.h / (lines as f64 * 1.05) - 4.)
-            .min(item.bounds.w * 1.7 / chars as f64)
+            .min(item.bounds.w * 1.6 / chars as f64)
             .max(4.);
 
         let max_width = (item.bounds.w / (try_font_size / 1.7)) as usize;
@@ -509,7 +519,7 @@ fn postprocess_treebox_items(items: &mut Vec<TreeBox>) {
         item.label = label.join("\n");
         item.font_size = item.font_size
             .min(item.bounds.h / (lines as f64 * 1.05) - 4.)
-            .min(item.bounds.w * 1.7 / chars as f64)
+            .min(item.bounds.w * 1.6 / chars as f64)
             .max(4.);
     }
 }

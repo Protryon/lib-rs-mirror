@@ -176,11 +176,12 @@ display: -webkit-box;
             </style>
             @for b in &stats.categories {
                 <rect class="cat" fill="@b.color" fill-opacity="0.7" x=@b.bounds.x y=@b.bounds.y width=@b.bounds.w height=@b.bounds.h>
-                    <title>@b.label (@b.count)</title></rect>
+                    <title>@b.title (@b.count)</title></rect>
                 <a href="@url.category(&b.cat)">
                 @for (i, w) in b.label.lines().enumerate() {<text
                     font-size="@b.font_size" fill="black" stroke="none" x="@(b.bounds.x + 3.)" y="@b.line_y(i)"
-                    text-anchor=start><title>@b.label (@b.count)</title>@w</text>}
+                    text-anchor=start><title>@b.title (@b.count)</title>@w
+</text>}
                 </a>
                 @if b.can_fit_count() {
                     <text font-size="@(b.font_size.min(10.5))" fill="black" opacity="0.5" stroke="none"

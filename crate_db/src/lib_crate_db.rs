@@ -1148,10 +1148,8 @@ impl KeywordInsert {
 }
 
 fn normalize_keyword(k: &str) -> String {
-    if k == "iOS" {
-        return "ios".into(); // silly i-os
-    }
-    if !k.is_ascii() { // heck messes up CJK
+    // heck messes up CJK, i-os looks bad
+    if !k.is_ascii() || k == "eBPF" || k == "iOS" {
         return k.to_lowercase();
     }
     k.to_kebab_case()

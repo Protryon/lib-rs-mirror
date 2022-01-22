@@ -448,7 +448,7 @@ impl KitchenSink {
 
         // apply some rank weight to downgrade spam, and pull main crates before their -sys or -derive
         for (origin, score) in &mut top {
-            *score *= 0.5 + self.crate_db.crate_rank(origin).await.unwrap_or(0.);
+            *score *= 0.3 + self.crate_db.crate_rank(origin).await.unwrap_or(0.);
         }
         top.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
 

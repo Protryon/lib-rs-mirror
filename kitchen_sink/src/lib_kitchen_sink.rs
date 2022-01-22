@@ -226,6 +226,8 @@ pub struct KitchenSink {
 pub enum SharedEvent {
     // Origin serialized
     CrateIndexed(String),
+    /// Newer crates.io release found
+    CrateUpdated(String),
     DailyStatsUpdated,
 }
 
@@ -632,6 +634,8 @@ impl KitchenSink {
 
         let mut crates2 = futures::stream::iter(self.crate_db.crates_to_reindex().await?.into_iter())
             .map(move |origin| async move {
+                let _ = self.event_log.post(&SharedEvent::CrateUpdated(origin.to_str())).map_err(|e| error!("{}", e));
+
                 self.rich_crate_async(&origin).await.map_err(|e| {
                     error!("Can't reindex {:?}: {}", origin, e);
                     for e in e.chain() {

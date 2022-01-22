@@ -146,7 +146,7 @@ async fn run_server(rt: Handle) -> Result<(), anyhow::Error> {
                 debug!("Got events from the log {:?}", batch);
                 for ev in batch.filter_map(|e| e.ok()) {
                     match ev {
-                        CrateIndexed(origin_str) => {
+                        CrateIndexed(origin_str) | CrateUpdated(origin_str) => {
                             info!("Purging local cache {}", origin_str);
                             let o = Origin::from_str(&origin_str);
                             state.crates.load().clear_cache_of_crate(&o);

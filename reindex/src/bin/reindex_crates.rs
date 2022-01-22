@@ -57,6 +57,16 @@ fn main() {
     let lines = TempCache::new(r.crates.main_cache_dir().join("search-uniq-lines.dat")).expect("init lines cache");
     let (tx, mut rx) = mpsc::channel::<(Arc<_>, _, _)>(64);
 
+    let r2 = r.clone();
+    std::thread::spawn(move || loop {
+        std::thread::sleep(Duration::from_millis(1000));
+        if stopped() {
+            eprintln!("Flushing caches");
+            r2.crates.cleanup();
+            return;
+        }
+    });
+
     let index_thread = rt.spawn({
         async move {
             let renderer = Arc::new(Renderer::new(None));

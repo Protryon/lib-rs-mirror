@@ -184,20 +184,21 @@ async fn run_server(rt: Handle) -> Result<(), anyhow::Error> {
                     false
                 };
                 if should_reload {
-                    last_reload = Instant::now();
                     match KitchenSink::new(&data_dir, &github_token).await {
                         Ok(k) => {
+                            info!("Reloading state");
                             state.crates.load().cleanup();
                             let k = Arc::new(k);
                             let _ = tokio::task::spawn({
                                 let k = k.clone();
                                 async move {
-                                    k.update().await
+                                    k.update().await;
+                                    k.prewarm().await;
                                 }
                             }).await;
+                            last_reload = Instant::now();
                             state.crates.store(k);
                             info!("Reloaded state");
-                            state.crates.load().prewarm().await;
                         },
                         Err(e) => {
                             error!("Refresh failed: {}", e);

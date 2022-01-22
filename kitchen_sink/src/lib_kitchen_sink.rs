@@ -2948,16 +2948,16 @@ impl KitchenSink {
 
     /// Prepare for drop: purge buffers, free memory
     pub fn cleanup(&self) {
-        self.index.clear_cache();
         let _ = self.crates_io_owners_cache.save();
         let _ = self.depender_changes.save();
         let _ = self.stats_histograms.save();
         let _ = self.url_check_cache.save();
         let _ = self.readme_check_cache.save();
         let _ = self.yearly.save();
-        self.loaded_rich_crate_version_cache.write().clear();
         self.crate_rustc_compat_cache.write().clear();
         self.crates_io.cleanup();
+        self.loaded_rich_crate_version_cache.write().clear();
+        self.index.clear_cache();
     }
 
     #[inline]

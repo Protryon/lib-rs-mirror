@@ -21,14 +21,14 @@ ENV PATH="$PATH:/home/rustyuser/.cargo/bin"
 RUN cargo install lts --vers ^0.3.1
 RUN rustup set profile minimal
 RUN cargo install libc --vers 99.9.9 || true # force index update
+RUN rustup toolchain add 1.46.0
+RUN rustup toolchain add 1.48.0
+RUN rustup toolchain add 1.50.0
+RUN rustup toolchain add 1.52.0
 RUN rustup toolchain add 1.56.0
-RUN rustup toolchain add 1.34.0
-RUN rustup toolchain add 1.39.0
-RUN rustup toolchain add 1.43.0
-RUN rustup toolchain add 1.45.0
-RUN rustup toolchain add 1.51.0
-RUN rustup toolchain add 1.54.0
 RUN rustup toolchain add 1.57.0
+RUN rustup toolchain add 1.19.0
+RUN rustup toolchain add 1.25.0
 RUN rustup toolchain list
 # RUN cargo new lts-dummy; cd lts-dummy; cargo lts setup; echo 'itoa = "*"' >> Cargo.toml; cargo update;
 "##;
@@ -36,15 +36,15 @@ RUN rustup toolchain list
 const TEMP_JUNK_DIR: &str = "/var/tmp/crates_env";
 
 const RUST_VERSIONS: [&str; 9] = [
-"1.56.0",
-"1.34.0",
-"1.39.0",
-"1.43.0",
-"1.45.0",
-"1.51.0",
-"1.54.0",
-"1.57.0",
+"1.46.0",
+"1.48.0",
+"1.50.0",
+"1.52.0",
 "1.55.0",
+"1.56.0",
+"1.57.0",
+"1.19.0",
+"1.25.0",
 ];
 
 use crate_db::builddb::*;
@@ -205,7 +205,7 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
     let mut rng = rand::thread_rng();
     let mut candidates: Vec<_> = all.versions().iter().rev() // rev() starts from most recent
         .filter(|v| !v.is_yanked())
-        .take(10)
+        .take(200)
         .filter_map(|v| SemVer::parse(v.version()).ok())
         .map(|v| {
             let c = compat_info.remove(&v).unwrap_or_default();
@@ -266,10 +266,10 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
     if has_anything_built_ok_yet {
         // biggest gap, then latest ver
         candidates.sort_unstable_by(|a,b| b.score.cmp(&a.score).then(b.ver.cmp(&a.ver)));
-        candidates.truncate(10);
+        candidates.truncate(50);
     } else {
         candidates.shuffle(&mut rng); // dunno which versions will build
-        candidates.truncate(4); // don't waste time on broken crates
+        candidates.truncate(25); // don't waste time on broken crates
     }
 
     for c in &candidates {
@@ -389,8 +389,12 @@ fn do_builds(docker_root: &Path, versions: &[(&'static str, Arc<str>, SemVer)]) 
                 RUSTC_BOOTSTRAP=1 timeout 20 cargo +$rustver -Z no-index-update fetch || timeout 40 cargo +$rustver fetch;
                 timeout 90 nice cargo +$rustver check -j3 --locked --message-format=json >>"$stdoutfile" 2>"$stderrfile";
             }} || {{
+                local rustfetchver="$rustver"
+                if [ "$rustver" == "1.19.0" ]; then
+                    rustfetchver="1.25.0"
+                fi
                 echo >>"$stdoutfile" "CHECKING $rustver $crate_name $libver (minimal-versions)"
-                RUSTC_BOOTSTRAP=1 timeout 20 cargo +$rustver -Z minimal-versions generate-lockfile;
+                RUSTC_BOOTSTRAP=1 timeout 20 cargo +$rustfetchver -Z minimal-versions generate-lockfile;
                 timeout 40 nice cargo +$rustver check -j3 --locked --message-format=json >>"$stdoutfile" 2>>"$stderrfile";
             }}
         }}

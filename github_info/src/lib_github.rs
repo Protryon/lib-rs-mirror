@@ -16,8 +16,8 @@ use quick_error::quick_error;
 quick_error! {
     #[derive(Debug)]
     pub enum Error {
-        NoBody {
-            display("Reponse with no body")
+        NoBody(key: String) {
+            display("Reponse with no body ({})", key)
         }
         TryAgainLater {
             display("Accepted, but no data available yet")
@@ -216,7 +216,7 @@ impl GitHub {
             Some(res) if !non_parsable_body => Some(Box::pin(res.obj()).await?),
             _ => None,
         };
-        match body.ok_or(Error::NoBody).and_then(|stats| {
+        match body.ok_or_else(|| Error::NoBody(format!("{},{}", key.0, key.1))).and_then(|stats| {
             let dbg = format!("stats={:?}", stats);
             Ok(postproc(serde_json::from_value(stats).map_err(|e| {
                 eprintln!("Error matching JSON: {}\n {} data: {}", e, key.0, dbg); e

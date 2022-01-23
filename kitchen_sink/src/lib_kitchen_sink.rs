@@ -124,6 +124,14 @@ pub enum Warning {
     ManifestParseError(String),
     #[error("Bad category: {}", _0)]
     BadCategory(String),
+    #[error("No categories specified")]
+    NoCategories,
+    #[error("No keywords specified")]
+    NoKeywords,
+    #[error("Edition {:?}, but MSRV {}", _0, _1)]
+    EditionMSRV(Edition, u16),
+    #[error("Bad MSRV: needs {}, but has {}", _0, _1)]
+    BadMSRV(u16, u16),
 }
 
 #[derive(Debug, Clone, thiserror::Error)]
@@ -1753,6 +1761,14 @@ impl KitchenSink {
             warnings.insert(Warning::BadCategory(c.clone()));
         }
 
+        if category_slugs.is_empty() && bad_categories.is_empty() {
+            warnings.insert(Warning::NoCategories);
+        }
+
+        if package.keywords.is_empty() {
+            warnings.insert(Warning::NoKeywords);
+        }
+
         if let Some(overrides) = self.category_overrides.get(origin.short_crate_name()) {
             category_slugs = overrides;
         }
@@ -1778,6 +1794,10 @@ impl KitchenSink {
             Some(r) => self.crate_db.path_in_repo(r, &package.name).await?,
             None => None,
         };
+
+        for w in &warnings {
+            debug!("{}: {}", package.name, w);
+        }
 
         let cached = CachedCrate {
             manifest,

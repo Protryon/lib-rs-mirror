@@ -283,6 +283,10 @@ impl RichCrateVersion {
         &self.derived.language_stats
     }
 
+    pub fn explicit_msrv(&self) -> Option<&str> {
+        self.package().rust_version.as_deref()
+    }
+
     /// compressed (whole tarball) and decompressed (extracted files only)
     #[inline]
     pub fn crate_size(&self) -> (usize, usize) {

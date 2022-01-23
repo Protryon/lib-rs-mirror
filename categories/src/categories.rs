@@ -116,10 +116,10 @@ impl Categories {
     }
 
 
-    pub fn fixed_category_slugs<'a, 'z>(cats: &'a [String], warnings: &'z mut Vec<String>) -> Vec<Cow<'a, str>> {
+    pub fn fixed_category_slugs<'a, 'z>(cats: &'a [String], invalid_categories: &'z mut Vec<String>) -> Vec<Cow<'a, str>> {
         let mut cats = cats.iter().enumerate()
-        .filter_map(|(idx, s)| {
-            let s = s.trim_matches(':');
+        .filter_map(|(idx, orig_name)| {
+            let s = orig_name.trim().trim_matches(':');
             let mut chars = s.chars().peekable();
             while let Some(cur) = chars.next() {
                 // look for a:b instead of a::b
@@ -137,12 +137,12 @@ impl Categories {
                     return None;
                 }
                 let depth = slug.split("::").count();
-                return Some((depth, idx, slug.into()));
+                return Some((depth, idx, slug.into(), orig_name));
             }
             let depth = s.split("::").count();
-            Some((depth, idx, Cow::Borrowed(s)))
+            Some((depth, idx, Cow::Borrowed(s), orig_name))
         })
-        .filter(|(_, _, s)| {
+        .filter(|(_, _, s, orig_name)| {
             if s.len() < 2 {
                 return false;
             }
@@ -153,11 +153,12 @@ impl Categories {
                 return false;
             }
             if !CATEGORIES.from_slug(s).1 {
-                warnings.push(format!("invalid cat name {}", s));
+                invalid_categories.push(orig_name.to_string());
                 return false;
             }
             true
         })
+        .map(|(a,b,c,_)| (a,b,c))
         .collect::<Vec<_>>();
 
         // depth, then original order

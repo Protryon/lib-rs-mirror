@@ -1,9 +1,7 @@
 use chrono::prelude::*;
 use heck::KebabCase;
-use rich_crate::CachedCrate;
 use rich_crate::CrateOwner;
 use rich_crate::CrateVersionSourceData;
-use rich_crate::Derived;
 use rich_crate::Manifest;
 use rich_crate::ManifestExt;
 use rich_crate::Origin;
@@ -64,9 +62,16 @@ pub struct CrateVersionData<'a> {
     pub is_dev: bool,
     pub authors: &'a [rich_crate::Author],
     pub category_slugs: &'a [Cow<'a, str>],
+    pub bad_categories: &'a [String],
     pub repository: Option<&'a Repo>,
     pub extracted_auto_keywords: Vec<(f32, String)>,
     pub cache_key: u64,
+}
+
+/// Metadata guessed
+pub struct DbDerived {
+    pub categories: Vec<String>,
+    pub keywords: Vec<String>,
 }
 
 pub struct CrateOwnerStat {
@@ -205,7 +210,7 @@ impl CrateDb {
 
     /// Add data of the latest version of a crate to the index
     /// Score is a ranking of a crate (0 = bad, 1 = great)
-    pub async fn index_latest(&self, c: CrateVersionData<'_>) -> FResult<CachedCrate> {
+    pub async fn index_latest(&self, c: CrateVersionData<'_>) -> FResult<DbDerived> {
         let origin = c.origin.to_str();
 
         let manifest = &c.manifest;
@@ -356,37 +361,12 @@ impl CrateDb {
                 keywords = Self::keywords_tx(tx, c.origin)?;
             }
 
-            let package = manifest.package.as_ref().expect("package in manifest");
-            let name = &package.name;
-            let maybe_repo = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
-            let path_in_repo = match maybe_repo.as_ref() {
-                Some(repo) => Self::path_in_repo_tx(tx, repo, name)?,
-                None => None,
-            };
-
-            let res = CachedCrate {
-                cache_key: c.cache_key,
-                manifest: c.manifest.clone(),
-                derived: Derived {
-                    path_in_repo,
-                    readme: c.source_data.readme.clone(),
-                    categories: categories.iter().map(|(_,_,slug)| slug.to_owned()).collect::<Vec<_>>(),
-                    keywords,
-                    crate_compressed_size: c.source_data.crate_compressed_size,
-                    crate_decompressed_size: c.source_data.crate_decompressed_size,
-                    capitalized_name: c.source_data.capitalized_name.clone(),
-                    lib_file: c.source_data.lib_file.clone(),
-                    has_buildrs: c.source_data.has_buildrs,
-                    is_nightly: c.source_data.is_nightly,
-                    is_yanked: c.source_data.is_yanked,
-                    has_code_of_conduct: c.source_data.has_code_of_conduct,
-                    language_stats: c.source_data.language_stats.clone(),
-                },
-            };
-
             mark_updated.execute(&[&crate_id, &next_timestamp])?;
             println!("{}", out);
-            Ok(res)
+            Ok(DbDerived {
+                categories: categories.iter().map(|(_,_,slug)| slug.to_owned()).collect::<Vec<_>>(),
+                keywords,
+            })
         }).await
     }
 
@@ -394,32 +374,24 @@ impl CrateDb {
     ///
     /// Rank relevance is normalized and biased towards one top category
     fn extract_crate_categories(&self, conn: &Connection, c: &CrateVersionData<'_>, keywords: impl Iterator<Item=String>, is_important_ish: bool) -> FResult<(Vec<(f64, f64, String)>, bool)> {
-        let (explicit_categories, invalid_categories): (Vec<_>, Vec<_>) = c.category_slugs.iter().map(|c| c.to_string())
-            .partition(|slug| {
-                categories::CATEGORIES.from_slug(&slug).1
-            });
-        let had_explicit_categories = !explicit_categories.is_empty();
+        let keywords = keywords.chain(c.bad_categories.iter().cloned()).collect();
 
-        let keywords_collected = keywords.chain(invalid_categories).collect();
-
+        let had_explicit_categories = !c.category_slugs.is_empty();
         let mut categories: Vec<_> = if had_explicit_categories {
-            let cat_w = 10.0 / (9.0 + explicit_categories.len() as f64);
-            let candidates = explicit_categories
-                .into_iter()
+            let cat_w = 10.0 / (9.0 + c.category_slugs.len() as f64);
+            let candidates = c.category_slugs
+                .iter()
                 .enumerate()
                 .map(|(i, slug)| {
-                    let mut w = 100. / (5 + i.pow(2)) as f64 * cat_w;
-                    if slug.contains("::") {
-                        w *= 1.3; // more specific
-                    }
-                    (slug, w)
+                    let w = 100. / (5 + i.pow(2)) as f64 * cat_w;
+                    (slug.to_string(), w)
                 })
                 .collect();
 
-            categories::adjusted_relevance(candidates, &keywords_collected, 0.01, 15)
+            categories::adjusted_relevance(candidates, &keywords, 0.01, 15)
         } else {
             let cat_w = 0.2 + 0.2 * c.manifest.package().keywords.len() as f64;
-            Self::guess_crate_categories_tx(conn, c.origin, &keywords_collected, if is_important_ish {0.1} else {0.25})?.into_iter()
+            Self::guess_crate_categories_tx(conn, c.origin, &keywords, if is_important_ish {0.1} else {0.25})?.into_iter()
             .map(|(w, slug)| {
                 ((w * cat_w).min(0.99), slug)
             }).collect()
@@ -1196,7 +1168,7 @@ version="1.2.3"
 keywords = ["test-CRATE"]
 categories = ["1", "two", "GAMES", "science", "::science::math::"]
 "#).unwrap();
-    let new = db.index_latest(CrateVersionData {
+    let new_derived = db.index_latest(CrateVersionData {
         source_data: &source_data,
         manifest: &manifest,
         origin: &origin,
@@ -1204,28 +1176,16 @@ categories = ["1", "two", "GAMES", "science", "::science::math::"]
         is_build: false,
         is_dev: false,
         authors: &[],
-        category_slugs: &[],
+        category_slugs: &["science".into()],
+        bad_categories: &["face".into(), "book".into()],
         repository: None,
         cache_key: 1,
         extracted_auto_keywords: Vec::new(),
     }).await.unwrap();
     assert_eq!(1, db.crates_with_keyword("test-crate").await.unwrap());
-    let new_manifest = new.manifest;
-    let new_derived = new.derived;
-    assert_eq!(manifest.package().name, new_manifest.package().name);
-    assert_eq!(manifest.package().keywords, new_manifest.package().keywords);
-    assert_eq!(manifest.package().categories, new_manifest.package().categories);
-
-    assert_eq!(new_derived.language_stats, source_data.language_stats);
-    assert_eq!(new_derived.crate_compressed_size, source_data.crate_compressed_size);
-    assert_eq!(new_derived.crate_decompressed_size, source_data.crate_decompressed_size);
-    assert_eq!(new_derived.is_nightly, source_data.is_nightly);
-    assert_eq!(new_derived.capitalized_name, source_data.capitalized_name);
-    assert_eq!(new_derived.readme, source_data.readme);
-    assert_eq!(new_derived.lib_file, source_data.lib_file);
-    assert_eq!(new_derived.has_buildrs, source_data.has_buildrs);
-    assert_eq!(new_derived.has_code_of_conduct, source_data.has_code_of_conduct);
-    assert_eq!(new_derived.is_yanked, source_data.is_yanked);
+    assert_eq!(new_derived.categories.len(), 1); // uses slugs, not manifest
+    assert_eq!(new_derived.categories[0], "science");
+    assert_eq!(new_derived.keywords.len(), 1); // only keywords from manifest
     });
     rt.block_on(f).unwrap();
 }

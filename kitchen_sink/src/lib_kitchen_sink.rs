@@ -122,6 +122,8 @@ pub enum Warning {
     BrokenLink(String, String),
     #[error("Error parsing manifest: {}", _0)]
     ManifestParseError(String),
+    #[error("Bad category: {}", _0)]
+    BadCategory(String),
 }
 
 #[derive(Debug, Clone, thiserror::Error)]
@@ -207,7 +209,7 @@ pub struct KitchenSink {
     git_checkout_path: PathBuf,
     main_cache_dir: PathBuf,
     yearly: AllDownloads,
-    category_overrides: HashMap<String, Vec<Cow<'static, str>>>,
+    category_overrides: HashMap<Box<str>, Vec<Cow<'static, str>>>,
     crates_io_owners_cache: TempCache<Vec<CrateOwner>>,
     depender_changes: TempCache<Vec<DependerChanges>>,
     stats_histograms: TempCache<StatsHistogram>,
@@ -344,7 +346,7 @@ impl KitchenSink {
         Ok(out)
     }
 
-    fn load_category_overrides(path: &Path) -> CResult<HashMap<String, Vec<Cow<'static, str>>>> {
+    fn load_category_overrides(path: &Path) -> CResult<HashMap<Box<str>, Vec<Cow<'static, str>>>> {
         let p = std::fs::read_to_string(path)?;
         let mut out = HashMap::new();
         for line in p.lines() {
@@ -358,7 +360,7 @@ impl KitchenSink {
             if categories.is_empty() {
                 continue;
             }
-            out.insert(crate_name.to_owned(), categories);
+            out.insert(crate_name.into(), categories);
         }
         Ok(out)
     }
@@ -1712,21 +1714,7 @@ impl KitchenSink {
 
         timeout("before-index", 5, self.crate_db.before_index_latest(origin).map_err(anyhow::Error::from)).await?;
 
-        let ((source_data, manifest, _warn), cache_key) = match origin {
-            Origin::CratesIo(ref name) => {
-                let cache_key = self.index.cache_key_for_crate(name)?;
-                let ver = self.index.crate_highest_version(name, false).context("rich_crate_version2")?;
-                let res = watch("reindexing-cio-data", self.rich_crate_version_data_from_crates_io(ver)).await.context("rich_crate_version_data_from_crates_io")?;
-                (res, cache_key)
-            },
-            Origin::GitHub { .. } | Origin::GitLab { .. } => {
-                if !self.crate_exists(origin) {
-                    return Err(KitchenSinkErr::GitCrateNotAllowed(origin.to_owned()).into())
-                }
-                let res = watch("reindexing-repodata", self.rich_crate_version_from_repo(origin)).await?;
-                (res, 0)
-            },
-        };
+        let (source_data, manifest, mut warnings, cache_key) = self.fetch_rich_crate_version_data(origin).await?;
 
         let _ = tokio::task::block_in_place(|| self.index_msrv_from_manifest(origin, &manifest)).map_err(|e| error!("{}", e));
 
@@ -1754,23 +1742,22 @@ impl KitchenSink {
         let repository = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
         let authors = package.authors.iter().map(|a| Author::new(a)).collect::<Vec<_>>();
 
-        let tmp;
-        let category_slugs = if let Some(overrides) = self.category_overrides.get(origin.short_crate_name()) {
-            &overrides
-        } else {
-            let mut warnings = Vec::new();
-            tmp = categories::Categories::fixed_category_slugs(&package.categories, &mut warnings);
-            if !warnings.is_empty() {
-                warn!("{}: {}", package.name, warnings.join("; "));
-            }
-            &tmp
-        };
+        let mut bad_categories = Vec::new();
+        let mut category_slugs = &categories::Categories::fixed_category_slugs(&package.categories, &mut bad_categories);
+        for c in &bad_categories {
+            warnings.insert(Warning::BadCategory(c.clone()));
+        }
+
+        if let Some(overrides) = self.category_overrides.get(origin.short_crate_name()) {
+            category_slugs = overrides;
+        }
 
         let extracted_auto_keywords = feat_extractor::auto_keywords(&manifest, source_data.github_description.as_deref(), readme_text.as_deref());
 
         let db_index = self.crate_db.index_latest(CrateVersionData {
             cache_key,
-            category_slugs,
+            good_category_slugs: category_slugs,
+            bad_categories: &bad_categories,
             authors: &authors,
             origin,
             repository: repository.as_ref(),
@@ -1780,11 +1767,55 @@ impl KitchenSink {
             source_data: &source_data,
             extracted_auto_keywords,
         });
-        let cached = timeout("db-index", 16, db_index.map_err(anyhow::Error::from)).await?;
+        let d = timeout("db-index", 16, db_index.map_err(anyhow::Error::from)).await?;
+
+        let path_in_repo = match repository.as_ref() {
+            Some(r) => self.crate_db.path_in_repo(r, &package.name).await?,
+            None => None,
+        };
+
+        let cached = CachedCrate {
+            manifest,
+            cache_key,
+            derived: rich_crate::Derived {
+                categories: d.categories,
+                keywords: d.keywords,
+                path_in_repo,
+                language_stats: source_data.language_stats,
+                crate_compressed_size: source_data.crate_compressed_size,
+                crate_decompressed_size: source_data.crate_decompressed_size,
+                is_nightly: source_data.is_nightly,
+                capitalized_name: source_data.capitalized_name,
+                readme: source_data.readme,
+                lib_file: source_data.lib_file,
+                has_buildrs: source_data.has_buildrs,
+                has_code_of_conduct: source_data.has_code_of_conduct,
+                is_yanked: source_data.is_yanked,
+            },
+        };
         self.derived_cache.set_serialize((&origin.to_str(), ""), &cached)?;
 
         self.event_log.post(&SharedEvent::CrateIndexed(origin.to_str()))?;
         Ok(())
+    }
+
+    async fn fetch_rich_crate_version_data(&self, origin: &Origin) -> CResult<(CrateVersionSourceData, Manifest, HashSet<Warning>, u64)> {
+        let ((source_data, manifest, warnings), cache_key) = match origin {
+            Origin::CratesIo(ref name) => {
+                let cache_key = self.index.cache_key_for_crate(name)?;
+                let ver = self.index.crate_highest_version(name, false).context("rich_crate_version2")?;
+                let res = watch("reindexing-cio-data", self.rich_crate_version_data_from_crates_io(ver)).await.context("rich_crate_version_data_from_crates_io")?;
+                (res, cache_key)
+            },
+            Origin::GitHub { .. } | Origin::GitLab { .. } => {
+                if !self.crate_exists(origin) {
+                    return Err(KitchenSinkErr::GitCrateNotAllowed(origin.to_owned()).into())
+                }
+                let res = watch("reindexing-repodata", self.rich_crate_version_from_repo(origin)).await?;
+                (res, 0)
+            },
+        };
+        Ok((source_data, manifest, warnings, cache_key))
     }
 
     fn capitalized_name<'a>(name: &str, source_sentences: impl Iterator<Item = &'a str>) -> String {

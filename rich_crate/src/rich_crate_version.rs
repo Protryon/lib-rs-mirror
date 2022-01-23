@@ -2,7 +2,7 @@ use crate::Author;
 use crate::Markup;
 use crate::Origin;
 use crate::Readme;
-use cargo_toml::{Dependency, Manifest, Package};
+use cargo_toml::{Dependency, Manifest, Package, OptionalFile};
 pub use cargo_toml::{DepsSet, Edition, Resolver, FeatureSet, MaintenanceStatus, TargetDepsSet};
 use repo_url::Repo;
 use std::borrow::Cow;
@@ -169,7 +169,7 @@ impl RichCrateVersion {
     }
 
     pub fn has_buildrs(&self) -> bool {
-        self.derived.has_buildrs || self.package().build.as_ref().map_or(false, |v| v.as_str().is_some() || v.as_bool().unwrap_or(false))
+        self.derived.has_buildrs || matches!(self.package().build, Some(OptionalFile::Path(_) | OptionalFile::Flag(true)))
     }
 
     pub fn has_code_of_conduct(&self) -> bool {

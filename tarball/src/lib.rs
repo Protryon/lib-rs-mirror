@@ -1,4 +1,5 @@
 use cargo_toml::Manifest;
+use cargo_toml::OptionalFile;
 use cargo_toml::Package;
 use libflate::gzip::Decoder;
 use render_readme::Markup;
@@ -239,7 +240,7 @@ impl CrateFile {
 /// Check if given filename is a README. If `package` is missing, guess.
 fn is_readme_filename(path: &Path, package: Option<&Package>) -> bool {
     path.to_str().map_or(false, |pathstr| {
-        if let Some(&Package { readme: Some(ref r), .. }) = package {
+        if let Some(&Package { readme: OptionalFile::Path(ref r), .. }) = package {
             // packages put ./README which doesn't match README
             r.trim_start_matches('.').trim_start_matches('/') == pathstr
         } else {

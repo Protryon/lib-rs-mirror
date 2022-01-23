@@ -2071,10 +2071,20 @@ impl KitchenSink {
             msrv = msrv.max(37);
         }
 
+        if let Some(ver) = &package.rust_version {
+            msrv = msrv.max(56); // rust-version added at all
+            if let Some(minor) = ver.split('.').nth(1).and_then(|minor| minor.parse().ok()) {
+                msrv = msrv.max(minor);
+            }
+        }
+
         // uses Option as iter
         let mut profiles = manifest.profile.release.iter().chain(&manifest.profile.dev).chain(&manifest.profile.test).chain(&manifest.profile.bench).chain(&manifest.profile.doc);
         if profiles.any(|p| p.build_override.is_some() || !p.package.is_empty()) {
             msrv = msrv.max(41);
+        }
+        if profiles.any(|p| p.strip.is_some()) {
+            msrv = msrv.max(59); // FIXME: not released as of yet
         }
 
         if matches!(package.resolver, Some(rich_crate::Resolver::V2)) {

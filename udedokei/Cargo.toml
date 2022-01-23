@@ -9,3 +9,6 @@ tokei = "12.0.4"
 ignore = "0.4.16"
 serde = "1.0.115"
 serde_derive = "1.0.115"
+
+[badges]
+maintenance = { status = "as-is" }

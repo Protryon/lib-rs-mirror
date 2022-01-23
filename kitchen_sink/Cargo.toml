@@ -20,7 +20,7 @@ github_info = { path = "../github_info", version = "0.9.3" }
 crate_git_checkout = { path = "../crate_git_checkout", version = "0.4.7" }
 user_db = { path = "../user_db", version = "0.3" }
 tarball = { path = "../tarball" }
-cargo_toml = "0.10.0"
+cargo_toml = "0.11.0"
 
 crate_db = { path = "../crate_db", version = "0.4.0" }
 categories = { path = "../categories" }

@@ -111,7 +111,7 @@ impl AllVersions {
         }).collect();
         combined_meta.sort_by(|(a, ..), (b, ..)| a.cmp(b));
 
-        let compat = kitchen_sink.rustc_compatibility(all).await?;
+        let compat = kitchen_sink.rustc_compatibility(&all).await?;
 
         let mut prev_required_deps = None::<HashMap<String, HashMap<_, _>>>;
         let mut prev_features = None::<HashSet<_>>;

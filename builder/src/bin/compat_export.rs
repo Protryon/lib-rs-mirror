@@ -59,7 +59,7 @@ async fn main() {
 
 async fn crate_compat(crates: &KitchenSink, name: &str) -> kitchen_sink::CResult<()> {
     let all = crates.rich_crate_async(&Origin::from_crates_io_name(name)).await?;
-    let compat = crates.rustc_compatibility(all).await?;
+    let compat = crates.rustc_compatibility(&all).await?;
 
     // if the raw ones are all missing, then it has never been tested with cargo check
     // so all the data is assumed based on release dates

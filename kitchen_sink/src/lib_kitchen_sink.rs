@@ -2119,7 +2119,7 @@ impl KitchenSink {
         Ok(())
     }
 
-    pub async fn rustc_compatibility(&self, all: RichCrate) -> Result<CompatByCrateVersion, KitchenSinkErr> {
+    pub async fn rustc_compatibility(&self, all: &RichCrate) -> Result<CompatByCrateVersion, KitchenSinkErr> {
         let in_progress = Arc::new(Mutex::new(HashSet::new()));
         Ok(self.rustc_compatibility_inner(all, in_progress).await?.unwrap())
     }
@@ -2140,7 +2140,7 @@ impl KitchenSink {
             .map_err(|_| KitchenSinkErr::BadRustcCompatData)
     }
 
-    fn rustc_compatibility_inner<'a>(&'a self, all: RichCrate, in_progress: Arc<Mutex<HashSet<Origin>>>) -> BoxFuture<'a, Result<Option<CompatByCrateVersion>, KitchenSinkErr>> { async move {
+    fn rustc_compatibility_inner<'a>(&'a self, all: &'a RichCrate, in_progress: Arc<Mutex<HashSet<Origin>>>) -> BoxFuture<'a, Result<Option<CompatByCrateVersion>, KitchenSinkErr>> { async move {
         if let Some(cached) = self.crate_rustc_compat_get_cached(all.origin()) {
             return Ok(Some(cached));
         }
@@ -2196,7 +2196,7 @@ impl KitchenSink {
                     } else {
                         debug!("recursing to get compat of {}", dep_origin.short_crate_name());
                         let dep_rich_crate = self.rich_crate_async(&dep_origin).await.ok()?;
-                        self.rustc_compatibility_inner(dep_rich_crate, in_progress).await.ok()??
+                        self.rustc_compatibility_inner(&dep_rich_crate, in_progress).await.ok()??
                     };
                     Some((dep_compat, dep_origin, reqs))
                 }

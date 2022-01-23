@@ -257,7 +257,7 @@ pub async fn render_trending_crates(out: &mut impl Write, kitchen_sink: &Kitchen
 pub async fn render_debug_page(out: &mut impl Write, all: RichCrate, kitchen_sink: &KitchenSink) -> Result<(), anyhow::Error> {
     let mut rustc_versions = HashSet::new();
 
-    let by_crate_ver = kitchen_sink.rustc_compatibility(all).await?;
+    let by_crate_ver = kitchen_sink.rustc_compatibility(&all).await?;
 
     for c in by_crate_ver.values() {
         if let Some(v) = c.oldest_ok { rustc_versions.insert(v); }

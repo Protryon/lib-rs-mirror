@@ -548,7 +548,9 @@ coreboot-table: embedded, parser-implementations
 coremidi: os::macos-apis, multimedia::audio
 cortex-m-semihosting: embedded
 cosmos_gravity: cryptography::cryptocurrencies
+cosmos_gravity_bridge: cryptography::cryptocurrencies
 cosmos_gravity_utils: cryptography::cryptocurrencies
+cosmos_sdk: cryptography::cryptocurrencies
 cosmrs: cryptography::cryptocurrencies
 cosmwasm-crypto: cryptography::cryptocurrencies
 cosmwasm-vm: cryptography::cryptocurrencies

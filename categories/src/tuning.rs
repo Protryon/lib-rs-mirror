@@ -512,7 +512,7 @@ lazy_static! {
         (Cond::All(&["qr", "code"]), &[("multimedia::images", 1.15, 0.)]),
         (Cond::Any(&["qr-code", "qrcode"]), &[("multimedia::images", 1.2, 0.05)]),
         (Cond::Any(&["dicom"]), &[("multimedia::images", 1.2, 0.1), ("parser-implementations", 1.1, 0.05), ("science", 1.05, 0.)]),
-        (Cond::Any(&["flif", "png", "jpeg2000", "jpeg", "heif", "heic", "avif", "avic", "exif", "ocr", "svg", "pixel"]), &[
+        (Cond::Any(&["flif", "png", "jpeg2000", "j2k", "jpeg", "heif", "heic", "avif", "avic", "exif", "ocr", "svg", "pixel"]), &[
             ("multimedia::images", 1.3, 0.15), ("encoding", 0.8, 0.), ("parsing", 0.8, 0.), ("rust-patterns", 0.6, 0.), ("data-structures", 0.9, 0.)]),
         (Cond::Any(&["imagemagick", "gamma", "photo", "openexr"]), &[
             ("multimedia::images", 1.3, 0.15), ("encoding", 0.5, 0.), ("parsing", 0.6, 0.), ("data-structures", 0.8, 0.)]),
@@ -837,12 +837,13 @@ lazy_static! {
             &[("algorithms", 1.1, 0.1), ("data-structures", 1.1, 0.1), ("science::math", 0.8, 0.), ("os", 0.8, 0.), ("games", 0.5, 0.), ("memory-management", 0.75, 0.), ("multimedia::video", 0.8, 0.)]),
         (Cond::Any(&["bloom", "arrays", "list", "vec", "container", "octree", "binary-tree", "hashmap", "hashtable", "map"]),
             &[("data-structures", 1.2, 0.1), ("algorithms", 1.1, 0.1), ("science::math", 0.8, 0.), ("os", 0.9, 0.), ("games", 0.8, 0.), ("memory-management", 0.75, 0.), ("multimedia::video", 0.8, 0.)]),
-        (Cond::Any(&["concurrent", "mpsc", "mpmc", "spsc", "producer", "condition",  "mutex", "futex"]), &[
+        (Cond::Any(&["concurrent", "mpsc", "mpmc", "spsc", "producer", "condition",  "mutex", "rwlock", "futex"]), &[
             ("concurrency", 1.3, 0.15), ("algorithms", 1.1, 0.1), ("data-structures", 0.9, 0.)]),
         (Cond::All(&["concurrent", "queue"]), &[("concurrency", 1.3, 0.15), ("no-std", 0.7, 0.), ("caching", 0.8, 0.), ("data-structures", 0.8, 0.)]),
         (Cond::All(&["message", "queue"]), &[("asynchronous", 1.2, 0.1)]),
         (Cond::All(&["bloom", "filter"]), &[("data-structures", 1.3, 0.2), ("accessibility", 0.5, 0.)]),
         (Cond::Any(&["scheduler", "publisher", "lock", "deque", "channel"]), &[("concurrency", 1.3, 0.15), ("algorithms", 0.9, 0.), ("os", 1.1, 0.), ("data-structures", 0.8, 0.)]),
+        (Cond::Any(&["thread"]), &[("concurrency", 1.2, 0.1), ("algorithms", 0.9, 0.), ("data-structures", 0.9, 0.)]),
         (Cond::Any(&["persistent", "immutable", "persistent-datastructures"]), &[("algorithms", 1.15, 0.1), ("data-structures", 1.3, 0.2), ("database-implementations", 1.1, 0.05)]),
 
         (Cond::Any(&["statistics", "statistic", "order-statistics", "svd", "markov", "cognitive"]),
@@ -872,6 +873,8 @@ lazy_static! {
                 &[("data-structures", 1.25, 0.1), ("concurrency", 1.1, 0.), ("algorithms", 1.1, 0.), ("science::math", 0.8, 0.), ("caching", 0.8, 0.), ("command-line-interface", 0.4, 0.), ("os", 0.9, 0.), ("command-line-utilities", 0.4, 0.)]),
         (Cond::Any(&["queue", "collection", "sort"]),
                 &[("data-structures", 1.25, 0.1), ("algorithms", 1.1, 0.), ("caching", 0.9, 0.), ("science::math", 0.8, 0.), ("caching", 0.8, 0.), ("command-line-interface", 0.4, 0.), ("os", 0.9, 0.), ("command-line-utilities", 0.4, 0.)]),
+        (Cond::Any(&["hyperloglog", "index-scan"]),
+                &[("data-structures", 1.1, 0.1), ("algorithms", 1.3, 0.2), ("science::math", 1.1, 0.), ("database-implementations", 1.1, 0.)]),
 
         (Cond::Any(&["macro", "macros", "dsl", "procedural-macros", "proc-macro", "proc-macros", "derive", "proc_macro", "custom-derive"]), &[
             ("development-tools::procedural-macro-helpers", 1.4, 0.2), ("no-std", 0.7, 0.), ("multimedia::video", 0.6, 0.), ("multimedia", 0.8, 0.), ("rust-patterns", 1.2, 0.1), ("cryptography", 0.7, 0.),
@@ -1392,7 +1395,7 @@ lazy_static! {
         (Cond::All(&["3d", "format"]), &[("rendering::data-formats", 1.3, 0.3), ("value-formatting", 0.5, 0.), ("parsing", 0.5, 0.), ("filesystem", 0.7, 0.), ("development-tools::ffi", 0.8, 0.)]),
         (Cond::Any(&["2d", "3d", "sprite"]), &[("rendering::graphics-api", 1.11, 0.), ("data-structures", 1.1, 0.), ("rendering::data-formats", 1.2, 0.), ("rendering", 1.1, 0.), ("games", 0.8, 0.), ("multimedia::audio", 0.8, 0.), ("rendering::graphics-api", 1.1, 0.)]),
         (Cond::NotAny(&["no-std", "no_std", "nostd", "hardware", "embedded"]), &[("no-std", 0.8, 0.)]),
-        (Cond::Any(&["discord", "telegram", "twitch"]), &[("web-programming", 1.1, 0.1), ("no-std", 0.8, 0.), ("compilers", 0.8, 0.), ("accessibility", 0.8, 0.), ("asynchronous", 0.8, 0.), ("websocket", 0.7, 0.)]),
+        (Cond::Any(&["discord", "telegram", "twitch"]), &[("web-programming", 1.1, 0.1), ("no-std", 0.8, 0.), ("compilers", 0.8, 0.), ("accessibility", 0.8, 0.), ("asynchronous", 0.8, 0.), ("web-programming::websocket", 0.7, 0.)]),
 
     ].iter().copied().collect();
 }

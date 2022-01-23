@@ -115,15 +115,15 @@ pub enum Warning {
     #[error("`readme` property points to a file that hasn't been published")]
     NoReadmePackaged,
     #[error("Can't find README in repository: {}", _0)]
-    NoReadmeInRepo(String),
+    NoReadmeInRepo(Box<str>),
     #[error("Could not clone repository: {}", _0)]
-    ErrorCloning(String),
+    ErrorCloning(Box<str>),
     #[error("{} URL is a broken link: {}", _0, _1)]
-    BrokenLink(String, String),
+    BrokenLink(Box<str>, Box<str>),
     #[error("Error parsing manifest: {}", _0)]
-    ManifestParseError(String),
+    ManifestParseError(Box<str>),
     #[error("Bad category: {}", _0)]
-    BadCategory(String),
+    BadCategory(Box<str>),
     #[error("No categories specified")]
     NoCategories,
     #[error("No keywords specified")]
@@ -134,6 +134,8 @@ pub enum Warning {
     BadMSRV(u16, u16),
     #[error("docs.rs did not build")]
     DocsRs,
+    #[error("Dependency {} v{} is outdated ({}%)", _0, _1, _2)]
+    OutdatedDependency(Box<str>, Box<str>, u8),
 }
 
 #[derive(Debug, Clone, thiserror::Error)]
@@ -1371,14 +1373,14 @@ impl KitchenSink {
                     meta.readme = Some(readme);
                 },
                 Ok(Ok(None)) => {
-                    warnings.insert(Warning::NoReadmeInRepo(repo.canonical_git_url().to_string()));
+                    warnings.insert(Warning::NoReadmeInRepo(repo.canonical_git_url().into()));
                 },
                 Ok(Err(err)) => {
-                    warnings.insert(Warning::ErrorCloning(repo.canonical_git_url().to_string()));
+                    warnings.insert(Warning::ErrorCloning(repo.canonical_git_url().into()));
                     error!("Search of {} ({}) failed: {}", package.name, repo.canonical_git_url(), err);
                 },
                 Err(err) => {
-                    warnings.insert(Warning::ErrorCloning(repo.canonical_git_url().to_string()));
+                    warnings.insert(Warning::ErrorCloning(repo.canonical_git_url().into()));
                     error!("Checkout of {} ({}) failed: {}", package.name, repo.canonical_git_url(), err);
                 },
             }
@@ -1405,7 +1407,7 @@ impl KitchenSink {
         let mut warnings = HashSet::new();
 
         // We show github link prominently, so if homepage = github, that's nothing new
-        let homepage_is_repo = Self::is_same_url(package.homepage.as_ref(), package.repository.as_ref());
+        let homepage_is_repo = Self::is_same_url(package.homepage.as_deref(), package.repository.as_deref());
         let homepage_is_canonical_repo = maybe_repo
             .and_then(|repo| {
                 package.homepage.as_ref()
@@ -1420,9 +1422,9 @@ impl KitchenSink {
             package.homepage = None;
         }
 
-        if Self::is_same_url(package.documentation.as_ref(), package.homepage.as_ref()) ||
-           Self::is_same_url(package.documentation.as_ref(), package.repository.as_ref()) ||
-           maybe_repo.map_or(false, |repo| Self::is_same_url(Some(&*repo.canonical_http_url("")), package.documentation.as_ref())) {
+        if Self::is_same_url(package.documentation.as_deref(), package.homepage.as_deref()) ||
+           Self::is_same_url(package.documentation.as_deref(), package.repository.as_deref()) ||
+           maybe_repo.map_or(false, |repo| Self::is_same_url(Some(&*repo.canonical_http_url("")), package.documentation.as_deref())) {
             package.documentation = None;
         }
 
@@ -1430,16 +1432,16 @@ impl KitchenSink {
             package.homepage = None;
         }
 
-        if let Some(url) = package.homepage.as_ref() {
+        if let Some(url) = package.homepage.as_deref() {
             if !self.check_url_is_valid(url).await {
-                warnings.insert(Warning::BrokenLink("homepage".to_string(), package.homepage.as_ref().unwrap().to_string()));
+                warnings.insert(Warning::BrokenLink("homepage".into(), url.into()));
                 package.homepage = None;
             }
         }
 
-        if let Some(url) = package.documentation.as_ref() {
+        if let Some(url) = package.documentation.as_deref() {
             if !self.check_url_is_valid(url).await {
-                warnings.insert(Warning::BrokenLink("documentation".to_string(), package.documentation.as_ref().unwrap().to_string()));
+                warnings.insert(Warning::BrokenLink("documentation".into(), url.into()));
                 package.documentation = None;
             }
         }
@@ -1475,7 +1477,7 @@ impl KitchenSink {
         watch("builds", self.docs_rs.builds(name, ver)).await.unwrap_or(true) // fail open
     }
 
-    fn is_same_url<A: AsRef<str> + std::fmt::Debug>(a: Option<A>, b: Option<&String>) -> bool {
+    fn is_same_url(a: Option<&str>, b: Option<&str>) -> bool {
         fn trim(s: &str) -> &str {
             let s = s.trim_start_matches("http://").trim_start_matches("https://");
             s.split('#').next().unwrap().trim_end_matches("/index.html").trim_end_matches('/')
@@ -1760,7 +1762,7 @@ impl KitchenSink {
         let mut bad_categories = Vec::new();
         let mut category_slugs = &categories::Categories::fixed_category_slugs(&package.categories, &mut bad_categories);
         for c in &bad_categories {
-            warnings.insert(Warning::BadCategory(c.clone()));
+            warnings.insert(Warning::BadCategory(c.as_str().into()));
         }
 
         if category_slugs.is_empty() && bad_categories.is_empty() {

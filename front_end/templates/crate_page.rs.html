@@ -9,6 +9,7 @@
 @use crate::Contributors;
 @use rich_crate::Origin;
 @use rich_crate::Edition;
+@use rich_crate::MaintenanceStatus;
 @use std::ops::Div;
 @use udedokei::LanguageExt;
 
@@ -62,7 +63,7 @@
       @:labels(&c.ver, c.is_build_or_dev())
 
       <span property="name">
-      @if c.ver.is_yanked() {
+      @if c.ver.is_yanked() || c.ver.maintenance() == MaintenanceStatus::Deprecated {
         <del>@c.ver.short_name()</del>
       } else {
         @if let Some((repo, package)) = c.ver.origin().repo() {

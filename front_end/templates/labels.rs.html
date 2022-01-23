@@ -1,37 +1,45 @@
 @use rich_crate::RichCrateVersion;
+@use rich_crate::MaintenanceStatus;
 
 @(ver: &RichCrateVersion, build_or_dev: (bool, bool))
 
 <span class="labels">
   @if ver.is_yanked() {
     <span title="this version has been deleted" class="yanked">yanked</span>
-  }
-  @if ver.is_nightly() {
-    <span title="uses unstable features" class="nightly">nightly</span>
-  }
-  @if ver.is_proc_macro() {
-    <span title="proc-macro, compiler plug-in" class="derive">macro</span>
-  }
-  @if ver.is_sys() {
-    <span title="system library" class="sys">sys</span>
-  }
-  @if ver.is_no_std() {
-    <span title="works without std" class="no-std">no-std</span>
-  }
-  @if build_or_dev.0 {
-    <span title="built-time tool" class="build">build</span>
   } else {
-    @if ver.is_app() {
-      <span title="contains executables" class="bin">app</span>
+    @if ver.maintenance() == MaintenanceStatus::Deprecated {
+      <span title="unmaintained" class="yanked">deprecated</span>
+    }
+    @if ver.maintenance() == MaintenanceStatus::AsIs {
+      <span title="unmaintained" class="yanked">archived</span>
+    }
+    @if ver.is_nightly() {
+      <span title="uses unstable features" class="nightly">nightly</span>
+    }
+    @if ver.is_proc_macro() {
+      <span title="proc-macro, compiler plug-in" class="derive">macro</span>
+    }
+    @if ver.is_sys() {
+      <span title="system library" class="sys">sys</span>
+    }
+    @if ver.is_no_std() {
+      <span title="works without std" class="no-std">no-std</span>
+    }
+    @if build_or_dev.0 {
+      <span title="built-time tool" class="build">build</span>
     } else {
-      @if build_or_dev.1 {
-        <span title="dev tool" class="dev">dev</span>
-      }
-      @if ver.has_bin() {
-        @if ver.has_lib() {
-          <span title="both a program and a library" class="bin lib">bin+lib</span>
-        } else {
-          <span title="contains executables" class="bin">bin</span>
+      @if ver.is_app() {
+        <span title="contains executables" class="bin">app</span>
+      } else {
+        @if build_or_dev.1 {
+          <span title="dev tool" class="dev">dev</span>
+        }
+        @if ver.has_bin() {
+          @if ver.has_lib() {
+            <span title="both a program and a library" class="bin lib">bin+lib</span>
+          } else {
+            <span title="contains executables" class="bin">bin</span>
+          }
         }
       }
     }

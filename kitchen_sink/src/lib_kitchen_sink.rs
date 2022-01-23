@@ -7,6 +7,7 @@ extern crate log;
 mod yearly;
 use event_log::EventLog;
 use anyhow::Context;
+use feat_extractor::is_deprecated_requirement;
 use futures::TryFutureExt;
 use tokio::time::Instant;
 
@@ -929,7 +930,7 @@ impl KitchenSink {
             }
         }
 
-        let data = match maybe_data {
+        let mut data = match maybe_data {
             Some(data) => data,
             None => {
                 if allow_stale {
@@ -943,6 +944,8 @@ impl KitchenSink {
             },
         };
 
+        self.refresh_crate_data(&mut data);
+
         let krate = Arc::new(RichCrateVersion::new(origin.clone(), data.manifest, data.derived));
         if !allow_stale {
             let mut cache = self.loaded_rich_crate_version_cache.write();
@@ -952,6 +955,25 @@ impl KitchenSink {
             cache.insert(origin.clone(), krate.clone());
         }
         Ok((krate, data.warnings))
+    }
+
+    // update cached data with external information that can change without reindexing
+    fn refresh_crate_data(&self, data: &mut CachedCrate) {
+        let package = data.manifest.package();
+
+        // allow overrides to take effect without reindexing
+        if let Some(overrides) = self.category_overrides.get(package.name.as_str()) {
+            data.derived.categories = overrides.iter().map(|c| c.to_string()).collect();
+        }
+
+        // allow forced deprecations to take effect without reindexing
+        if data.manifest.badges.maintenance.status == MaintenanceStatus::None {
+            if let Ok(req) = package.version.parse() {
+                if is_deprecated_requirement(&package.name, &req) {
+                    data.manifest.badges.maintenance.status = MaintenanceStatus::Deprecated;
+                }
+            }
+        }
     }
 
     pub async fn changelog_url(&self, k: &RichCrateVersion) -> Option<String> {

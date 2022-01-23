@@ -39,9 +39,9 @@ pub use github_info::Org;
 pub use github_info::User;
 pub use github_info::UserOrg;
 pub use github_info::UserType;
-pub use rich_crate::CachedCrate;
 pub use rich_crate::DependerChangesMonthly;
 pub use rich_crate::Edition;
+pub use rich_crate::Derived;
 pub use rich_crate::MaintenanceStatus;
 use rich_crate::ManifestExt;
 pub use rich_crate::Markup;
@@ -867,12 +867,15 @@ impl KitchenSink {
     ///
     /// There's no support for getting anything else than the latest version.
     pub fn rich_crate_version_async<'a>(&'a self, origin: &'a Origin) -> Pin<Box<dyn Future<Output = CResult<ArcRichCrateVersion>> + Send + 'a>> {
-        watch("rcv-1", self.rich_crate_version_async_opt(origin, false))
+        watch("rcv-1", self.rich_crate_version_async_opt(origin, false, false).map(|res| res.map(|(k,_)| k)))
+    }
+    pub fn rich_crate_warnings<'a>(&'a self, origin: &'a Origin) -> Pin<Box<dyn Future<Output = CResult<HashSet<Warning>>> + Send + 'a>> {
+        watch("rcv-1", self.rich_crate_version_async_opt(origin, false, true).map(|res| res.map(|(_, w)| w)))
     }
 
     /// Same as rich_crate_version_async, but it won't try to refresh the data. Just fails if there's no cached data.
     pub fn rich_crate_version_stale_is_ok<'a>(&'a self, origin: &'a Origin) -> Pin<Box<dyn Future<Output = CResult<ArcRichCrateVersion>> + Send + 'a>> {
-        watch("stale-rich-crate", self.rich_crate_version_async_opt(origin, true))
+        watch("stale-rich-crate", self.rich_crate_version_async_opt(origin, true, false).map(|res| res.map(|(k,_)| k)))
     }
 
     async fn rich_crate_version_data_cached(&self, origin: &Origin) -> CResult<Option<CachedCrate>> {
@@ -881,14 +884,16 @@ impl KitchenSink {
         Ok(self.derived_cache.get_deserialized(key)?)
     }
 
-    async fn rich_crate_version_async_opt(&self, origin: &Origin, allow_stale: bool) -> CResult<ArcRichCrateVersion> {
+    async fn rich_crate_version_async_opt(&self, origin: &Origin, allow_stale: bool, include_warnings: bool) -> CResult<(ArcRichCrateVersion, HashSet<Warning>)> {
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
 
-        if let Some(krate) = self.loaded_rich_crate_version_cache.read().get(origin) {
-            trace!("rich_crate_version_async HIT {:?}", origin);
-            return Ok(krate.clone());
+        if !include_warnings {
+            if let Some(krate) = self.loaded_rich_crate_version_cache.read().get(origin) {
+                trace!("rich_crate_version_async HIT {:?}", origin);
+                return Ok((krate.clone(), HashSet::new()));
+            }
+            trace!("rich_crate_version_async MISS {:?}", origin);
         }
-        trace!("rich_crate_version_async MISS {:?}", origin);
 
         let mut maybe_data = tokio::time::timeout(Duration::from_secs(3), self.rich_crate_version_data_cached(origin))
             .await.map_err(|_| {
@@ -933,7 +938,7 @@ impl KitchenSink {
             }
             cache.insert(origin.clone(), krate.clone());
         }
-        Ok(krate)
+        Ok((krate, data.warnings))
     }
 
     pub async fn changelog_url(&self, k: &RichCrateVersion) -> Option<String> {
@@ -1756,7 +1761,7 @@ impl KitchenSink {
 
         let db_index = self.crate_db.index_latest(CrateVersionData {
             cache_key,
-            good_category_slugs: category_slugs,
+            category_slugs,
             bad_categories: &bad_categories,
             authors: &authors,
             origin,
@@ -1792,6 +1797,7 @@ impl KitchenSink {
                 has_code_of_conduct: source_data.has_code_of_conduct,
                 is_yanked: source_data.is_yanked,
             },
+            warnings,
         };
         self.derived_cache.set_serialize((&origin.to_str(), ""), &cached)?;
 
@@ -3143,6 +3149,15 @@ pub struct DependerChanges {
     pub removed: u16,
     /// Crate has this dependnecy, but is not active any more
     pub expired: u16,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct CachedCrate {
+    pub manifest: Manifest,
+    pub derived: Derived,
+    pub cache_key: u64,
+    #[serde(default)]
+    pub warnings: HashSet<Warning>,
 }
 
 #[test]

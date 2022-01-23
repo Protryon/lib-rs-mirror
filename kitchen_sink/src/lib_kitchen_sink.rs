@@ -1152,6 +1152,11 @@ impl KitchenSink {
         let mut github_name = None;
         if let Some(ref crate_repo) = maybe_repo {
             if let Some(ghrepo) = self.github_repo(crate_repo).await? {
+                if ghrepo.archived {
+                    if meta.manifest.badges.maintenance.status == MaintenanceStatus::None {
+                        meta.manifest.badges.maintenance.status = MaintenanceStatus::AsIs; // FIXME: not exactly
+                    }
+                }
                 if package.homepage.is_none() {
                     if let Some(url) = ghrepo.homepage {
                         let also_add_docs = package.documentation.is_none() && ghrepo.github_page_url.as_ref().map_or(false, |p| p != &url);

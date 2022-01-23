@@ -1,4 +1,5 @@
 @use kitchen_sink::ArcRichCrateVersion;
+@use kitchen_sink::MaintenanceStatus;
 @use chrono_humanize::*;
 @use chrono_humanize::HumanTime;
 @use crate::AuthorPage;
@@ -15,7 +16,7 @@
       <a href="@url.krate(&k)">
         <div class=h>
           <h4>
-            @if !k.is_yanked() { @k.short_name() } else { <del>@k.short_name()</del> }
+            @if !k.is_yanked() && k.maintenance() != MaintenanceStatus::Deprecated { @k.short_name() } else { <del>@k.short_name()</del> }
           </h4>
         </div>
         <div class=meta>
@@ -23,15 +24,31 @@
             <span class=downloads title="@dl recent downloads">@if let Some((num,unit)) = Some(format_downloads(*dl)) {@num<b>@unit</b>}</span>
           }
 
+          @if k.maintenance() == MaintenanceStatus::Deprecated || k.maintenance() == MaintenanceStatus::LookingForMaintainer {
+            Unmaintained.
+          }
+          @if k.maintenance() == MaintenanceStatus::PassivelyMaintained {
+            Passively maintained.
+          }
+          @if k.maintenance() == MaintenanceStatus::AsIs {
+            Archived.
+          }
+
           @if r.invited_by_github_id.is_none() {
             Founded
             @if let Some(d) = r.invited_at {
-              in @AuthorPage::format_month(&d). Last updated @HumanTime::from(r.latest_release).to_text_en(Accuracy::Rough, Tense::Past).
+              in @AuthorPage::format_month(&d).
+              @if !k.is_yanked() && k.maintenance() != MaintenanceStatus::Deprecated && k.maintenance() != MaintenanceStatus::LookingForMaintainer {
+                Last updated @HumanTime::from(r.latest_release).to_text_en(Accuracy::Rough, Tense::Past).
+              }
             }
           } else {
             Member
             @if let Some(d) = r.invited_at {
-              since @AuthorPage::format_month(&d) (@HumanTime::from(d).to_text_en(Accuracy::Rough, Tense::Present))
+              since @AuthorPage::format_month(&d)
+              @if !k.is_yanked() && k.maintenance() != MaintenanceStatus::Deprecated && k.maintenance() != MaintenanceStatus::LookingForMaintainer && k.maintenance() != MaintenanceStatus::PassivelyMaintained {
+                (@HumanTime::from(d).to_text_en(Accuracy::Rough, Tense::Present))
+              }
             }
           }
         </div>

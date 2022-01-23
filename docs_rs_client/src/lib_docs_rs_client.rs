@@ -25,13 +25,14 @@ impl DocsRsClient {
 
     pub async fn builds(&self, crate_name: &str, version: &str) -> Result<bool, Error> {
         let res = self.build_status(crate_name, version).await?;
-        Ok(res.and_then(|s| s.get(0).map(|st| st.build_status)).unwrap_or(false))
+        Ok(res.map_or(false, |s| s.iter().any(|st| st.build_status)))
     }
 
     pub async fn build_status(&self, crate_name: &str, version: &str) -> Result<Option<Vec<BuildStatus>>, Error> {
         let key = format!("{}-{}", crate_name, version);
-        if let Some(cached) = self.cache.get(key.as_str())? {
-            return Ok(cached);
+        // Don't cache 404s, since builds can appear later
+        if let Some(Some(cached)) = self.cache.get(key.as_str())? {
+            return Ok(Some(cached));
         }
         let url = format!("https://docs.rs/crate/{}/{}/builds.json", crate_name, version);
         Ok(self.cache.get_json(&key, url, |t| t).await?.and_then(|f| f))

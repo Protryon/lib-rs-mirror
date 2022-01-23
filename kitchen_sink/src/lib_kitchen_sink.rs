@@ -132,6 +132,8 @@ pub enum Warning {
     EditionMSRV(Edition, u16),
     #[error("Bad MSRV: needs {}, but has {}", _0, _1)]
     BadMSRV(u16, u16),
+    #[error("docs.rs did not build")]
+    DocsRs,
 }
 
 #[derive(Debug, Clone, thiserror::Error)]

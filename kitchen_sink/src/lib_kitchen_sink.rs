@@ -648,6 +648,7 @@ impl KitchenSink {
 
         let mut crates2 = futures::stream::iter(self.crate_db.crates_to_reindex().await?.into_iter())
             .map(move |origin| async move {
+                self.force_crate_reindexing(&origin);
                 let _ = self.event_log.post(&SharedEvent::CrateUpdated(origin.to_str())).map_err(|e| error!("{}", e));
 
                 self.rich_crate_async(&origin).await.map_err(|e| {
@@ -1536,9 +1537,18 @@ impl KitchenSink {
         let _ = self.index.deps_stats().await;
     }
 
-    pub fn clear_cache_of_crate(&self, origin: &Origin) {
+    pub fn reload_indexed_crate(&self, origin: &Origin) {
         self.loaded_rich_crate_version_cache.write().remove(origin);
         self.crate_rustc_compat_cache.write().remove(origin);
+    }
+
+    pub fn force_crate_reindexing(&self, origin: &Origin) {
+        if let Origin::CratesIo(crate_name) = origin {
+            let _ = self.crates_io_owners_cache.delete(crate_name);
+        }
+        let origin_str = origin.to_str();
+        let _ = self.derived_cache.delete((origin_str.as_str(), ""));
+        self.loaded_rich_crate_version_cache.write().remove(origin);
     }
 
     pub async fn update(&self) {

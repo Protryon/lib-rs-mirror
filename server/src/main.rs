@@ -149,7 +149,7 @@ async fn run_server(rt: Handle) -> Result<(), anyhow::Error> {
                         CrateIndexed(origin_str) | CrateUpdated(origin_str) => {
                             info!("Purging local cache {}", origin_str);
                             let o = Origin::from_str(&origin_str);
-                            state.crates.load().clear_cache_of_crate(&o);
+                            state.crates.load().reload_indexed_crate(&o);
                             let path = state.page_cache_dir.join(cache_file_name_for_origin(&o));
                             let _ = std::fs::remove_file(path);
                         },

@@ -116,7 +116,7 @@ impl Categories {
     }
 
 
-    pub fn fixed_category_slugs<'a, 'z>(cats: &'a [String], invalid_categories: &'z mut Vec<String>) -> Vec<Cow<'a, str>> {
+    pub fn fixed_category_slugs<'a, 'z>(cats: &'a [String], invalid_lib_rs_categories: &'z mut Vec<String>) -> Vec<Cow<'a, str>> {
         let mut cats = cats.iter().enumerate()
         .filter_map(|(idx, orig_name)| {
             let s = orig_name.trim().trim_matches(':');
@@ -146,6 +146,7 @@ impl Categories {
             if s.len() < 2 {
                 return false;
             }
+            // mapping of crates.io -> lib.rs categories is done elsewhere
             if s == "external-ffi-bindings" { // We pretend it doesn't exist
                 return false;
             }
@@ -153,7 +154,8 @@ impl Categories {
                 return false;
             }
             if !CATEGORIES.from_slug(s).1 {
-                invalid_categories.push(orig_name.to_string());
+                // this is invalid for lib.rs, but may contain slus valid for crates.io
+                invalid_lib_rs_categories.push(orig_name.to_string());
                 return false;
             }
             true

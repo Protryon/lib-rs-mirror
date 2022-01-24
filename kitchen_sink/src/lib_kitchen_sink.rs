@@ -1811,6 +1811,10 @@ impl KitchenSink {
         let mut bad_categories = Vec::new();
         let mut category_slugs = &categories::Categories::fixed_category_slugs(&package.categories, &mut bad_categories);
         for c in &bad_categories {
+            // categories invalid for lib.rs may still be valid for crates.io (they've drifted over time)
+            if is_valid_crates_io_category_not_on_lib_rs(&c) {
+                continue;
+            }
             warnings.insert(Warning::BadCategory(c.as_str().into()));
         }
 
@@ -3387,3 +3391,23 @@ fn rustc_rel_dates() {
     }
 }
 
+fn is_valid_crates_io_category_not_on_lib_rs(slug: &str) -> bool {
+    matches!(slug,
+    "aerospace::drones" |
+    "aerospace::protocols" |
+    "aerospace::simulation" |
+    "aerospace::space-protocols" |
+    "aerospace::unmanned-aerial-vehicles" |
+    "aerospace" |
+    "api-bindings" |
+    "computer-vision" |
+    "external-ffi-bindings" |
+    "game-engines" |
+    "graphics" |
+    "localization" |
+    "mathematics" |
+    "multimedia::encoding" |
+    "os::freebsd-apis" |
+    "os::linux-apis" |
+    "science::robotics")
+}

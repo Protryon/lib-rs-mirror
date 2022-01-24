@@ -737,6 +737,8 @@ async fn handle_global_stats(req: HttpRequest) -> Result<HttpResponse, ServerErr
     ))
 }
 
+const CACHE_MAGIC_TAG: &[u8; 4] = b"  <c";
+
 /// takes path to storage, freshness in seconds, and a function to call on cache miss
 /// returns (page, fresh in seconds)
 async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cache_time: u32, generate: F) -> Result<Rendered, anyhow::Error>
@@ -751,13 +753,16 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
         let age_secs = now.duration_since(modified).ok().map(|age| age.as_secs()).unwrap_or(0);
 
         if let Ok(mut page_cached) = std::fs::read(&cache_file) {
-            if !is_acceptable || page_cached.len() <= 4 {
+            if !is_acceptable || page_cached.len() <= 8 {
                 let _ = std::fs::remove_file(&cache_file); // next req will block instead of an endless refresh loop
             }
+            assert!(page_cached.len() > 8);
 
-            assert!(page_cached.len() > 4);
-            let trailer_pos = page_cached.len() - 4; // The worst data format :)
-            let timestamp = u32::from_le_bytes(page_cached.get(trailer_pos..).unwrap().try_into().unwrap());
+            let trailer_pos = page_cached.len() - 8; // The worst data format :)
+            if page_cached[trailer_pos .. trailer_pos + 4] != CACHE_MAGIC_TAG[..] {
+                let _ = std::fs::remove_file(&cache_file);
+            }
+            let timestamp = u32::from_le_bytes(page_cached.get(trailer_pos + 4..).unwrap().try_into().unwrap());
             page_cached.truncate(trailer_pos);
 
             let last_modified = if timestamp > 0 { Some(DateTime::from_utc(NaiveDateTime::from_timestamp(timestamp as _, 0), FixedOffset::east(0))) } else { None };
@@ -813,11 +818,13 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
         }}).await??;
 
     let timestamp = last_modified.map(|a| a.timestamp() as u32).unwrap_or(0);
+    page.extend_from_slice(&CACHE_MAGIC_TAG[..]); // The worst data format :)
     page.extend_from_slice(&timestamp.to_le_bytes()); // The worst data format :)
-
     if let Err(e) = std::fs::write(&cache_file, &page) {
         error!("warning: Failed writing to {}: {}", cache_file.display(), e);
     }
+    page.truncate(page.len() - 8);
+
     Ok(Rendered {page, cache_time, refresh: false, last_modified})
 }
 

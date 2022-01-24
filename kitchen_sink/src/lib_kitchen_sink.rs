@@ -1172,6 +1172,8 @@ impl KitchenSink {
             }
         }
 
+        let explicit_documentation_link_existed = package.documentation.is_some();
+
         if origin.is_crates_io() {
             // Delete the original docs.rs link, because we have our own
             // TODO: what if the link was to another crate or a subpage?
@@ -1195,7 +1197,9 @@ impl KitchenSink {
                     if let Some(url) = ghrepo.homepage {
                         let also_add_docs = package.documentation.is_none() && ghrepo.github_page_url.as_ref().map_or(false, |p| p != &url);
                         package.homepage = Some(url);
-                        if also_add_docs {
+                        // github pages URLs are often bad, so don't even try to use them unless documentation property is missing
+                        // (especially don't try to replace docs.rs with this gamble)
+                        if also_add_docs && !explicit_documentation_link_existed {
                             if let Some(url) = ghrepo.github_page_url {
                                 package.documentation = Some(url);
                             }

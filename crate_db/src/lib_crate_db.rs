@@ -823,8 +823,9 @@ impl CrateDb {
         let res: Vec<(f64, String)> = query.query_map(&[&origin.to_str()], |row| Ok((row.get_unwrap(0), row.get_unwrap(1))))?
             .collect::<std::result::Result<_,_>>()?;
         let min_score = res.get(0).map_or(0., |(rel,_)|rel/20.);
-        Ok(res.into_iter().filter_map(|(rel,k)|{
-            if rel >= min_score {
+        let crate_name = origin.short_crate_name();
+        Ok(res.into_iter().filter_map(move |(rel,k)|{
+            if rel >= min_score && k != crate_name {
                 Some(k)
             } else {
                 None

@@ -103,6 +103,7 @@ type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 
 pub type CError = anyhow::Error;
 pub type CResult<T> = Result<T, CError>;
+pub type KResult<T> = Result<T, KitchenSinkErr>;
 pub type Warnings = HashSet<Warning>;
 
 #[derive(Debug, Clone, Serialize, thiserror::Error, Deserialize, Hash, Eq, PartialEq)]
@@ -189,10 +190,22 @@ pub enum KitchenSinkErr {
     Deps(#[from] DepsErr),
     #[error("Bad rustc compat data")]
     BadRustcCompatData,
+    #[error("bad cache: {}", _0)]
+    BorkedCache(String),
     #[error("Event log error")]
     Event(#[from] #[source] Arc<event_log::Error>),
     #[error("Internal error: {}", _0)]
-    Internal(std::sync::Arc<dyn std::error::Error + Send + Sync>)
+    Internal(std::sync::Arc<dyn std::error::Error + Send + Sync>),
+}
+
+impl From<crates_io_client::Error> for KitchenSinkErr {
+    #[cold]
+    fn from(e: crates_io_client::Error) -> Self {
+        match e {
+            crates_io_client::Error::NotInCache => Self::CacheExpired,
+            other => Self::BorkedCache(other.to_string()),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -413,12 +426,12 @@ impl KitchenSink {
         self.index.crates_io_crates()
     }
 
-    pub fn total_year_downloads(&self, year: u16) -> CResult<[u64; 366]> {
+    pub fn total_year_downloads(&self, year: u16) -> KResult<[u64; 366]> {
         Ok(self.yearly.total_year_downloads(year)?)
     }
 
     #[inline]
-    fn summed_year_downloads(&self, crate_name: &str, curr_year: u16) -> CResult<[u32; 366]> {
+    fn summed_year_downloads(&self, crate_name: &str, curr_year: u16) -> KResult<[u32; 366]> {
         let curr_year_data = self.yearly.get_crate_year(crate_name, curr_year)?.unwrap_or_default();
         let mut summed_days = [0; 366];
         for (_, days) in curr_year_data {
@@ -542,7 +555,7 @@ impl KitchenSink {
     }
 
     // Monthly downloads, sampled from last few days or weeks
-    pub async fn recent_downloads_by_version(&self, origin: &Origin) -> CResult<HashMap<MiniVer, u32>> {
+    pub async fn recent_downloads_by_version(&self, origin: &Origin) -> KResult<HashMap<MiniVer, u32>> {
 
         let now = Utc::today();
         let curr_year = now.year() as u16;
@@ -794,7 +807,7 @@ impl KitchenSink {
     }
 
     #[inline]
-    pub async fn downloads_per_month(&self, origin: &Origin) -> CResult<Option<usize>> {
+    pub async fn downloads_per_month(&self, origin: &Origin) -> KResult<Option<usize>> {
         Ok(match origin {
             Origin::CratesIo(name) => {
                 let mut now = Utc::today();
@@ -852,16 +865,15 @@ impl KitchenSink {
         Ok(None)
     }
 
-    pub async fn crates_io_meta(&self, name: &str) -> CResult<CrateMetaFile> {
+    pub async fn crates_io_meta(&self, name: &str) -> KResult<CrateMetaFile> {
         tokio::task::yield_now().await;
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
 
         let krate = tokio::task::block_in_place(|| {
-            self.index.crates_io_crate_by_lowercase_name(name).context("rich_crate")
+            self.index.crates_io_crate_by_lowercase_name(name)
         })?;
         let latest_in_index = krate.latest_version().version(); // most recently published version
-        let meta = timeout("cacheable meta request", 10, self.crates_io.crate_meta(name, latest_in_index).map(|r| r.map_err(CError::from))).await
-            .with_context(|| format!("crates.io meta for {} {}", name, latest_in_index))?;
+        let meta = timeout("cacheable meta request", 10, self.crates_io.crate_meta(name, latest_in_index).map(|r| r.map_err(KitchenSinkErr::from))).await?;
         let mut meta = meta.ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?;
         if !meta.versions.iter().any(|v| v.num == latest_in_index) {
             warn!("Crate data missing latest version {}@{}", name, latest_in_index);
@@ -892,7 +904,7 @@ impl KitchenSink {
         watch("stale-rich-crate", self.rich_crate_version_async_opt(origin, true, false).map(|res| res.map(|(k,_)| k)))
     }
 
-    async fn rich_crate_version_data_cached(&self, origin: &Origin) -> CResult<Option<CachedCrate>> {
+    async fn rich_crate_version_data_cached(&self, origin: &Origin) -> KResult<Option<CachedCrate>> {
         let origin_str = origin.to_str();
         let key = (origin_str.as_str(), "");
         Ok(self.derived_cache.get_deserialized(key)?)
@@ -2651,7 +2663,7 @@ impl KitchenSink {
                 let current_owners = async {
                     Ok(match self.crates_io_owners_cache.get(crate_name)? {
                         Some(o) => o,
-                        None => timeout("owners-fallback", 3, self.crates_io.crate_owners(crate_name, "fallback").map(|r| r.map_err(CError::from))).await?.unwrap_or_default(),
+                        None => timeout("owners-fallback", 3, self.crates_io.crate_owners(crate_name, "fallback").map(|r| r.map_err(KitchenSinkErr::from))).await?.unwrap_or_default(),
                     })
                 };
                 let (mut current_owners, meta) = futures::try_join!(current_owners, self.crates_io_meta(crate_name))?;

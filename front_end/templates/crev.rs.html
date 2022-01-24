@@ -1,5 +1,6 @@
 @use crate::templates::base;
 @use crate::crev::ReviewsPage;
+@use crate::crev::Rating;
 @use crate::Urler;
 
 @(url: &Urler, c: &ReviewsPage)
@@ -41,7 +42,9 @@
                         <span class=thoroughness>Thoroughness: <span class="@c.level_class(r.thoroughness)">@c.level_label(r.thoroughness)</span></span>
                         <span class=understanding>Understanding: <span class="@c.level_class(r.understanding)">@c.level_label(r.understanding)</span></span>
                     </p>
-                    <p class=by>by @if let Some(author_url) = r.author_url.as_ref() {
+                    <p class=by>
+                        @if (r.rating == Rating::Positive || r.rating == Rating::Strong) && r.comment_markdown.trim_start().is_empty() && r.issues.is_empty() { Approved without comment }
+                        by @if let Some(author_url) = r.author_url.as_ref() {
                             <a rel="nofollow ugc noopener" href="@author_url#@r.author_id">@c.author_name(r)</a>
                         } else {
                             @c.author_name(r)

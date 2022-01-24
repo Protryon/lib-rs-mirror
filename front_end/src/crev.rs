@@ -3,7 +3,7 @@ use crate::Page;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::Level;
 use kitchen_sink::Origin;
-use kitchen_sink::Rating;
+pub use kitchen_sink::Rating;
 use kitchen_sink::Review;
 use kitchen_sink::SemVer;
 use render_readme::Links;

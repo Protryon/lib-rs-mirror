@@ -1,0 +1,42 @@
+@use crate::MaintainerDashboard;
+@use crate::Urler;
+
+@(url: &Urler, p: &MaintainerDashboard)
+
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Lib.rs maintainer feed for @p.login()</title>
+  <subtitle>Notifications about @p.login()'s crates</subtitle>
+  <link href="https://lib.rs"/>
+  <link rel="self" href="https://lib.rs@url.crates_io_user_maintainer_dashboard_atom_by_github_login(p.login())"/>
+  <updated>@p.now()</updated>
+  <author>
+    <name>lib.rs</name>
+  </author>
+  <icon>https://lib.rs/crates-logo.png</icon>
+  <id>https://lib.rs/~@p.login()/dash</id>
+  <generator uri="https://gitlab.com/crates.rs"/>
+
+  @for (origin, _, warnings) in &p.warnings {
+    @for w in warnings {
+      <entry>
+        <title>@origin.short_crate_name(): @w.title</title>
+        <author>
+          <name>lib.rs/@origin.short_crate_name()</name>
+          <link href="https://lib.rs@url.crate_abs_path_by_origin(origin)" />
+        </author>
+
+        @if let Some((label, url)) = &w.url {
+          <link title="@label" href="@url"/>
+        }
+        <link title="Dashboard" href="https://lib.rs@url.crates_io_user_maintainer_dashboard_by_github_login(p.login())#crate-@origin.short_crate_name()"/>
+        <category term="l@w.severity"/>
+
+        <id>@p.atom_id_for(origin, w)</id>
+        <content type="text">@w.desc @if let Some(ext) = w.extended_desc {
+
+@ext
+}</content>
+      </entry>
+    }
+  }
+</feed>

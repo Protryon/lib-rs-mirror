@@ -60,6 +60,9 @@
       @if let Some((url, label)) = p.forum_link() {
         <li><a href="@url" rel="ugc nofollow" >Forum (@label)</a></li>
       }
+      @if p.founder_total != 0 || p.member_total != 0 {
+        <li><a rel="nofollow" href="@url.crates_io_user_maintainer_dashboard_by_github_login(&p.aut.github.login)">Maintainer dashboard</a></li>
+      }
     </ul></nav>
     </div>
   </header>

@@ -190,6 +190,14 @@ impl Urler {
         format!("/~{}", Encoded(login))
     }
 
+    pub fn crates_io_user_maintainer_dashboard_by_github_login(&self, login: &str) -> String {
+        format!("/~{}/dash", Encoded(login))
+    }
+
+    pub fn crates_io_user_maintainer_dashboard_atom_by_github_login(&self, login: &str) -> String {
+        format!("/~{}/dash.xml", Encoded(login))
+    }
+
     pub fn search_crates_io(&self, query: &str) -> String {
         format!("https://crates.io/search?q={}", Encoded(query))
     }

@@ -30,6 +30,7 @@ members = [
 "feat_extractor",
 "deps_index",
 "debcargo_list",
+"validator",
 ]
 
 [profile.dev]

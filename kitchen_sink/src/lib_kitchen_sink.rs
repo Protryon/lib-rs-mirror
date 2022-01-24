@@ -138,6 +138,8 @@ pub enum Warning {
     DocsRs,
     #[error("Dependency {} v{} is outdated ({}%)", _0, _1, _2)]
     OutdatedDependency(Box<str>, Box<str>, u8),
+    #[error("Dependency {} v{} is deprecated", _0, _1)]
+    DeprecatedDependency(Box<str>, Box<str>),
     #[error("Dependency {} has bad requirement {}", _0, _1)]
     BadRequirement(Box<str>, Box<str>),
     #[error("Dependency {} has exact requirement {}", _0, _1)]
@@ -148,6 +150,10 @@ pub enum Warning {
     CryptocurrencyBS,
     #[error("The crate tarball is big: {}MB", _0 / 1000 / 1000)]
     Chonky(u64),
+    #[error("A *-sys crates without links property")]
+    SysNoLinks,
+    #[error("Squatted name")]
+    Reserved,
 }
 
 #[derive(Debug, Clone, thiserror::Error)]
@@ -1651,17 +1657,22 @@ impl KitchenSink {
     /// 0 = not used
     /// 1 = everyone uses it
     #[inline]
-    pub async fn version_popularity(&self, crate_name: &str, requirement: &VersionReq) -> CResult<Option<(bool, f32)>> {
-        let mut res = self.index.version_popularity(crate_name, requirement).await.map_err(KitchenSinkErr::Deps)?;
-        if let Some((ref mut matches_latest, ref mut pop)) = &mut res {
-            if let Some((former_glory, _)) = self.former_glory(&Origin::from_crates_io_name(crate_name)).await? {
-                if former_glory < 0.5 {
-                    *matches_latest = false;
-                }
-                *pop *= former_glory as f32;
+    pub async fn version_popularity(&self, crate_name: &str, requirement: &VersionReq) -> CResult<Option<VersionPopularity>> {
+        let mut lost_popularity = false;
+        let (matches_latest, mut pop) = match self.index.version_popularity(crate_name, requirement).await.map_err(KitchenSinkErr::Deps)? {
+            Some(res) => res,
+            None => return Ok(None),
+        };
+
+        if let Some((former_glory, _)) = self.former_glory(&Origin::from_crates_io_name(crate_name)).await? {
+            if former_glory < 0.5 {
+                lost_popularity = true;
             }
+            pop *= former_glory as f32;
         }
-        Ok(res)
+        Ok(Some(VersionPopularity {
+            lost_popularity, pop, matches_latest,
+        }))
     }
 
     #[inline]
@@ -3109,6 +3120,13 @@ impl Drop for KitchenSink {
     fn drop(&mut self) {
         self.cleanup()
     }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct VersionPopularity {
+    pub pop: f32,
+    pub matches_latest: bool,
+    pub lost_popularity: bool,
 }
 
 #[derive(Debug, Clone)]

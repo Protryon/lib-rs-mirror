@@ -353,7 +353,7 @@ impl ManifestExt for Manifest {
             let package = dep.package().unwrap_or(name);
             (package.into(), RichDep {
                 package: package.into(),
-                name: name.as_str().into(),
+                user_alias: name.as_str().into(),
                 dep: dep.clone(),
                 only_for_features: BTreeMap::new(),
                 only_for_targets: Vec::new(),
@@ -375,7 +375,7 @@ impl ManifestExt for Manifest {
                     }
                     e.insert(RichDep {
                         package: package.into(),
-                        name: name.as_str().into(),
+                        user_alias: name.as_str().into(),
                         dep: dep.clone(),
                         only_for_targets,
                         only_for_features: BTreeMap::new(),
@@ -428,8 +428,8 @@ impl ManifestExt for Manifest {
         fn convsort(dep: BTreeMap<String, RichDep>) -> Vec<RichDep> {
             let mut dep: Vec<_> = dep.into_iter()
                 .map(|(_, mut dep)| {
-                    if dep.only_for_features.is_empty() && dep.name != dep.package {
-                        dep.only_for_features.insert(dep.name.clone(), false);
+                    if dep.only_for_features.is_empty() && dep.user_alias != dep.package {
+                        dep.only_for_features.insert(dep.user_alias.clone(), false);
                     }
                     dep
                 })
@@ -447,7 +447,7 @@ impl ManifestExt for Manifest {
 
 pub struct RichDep {
     pub package: Box<str>,
-    pub name: Box<str>,
+    pub user_alias: Box<str>,
     pub dep: Dependency,
     /// it's optional, used only for a platform
     pub only_for_targets: Vec<Target>,

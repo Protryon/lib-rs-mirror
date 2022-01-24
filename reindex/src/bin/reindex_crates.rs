@@ -1,3 +1,4 @@
+use kitchen_sink::VersionPopularity;
 use anyhow::anyhow;
 use debcargo_list::DebcargoList;
 use feat_extractor::*;
@@ -289,15 +290,15 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
                 let pop = crates.version_popularity(&richdep.package, &req)
                     .await
                     .map_err(|e| log::error!("ver1pop {}", e)).unwrap_or(None);
-                (richdep.is_optional(), pop.unwrap_or((false, 0.)))
+                (richdep.is_optional(), pop.unwrap_or(VersionPopularity { matches_latest: true, pop: 0., lost_popularity: false}))
             })
         }))
         .await
         .into_iter()
-        .map(|(is_optional, (is_latest, popularity))| {
-            if is_latest {1.0} // don't penalize pioneers
-            else if is_optional {0.8 + popularity * 0.2} // not a big deal when it's off
-            else {popularity}
+        .map(|(is_optional, pop)| {
+            if pop.matches_latest {1.0} // don't penalize pioneers
+            else if is_optional {0.8 + pop.pop * 0.2} // not a big deal when it's off
+            else {pop.pop}
         })
         .collect()
     };

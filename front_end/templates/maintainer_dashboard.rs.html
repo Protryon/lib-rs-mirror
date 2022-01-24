@@ -1,0 +1,86 @@
+@use crate::MaintainerDashboard;
+@use crate::templates::base;
+@use crate::Urler;
+
+@(url: &Urler, p: &MaintainerDashboard)
+
+@:base(&p.page(), {
+  <header id="author">
+    <div class="inner-col">
+    <div class="breadcrumbs">
+      <h1><a href="/">Lib.rs</a></h1> › <span>@if p.is_org() {
+        Orgs
+      } else {
+        Users
+      }</span>
+
+       › <span><a href="@url.crates_io_user_by_github_login(p.login())">@p.login()</a></span>
+    </div>
+
+    <h2>
+      Dashboard
+    </h2>
+
+    <nav><ul>
+      <li><a rel="alternate nofollow" type="application/atom+xml" href="@url.crates_io_user_maintainer_dashboard_atom_by_github_login(p.login())">Atom Feed</a></li>
+      <li><a href="@url.crates_io_user_by_github_login(p.login())">lib.rs profile</a></li>
+      <li><a rel="ugc nofollow" href="https://crates.io/users/@p.login()">crates.io profile</a></li>
+    </ul></nav>
+    </div>
+  </header>
+  <main>
+    <div class="inner-col" id="validator">
+      @if p.warnings.is_empty() {
+        <h3>No issues found</h3>
+        <p>At the moment your crates are fine. Please check back later.</p>
+        <p>The best way to monitor these issues is to <a rel="alternate nofollow" type="application/atom+xml" href="@url.crates_io_user_maintainer_dashboard_atom_by_github_login(p.login())">subscribe to the atom feed</a> in your RSS reader.</p>
+        <p>Checked:
+          @for origin in &p.okay_crates {
+            <a href="@url.crate_abs_path_by_origin(origin)">@origin.short_crate_name()</a>
+          }
+        </p>
+      } else {
+        <h3>Issues found</h3>
+        <p>Based on crates you own that have been published to crates.io. The best way to monitor these issues is to <a rel="alternate nofollow" type="application/atom+xml" href="@url.crates_io_user_maintainer_dashboard_atom_by_github_login(p.login())">subscribe to the atom feed</a> in your RSS reader.</p>
+        <ul class="issues-by-crate">
+        @for (origin, _, warnings) in &p.warnings {
+          <li id="crate-@origin.short_crate_name()"><details open>
+            <summary><h4><a href="@url.crate_abs_path_by_origin(origin)">@origin.short_crate_name()</a></h4></summary>
+            <ul>
+              @for w in warnings {
+                <li class="severity@w.severity"><h5>@w.title</h5><p>@w.desc</p>
+                @if let Some(ext) = w.extended_desc {
+                  @if p.should_print_extended_description(ext) {
+                    <p>@ext</p>
+                  }
+                }
+                @if let Some((label, url)) = &w.url {
+                  <p><a href="@url">@label</a></p>
+                }
+                </li>
+              }
+            </ul>
+          </details></li>
+        }
+        </ul>
+        @if !p.okay_crates.is_empty() {
+          <p>No issues found in:
+            @for origin in &p.okay_crates {
+              <a href="@url.crate_abs_path_by_origin(origin)">@origin.short_crate_name()</a>
+            }
+          </p>
+        }
+        <p>If some of these crates are unmaintained and shouldn't be checked, yank them or add <code>[badges.maintenance]<br>status = "deprecated"</code> to their <code>Cargo.toml</code>.</p>
+      }
+    </div>
+  </main>
+  </div>
+
+  <footer>
+    <div class="inner-col">
+      <p><a rel="alternate nofollow" type="application/atom+xml" href="@url.crates_io_user_maintainer_dashboard_atom_by_github_login(p.login())">Atom Feed</a>.</p>
+      <p>This page is a work in progress. The data is refreshed only every couple of hours.</p>
+      <aside role="contentinfo"><p><a href="/"><b>Lib.rs</b></a> is an unofficial list of Rust/Cargo crates. It's <a href="https://gitlab.com/crates.rs?sort=stars_desc">open-source</a>, created by <a href="/~kornelski">kornelski</a>.</p></aside>
+    </div>
+  </footer>
+})

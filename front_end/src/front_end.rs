@@ -14,6 +14,7 @@ mod download_graph;
 mod home_page;
 mod install_page;
 mod iter;
+mod maintainer_dashboard;
 mod not_found_page;
 mod reverse_dependencies;
 mod search_page;
@@ -24,6 +25,7 @@ pub use crate::search_page::*;
 pub use crate::global_stats::*;
 use futures::future::try_join_all;
 use kitchen_sink::CrateOwnerRow;
+use maintainer_dashboard::MaintainerDashboard;
 use crate::author_page::*;
 use crate::crate_page::*;
 use crate::urler::Urler;
@@ -150,6 +152,23 @@ pub async fn render_author_page<W: Write>(out: &mut W, rows: Vec<CrateOwnerRow>,
     let urler = Urler::new(None);
     let c = AuthorPage::new(aut, rows, kitchen_sink, renderer).await.context("Can't load data for author page")?;
     templates::author(out, &urler, &c).context("author page io")?;
+    Ok(())
+}
+
+/// See `maintainer_dashboard.rs.html`
+/// See `maintainer_dashboard_atom.rs.html`
+pub async fn render_maintainer_dashboard<W: Write>(out: &mut W, atom_feed: bool, rows: Vec<CrateOwnerRow>, aut: &RichAuthor, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<(), anyhow::Error> {
+    if stopped() {
+        return Err(KitchenSinkErr::Stopped.into());
+    }
+
+    let urler = Urler::new(None);
+    let c = MaintainerDashboard::new(aut, rows, kitchen_sink, &urler, renderer).await.context("Can't load data for the dashboard")?;
+    if !atom_feed {
+        templates::maintainer_dashboard(out, &urler, &c)
+    } else {
+        templates::maintainer_dashboard_atom(out, &urler, &c)
+    }.context("maintainer dashboard io")?;
     Ok(())
 }
 

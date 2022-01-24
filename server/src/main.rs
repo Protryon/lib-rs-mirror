@@ -256,6 +256,8 @@ async fn run_server(rt: Handle) -> Result<(), anyhow::Error> {
             .route("/crates/{crate}/reverse_dependencies", web::get().to(handle_crate_reverse_dependencies_redir))
             .route("/crates/{crate}/crev", web::get().to(handle_crate_reviews))
             .route("/~{author}", web::get().to(handle_author))
+            .route("/~{author}/dash", web::get().to(handle_maintainer_dashboard_html))
+            .route("/~{author}/dash.xml", web::get().to(handle_maintainer_dashboard_xml))
             .route("/users/{author}", web::get().to(handle_author_redirect))
             .route("/install/{crate:.*}", web::get().to(handle_install))
             .route("/compat/{crate:.*}", web::get().to(handle_compat))
@@ -614,6 +616,66 @@ async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     ))
 }
 
+async fn handle_maintainer_dashboard_html(req: HttpRequest) -> Result<HttpResponse, ServerError> {
+    handle_maintainer_dashboard(req, false).await
+}
+
+async fn handle_maintainer_dashboard_xml(req: HttpRequest) -> Result<HttpResponse, ServerError> {
+    handle_maintainer_dashboard(req, true).await
+}
+
+async fn handle_maintainer_dashboard(req: HttpRequest, atom_feed: bool) -> Result<HttpResponse, ServerError> {
+    let login = req.match_info().query("author");
+    debug!("maintainer_dashboard for {:?}", login);
+    let state: &AServerState = req.app_data().expect("appdata");
+
+    let aut = match rt_run_timeout(&state.rt, "aut1", 5, {
+        let login = login.to_owned();
+        let crates = state.crates.load();
+        async move { crates.author_by_login(&login).await }
+    }).await {
+        Ok(aut) => aut,
+        Err(e) => {
+            debug!("user fetch {} failed: {}", login, e);
+            return render_404_page(state, login, "user").await;
+        }
+    };
+    if aut.github.login != login && !atom_feed {
+        return Ok(HttpResponse::PermanentRedirect().insert_header(("Location", format!("/~{}/dash", Encoded(&aut.github.login)))).body(""));
+    }
+
+    let crates = state.crates.load();
+    if crates.author_shitlist.get(&aut.github.login.to_ascii_lowercase()).is_some() {
+        return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", format!("/~{}", Encoded(&aut.github.login)))).body(""));
+    }
+
+    let aut2 = aut.clone();
+    let rows = rt_run_timeout(&state.rt, "maintainer_dashboard1", 60, async move { crates.crates_of_author(&aut2).await }).await?;
+
+    if rows.is_empty() {
+        return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", format!("/~{}", Encoded(&aut.github.login)))).body(""));
+    }
+
+    let cache_file = state.page_cache_dir.join(format!("@{}.dash{}.html", login, if atom_feed { "xml" } else { "" }));
+    let rendered = with_file_cache(state, cache_file, if atom_feed { 3 * 3600 } else { 600 }, {
+        let state = state.clone();
+        run_timeout("maintainer_dashboard2", 60, async move {
+            let crates = state.crates.load();
+            let mut page: Vec<u8> = Vec::with_capacity(32000);
+            front_end::render_maintainer_dashboard(&mut page, atom_feed, rows, &aut, &crates, &state.markup).await?;
+            if !atom_feed { minify_html(&mut page); }
+            mark_server_still_alive(&state);
+            Ok::<_, anyhow::Error>((page, None))
+        })
+    })
+    .await?;
+    if !atom_feed {
+        Ok(serve_page(rendered))
+    } else {
+        Ok(serve_feed(rendered))
+    }
+}
+
 fn cache_file_name_for_origin(origin: &Origin) -> String {
     match origin {
         Origin::CratesIo(crate_name) => {
@@ -939,6 +1001,25 @@ fn serve_page(Rendered {page, cache_time, refresh, last_modified}: Rendered) -> 
     if let Some(l) = last_modified {
         // can't give validator, because then 304 leaves refresh
         if !refresh {
+            h.insert_header(("Last-Modified", l.to_rfc2822()));
+        }
+    }
+    h.no_chunking(page.len() as u64).body(page)
+}
+
+fn serve_feed(Rendered {page, cache_time, refresh, last_modified}: Rendered) -> HttpResponse {
+    // last-modified is ambiguous, because it's modification of the content, not the whole state
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(if refresh { b"1" } else { b"0" });
+    hasher.update(&page);
+    let etag = format!("\"{:.16}\"", base64::encode(hasher.finalize().as_bytes()));
+
+    let mut h = HttpResponse::Ok();
+    h.content_type("application/atom+xml;charset=UTF-8");
+    h.insert_header(("etag", etag));
+    if !refresh {
+        h.insert_header(("Cache-Control", format!("public, max-age={}", cache_time)));
+        if let Some(l) = last_modified {
             h.insert_header(("Last-Modified", l.to_rfc2822()));
         }
     }

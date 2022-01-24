@@ -441,10 +441,10 @@ impl<'a> CratePage<'a> {
         }
         self.block(async {
             if let Ok(req) = richdep.dep.req().parse() {
-                if let Ok(Some((matches_latest, pop))) = self.kitchen_sink.version_popularity(&richdep.package, &req).await {
-                    return match pop {
-                        x if x >= 0.75 => "common", // hide the version completely
-                        _ if matches_latest => "verynew", // display version in black
+                if let Ok(Some(pop)) = self.kitchen_sink.version_popularity(&richdep.package, &req).await {
+                    return match pop.pop {
+                        x if x >= 0.75 && !pop.lost_popularity => "common", // hide the version completely
+                        _ if pop.matches_latest && !pop.lost_popularity => "verynew", // display version in black
                         x if x >= 0.33 => "outdated", // orange
                         _ => "obsolete", // red
                     };

@@ -44,8 +44,8 @@ pub struct CrateLicense {
 }
 
 pub struct CrateSizes {
-    pub tarball: usize,
-    pub uncompressed: usize,
+    pub tarball: u64,
+    pub uncompressed: u64,
     pub minimal: DepsSize,
     pub typical: DepsSize,
 }
@@ -344,7 +344,7 @@ impl<'a> CratePage<'a> {
         (Numeric::english().format_int(num), unit)
     }
 
-    pub fn format_kbytes(&self, bytes: usize) -> String {
+    pub fn format_kbytes(&self, bytes: u64) -> String {
         let (num, unit) = match bytes {
             0..=100_000 => ((bytes + 999) / 1000, "KB"),
             0..=800_000 => ((bytes + 3999) / 5000 * 5, "KB"),
@@ -372,7 +372,7 @@ impl<'a> CratePage<'a> {
         }
     }
 
-    pub fn format_kbytes_range(&self, a: usize, b: usize) -> String {
+    pub fn format_kbytes_range(&self, a: u64, b: u64) -> String {
         let min_bytes = a.min(b);
         let max_bytes = a.max(b);
 
@@ -890,10 +890,10 @@ impl<'a> CratePage<'a> {
             }
 
             let crate_size = krate.crate_size();
-            let tarball_weighed = (crate_size.0 as f32 * weight) as usize;
-            let uncompr_weighed = (crate_size.1 as f32 * weight) as usize;
-            let tarball_weighed_minimal = (crate_size.0 as f32 * weight_minimal) as usize;
-            let uncompr_weighed_minimal = (crate_size.1 as f32 * weight_minimal) as usize;
+            let tarball_weighed = (crate_size.0 as f32 * weight) as u64;
+            let uncompr_weighed = (crate_size.1 as f32 * weight) as u64;
+            let tarball_weighed_minimal = (crate_size.0 as f32 * weight_minimal) as u64;
+            let uncompr_weighed_minimal = (crate_size.1 as f32 * weight_minimal) as u64;
             let crate_stats = krate.language_stats();
 
             if depinf.direct && Self::is_same_project(self.ver, &krate) {
@@ -954,8 +954,8 @@ pub struct DepsStatsResult<'a> {
 
 #[derive(Debug, Copy, Clone, Default)]
 pub struct DepsSize {
-    pub tarball: usize,
-    pub uncompressed: usize,
+    pub tarball: u64,
+    pub uncompressed: u64,
     pub lines: usize,
 }
 

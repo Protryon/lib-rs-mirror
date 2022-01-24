@@ -79,7 +79,7 @@ use rich_crate::Author;
 use rich_crate::CrateVersion;
 use rich_crate::CrateVersionSourceData;
 use rich_crate::Readme;
-use semver::VersionReq;
+pub use semver::VersionReq;
 use simple_cache::SimpleCache;
 use simple_cache::TempCache;
 use smol_str::SmolStr;
@@ -118,12 +118,12 @@ pub enum Warning {
     NoReadmePackaged,
     #[error("Can't find README in repository: {}", _0)]
     NoReadmeInRepo(Box<str>),
+    #[error("Readme has a problematic path: {}", _0)]
+    EscapingReadmePath(Box<str>),
     #[error("Could not clone repository: {}", _0)]
     ErrorCloning(Box<str>),
     #[error("{} URL is a broken link: {}", _0, _1)]
     BrokenLink(Box<str>, Box<str>),
-    #[error("Error parsing manifest: {}", _0)]
-    ManifestParseError(Box<str>),
     #[error("Bad category: {}", _0)]
     BadCategory(Box<str>),
     #[error("No categories specified")]
@@ -138,6 +138,16 @@ pub enum Warning {
     DocsRs,
     #[error("Dependency {} v{} is outdated ({}%)", _0, _1, _2)]
     OutdatedDependency(Box<str>, Box<str>, u8),
+    #[error("Dependency {} has bad requirement {}", _0, _1)]
+    BadRequirement(Box<str>, Box<str>),
+    #[error("Dependency {} has exact requirement {}", _0, _1)]
+    ExactRequirement(Box<str>, Box<str>),
+    #[error("Dependency {} has imprecise requirement {}", _0, _1)]
+    LaxRequirement(Box<str>, Box<str>),
+    #[error("The crate is classified as a cryptocurrency-related")]
+    CryptocurrencyBS,
+    #[error("The crate tarball is big: {}MB", _0 / 1000 / 1000)]
+    Chonky(u64),
 }
 
 #[derive(Debug, Clone, thiserror::Error)]

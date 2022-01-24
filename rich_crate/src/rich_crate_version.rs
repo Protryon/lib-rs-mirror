@@ -69,6 +69,10 @@ impl RichCrateVersion {
         !self.package().categories.is_empty()
     }
 
+    pub fn manifest_raw_categories(&self) -> &[String] {
+        &self.package().categories
+    }
+
     /// Finds preferred capitalization for the name
     pub fn capitalized_name(&self) -> &str {
         &self.derived.capitalized_name
@@ -150,6 +154,10 @@ impl RichCrateVersion {
 
     pub fn readme(&self) -> Option<&Readme> {
         self.derived.readme.as_ref()
+    }
+
+    pub fn readme_raw_path(&self) -> Option<&str> {
+        self.package().readme.as_ref()
     }
 
     /// Contents of the `src/lib.rs` from the crate, if available
@@ -289,8 +297,8 @@ impl RichCrateVersion {
 
     /// compressed (whole tarball) and decompressed (extracted files only)
     #[inline]
-    pub fn crate_size(&self) -> (usize, usize) {
-        (self.derived.crate_compressed_size as usize, self.derived.crate_decompressed_size as usize)
+    pub fn crate_size(&self) -> (u64, u64) {
+        (self.derived.crate_compressed_size as u64, self.derived.crate_decompressed_size as u64)
     }
 }
 

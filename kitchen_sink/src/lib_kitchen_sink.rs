@@ -5,6 +5,7 @@ extern crate serde_derive;
 extern crate log;
 
 mod yearly;
+use crate_git_checkout::FoundManifest;
 use event_log::EventLog;
 use anyhow::Context;
 use feat_extractor::is_deprecated_requirement;
@@ -1024,26 +1025,26 @@ impl KitchenSink {
         };
         let checkout = self.checkout_repo(repo.clone()).await?;
         spawn_blocking(move || {
-            let (path_in_repo, tree_id, manifest) = crate_git_checkout::path_in_repo(&checkout, &package)?
+            let found = crate_git_checkout::path_in_repo(&checkout, &package)?
                 .ok_or_else(|| {
                     let (has, err) = crate_git_checkout::find_manifests(&checkout).unwrap_or_default();
                     for e in err {
                         warn!("parse err: {}", e.0);
                     }
                     for h in has {
-                        info!("has: {} -> {}", h.0, h.2.package.as_ref().map(|p| p.name.as_str()).unwrap_or("?"));
+                        info!("has: {} -> {}", h.inner_path, h.manifest.package.as_ref().map(|p| p.name.as_str()).unwrap_or("?"));
                     }
                     KitchenSinkErr::CrateNotFoundInRepo(package.to_string(), repo.canonical_git_url().into_owned())
                 })?;
 
 
-            let mut meta = tarball::read_repo(&checkout, tree_id)?;
-            debug_assert_eq!(meta.manifest.package, manifest.package);
+            let mut meta = tarball::read_repo(&checkout, found.tree)?;
+            debug_assert_eq!(meta.manifest.package, found.manifest.package);
             let package = meta.manifest.package.as_mut().ok_or(KitchenSinkErr::NotAPackage(origin))?;
 
             // Allowing any other URL would allow spoofing
             package.repository = Some(repo.canonical_git_url().into_owned());
-            Ok::<_, CError>((meta, path_in_repo))
+            Ok::<_, CError>((meta, found.inner_path))
         }).await?
     }
 
@@ -1273,7 +1274,7 @@ impl KitchenSink {
                     // but it needs to normalize ../readme paths
                     let url = url::Url::parse(&format!("http://localhost/{}", path_in_repo)).and_then(|u| u.join(&readme_path));
                     let in_repo_url_path = url.as_ref().map_or("", |u| u.path().trim_start_matches('/'));
-                    (Some(repo.readme_base_url(in_repo_url_path)), Some(repo.readme_base_image_url(in_repo_url_path)))
+                    (Some(repo.readme_base_url(in_repo_url_path)), Some(repo.readme_base_image_url(in_repo_url_path, None)))
                 },
                 None => (None, None),
             };
@@ -1986,7 +1987,7 @@ impl KitchenSink {
         }
     }
 
-    pub async fn inspect_repo_manifests(&self, repo: &Repo) -> CResult<Vec<(String, crate_git_checkout::Oid, Manifest)>> {
+    pub async fn inspect_repo_manifests(&self, repo: &Repo) -> CResult<Vec<FoundManifest>> {
         let checkout = self.checkout_repo(repo.clone()).await?;
         let (has, _) = tokio::task::block_in_place(|| crate_git_checkout::find_manifests(&checkout))?;
         Ok(has)
@@ -2013,8 +2014,11 @@ impl KitchenSink {
             for warn in warnings {
                 warn!("warning: {}", warn.0);
             }
-            Ok::<_, CError>((checkout, manif.into_iter().filter_map(|(subpath, _, manifest)| {
-                manifest.package.map(|p| (subpath, p.name))
+            Ok::<_, CError>((checkout, manif.into_iter().filter_map(|found| {
+                let inner_path = found.inner_path;
+                let manifest = found.manifest;
+                let commit = found.commit;
+                manifest.package.map(move |p| (inner_path, p.name, commit.to_string()))
             })))
         }).await??;
         self.crate_db.index_repo_crates(repo, manif).await.context("index rev repo")?;

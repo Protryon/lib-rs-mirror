@@ -433,14 +433,15 @@ impl CrateDb {
     ///    finds location of the crate within the repo, adding extra precision to the
     ///    crate's repo URL (needed for e.g. GitHub README relative links), and adds
     ///    interesting relationship information for crates.
-    pub async fn index_repo_crates(&self, repo: &Repo, paths_and_names: impl Iterator<Item = (impl AsRef<str>, impl AsRef<str>)>) -> FResult<()> {
+    pub async fn index_repo_crates(&self, repo: &Repo, paths_and_names: impl Iterator<Item = (impl AsRef<str>, impl AsRef<str>, impl AsRef<str>)>) -> FResult<()> {
         let repo = repo.canonical_git_url();
         self.with_write("index_repo_crates", |tx| {
-            let mut insert_repo = tx.prepare_cached("INSERT OR IGNORE INTO repo_crates (repo, path, crate_name) VALUES (?1, ?2, ?3)")?;
-            for (path, name) in paths_and_names {
+            let mut insert_repo = tx.prepare_cached("INSERT OR IGNORE INTO repo_crates (repo, path, crate_name, revision) VALUES (?1, ?2, ?3, ?4)")?;
+            for (path, name, revision) in paths_and_names {
                 let name = name.as_ref();
                 let path = path.as_ref();
-                insert_repo.execute(&[&repo.as_ref(), &path, &name]).map_err(|e| Error::DbCtx(e, "repo rev insert"))?;
+                let revision = revision.as_ref();
+                insert_repo.execute(&[&repo.as_ref(), &path, &name, &revision]).map_err(|e| Error::DbCtx(e, "repo rev insert"))?;
             }
             Ok(())
         }).await

@@ -36,7 +36,9 @@ async fn check_repo(line: &str, crates: &KitchenSink) -> Result<(), Box<dyn std:
         std::io::stdout().flush()?;
         let manifests = crates.inspect_repo_manifests(&repo).await?;
         println!(" {} found", manifests.len());
-        for (path, _, manif) in manifests {
+        for f in manifests {
+            let manif = f.manifest;
+            let path = f.inner_path;
             if let Some(pkg) = &manif.package {
                 if path.contains("example") {
                     println!("// skip {} {}", path, pkg.name);

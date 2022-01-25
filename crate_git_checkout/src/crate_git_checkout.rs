@@ -49,6 +49,7 @@ pub fn checkout(repo: &Repo, base_path: &Path) -> Result<Repository, git2::Error
     Ok(repo)
 }
 
+/// at: tree, commit
 #[inline]
 pub fn iter_blobs<E, F>(repo: &Repository, at: Option<Oid>, cb: F) -> Result<(), E>
     where F: FnMut(&str, &Tree<'_>, &str, Blob<'_>) -> Result<(), E>, E: From<Error>
@@ -145,10 +146,10 @@ fn get_repo(repo: &Repo, base_path: &Path) -> Result<Repository, git2::Error> {
 }
 
 /// Returns (path, Tree Oid, Cargo.toml)
-pub fn find_manifests(repo: &Repository) -> Result<(Vec<(String, Oid, Manifest)>, Vec<ParseError>), Error> {
+pub fn find_manifests(repo: &Repository) -> Result<(Vec<FoundManifest>, Vec<ParseError>), Error> {
     let head = repo.head()?;
     let tree = head.peel_to_tree()?;
-    find_manifests_in_tree(repo, &tree)
+    find_manifests_in_tree(repo, &tree, head.peel_to_commit()?.id())
 }
 
 struct GitFS<'a, 'b> {
@@ -188,8 +189,15 @@ impl GitFS<'_, '_> {
     }
 }
 
+pub struct FoundManifest {
+    pub inner_path: String,
+    pub tree: Oid,
+    pub commit: Oid,
+    pub manifest: Manifest,
+}
+
 /// Path, tree Oid, parsed TOML
-fn find_manifests_in_tree(repo: &Repository, start_tree: &Tree<'_>) -> Result<(Vec<(String, Oid, Manifest)>, Vec<ParseError>), Error> {
+fn find_manifests_in_tree(repo: &Repository, start_tree: &Tree<'_>, commit_id: Oid) -> Result<(Vec<FoundManifest>, Vec<ParseError>), Error> {
     let mut tomls = Vec::with_capacity(8);
     let mut warnings = Vec::new();
     iter_blobs_in_tree::<Error, _>(repo, start_tree, |inner_path, inner_tree, name, blob| {
@@ -198,7 +206,12 @@ fn find_manifests_in_tree(repo: &Repository, start_tree: &Tree<'_>) -> Result<(V
                 Ok(mut toml) => {
                     toml.complete_from_abstract_filesystem(GitFS { repo, tree: inner_tree })?;
                     if toml.package.is_some() {
-                        tomls.push((inner_path.to_owned(), inner_tree.id(), toml))
+                        tomls.push(FoundManifest {
+                            inner_path: inner_path.to_owned(),
+                            tree: inner_tree.id(),
+                            commit: commit_id,
+                            manifest: toml
+                        })
                     }
                 },
                 Err(err) => {
@@ -211,22 +224,21 @@ fn find_manifests_in_tree(repo: &Repository, start_tree: &Tree<'_>) -> Result<(V
     Ok((tomls, warnings))
 }
 
-pub fn path_in_repo(repo: &Repository, crate_name: &str) -> Result<Option<(String, Oid, Manifest)>, Error> {
+pub fn path_in_repo(repo: &Repository, crate_name: &str) -> Result<Option<FoundManifest>, Error> {
     let head = repo.head()?;
     let tree = head.peel_to_tree()?;
-    path_in_repo_in_tree(repo, &tree, crate_name)
+    path_in_repo_in_tree(repo, &tree, head.peel_to_commit()?.id(), crate_name)
 }
 
-fn path_in_repo_in_tree(repo: &Repository, tree: &Tree<'_>, crate_name: &str) -> Result<Option<(String, Oid, Manifest)>, Error> {
-    Ok(find_manifests_in_tree(repo, tree)?.0
+fn path_in_repo_in_tree(repo: &Repository, tree: &Tree<'_>, commit_id: Oid, crate_name: &str) -> Result<Option<FoundManifest>, Error> {
+    Ok(find_manifests_in_tree(repo, tree, commit_id)?.0
         .into_iter()
-        .find(|(_, _, manifest)| manifest.package.as_ref().map_or(false, |p| p.name == crate_name)))
+        .find(|f| f.manifest.package.as_ref().map_or(false, |p| p.name == crate_name)))
 }
 
 #[derive(Debug, Copy, Clone, Default)]
 struct State {
     since: Option<usize>,
-    until: Option<usize>,
 }
 
 pub type PackageVersionTimestamps = HashMap<String, HashMap<String, i64>>;
@@ -238,8 +250,8 @@ pub fn find_versions(repo: &Repository) -> Result<PackageVersionTimestamps, Erro
         .filter_map(|tag| repo.find_reference(&format!("refs/tags/{}", tag)).map_err(|e| eprintln!("bad tag {}: {}", tag, e)).ok())
         .filter_map(|r| r.peel_to_commit().map_err(|e| eprintln!("bad ref/tag: {}", e)).ok())
     {
-        for (_, _, manifest) in find_manifests_in_tree(repo, &commit.tree()?)?.0 {
-            if let Some(pkg) = manifest.package {
+        for f in find_manifests_in_tree(repo, &commit.tree()?, commit.id())?.0 {
+            if let Some(pkg) = f.manifest.package {
                 add_package(&mut package_versions, pkg, &commit);
             }
         }
@@ -286,15 +298,15 @@ pub fn find_dependency_changes(repo: &Repository, mut cb: impl FnMut(HashSet<Str
         // All deps in a repo, because we traverse history once per repo, not once per crate,
         // and because moving of deps between internal crates doesn't count.
         let mut older_deps = HashSet::with_capacity(100);
-        for (_, _, manifest) in find_manifests_in_tree(repo, &commit.tree()?)?.0 {
+        for f in find_manifests_in_tree(repo, &commit.tree()?, commit.id())?.0 {
             // Find oldest occurence of each version, assuming it's a release date
-            if let Some(pkg) = manifest.package {
+            if let Some(pkg) = f.manifest.package {
                 add_package(&mut package_versions, pkg, &commit);
             }
 
-            older_deps.extend(manifest.dependencies.into_iter().map(|(k, _)| k));
-            older_deps.extend(manifest.dev_dependencies.into_iter().map(|(k, _)| k));
-            older_deps.extend(manifest.build_dependencies.into_iter().map(|(k, _)| k));
+            older_deps.extend(f.manifest.dependencies.into_iter().map(|(k, _)| k));
+            older_deps.extend(f.manifest.dev_dependencies.into_iter().map(|(k, _)| k));
+            older_deps.extend(f.manifest.build_dependencies.into_iter().map(|(k, _)| k));
         }
 
         let mut added = HashSet::with_capacity(10);
@@ -313,7 +325,7 @@ pub fn find_dependency_changes(repo: &Repository, mut cb: impl FnMut(HashSet<Str
             if let Vacant(e) = newer_deps.entry(dep) {
                 if age > 0 {
                     removed.insert(e.key().clone());
-                    e.insert(State { since: None, until: Some(age) });
+                    e.insert(State { since: None }); // until: Some(age)
                 } else {
                     e.insert(State::default());
                 }
@@ -328,17 +340,18 @@ pub fn find_dependency_changes(repo: &Repository, mut cb: impl FnMut(HashSet<Str
 // FIXME: buggy, barely works
 pub fn find_readme(repo: &Repository, package: &Package) -> Result<Option<(String, Markup)>, Error> {
     let head = repo.head()?;
+    let commit_id = head.peel_to_commit()?.id();
     let tree = head.peel_to_tree()?;
     let mut readme = None;
     let mut found_best = false; // it'll find many readmes, including fallbacks
 
-    let mut prefix = path_in_repo_in_tree(repo, &tree, &package.name)?;
-    if let Some((ref mut prefix, ..)) = prefix {
-        if !prefix.ends_with('/') {
-            prefix.push('/');
+    let mut f = path_in_repo_in_tree(repo, &tree, commit_id, &package.name)?;
+    if let Some(f) = &mut f {
+        if !f.inner_path.ends_with('/') {
+            f.inner_path.push('/');
         }
     }
-    let prefix = prefix.as_ref().map(|(s, ..)| s.as_str()).unwrap_or("");
+    let prefix = f.as_ref().map(|f| f.inner_path.as_str()).unwrap_or("");
 
     iter_blobs_in_tree::<Error, _>(repo, &tree, |base, _inner_tree, name, blob| {
         if found_best {

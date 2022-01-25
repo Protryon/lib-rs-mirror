@@ -3,6 +3,7 @@ edition = "2018"
 name = "udedokei"
 version = "0.1.1"
 authors = ["Kornel <kornel@geekhood.net>"]
+publish = false
 
 [dependencies]
 tokei = "12.0.4"

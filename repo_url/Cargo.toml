@@ -5,6 +5,7 @@ version = "0.3.3"
 authors = ["Kornel <kornel@geekhood.net>"]
 description = "Basic properties and formatting of URLs of GitHub and GitLab repositories"
 license = "CC0-1.0"
+publish = false
 
 [lib]
 name = "repo_url"

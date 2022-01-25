@@ -3,6 +3,7 @@ version = "0.3.5"
 edition = "2018"
 name = "search_index"
 authors = ["Kornel <kornel@geekhood.net>"]
+publish = false
 
 [lib]
 name = "search_index"

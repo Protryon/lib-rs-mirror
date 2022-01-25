@@ -5,6 +5,7 @@ version = "0.5.4"
 authors = ["Kornel <kornel@geekhood.net>"]
 description = "Crate struct enriched with additional crates.rs metadata"
 license = "Apache-2.0 OR MIT"
+publish = false
 
 [dependencies]
 crates_io_client = { path = "../crates_io_client", version = "0.8.2" }

@@ -3,6 +3,7 @@ version = "0.3.11"
 edition = "2018"
 name = "reindex"
 authors = ["Kornel <kornel@geekhood.net>"]
+publish = false
 
 [dependencies]
 crate_db = { path = "../crate_db", version = "0.4.0" }

@@ -4,6 +4,7 @@ name = "user_db"
 version = "0.3.9"
 authors = ["Kornel <kornel@geekhood.net>"]
 description = "Stores mapping between Cargo crate authors and GitHub users"
+publish = false
 
 [lib]
 name ="user_db"

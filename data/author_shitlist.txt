@@ -1,3 +1,6 @@
 yuulive: crate name squatting
-mahkoh: crate name squatting
+rellfy: crate name squatting
 andres-roman: squatting crates using fake descriptions and stolen code
+marlonhanks: squatting crates using fake descriptions and stolen code
+ccmlm: abuse of crates.io downloads
+jackpot51: user's own request

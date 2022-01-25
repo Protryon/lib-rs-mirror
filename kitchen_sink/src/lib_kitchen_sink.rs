@@ -1352,6 +1352,18 @@ impl KitchenSink {
                 *cat = "game-development".into();
             }
 
+            if cat == "data-structure" {
+                *cat = "data-structures".to_string();
+            }
+            if cat == "serialization" {
+                *cat = "encoding".to_string();
+            }
+            if cat == "async" {
+                *cat = "asynchronous".to_string();
+            }
+            if cat == "blockchain" {
+                *cat = "cryptography::cryptocurrencies".to_string();
+            }
             if cat == "aerospace::simulation" {
                 *cat = "simulation".to_string();
             }

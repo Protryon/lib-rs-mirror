@@ -129,6 +129,7 @@ impl RichCrateVersion {
             if d.contains(". ") {d} // multiple sentences, leave them alone
             else {d.trim_end_matches('.')}
         })
+        .filter(|&d| d != self.short_name()) // spams
     }
 
     /// Only explicitly-specified authors

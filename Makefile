@@ -12,7 +12,8 @@ Cargo.lock: Cargo.toml
 	cargo update
 
 backup:
-	rsync -Praz librs:/var/lib/crates-server/ data/ --exclude=tarballs --exclude=git --exclude=index --exclude=event_log.db --exclude='.*' --exclude=data
+	rsync -Praz librs:/var/lib/crates-server/ data/ --exclude=tarballs --exclude=git --exclude=index --exclude=event_log.db --exclude='.*' --exclude='*.txt' --exclude=data
+	rsync -Praz librs:/var/lib/crates-server/ data/ --exclude=tarballs --exclude='*.mpbr' --exclude=git --exclude=index --exclude=event_log.db --exclude='.*' --exclude='*.txt' --exclude=data
 
 $(CACHE_FILES):
 	if [ ! -d data/data.tar.xz -a -f data.tar.xz ]; then mv data.tar.xz data/; fi

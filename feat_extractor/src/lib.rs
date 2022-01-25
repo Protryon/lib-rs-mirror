@@ -1,6 +1,7 @@
 use rich_crate::MaintenanceStatus;
 use rich_crate::Manifest;
 use rich_crate::ManifestExt;
+use rich_crate::Markup;
 use rich_crate::RichCrateVersion;
 use semver::VersionReq;
 use std::collections::HashSet;
@@ -191,29 +192,52 @@ pub fn is_squatspam(k: &RichCrateVersion) -> bool {
         if desc == "..." { // spam by mahkoh
             return true;
         }
-        let desc = desc.trim_matches(|c: char| !c.is_ascii_alphabetic()).to_ascii_lowercase();
-        return desc.contains("this crate is a placeholder") ||
-            desc.contains("reserving this crate") ||
-            desc.contains("only to reserve the name") ||
-            desc.contains("this crate has been retired") ||
-            desc.contains("want to use this name") ||
-            desc.contains("this is a dummy package") ||
-            desc.starts_with("a reserved crate ") ||
-            desc.contains("this crate is reserved ") ||
-            desc == "reserved" ||
-            desc.starts_with("reserved for future use") ||
-            desc.starts_with("placeholder") ||
-            desc.ends_with(" placeholder") ||
-            desc.starts_with("dummy crate") ||
-            desc.starts_with("a placeholder") ||
-            desc.starts_with("empty crate") ||
-            desc.starts_with("an empty crate") ||
-            desc.starts_with("reserved for ") ||
-            desc.starts_with("stub to squat") ||
-            desc.starts_with("claiming it before someone") ||
-            desc.starts_with("reserved name") ||
-            desc.starts_with("reserved package") ||
-            desc.starts_with("reserve the name");
+        if is_reserved_boilerplate_text(desc) {
+            return true;
+        }
+    } else if let Some(readme) = k.readme() {
+        match &readme.markup {
+            Markup::Html(s) | Markup::Markdown(s) | Markup::Rst(s) => if is_reserved_boilerplate_text(s) {
+                return true;
+            }
+        }
     }
     false
+}
+
+fn is_reserved_boilerplate_text(desc: &str) -> bool {
+    let desc = desc.trim_matches(|c: char| !c.is_ascii_alphabetic()).to_ascii_lowercase();
+    let desc2 = desc.trim_start_matches("this crate ")
+        .trim_start_matches("is being ")
+        .trim_start_matches("is ")
+        .trim_start_matches("has been ")
+        .trim_start_matches("has ")
+        .trim_start_matches("a ").trim_start();
+    return desc.contains("this crate is a placeholder") ||
+        desc.contains("reserving this crate") ||
+        desc.contains("reserving this crate") ||
+        desc.contains("only to reserve the name") ||
+        desc.contains("this crate has been retired") ||
+        desc.contains("want to use this name") ||
+        desc.contains("this is a dummy package") ||
+        desc2.starts_with("reserved crate ") ||
+        desc.contains("this crate is reserved ") ||
+        desc == "reserved" ||
+        desc2.starts_with("reserved for future use") ||
+        desc2.starts_with("placeholder") ||
+        desc.ends_with(" placeholder") ||
+        desc.ends_with(" reserved for use") ||
+        desc2.starts_with("dummy crate") ||
+        desc2.starts_with("reserved, for") ||
+        desc2.starts_with("crate name reserved for") ||
+        desc2.starts_with("wip: reserved") ||
+        desc2.starts_with("placeholder") ||
+        desc2.starts_with("empty crate") ||
+        desc2.starts_with("an empty crate") ||
+        desc2.starts_with("reserved for ") ||
+        desc2.starts_with("stub to squat") ||
+        desc2.starts_with("claiming it before someone") ||
+        desc2.starts_with("reserved name") ||
+        desc2.starts_with("reserved package") ||
+        desc2.starts_with("reserve the name");
 }

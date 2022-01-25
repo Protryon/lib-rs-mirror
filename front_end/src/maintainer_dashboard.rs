@@ -305,5 +305,5 @@ fn comma_list<'a>(items: impl Iterator<Item=&'a String>) -> String {
 
 fn is_breaking_semver(name: &str) -> bool {
     // it is ironic that the new semver maintainer passionately hates semver feature rules.
-    matches!(name, "serde" | "serde_json" | "cc" | "serde_derive" | "anyhow" | "cxx" | "cxx-build" | "serde_test" | "syn")
+    matches!(name, "serde" | "serde_json" | "cc" | "serde_derive" | "anyhow" | "thiserror" | "cxx" | "cxx-build" | "serde_test" | "syn")
 }

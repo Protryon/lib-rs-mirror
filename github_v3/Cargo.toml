@@ -1,7 +1,7 @@
 [package]
 name = "github_v3"
 description = "Async GitHub API v3 client"
-version = "1.0.1"
+version = "1.0.2"
 authors = ["Kornel <kornel@geekhood.net>"]
 keywords = ["github", "restful", "api", "async"]
 categories = ["web-programming", "web-programming::http-client"]
@@ -12,18 +12,18 @@ homepage = "https://lib.rs/github_v3"
 license = "CC0-1.0"
 
 [dependencies]
-reqwest = { version = "0.11.0", features = ["json"] }
-serde = "1.0.104"
-serde_json = "1.0.47"
-thiserror = "1.0.10"
-serde_derive = "1.0.104"
-futures = "0.3.4"
-async-stream = "0.3"
-tokio = { version = "1.2.0", features = ["time"] }
-urlencoding = "2.0.0"
+reqwest = { version = "0.11.9", features = ["json"] }
+serde = "1.0.135"
+serde_json = "1.0.78"
+thiserror = "1.0.30"
+serde_derive = "1.0.135"
+futures = "0.3.19"
+async-stream = "0.3.2"
+tokio = { version = "1.15.0", features = ["time"] }
+urlencoding = "2.1.0"
 
 [dev-dependencies]
-tokio = { version = "1.2.0", features = ["rt-multi-thread", "macros", "time"] }
+tokio = { version = "1.15.0", features = ["rt-multi-thread", "macros", "time"] }
 
 [features]
 default = ["gzip"]

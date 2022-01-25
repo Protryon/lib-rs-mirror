@@ -97,8 +97,8 @@ impl Builder {
     /// Add a raw unescaped query string. The string must *not* start with `?`
     ///
     /// ```rust
-    /// # Client::new(None)
-    /// .get().path("search/users").query("q=").arg(somestring)
+    /// # github_v3::Client::new(None)
+    /// .get().path("search/users").query("q=").arg("somestring");
     /// ```
     pub fn query(mut self, query_string: &str) -> Self {
         debug_assert!(!query_string.starts_with('?'));

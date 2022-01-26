@@ -247,30 +247,30 @@ impl CrateDb {
 
         for feat in manifest.features.keys() {
             if feat != "default" && feat != "std" && feat != "nightly" {
-                insert_keyword.add(&format!("feature:{}", feat), 0.55, false);
+                insert_keyword.add_raw(format!("feature:{}", feat), 0.55, false);
             }
         }
         if manifest.is_sys(c.source_data.has_buildrs || package.build.is_some()) {
-            insert_keyword.add("has:is_sys", 0.01, false);
+            insert_keyword.add_raw("has:is_sys".into(), 0.01, false);
         }
         if manifest.is_proc_macro() {
-            insert_keyword.add("has:proc_macro", 0.25, false);
+            insert_keyword.add_raw("has:proc_macro".into(), 0.25, false);
         }
         if manifest.has_bin() {
-            insert_keyword.add("has:bin", 0.01, false);
+            insert_keyword.add_raw("has:bin".into(), 0.01, false);
             if manifest.has_cargo_bin() {
-                insert_keyword.add("has:cargo-bin", 0.2, false);
+                insert_keyword.add_raw("has:cargo-bin".into(), 0.2, false);
             }
         }
         if c.is_build {
-            insert_keyword.add("has:is_build", 0.01, false);
+            insert_keyword.add_raw("has:is_build".into(), 0.01, false);
         }
         if c.is_dev {
-            insert_keyword.add("has:is_dev", 0.01, false);
+            insert_keyword.add_raw("has:is_dev".into(), 0.01, false);
         }
 
         for &(dep, weight) in c.deps_stats {
-            insert_keyword.add(&format!("dep:{}", dep), (weight / 2.0).into(), false);
+            insert_keyword.add_raw(format!("dep:{}", dep), (weight / 2.0).into(), false);
         }
 
         let mut out = String::with_capacity(200);
@@ -332,7 +332,7 @@ impl CrateDb {
                 let args: &[&dyn ToSql] = &[&crate_id, slug, rank, rel];
                 insert_category.execute(args).map_err(|e| Error::DbCtx(e, "insert cat"))?;
                 if had_explicit_categories {
-                    insert_keyword.add(slug, rel/3., false);
+                    insert_keyword.add_raw(slug, rel/3., false);
                 }
             }
 
@@ -344,12 +344,12 @@ impl CrateDb {
 
             for (i, k) in c.authors.iter().filter_map(|a| a.email.as_ref().or(a.name.as_ref())).enumerate() {
                 let w: f64 = 50. / (100 + i) as f64;
-                insert_keyword.add(k, w, false);
+                insert_keyword.add_raw(k, w, false);
             }
 
             if let Some(repo) = c.repository {
                 let url = repo.canonical_git_url();
-                insert_keyword.add(&format!("repo:{}", url), 1., false); // crates in monorepo probably belong together
+                insert_keyword.add_raw(&format!("repo:{}", url), 1., false); // crates in monorepo probably belong together
             }
 
             // yanked crates may contain garbage, or needlessly come up in similar crates
@@ -1047,8 +1047,15 @@ impl KeywordInsert {
         if word.is_empty() || weight <= 0.000001 {
             return;
         }
-        let word = word.to_kebab_case();
+        let word = normalize_keyword(word);
         if word == "rust" || word == "rs" {
+            return;
+        }
+        self.add_raw(word, weight, visible);
+    }
+
+    pub fn add_raw(&mut self, word: String, weight: f64, visible: bool) {
+        if word.is_empty() {
             return;
         }
         let k = self.keywords.entry(word).or_insert((weight, visible));

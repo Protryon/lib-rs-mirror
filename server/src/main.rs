@@ -265,6 +265,8 @@ async fn run_server(rt: Handle) -> Result<(), anyhow::Error> {
             .route("/{host}/{owner}/{repo}/{crate}/versions", web::get().to(handle_repo_crate_all_versions))
             .route("/atom.xml", web::get().to(handle_feed))
             .route("/sitemap.xml", web::get().to(handle_sitemap))
+            .route("/{crate}/info/refs", web::get().to(handle_git_clone))
+            .route("/crates/{crate}/info/refs", web::get().to(handle_git_clone))
             .service(actix_files::Files::new("/", &public_document_root))
             .default_service(web::route().to(default_handler))
     })
@@ -457,6 +459,37 @@ async fn handle_redirect(req: HttpRequest) -> HttpResponse {
     let inf = req.match_info();
     let rest = inf.query("rest");
     HttpResponse::PermanentRedirect().insert_header(("Location", format!("/{}", rest))).body("")
+}
+
+async fn handle_git_clone(req: HttpRequest) -> HttpResponse {
+    let inf = req.match_info();
+    let crate_name = inf.query("crate");
+    if let Some(o) = Origin::try_from_crates_io_name(crate_name) {
+        let state2: &AServerState = req.app_data().expect("appdata");
+        let state = state2.clone();
+        if let Ok(Ok(url)) = state2.rt.spawn(async move {
+            let crates = state.crates.load();
+            let k = crates.rich_crate_version_async(&o).await?;
+            let r = k.repository().unwrap();
+
+            let mut url = r.canonical_git_url().into_owned();
+            if url.ends_with("/") {
+                url.truncate(url.len() - 1);
+            }
+            if !url.ends_with(".git") {
+                url.push_str(".git");
+            }
+            url.push_str("/info/refs?service=git-upload-pack");
+
+            Ok::<_, ServerError>(url)
+        }).await {
+            return HttpResponse::TemporaryRedirect()
+                .insert_header(("X-Robots-Tag", "noindex, nofollow"))
+                .insert_header(("Location", url))
+                .body("");
+        }
+    }
+    HttpResponse::NotFound().body("Crate not found")
 }
 
 async fn handle_crate_reverse_dependencies_redir(req: HttpRequest) -> HttpResponse {

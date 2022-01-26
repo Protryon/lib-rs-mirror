@@ -4,7 +4,9 @@ use rich_crate::CrateOwner;
 use rich_crate::CrateVersionSourceData;
 use rich_crate::Manifest;
 use rich_crate::ManifestExt;
+use rich_crate::Markup;
 use rich_crate::Origin;
+use rich_crate::Readme;
 use rich_crate::Repo;
 use rich_crate::RichCrate;
 use rusqlite::types::ToSql;
@@ -236,6 +238,15 @@ impl CrateDb {
             insert_keyword.add(l.trim_start_matches("lib"), 0.54, false);
         }
 
+        // this will find forks
+        if let Some(lib) = c.source_data.lib_file.as_ref() {
+            insert_keyword.add_raw(hex_hash(lib), 1., false);
+        }
+        // this will find crates from the same repo/template
+        if let Some(Readme { markup: Markup::Markdown(txt) | Markup::Html(txt) | Markup::Rst(txt) , ..}) = c.source_data.readme.as_ref() {
+            insert_keyword.add_raw(hex_hash(txt), 1., false);
+        }
+
         // order is important. SO's synonyms are very keyword-specific and would
         // add nonsense keywords if applied to freeform text
         insert_keyword.add_synonyms(&self.tag_synonyms);
@@ -332,7 +343,7 @@ impl CrateDb {
                 let args: &[&dyn ToSql] = &[&crate_id, slug, rank, rel];
                 insert_category.execute(args).map_err(|e| Error::DbCtx(e, "insert cat"))?;
                 if had_explicit_categories {
-                    insert_keyword.add_raw(slug, rel/3., false);
+                    insert_keyword.add_raw(slug.into(), rel/3., false);
                 }
             }
 
@@ -344,12 +355,12 @@ impl CrateDb {
 
             for (i, k) in c.authors.iter().filter_map(|a| a.email.as_ref().or(a.name.as_ref())).enumerate() {
                 let w: f64 = 50. / (100 + i) as f64;
-                insert_keyword.add_raw(k, w, false);
+                insert_keyword.add_raw(k.into(), w, false);
             }
 
             if let Some(repo) = c.repository {
                 let url = repo.canonical_git_url();
-                insert_keyword.add_raw(&format!("repo:{}", url), 1., false); // crates in monorepo probably belong together
+                insert_keyword.add_raw(format!("repo:{}", url), 1., false); // crates in monorepo probably belong together
             }
 
             // yanked crates may contain garbage, or needlessly come up in similar crates
@@ -1139,6 +1150,10 @@ fn normalize_keyword(k: &str) -> String {
 fn crates_io_name(name: &str) -> std::result::Result<Origin, rusqlite::Error> {
     Origin::try_from_crates_io_name(name)
                     .ok_or_else(|| rusqlite::Error::ToSqlConversionFailure(format!("bad name {}", name).into()))
+}
+
+fn hex_hash(s: &str) -> String {
+    format!("*{}", blake3::hash(s.as_bytes()).to_hex())
 }
 
 #[derive(Debug)]

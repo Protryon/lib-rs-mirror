@@ -14,7 +14,7 @@
   </author>
   <icon>https://lib.rs/crates-logo.png</icon>
   <id>https://lib.rs/~@p.login()/dash</id>
-  <generator uri="https://gitlab.com/crates.rs"/>
+  <generator uri="https://gitlab.com/crates.rs">lib.rs</generator>
 
   @for (origin, _, warnings) in &p.warnings {
     @for w in warnings {
@@ -22,14 +22,14 @@
         <title>@origin.short_crate_name(): @w.title</title>
         <author>
           <name>lib.rs/@origin.short_crate_name()</name>
-          <link href="https://lib.rs@url.crate_abs_path_by_origin(origin)" />
+          <uri>https://lib.rs@url.crate_abs_path_by_origin(origin)</uri>
         </author>
 
         @if let Some((label, url)) = &w.url {
-          <link title="@label" href="@url"/>
+          <link rel="related" title="@label" href="@url"/>
         }
-        <link title="Dashboard" href="https://lib.rs@url.crates_io_user_maintainer_dashboard_by_github_login(p.login())#crate-@origin.short_crate_name()"/>
-        <category term="l@w.severity"/>
+        <link rel="alternate" title="Dashboard" href="https://lib.rs@url.crates_io_user_maintainer_dashboard_by_github_login(p.login())#crate-@origin.short_crate_name()"/>
+        <category term="l@w.severity" scheme="https://lib.rs#dash" />
 
         <id>@p.atom_id_for(origin, w)</id>
         <content type="text">@w.desc @if let Some(ext) = w.extended_desc {

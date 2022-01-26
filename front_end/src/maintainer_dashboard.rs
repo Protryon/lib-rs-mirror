@@ -126,7 +126,7 @@ impl<'a> MaintainerDashboard<'a> {
     }
 
     pub fn now(&self) -> String {
-        chrono::Utc::now().to_string()
+        chrono::Utc::now().to_rfc3339()
     }
 
     pub fn render_markdown_str(&self, s: &str) -> templates::Html<String> {

@@ -236,8 +236,9 @@ impl<'a> HomePage<'a> {
         &allver.versions().iter().max_by(|a, b| a.created_at.cmp(&b.created_at)).expect("no versions?").created_at
     }
 
+    /// for the feed
     pub fn now(&self) -> String {
-        chrono::Utc::now().to_string()
+        chrono::Utc::now().to_rfc3339()
     }
 
     pub fn all_contributors<'c>(&self, krate: &'c RichCrateVersion) -> Option<Vec<CrateAuthor<'c>>> {

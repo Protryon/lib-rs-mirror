@@ -1,5 +1,5 @@
 use categories::Category;
-use heck::KebabCase;
+use heck::ToKebabCase;
 use kitchen_sink::CrateAuthor;
 use kitchen_sink::UserType;
 use rich_crate::Origin;
@@ -136,6 +136,7 @@ impl Urler {
         }
     }
 
+    /// FIXME: it doesn't normalize keywords as well as the db inserter
     pub fn keyword(&self, name: &str) -> String {
         format!("/keywords/{}", Encoded(&name.to_kebab_case()))
     }

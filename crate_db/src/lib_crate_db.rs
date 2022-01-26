@@ -1,5 +1,5 @@
+use heck::ToKebabCase;
 use chrono::prelude::*;
-use heck::KebabCase;
 use rich_crate::CrateOwner;
 use rich_crate::CrateVersionSourceData;
 use rich_crate::Manifest;

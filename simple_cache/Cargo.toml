@@ -14,7 +14,7 @@ serde = "1.0.107"
 rusqlite = "0.26.0"
 thread_local = "1.0.1"
 tempfile = "3.1.0"
-rmp-serde = "0.15"
+rmp-serde = "1.0.0"
 parking_lot = "0.11"
 ahash = "0.7.4"
 fetcher = { path = "../fetcher/" }

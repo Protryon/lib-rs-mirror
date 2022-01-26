@@ -9,6 +9,7 @@ anyhow = "1.0.41"
 cargo_toml = "0.11.0"
 crate_git_checkout = { path = "../crate_git_checkout", version = "0.4.7" }
 libflate = "1.0.0"
+log = "0.4.14"
 render_readme = { path = "../render_readme" }
 tar = "0.4.26"
 thiserror = "1.0.26"

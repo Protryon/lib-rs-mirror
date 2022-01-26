@@ -9,7 +9,7 @@ use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
 use tar::{Archive, Entry, EntryType};
-
+use log::debug;
 use udedokei::LanguageExt;
 
 #[derive(Debug, thiserror::Error)]
@@ -124,6 +124,7 @@ impl Collector {
                 },
             }
         };
+
         self.files.push(relpath);
         if path_match == ReadAs::Skip {
             return Ok(());
@@ -132,7 +133,12 @@ impl Collector {
         let mut data = Vec::with_capacity(size.min(MAX_FILE_SIZE) as usize);
         file_data.take(MAX_FILE_SIZE).read_to_end(&mut data)?;
         self.decompressed_size += data.len();
-        let data = String::from_utf8_lossy(&data);
+
+        let data = String::from_utf8(data).unwrap_or_else(|e| String::from_utf8_lossy(&e.into_bytes()).into_owned());
+        if data.trim_start().is_empty() {
+            debug!("Skipping empty tarball entry file");
+            return Ok(());
+        }
 
         match path_match {
             ReadAs::Lib => {
@@ -140,16 +146,16 @@ impl Collector {
                 if check_if_uses_nightly_features(&data) {
                     self.is_nightly = true;
                 }
-                self.lib_file = Some(data.to_string());
+                self.lib_file = Some(data);
             },
             ReadAs::Toml => {
-                self.manifest = Some(Manifest::from_slice(data.as_bytes())?);
+                self.manifest = Some(Manifest::from_str(&data)?);
             },
             ReadAs::ReadmeMarkdown(path_prefix) => {
-                self.markup = Some((path_prefix, Markup::Markdown(data.to_string())));
+                self.markup = Some((path_prefix, Markup::Markdown(data)));
             },
             ReadAs::ReadmeRst(path_prefix) => {
-                self.markup = Some((path_prefix, Markup::Rst(data.to_string())));
+                self.markup = Some((path_prefix, Markup::Rst(data)));
             },
             ReadAs::GetStatsOfFile(lang) => {
                 self.stats.add_to_stats(lang, &data);

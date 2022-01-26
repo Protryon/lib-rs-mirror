@@ -415,9 +415,8 @@ fn render_404_page(state: &AServerState, path: &str, item_name: &str) -> impl Fu
 async fn handle_category(req: HttpRequest, cat: &'static Category) -> Result<HttpResponse, ServerError> {
     let state: &AServerState = req.app_data().expect("appdata");
     let crates = state.crates.load();
-    let cache_file = state.page_cache_dir.join(format!("_{}.html", cat.slug));
     Ok(serve_page(
-        with_file_cache(state, cache_file, 1800, {
+        with_file_cache(state, &format!("_{}.html", cat.slug), 1800, {
             let state = state.clone();
             rt_run_timeout(&state.clone().rt, "catrender", 30, async move {
                 let mut page: Vec<u8> = Vec::with_capacity(150000);
@@ -438,9 +437,8 @@ async fn handle_home(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     }
 
     let state: &AServerState = req.app_data().expect("appdata");
-    let cache_file = state.page_cache_dir.join("_.html");
     Ok(serve_page(
-        with_file_cache(state, cache_file, 3600, {
+        with_file_cache(state, "_.html", 3600, {
             let state = state.clone();
             run_timeout("homepage", 300, async move {
                 let crates = state.crates.load();
@@ -490,8 +488,7 @@ async fn handle_repo_crate(req: HttpRequest) -> Result<HttpResponse, ServerError
         return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", url.into_owned())).finish());
     }
 
-    let cache_file = state.page_cache_dir.join(cache_file_name_for_origin(&origin));
-    Ok(serve_page(with_file_cache(state, cache_file, 86400, {
+    Ok(serve_page(with_file_cache(state, &cache_file_name_for_origin(&origin), 86400, {
         render_crate_page(state.clone(), origin)
     }).await?))
 }
@@ -599,9 +596,8 @@ async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     if rows.is_empty() {
         return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", format!("https://github.com/{}", Encoded(&aut.github.login)))).body(""));
     }
-    let cache_file = state.page_cache_dir.join(format!("@{}.html", login));
     Ok(serve_page(
-        with_file_cache(state, cache_file, 3600, {
+        with_file_cache(state, &format!("@{}.html", login), 3600, {
             let state = state.clone();
             run_timeout("authorpage", 60, async move {
                 let crates = state.crates.load();
@@ -656,8 +652,8 @@ async fn handle_maintainer_dashboard(req: HttpRequest, atom_feed: bool) -> Resul
         return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", format!("/~{}", Encoded(&aut.github.login)))).body(""));
     }
 
-    let cache_file = state.page_cache_dir.join(format!("@{}.dash{}.html", login, if atom_feed { "xml" } else { "" }));
-    let rendered = with_file_cache(state, cache_file, if atom_feed { 3 * 3600 } else { 600 }, {
+    let cache_file_name = format!("@{}.dash{}.html", login, if atom_feed { "xml" } else { "" });
+    let rendered = with_file_cache(state, &cache_file_name, if atom_feed { 3 * 3600 } else { 600 }, {
         let state = state.clone();
         run_timeout("maintainer_dashboard2", 60, async move {
             let crates = state.crates.load();
@@ -699,8 +695,7 @@ async fn handle_crate(req: HttpRequest) -> Result<HttpResponse, ServerError> {
         Some(o) => o,
         None => return render_404_page(state, crate_name, "crate").await,
     };
-    let cache_file = state.page_cache_dir.join(cache_file_name_for_origin(&origin));
-    Ok(serve_page(with_file_cache(state, cache_file, 600, {
+    Ok(serve_page(with_file_cache(state, &cache_file_name_for_origin(&origin), 600, {
         render_crate_page(state.clone(), origin)
     }).await?))
 }
@@ -768,7 +763,7 @@ async fn handle_crate_reviews(req: HttpRequest) -> Result<HttpResponse, ServerEr
 async fn handle_new_trending(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let state: &AServerState = req.app_data().expect("appdata");
     Ok(serve_page(
-        with_file_cache(state, state.page_cache_dir.join("_new_.html"), 600, {
+        with_file_cache(state, "_new_.html", 600, {
             let state = state.clone();
             run_timeout("trendpage", 60, async move {
                 let crates = state.crates.load();
@@ -785,7 +780,7 @@ async fn handle_new_trending(req: HttpRequest) -> Result<HttpResponse, ServerErr
 async fn handle_global_stats(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let state: &AServerState = req.app_data().expect("appdata");
     Ok(serve_page(
-        with_file_cache(state, state.page_cache_dir.join("_stats_.html"), 6 * 3600, {
+        with_file_cache(state, "_stats_.html", 6 * 3600, {
             let state = state.clone();
             run_timeout("trendpage", 90, async move {
                 let crates = state.crates.load();
@@ -803,8 +798,9 @@ const CACHE_MAGIC_TAG: &[u8; 4] = b"  <c";
 
 /// takes path to storage, freshness in seconds, and a function to call on cache miss
 /// returns (page, fresh in seconds)
-async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cache_time: u32, generate: F) -> Result<Rendered, anyhow::Error>
+async fn with_file_cache<F: Send>(state: &AServerState, cache_file_name: &str, cache_time: u32, generate: F) -> Result<Rendered, anyhow::Error>
     where F: Future<Output=Result<(Vec<u8>, Option<DateTime<FixedOffset>>), anyhow::Error>> + 'static {
+    let cache_file = state.page_cache_dir.join(cache_file_name);
     if let Ok(modified) = std::fs::metadata(&cache_file).and_then(|m| m.modified()) {
         let now = SystemTime::now();
         let cache_time = cache_time as u64;
@@ -836,11 +832,12 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file: PathBuf, cac
                 let _ = rt_run_timeout(&state.rt, "refreshbg", 300, {
                     let state = state.clone();
                     async move {
+                        let start = Instant::now();
                         debug!("Bg refresh of {}", cache_file.display());
                         if let Ok(_s) = state.background_job.try_acquire() {
                             match generate.await {
                                 Ok((mut page, last_mod)) => {
-                                    info!("Done refresh of {}", cache_file.display());
+                                    info!("Done refresh of {} in {}ms", cache_file.display(), start.elapsed().as_millis() as u32);
                                     let timestamp = last_mod.map(|a| a.timestamp() as u32).unwrap_or(0);
                                     page.extend_from_slice(&timestamp.to_le_bytes()); // The worst data format :)
 

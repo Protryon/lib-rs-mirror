@@ -827,7 +827,7 @@ impl<'a> CratePage<'a> {
                 let krate = match self.get_crate_of_dependency(&name, ()).await {
                     Ok(k) => k,
                     Err(e) => {
-                        warn!("bad dep not counted: {}", e);
+                        warn!("bad dep not counted: {} {}", name, e);
                         return None;
                     },
                 };

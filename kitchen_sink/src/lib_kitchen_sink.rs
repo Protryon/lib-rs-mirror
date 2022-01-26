@@ -1520,7 +1520,7 @@ impl KitchenSink {
                 res.status().is_success()
             })
             .unwrap_or(false);
-            self.url_check_cache.set(url, res).unwrap();
+            let _ = self.url_check_cache.set(url, res).map_err(|e| error!("url cache: {}", e));
             res
         }).await
     }

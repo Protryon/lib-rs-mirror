@@ -127,7 +127,7 @@ async fn run_server(rt: Handle) -> Result<(), anyhow::Error> {
         page_cache_dir,
         data_dir: data_dir.clone(),
         rt,
-        background_job: tokio::sync::Semaphore::new(4),
+        background_job: tokio::sync::Semaphore::new(5),
         foreground_job: tokio::sync::Semaphore::new(32),
         start_time: Instant::now(),
         last_ok_response: AtomicU32::new(0),
@@ -146,12 +146,19 @@ async fn run_server(rt: Handle) -> Result<(), anyhow::Error> {
                 debug!("Got events from the log {:?}", batch);
                 for ev in batch.filter_map(|e| e.ok()) {
                     match ev {
-                        CrateIndexed(origin_str) | CrateUpdated(origin_str) => {
+                        CrateUpdated(origin_str) => {
+                            info!("New crate updated {}", origin_str);
+                            let o = Origin::from_str(&origin_str);
+                            let cache_path = state.page_cache_dir.join(cache_file_name_for_origin(&o));
+                            let _ = std::fs::remove_file(&cache_path);
+                        },
+                        CrateIndexed(origin_str) => {
                             info!("Purging local cache {}", origin_str);
                             let o = Origin::from_str(&origin_str);
                             state.crates.load().reload_indexed_crate(&o);
-                            let path = state.page_cache_dir.join(cache_file_name_for_origin(&o));
-                            let _ = std::fs::remove_file(path);
+                            let cache_path = state.page_cache_dir.join(cache_file_name_for_origin(&o));
+                            let _ = std::fs::remove_file(&cache_path);
+                            background_refresh(state.clone(), cache_path, render_crate_page(state.clone(), o));
                         },
                         DailyStatsUpdated => {
                             let _ = std::fs::remove_file(state.page_cache_dir.join("_stats_.html"));
@@ -896,9 +903,9 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file_name: &str, c
 }
 
 fn background_refresh<F>(state: AServerState, cache_file: PathBuf, generate: F)
-    where F: Future<Output=Result<(Vec<u8>, Option<DateTime<FixedOffset>>), anyhow::Error>> + 'static {
+    where F: Future<Output=Result<(Vec<u8>, Option<DateTime<FixedOffset>>), anyhow::Error>> + 'static + Send {
 
-    let _ = rt_run_timeout(&state.rt, "refreshbg", 300, {
+    let _ = rt_run_timeout(&state.clone().rt, "refreshbg", 300, {
         async move {
             let start = Instant::now();
             debug!("Bg refresh of {}", cache_file.display());

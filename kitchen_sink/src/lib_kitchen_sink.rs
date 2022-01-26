@@ -77,7 +77,7 @@ use repo_url::Repo;
 use repo_url::RepoHost;
 use repo_url::SimpleRepo;
 use rich_crate::Author;
-use rich_crate::CrateVersion;
+pub use rich_crate::CrateVersion;
 use rich_crate::CrateVersionSourceData;
 use rich_crate::Readme;
 pub use semver::VersionReq;
@@ -123,6 +123,8 @@ pub enum Warning {
     EscapingReadmePath(Box<str>),
     #[error("Could not clone repository: {}", _0)]
     ErrorCloning(Box<str>),
+    #[error("The crate is not in the repository")]
+    NotFoundInRepo,
     #[error("{} URL is a broken link: {}", _0, _1)]
     BrokenLink(Box<str>, Box<str>),
     #[error("Bad category: {}", _0)]
@@ -155,6 +157,11 @@ pub enum Warning {
     SysNoLinks,
     #[error("Squatted name")]
     Reserved,
+    #[error("License is not an SPDX expression")]
+    LicenseSpdxSyntax,
+    /// last arg is severity 1-n
+    #[error("It's been {} days since the last {}release", _0, if *_1 {"stable "} else {"pre"})]
+    StaleRelease(u32, bool, u8)
 }
 
 #[derive(Debug, Clone, thiserror::Error)]

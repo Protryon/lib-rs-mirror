@@ -38,6 +38,14 @@ pub async fn warnings_for_crate(c: &KitchenSink, k: &RichCrateVersion, all: &Ric
         Some((v.num.parse::<SemVer>().ok()?, v))
     }).collect::<Vec<_>>();
 
+    if k.license().map_or(false, |l| l.contains('/')) {
+        warnings.insert(Warning::LicenseSpdxSyntax);
+    }
+
+    if !k.has_path_in_repo() && warnings.get(&Warning::NoRepositoryProperty).is_none() && !warnings.iter().any(|w| matches!(w, Warning::ErrorCloning(_))) {
+        warnings.insert(Warning::NotFoundInRepo);
+    }
+
     // This uses dates, not semvers, because we care about crates giving signs of life,
     // even if by patching old semvers.
     let latest_stable = find_most_recent_release(&versions, false);

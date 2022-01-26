@@ -248,8 +248,8 @@ fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult<(ArcR
                     (3, "Cryptocurrency crate".into(), "This crate has been classified as related to the planet-incinerating mania. If you believe this categorization is a mistake, then review crate's categories and keywords, or file a bug. If it is related, then please yank it.".into(), None)
                 },
                 Warning::Chonky(size) => {
-                    extended_desc = Some("Check that large files weren't included by accident. Note that tarballs uploaded to crates.io can't be used to run examples or tests, so you can use the exclude property in Cargo.toml to minimize crate's download size. Crates.io keeps all versions of all crates forever, so this storage adds up.");
-                    (1, "Big download".into(), format!("The crate is a {}MB download. You can use cargo package to review crate's files in target/package.", size/1000/1000).into(), None)
+                    extended_desc = Some("Check that large files weren't included by accident. Note that tarballs uploaded to crates.io can't be used to run examples or tests, so it's fine to exclude them and their data files. You can use the exclude property in Cargo.toml to minimize crate's download size. Crates.io keeps all versions of all crates forever, so this storage adds up.");
+                    (1, "Big download".into(), format!("The crate is a {}MB download. You can use `cargo package` command to review crate's archive in target/package.", size/1000/1000).into(), None)
                 },
                 Warning::SysNoLinks => {
                     extended_desc = Some("This is also needed to protect your crate from duplicate older versions of itself. C symbols are global, and duplicate symbols can cause all sorts of breakage.");
@@ -278,6 +278,15 @@ fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult<(ArcR
                             if k.maintenance() == MaintenanceStatus::Experimental {"How did the experiment go"} else {"Is this crate still maintained"}).into(),
                         Some(("Maintenance status field docs".into(), "https://doc.rust-lang.org/cargo/reference/manifest.html#the-badges-section".into())))
                 },
+                Warning::NotFoundInRepo => {
+                    let repo = k.repository_http_url();
+                    let repo_url = repo.as_ref().map(|(_, url)| &**url).unwrap_or("???");
+                    extended_desc = Some("If it's a newly released crate, it's possible we haven't finished indexing the repository yet.");
+                    (1, "Could not find the crate in the repository".into(), format!("Make sure the main branch of {} contains the Cargo.toml for the crate. If you have forked the crate, change the repository property in Cargo.toml to your fork's URL.", repo_url).into(), None)
+                },
+                Warning::LicenseSpdxSyntax => {
+                    (1, format!("License {} is not in SPDX syntax", k.license().unwrap_or("")).into(), "Use \"OR\" instead of \"/\".".into(), Some(("SPDX license list".into(), "https://spdx.org/licenses/".into())))
+                }
             };
             StructuredWarning {
                 severity, title, desc, url, extended_desc,

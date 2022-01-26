@@ -862,32 +862,7 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file_name: &str, c
             debug!("Using cached page {} {}s fresh={:?} acc={:?}", cache_file.display(), cache_time_remaining, is_fresh, is_acceptable);
 
             if !is_fresh {
-                let _ = rt_run_timeout(&state.rt, "refreshbg", 300, {
-                    let state = state.clone();
-                    async move {
-                        let start = Instant::now();
-                        debug!("Bg refresh of {}", cache_file.display());
-                        if let Ok(_s) = state.background_job.try_acquire() {
-                            match generate.await {
-                                Ok((mut page, last_mod)) => {
-                                    info!("Done refresh of {} in {}ms", cache_file.display(), start.elapsed().as_millis() as u32);
-                                    let timestamp = last_mod.map(|a| a.timestamp() as u32).unwrap_or(0);
-                                    page.extend_from_slice(&timestamp.to_le_bytes()); // The worst data format :)
-
-                                    if let Err(e) = std::fs::write(&cache_file, &page) {
-                                        error!("warning: Failed writing to {}: {}", cache_file.display(), e);
-                                    }
-                                }
-                                Err(e) => {
-                                    error!("Refresh err: {} {}", e.chain().map(|e| e.to_string()).collect::<Vec<_>>().join("; "), cache_file.display());
-                                }
-                            }
-                        } else {
-                            info!("Too busy to refresh {}", cache_file.display());
-                        }
-                        Ok(())
-                    }
-                });
+                background_refresh(state.clone(), cache_file, generate);
             }
             return Ok(Rendered {
                 page: page_cached,
@@ -918,6 +893,37 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file_name: &str, c
     page.truncate(page.len() - 8);
 
     Ok(Rendered {page, cache_time, refresh: false, last_modified})
+}
+
+fn background_refresh<F>(state: AServerState, cache_file: PathBuf, generate: F)
+    where F: Future<Output=Result<(Vec<u8>, Option<DateTime<FixedOffset>>), anyhow::Error>> + 'static {
+
+    let _ = rt_run_timeout(&state.rt, "refreshbg", 300, {
+        async move {
+            let start = Instant::now();
+            debug!("Bg refresh of {}", cache_file.display());
+            if let Ok(_s) = state.background_job.try_acquire() {
+                match generate.await {
+                    Ok((mut page, last_mod)) => {
+                        info!("Done refresh of {} in {}ms", cache_file.display(), start.elapsed().as_millis() as u32);
+                        let timestamp = last_mod.map(|a| a.timestamp() as u32).unwrap_or(0);
+                        page.extend_from_slice(&CACHE_MAGIC_TAG[..]); // The worst data format :)
+                        page.extend_from_slice(&timestamp.to_le_bytes());
+
+                        if let Err(e) = std::fs::write(&cache_file, &page) {
+                            error!("warning: Failed writing to {}: {}", cache_file.display(), e);
+                        }
+                    }
+                    Err(e) => {
+                        error!("Refresh err: {} {}", e.chain().map(|e| e.to_string()).collect::<Vec<_>>().join("; "), cache_file.display());
+                    }
+                }
+            } else {
+                info!("Too busy to refresh {}", cache_file.display());
+            }
+            Ok(())
+        }
+    });
 }
 
 fn render_crate_page(state: AServerState, origin: Origin) -> impl Future<Output = Result<(Vec<u8>, Option<DateTime<FixedOffset>>), anyhow::Error>> + 'static {

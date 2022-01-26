@@ -250,7 +250,7 @@ pub struct KitchenSink {
     url_check_cache: TempCache<bool>,
     readme_check_cache: TempCache<()>,
     crate_db: CrateDb,
-    derived_cache: SimpleCache,
+    derived_storage: SimpleCache,
     user_db: user_db::UserDb,
     gh: github_info::GitHub,
     loaded_rich_crate_version_cache: RwLock<FxHashMap<Origin, ArcRichCrateVersion>>,
@@ -318,7 +318,7 @@ impl KitchenSink {
             readme_check_cache: TempCache::new(&data_path.join("readme_check.db")).context("readmecheck")?,
             docs_rs: docs_rs_client::DocsRsClient::new(data_path.join("docsrs.db")).context("docs")?,
             crate_db: CrateDb::new(Self::assert_exists(data_path.join("crate_data.db"))?).context("db")?,
-            derived_cache: SimpleCache::new(data_path.join("derived.db"), true)?,
+            derived_storage: SimpleCache::new(data_path.join("derived.db"), true)?,
             user_db: user_db::UserDb::new(Self::assert_exists(data_path.join("users.db"))?).context("udb")?,
             gh: gh.context("gh")?,
             loaded_rich_crate_version_cache: RwLock::new(FxHashMap::default()),
@@ -928,10 +928,10 @@ impl KitchenSink {
         watch("stale-rich-crate", self.rich_crate_version_async_opt(origin, true, false).map(|res| res.map(|(k,_)| k)))
     }
 
-    async fn rich_crate_version_data_cached(&self, origin: &Origin) -> KResult<Option<CachedCrate>> {
+    async fn rich_crate_version_data_derived(&self, origin: &Origin) -> KResult<Option<CachedCrate>> {
         let origin_str = origin.to_str();
         let key = (origin_str.as_str(), "");
-        Ok(self.derived_cache.get_deserialized(key)?)
+        Ok(self.derived_storage.get_deserialized(key)?)
     }
 
     async fn rich_crate_version_async_opt(&self, origin: &Origin, allow_stale: bool, include_warnings: bool) -> CResult<(ArcRichCrateVersion, HashSet<Warning>)> {
@@ -945,7 +945,7 @@ impl KitchenSink {
             trace!("rich_crate_version_async MISS {:?}", origin);
         }
 
-        let mut maybe_data = tokio::time::timeout(Duration::from_secs(3), self.rich_crate_version_data_cached(origin))
+        let mut maybe_data = tokio::time::timeout(Duration::from_secs(3), self.rich_crate_version_data_derived(origin))
             .await.map_err(|_| {
                 warn!("db data fetch for {:?} timed out", origin);
                 KitchenSinkErr::DerivedDataTimedOut
@@ -976,7 +976,7 @@ impl KitchenSink {
                 let _th = timeout("autoindex", 29, self.auto_indexing_throttle.acquire().map(|e| e.map_err(CError::from))).await?;
                 let reindex = timeout("reindex", 59, self.index_crate_highest_version(origin)).map_err(|e| {error!("{:?} reindex: {}", origin, e); e});
                 watch("reindex", reindex).await.with_context(|| format!("reindexing {:?}", origin))?; // Pin to lower stack usage
-                timeout("reindexed data", 9, self.rich_crate_version_data_cached(origin)).await?.ok_or(KitchenSinkErr::CacheExpired)?
+                timeout("reindexed data", 9, self.rich_crate_version_data_derived(origin)).await?.ok_or(KitchenSinkErr::DerivedDataTimedOut)?
             },
         };
 
@@ -1614,7 +1614,7 @@ impl KitchenSink {
             let _ = self.crates_io_owners_cache.delete(crate_name);
         }
         let origin_str = origin.to_str();
-        let _ = self.derived_cache.delete((origin_str.as_str(), ""));
+        let _ = self.derived_storage.delete((origin_str.as_str(), ""));
         self.loaded_rich_crate_version_cache.write().remove(origin);
     }
 
@@ -1909,7 +1909,7 @@ impl KitchenSink {
             },
             warnings,
         };
-        self.derived_cache.set_serialize((&origin.to_str(), ""), &cached)?;
+        self.derived_storage.set_serialize((&origin.to_str(), ""), &cached)?;
 
         self.event_log.post(&SharedEvent::CrateIndexed(origin.to_str()))?;
         Ok(())

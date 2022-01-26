@@ -278,6 +278,8 @@ pub struct KitchenSink {
 pub enum SharedEvent {
     // Origin serialized
     CrateIndexed(String),
+    // Origin serialized
+    CrateNeedsReindexing(String),
     /// Newer crates.io release found
     CrateUpdated(String),
     DailyStatsUpdated,
@@ -970,6 +972,7 @@ impl KitchenSink {
             Some(data) => data,
             None => {
                 if allow_stale {
+                    self.event_log.post(&SharedEvent::CrateNeedsReindexing(origin.to_str()))?;
                     return Err(KitchenSinkErr::CacheExpired.into());
                 }
                 debug!("Getting/indexing {:?}", origin);

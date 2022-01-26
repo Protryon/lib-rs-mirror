@@ -160,6 +160,15 @@ async fn run_server(rt: Handle) -> Result<(), anyhow::Error> {
                             let _ = std::fs::remove_file(&cache_path);
                             background_refresh(state.clone(), cache_path, render_crate_page(state.clone(), o));
                         },
+                        CrateNeedsReindexing(origin_str) => {
+                            info!("Heard about outdated crate {}", origin_str);
+                            let o = Origin::from_str(&origin_str);
+                            let s2 = state.clone();
+                            state.rt.spawn(async move {
+                                // this kicks off indexing if not cached
+                                let _ = s2.crates.load().rich_crate_version_async(&o).await;
+                            });
+                        },
                         DailyStatsUpdated => {
                             let _ = std::fs::remove_file(state.page_cache_dir.join("_stats_.html"));
                         },
@@ -490,7 +499,7 @@ async fn handle_git_clone(req: HttpRequest) -> HttpResponse {
 
             Ok::<_, ServerError>(url)
         }).await {
-            return HttpResponse::TemporaryRedirect()
+            return HttpResponse::PermanentRedirect()
                 .insert_header(("X-Robots-Tag", "noindex, nofollow"))
                 .insert_header(("Location", url))
                 .body("");

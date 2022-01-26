@@ -977,7 +977,7 @@ impl KitchenSink {
                 }
                 debug!("Getting/indexing {:?}", origin);
                 let _th = timeout("autoindex", 29, self.auto_indexing_throttle.acquire().map(|e| e.map_err(CError::from))).await?;
-                let reindex = timeout("reindex", 59, self.index_crate_highest_version(origin)).map_err(|e| {error!("{:?} reindex: {}", origin, e); e});
+                let reindex = timeout("reindex", 59, self.index_crate_highest_version(origin, false)).map_err(|e| {error!("{:?} reindex: {}", origin, e); e});
                 watch("reindex", reindex).await.with_context(|| format!("reindexing {:?}", origin))?; // Pin to lower stack usage
                 timeout("reindexed data", 9, self.rich_crate_version_data_derived(origin)).await?.ok_or(KitchenSinkErr::DerivedDataTimedOut)?
             },
@@ -1809,7 +1809,7 @@ impl KitchenSink {
         Ok(())
     }
 
-    pub async fn index_crate_highest_version(&self, origin: &Origin) -> CResult<()> {
+    pub async fn index_crate_highest_version(&self, origin: &Origin, maintenance_only_reindexing: bool) -> CResult<()> {
         tokio::task::yield_now().await;
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
         info!("Indexing {:?}", origin);
@@ -1914,7 +1914,9 @@ impl KitchenSink {
         };
         self.derived_storage.set_serialize((&origin.to_str(), ""), &cached)?;
 
-        self.event_log.post(&SharedEvent::CrateIndexed(origin.to_str()))?;
+        if !maintenance_only_reindexing {
+            self.event_log.post(&SharedEvent::CrateIndexed(origin.to_str()))?;
+        }
         Ok(())
     }
 

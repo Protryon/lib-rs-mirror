@@ -103,13 +103,13 @@ fn main() {
     };
 
     rt.block_on(rt.spawn(async move {
-        main_indexing_loop(r, c, tx, repos).await;
+        main_indexing_loop(r, c, tx, repos, everything).await;
         if stopped() {return;}
         index_thread.await.unwrap().unwrap();
     })).unwrap();
 }
 
-async fn main_indexing_loop(ref r: Arc<Reindexer>, crate_origins: Box<dyn Iterator<Item=Origin> + Send>, tx: mpsc::Sender<(Arc<RichCrateVersion>, usize, f64)>, repos: bool) {
+async fn main_indexing_loop(ref r: Arc<Reindexer>, crate_origins: Box<dyn Iterator<Item=Origin> + Send>, tx: mpsc::Sender<(Arc<RichCrateVersion>, usize, f64)>, repos: bool, reindexing_all_crates: bool) {
     let ref renderer = Renderer::new(None);
     let ref seen_repos = Mutex::new(HashSet::new());
     let ref repo_concurrency = tokio::sync::Semaphore::new(4);
@@ -118,7 +118,7 @@ async fn main_indexing_loop(ref r: Arc<Reindexer>, crate_origins: Box<dyn Iterat
         async move {
         if stopped() {return;}
         println!("{}…", i);
-        match run_timeout(62, r.crates.index_crate_highest_version(&origin)).await {
+        match run_timeout(62, r.crates.index_crate_highest_version(&origin, reindexing_all_crates)).await {
             Ok(()) => {},
             err => {
                 print_res(err);

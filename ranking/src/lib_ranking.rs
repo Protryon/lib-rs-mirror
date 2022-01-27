@@ -108,7 +108,7 @@ fn cargo_toml_score(cr: &CrateVersionInputs<'_>) -> Score {
     s.has("has_homepage_link", 30, cr.has_homepage_link);
 
     // we care about being able to analyze
-    s.has("has_repository_link", 10, cr.has_repository_link);
+    s.has("has_repository_link", 8, cr.has_repository_link);
     s.has("has_verified_repository_link", 10, cr.has_verified_repository_link);
 
     // helps lib.rs show crate in the right place

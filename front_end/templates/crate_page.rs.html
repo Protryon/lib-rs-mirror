@@ -140,7 +140,7 @@
         }
       }
       @if !c.is_on_shitlist {
-        @if let Some((url, label)) = c.repository_link() {
+        @for (url, label) in c.repository_links() {
           <li><a href="@url" @if c.homepage_link().is_none() {property="url"}>@label</a></li>
         }
         @if let Some((url, label)) = c.documentation_link() {

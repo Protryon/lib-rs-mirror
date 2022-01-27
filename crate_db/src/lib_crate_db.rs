@@ -239,6 +239,9 @@ impl CrateDb {
         if let Some(lib) = c.source_data.lib_file.as_ref() {
             insert_keyword.add_raw(hex_hash(lib), 1., false);
         }
+        if let Some(bin) = c.source_data.bin_file.as_ref() {
+            insert_keyword.add_raw(hex_hash(bin), 1., false);
+        }
         // this will find crates from the same repo/template
         if let Some(Readme { markup: Markup::Markdown(txt) | Markup::Html(txt) | Markup::Rst(txt) , ..}) = c.source_data.readme.as_ref() {
             insert_keyword.add_raw(hex_hash(txt), 1., false);

@@ -166,6 +166,11 @@ impl RichCrateVersion {
         self.derived.lib_file.as_deref()
     }
 
+    /// Contents of the `src/main.rs` from the crate, if available
+    pub fn bin_file(&self) -> Option<&str> {
+        self.derived.bin_file.as_deref()
+    }
+
     pub fn lib_file_markdown(&self) -> Option<Markup> {
         self.derived.lib_file.as_ref().and_then(|code| {
             let out = extract_doc_comments(code);
@@ -492,6 +497,8 @@ pub struct Derived {
     pub has_buildrs: bool,
     pub has_code_of_conduct: bool,
     pub is_yanked: bool,
+    #[serde(default)]
+    pub bin_file: Option<String>,
 }
 
 /// Metadata guessed
@@ -506,6 +513,8 @@ pub struct CrateVersionSourceData {
     pub capitalized_name: String,
     pub readme: Option<Readme>,
     pub lib_file: Option<String>,
+    /// src/main.rs
+    pub bin_file: Option<String>,
     pub has_buildrs: bool,
     pub has_code_of_conduct: bool,
     pub is_yanked: bool,

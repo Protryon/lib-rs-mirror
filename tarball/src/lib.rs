@@ -39,6 +39,7 @@ enum ReadAs {
     ReadmeMarkdown(String),
     ReadmeRst(String),
     Lib,
+    Bin,
     GetStatsOfFile(udedokei::Language),
     Skip,
 }
@@ -80,6 +81,7 @@ struct Collector {
     markup: Option<(String, Markup)>,
     files: Vec<PathBuf>,
     lib_file: Option<String>,
+    bin_file: Option<String>,
     stats: udedokei::Collect,
     decompressed_size: usize,
     is_nightly: bool,
@@ -92,6 +94,7 @@ impl Collector {
             markup: None,
             files: Vec::new(),
             lib_file: None,
+            bin_file: None,
             stats: udedokei::Collect::new(),
             decompressed_size: 0,
             is_nightly: false,
@@ -102,7 +105,8 @@ impl Collector {
         let path_match = {
             match &relpath {
                 p if p == Path::new("Cargo.toml") || p == Path::new("cargo.toml") => ReadAs::Toml,
-                p if p == Path::new("src/lib.rs") => ReadAs::Lib,
+                p if is_lib_filename(p, self.manifest.as_ref()) => ReadAs::Lib,
+                p if is_bin_filename(p, self.manifest.as_ref()) => ReadAs::Bin,
                 p if is_readme_filename(p, self.manifest.as_ref().and_then(|m| m.package.as_ref())) => {
                     let path_prefix = p.parent().unwrap().display().to_string();
                     if p.extension().map_or(false, |e| e == "rst") {
@@ -148,6 +152,13 @@ impl Collector {
                 }
                 self.lib_file = Some(data);
             },
+            ReadAs::Bin => {
+                self.stats.add_to_stats(udedokei::from_path("main.rs").unwrap(), &data);
+                if check_if_uses_nightly_features(&data) {
+                    self.is_nightly = true;
+                }
+                self.bin_file = Some(data);
+            },
             ReadAs::Toml => {
                 self.manifest = Some(Manifest::from_str(&data)?);
             },
@@ -179,6 +190,7 @@ impl Collector {
             manifest,
             files: self.files,
             lib_file: self.lib_file,
+            bin_file: self.bin_file,
             language_stats: self.stats.finish(),
             is_nightly: self.is_nightly,
         })
@@ -226,6 +238,7 @@ fn is_source_code_file(path: &Path) -> Option<udedokei::Language> {
 pub struct CrateFile {
     pub manifest: Manifest,
     pub lib_file: Option<String>,
+    pub bin_file: Option<String>,
     pub files: Vec<PathBuf>,
     // relative path and markdown
     pub readme: Option<(String, Markup)>,
@@ -241,6 +254,25 @@ impl CrateFile {
         let path = path.as_ref();
         self.files.iter().any(|p| p == path)
     }
+}
+
+fn is_lib_filename(path: &Path, manifest: Option<&Manifest>) -> bool {
+    let expected_path = if let Some(lib_path) = manifest.and_then(|m| m.lib.as_ref()).and_then(|l| l.path.as_ref()) {
+        Path::new(lib_path)
+    } else {
+        Path::new("src/lib.rs")
+    };
+    path == expected_path
+
+}
+
+fn is_bin_filename(path: &Path, manifest: Option<&Manifest>) -> bool {
+    if let Some(bins) = manifest.map(|m| &m.bin) {
+        if bins.iter().filter_map(|p| p.path.as_ref()).any(|bin_path| Path::new(bin_path) == path) {
+            return true;
+        }
+    }
+    path == Path::new("src/main.rs")
 }
 
 /// Check if given filename is a README. If `package` is missing, guess.

@@ -195,7 +195,8 @@ fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult<(ArcR
                         Some(("The Edition Guide".into(), "https://doc.rust-lang.org/edition-guide/".into())))
                 },
                 Warning::BadMSRV(needs, says) => {
-                    (1, "Needs to specify correct MSRV".into(), format!("We estimate that this crate requires at least Rust 1.{}, but specified Rust 1.{} as the minimum version. Add rust-version = \"1.{}\" to the Cargo.toml.", needs, says, needs).into(),
+                    let tmp;
+                    (1, "Needs to specify correct MSRV".into(), format!("We estimate that this crate requires at least Rust 1.{}{}. Add rust-version = \"1.{}\" to the Cargo.toml.", needs, if says > 0 {tmp=format!(", but specified Rust 1.{} as the minimum version", says); &tmp} else {""}, needs).into(),
                         Some((format!("{} versions", k.short_name()).into(), urler.all_versions(k.origin()).unwrap_or_else(|| urler.crate_by_origin(k.origin())).into())))
                 },
                 Warning::DocsRs => {
@@ -215,7 +216,7 @@ fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult<(ArcR
                         11..=30 => "a bit ",
                         31..=80 => "",
                         81..=255 => "seriously ",
-                    }).into(), if severity > 40 { "Upgrade to the latest version to get all the fixes, and avoid causing duplicate dependencies in projects." } else { "Consider upgrading to the latest version to get all the fixes and improvements." }.into(),
+                    }).into(), if severity > 40 && !k.is_app() { "Upgrade to the latest version to get all the fixes, and avoid causing duplicate dependencies in projects." } else { "Consider upgrading to the latest version to get all the fixes and improvements." }.into(),
                     Some((
                         format!("{} versions", name).into(),
                         if severity > 40 { urler.reverse_deps(&origin) } else { urler.all_versions(&origin) }.unwrap_or_else(|| urler.crate_by_origin(&origin)).into(),

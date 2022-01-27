@@ -42,7 +42,9 @@ pub async fn warnings_for_crate(c: &KitchenSink, k: &RichCrateVersion, all: &Ric
         warnings.insert(Warning::LicenseSpdxSyntax);
     }
 
-    if !k.has_path_in_repo() && warnings.get(&Warning::NoRepositoryProperty).is_none() && !warnings.iter().any(|w| matches!(w, Warning::ErrorCloning(_))) {
+    // we check git repo in the background, so first release may not have it indexed yet
+    // so only complain about crates with multiple releases
+    if all.versions().len() > 1 && !k.has_path_in_repo() && warnings.get(&Warning::NoRepositoryProperty).is_none() && !warnings.iter().any(|w| matches!(w, Warning::ErrorCloning(_))) {
         warnings.insert(Warning::NotFoundInRepo);
     }
 
@@ -123,8 +125,8 @@ pub async fn warnings_for_crate(c: &KitchenSink, k: &RichCrateVersion, all: &Ric
     let (runtime, dev, build) = k.direct_dependencies();
     warn_outdated_deps(&runtime, &mut warnings, &c).await;
     warn_outdated_deps(&build, &mut warnings, &c).await;
-    warn_bad_requirements(&runtime, &mut warnings, &c).await;
-    warn_bad_requirements(&build, &mut warnings, &c).await;
+    warn_bad_requirements(k, &runtime, &mut warnings, &c).await;
+    warn_bad_requirements(k, &build, &mut warnings, &c).await;
     // dev deps are very low priority, so don't warn about them unless there's nothing else to do
     if warnings.is_empty() {
         warn_outdated_deps(&dev, &mut warnings, &c).await;
@@ -137,7 +139,7 @@ fn find_most_recent_release<'a>(versions: &'a [(SemVer, &CrateVersion)], pre: bo
         .and_then(|(v, c)| Some((v, DateTime::parse_from_rfc3339(&c.created_at).ok()?)))
 }
 
-async fn warn_bad_requirements(dependencies: &[RichDep], warnings: &mut HashSet<Warning>, c: &KitchenSink) {
+async fn warn_bad_requirements(k: &RichCrateVersion, dependencies: &[RichDep], warnings: &mut HashSet<Warning>, c: &KitchenSink) {
     for richdep in dependencies {
         let req_str = richdep.dep.req().trim();
         if req_str == "*" || !richdep.dep.is_crates_io() {
@@ -162,7 +164,16 @@ async fn warn_bad_requirements(dependencies: &[RichDep], warnings: &mut HashSet<
             Ok(req) => {
                 // allow prerelease match to be exact; binary release likely needs to match
                 if req.is_exact() && !req_str.split('+').next().unwrap().contains('-') && !richdep.package.contains("x86_64-") && !richdep.package.contains("aarch64-") {
-                    warnings.insert(Warning::ExactRequirement(richdep.package.clone(), req_str.into()));
+                    if let Ok(other_crate) = c.rich_crate_version_async(&Origin::from_crates_io_name(&richdep.package)).await {
+                        // if they belong to the same repo, they're probably versioned together
+                        if other_crate.repository() == k.repository() {
+                            continue;
+                        }
+                    }
+                    // app-only crates get a free pass (outdated reqs are handled separately)
+                    if !k.has_lib() {
+                        warnings.insert(Warning::ExactRequirement(richdep.package.clone(), req_str.into()));
+                    }
                 }
             },
             Err(err) => {

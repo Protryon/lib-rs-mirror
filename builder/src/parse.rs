@@ -563,6 +563,11 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                         return None; // oops, our bad
                     }
 
+                    if desc.starts_with("`#![feature]` may not be used on the stable release channel") {
+                        eprintln!("Nightly crate (or unstable features enabled), can't check");
+                        return None;
+                    }
+
                     if let Some(feat) = desc.strip_prefix("use of unstable library feature '") {
                         let feat = feat.splitn(2, '\'').next().unwrap();
                         if let Some(rustc_min) = feature_flags.get(feat) {

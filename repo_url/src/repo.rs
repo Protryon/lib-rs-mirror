@@ -5,7 +5,7 @@ use url::Url;
 
 pub type GResult<T> = Result<T, GitError>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Repo {
     // as set by the create author
     pub url: Url,

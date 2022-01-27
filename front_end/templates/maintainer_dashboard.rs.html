@@ -1,6 +1,7 @@
 @use crate::MaintainerDashboard;
 @use crate::templates::base;
 @use crate::Urler;
+@use crate::iter::IdentifyLast;
 
 @(url: &Urler, p: &MaintainerDashboard)
 
@@ -35,8 +36,8 @@
         <p>At the moment your crates are fine. Please check back later.</p>
         <p>The best way to monitor these issues is to <a rel="alternate nofollow" type="application/atom+xml" href="@url.crates_io_user_maintainer_dashboard_atom_by_github_login(p.login())">subscribe to the atom feed</a> in your RSS reader.</p>
         <p>Checked:
-          @for origin in &p.okay_crates {
-            <a href="@url.crate_abs_path_by_origin(origin)">@origin.short_crate_name()</a>
+          @for (is_last, origin) in p.okay_crates.iter().identify_last() {
+            <a href="@url.crate_abs_path_by_origin(origin)">@origin.short_crate_name()</a>@if !is_last {, }
           }
         </p>
       } else {

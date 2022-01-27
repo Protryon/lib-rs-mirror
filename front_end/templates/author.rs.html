@@ -75,43 +75,44 @@
           <hr>
           <p>If you're the banned user, you can appeal by opening an issue in <a href="https://gitlab.com/crates.rs/crates.rs">the project repo</a>.</p>
         </section>
-      }
-      @if !p.orgs.is_empty() {
-        <section>
-          <h3>Member of GitHub orgs</h3>
-          @for (last, org) in p.orgs.iter().identify_last() {
-            <a rel="ugc nofollow" href="@org.html_url">@AuthorPage::org_name(org)</a>@if !last {,}
-          }
-        </section>
-      }
-      @if !p.collab.is_empty() {
-        <section>
-          <h3>Collaborated with</h3>
-          @for (last, user) in p.collab.iter().identify_last() {
-            <a href="@url.crates_io_user_by_github_login(&user.login)">@user.login</a>@if !last {,}
-          }
-        </section>
-      }
-    </div>
-    <div class="author-cols">
-      <div class="inner-col">
-        @if p.founder_total > 0 {
+      } else {
+        @if !p.orgs.is_empty() {
           <section>
-            <h3>@p.aut.name() created @p.founder_total crate@if p.founder_total != 1 {s}</h3>
-            @:author_list(&p.founder_crates, url)
+            <h3>Member of GitHub orgs</h3>
+            @for (last, org) in p.orgs.iter().identify_last() {
+              <a rel="ugc nofollow" href="@org.html_url">@AuthorPage::org_name(org)</a>@if !last {,}
+            }
           </section>
         }
-        @if p.member_total > 0 {
+        @if !p.collab.is_empty() {
           <section>
-            <h3>Co-owns @p.member_total crate@if p.member_total != 1 {s}</h3>
-            @:author_list(&p.member_crates, url)
+            <h3>Collaborated with</h3>
+            @for (last, user) in p.collab.iter().identify_last() {
+              <a href="@url.crates_io_user_by_github_login(&user.login)">@user.login</a>@if !last {,}
+            }
           </section>
-        }
-        @if p.founder_total == 0 && p.member_total == 0 {
-          <p class=empty>This person doesn't own any crates on crates-io.</p>
         }
       </div>
-    </div>
+      <div class="author-cols">
+        <div class="inner-col">
+          @if p.founder_total > 0 {
+            <section>
+              <h3>@p.aut.name() created @p.founder_total crate@if p.founder_total != 1 {s}</h3>
+              @:author_list(&p.founder_crates, url)
+            </section>
+          }
+          @if p.member_total > 0 {
+            <section>
+              <h3>Co-owns @p.member_total crate@if p.member_total != 1 {s}</h3>
+              @:author_list(&p.member_crates, url)
+            </section>
+          }
+          @if p.founder_total == 0 && p.member_total == 0 {
+            <p class=empty>This person doesn't own any crates on crates-io.</p>
+          }
+        </div>
+      </div>
+      }
   </main>
   </div>
 

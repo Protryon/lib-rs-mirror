@@ -315,6 +315,22 @@ pub fn render_static_page(out: &mut impl Write, title: String, page: &Markup, re
     Ok(())
 }
 
+/// See `crate_page.rs.html`
+pub fn render_static_trusted_html(out: &mut impl Write, title: String, html: String) -> Result<(), anyhow::Error> {
+    if stopped() {
+        return Err(KitchenSinkErr::Stopped.into());
+    }
+
+    templates::static_page(out, &Page {
+        title,
+        local_css_data: Some("main li {margin-top:0.25em;margin-bottom:0.25em}"),
+        noindex: false,
+        search_meta: true,
+        ..Default::default()
+    }, templates::Html(html))?;
+    Ok(())
+}
+
 pub fn limit_text_len<'t>(text: &'t str, mut len_min: usize, mut len_max: usize) -> Cow<'t, str> {
     assert!(len_min <= len_max);
     if text.len() <= len_max {

@@ -274,6 +274,8 @@ async fn run_server(rt: Handle) -> Result<(), anyhow::Error> {
             .route("/~{author}", web::get().to(handle_author))
             .route("/~{author}/dash", web::get().to(handle_maintainer_dashboard_html))
             .route("/~{author}/dash.xml", web::get().to(handle_maintainer_dashboard_xml))
+            .route("/~", web::get().to(handle_maintainer_form))
+            .route("/dash", web::get().to(handle_maintainer_form))
             .route("/users/{author}", web::get().to(handle_author_redirect))
             .route("/install/{crate:.*}", web::get().to(handle_install))
             .route("/compat/{crate:.*}", web::get().to(handle_compat))
@@ -346,6 +348,29 @@ fn handle_static_page(state: &ServerState, path: &str) -> Result<Option<HttpResp
         .insert_header(("Cache-Control", "public, max-age=7200, stale-while-revalidate=604800, stale-if-error=86400"))
         .no_chunking(page.len() as u64)
         .body(page)))
+}
+
+async fn handle_maintainer_form(req: HttpRequest) -> Result<HttpResponse, ServerError> {
+    let query = req.query_string().trim_start_matches('?');
+    if let Some(u) = query.strip_prefix("username=") {
+        return Ok(HttpResponse::PermanentRedirect().insert_header(("Location", format!("/~{}/dash", u))).body(""));
+    }
+
+    let mut page = Vec::with_capacity(5000);
+    front_end::render_static_trusted_html(&mut page, "Maintainer dashboard".into(), r##"
+        <h1>Hello Rustaceans</h1>
+        <p>Have you published any Rust crates? Find your profile page and dashboard on lib.rs. The dashboard lets you validate your crates' metadata and dependencies.</p>
+        <form>
+        <p><label>Your <strong>GitHub username</strong>: <input type="text" name="username"></label><p>
+        <p><button type="submit">Go to the Dashboard</button></p>
+        </form>
+    "##.into())?;
+
+    Ok(HttpResponse::Ok()
+        .content_type("text/html;charset=UTF-8")
+        .insert_header(("Cache-Control", "public, max-age=604800"))
+        .no_chunking(page.len() as u64)
+        .body(page))
 }
 
 async fn default_handler(req: HttpRequest) -> Result<HttpResponse, ServerError> {

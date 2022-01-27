@@ -39,7 +39,8 @@ debug = false
 
 [profile.release]
 opt-level = 2
-debug = 1
+debug = false
+lto = false
 
 [profile.release.package."*"]
 opt-level = 2

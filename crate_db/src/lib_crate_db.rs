@@ -222,10 +222,7 @@ impl CrateDb {
             .chain(c.source_data.github_keywords.iter().flatten());
 
         for (i, k) in all_explicit_keywords.enumerate() {
-            let mut w: f64 = 100. / (6 + i * 2) as f64;
-            if STOPWORDS.get(k.as_str()).is_some() {
-                w *= 0.6;
-            }
+            let w: f64 = 100. / (6 + i * 2) as f64;
             insert_keyword.add(k, w, true);
         }
 
@@ -1050,7 +1047,7 @@ impl KeywordInsert {
         })
     }
 
-    pub fn add(&mut self, word: &str, weight: f64, visible: bool) {
+    pub fn add(&mut self, word: &str, mut weight: f64, visible: bool) {
         let word = word
             .trim_matches(|c: char| !c.is_alphanumeric())
             .trim_end_matches("-rs")
@@ -1061,6 +1058,9 @@ impl KeywordInsert {
         let word = normalize_keyword(word);
         if word == "rust" || word == "rs" {
             return;
+        }
+        if STOPWORDS.contains(word.as_str()) {
+            weight *= 0.1;
         }
         self.add_raw(word, weight, visible);
     }

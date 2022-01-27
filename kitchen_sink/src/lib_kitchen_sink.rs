@@ -247,7 +247,7 @@ pub struct KitchenSink {
     pub index: Index,
     crates_io: crates_io_client::CratesIoClient,
     docs_rs: docs_rs_client::DocsRsClient,
-    url_check_cache: TempCache<bool>,
+    url_check_cache: TempCache<(bool, u8)>,
     readme_check_cache: TempCache<()>,
     crate_db: CrateDb,
     derived_storage: SimpleCache,
@@ -316,7 +316,7 @@ impl KitchenSink {
             crev: Arc::new(crev?),
             crates_io: crates_io?,
             index: index?,
-            url_check_cache: TempCache::new(&data_path.join("url_check.db")).context("urlcheck")?,
+            url_check_cache: TempCache::new(&data_path.join("url_check2.db")).context("urlcheck")?,
             readme_check_cache: TempCache::new(&data_path.join("readme_check.db")).context("readmecheck")?,
             docs_rs: docs_rs_client::DocsRsClient::new(data_path.join("docsrs.db")).context("docs")?,
             crate_db: CrateDb::new(Self::assert_exists(data_path.join("crate_data.db"))?).context("db")?,
@@ -1520,19 +1520,27 @@ impl KitchenSink {
     }
 
     async fn check_url_is_valid(&self, url: &str) -> bool {
-        if let Ok(Some(res)) = self.url_check_cache.get(url) {
-            return res;
-        }
-        watch("urlchk", async {
-            debug!("CHK: {}", url);
+        let retries = 1 + if let Ok(Some((res, retries_so_far))) = self.url_check_cache.get(url) {
+            if res || retries_so_far > 3 {
+                return res;
+            }
+            retries_so_far
+        } else {
+            0
+        };
+        let res = timeout("urlchk", 10, async {
             let req = reqwest::Client::builder().build().unwrap();
-            let res = req.get(url).send().await.map(|res| {
-                res.status().is_success()
-            })
-            .unwrap_or(false);
-            let _ = self.url_check_cache.set(url, res).map_err(|e| error!("url cache: {}", e));
-            res
-        }).await
+            let res = match req.get(url).send().await {
+                Ok(res) => res.status().is_success(),
+                Err(e) => {
+                    warn!("URL CHK: {} = {}", url, e);
+                    false
+                },
+            };
+            Ok::<_, KitchenSinkErr>(res)
+        }).await.unwrap_or(false);
+        let _ = self.url_check_cache.set(url, (res, retries)).map_err(|e| error!("url cache: {}", e));
+        res
     }
 
     fn is_docs_rs_link(d: &str) -> bool {

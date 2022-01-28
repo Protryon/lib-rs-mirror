@@ -45,12 +45,12 @@ impl<'a> MaintainerDashboard<'a> {
         rows.sort_by(|a, b| b.latest_release.cmp(&a.latest_release));
         rows.truncate(400);
 
-        let mut okay_crates = Vec::new();
-        let mut warnings = Self::look_up(kitchen_sink, rows).await.into_iter().filter_map(|(origin, crate_ranking, res)| {
-            elaborate_warnings(origin, crate_ranking, res, urler, &mut okay_crates)
+        let (okay_crates, mut warnings): (Vec<_>, Vec<_>) = Self::look_up(kitchen_sink, rows).await.into_iter().map(move |(origin, crate_ranking, res)| {
+            elaborate_warnings(origin, crate_ranking, res, urler)
         })
-        .filter(|(_,_,w)| !w.is_empty())
-        .collect::<Vec<_>>();
+        .partition(|(_,_,w)| w.is_empty());
+
+        let okay_crates = okay_crates.into_iter().map(|(origin, ..)| origin).collect();
 
         warnings.iter_mut().for_each(|(_, _, w)| {
             w.sort_by(|a, b| b.severity.cmp(&a.severity).then(a.title.cmp(&b.title)))
@@ -134,20 +134,19 @@ impl<'a> MaintainerDashboard<'a> {
     }
 }
 
-fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult<(ArcRichCrateVersion, RichCrate, HashSet<Warning>)>, urler: &Urler, okay_crates: &mut Vec<Origin>) -> Option<(Origin, f32, Vec<StructuredWarning>)> {
+fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult<(ArcRichCrateVersion, RichCrate, HashSet<Warning>)>, urler: &Urler) -> (Origin, f32, Vec<StructuredWarning>) {
     let (k, _all, w) = match res {
         Ok(res) => res,
-        Err(e) => return Some((origin, 0., vec![StructuredWarning {
+        Err(e) => return (origin, 0., vec![StructuredWarning {
             title: Cow::Borrowed("Internal error"),
             desc: Cow::Owned(format!("We couldn't check this crate at this time, because: {}. Please try again later.", e)),
             url: None,
             extended_desc: None,
             severity: 0,
-        }])),
+        }]),
     };
     if w.is_empty() || k.is_yanked() || k.maintenance() == MaintenanceStatus::Deprecated {
-        okay_crates.push(origin);
-        None
+        (origin, crate_ranking, vec![])
     } else {
         // Ranking is used for sorting, so focus on maintenance here
         crate_ranking *= match k.maintenance() {
@@ -159,7 +158,7 @@ fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult<(ArcR
             MaintenanceStatus::LookingForMaintainer => 0.1,
             MaintenanceStatus::Deprecated => 0.01,
         };
-        Some((origin, crate_ranking, w.into_iter()
+        (origin, crate_ranking, w.into_iter()
             .filter(|w| !matches!(w, Warning::BrokenLink(..))) // FIXME: these are unreliable ;(
             .map(|w| {
             let mut extended_desc = None;
@@ -292,7 +291,7 @@ fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult<(ArcR
             StructuredWarning {
                 severity, title, desc, url, extended_desc,
             }
-        }).collect()))
+        }).collect())
     }
 }
 

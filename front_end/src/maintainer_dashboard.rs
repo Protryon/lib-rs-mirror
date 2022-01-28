@@ -1,6 +1,7 @@
 use crate::Page;
 use crate::templates;
 use crate::urler::Urler;
+use futures::Stream;
 use futures::stream::StreamExt;
 use kitchen_sink::ArcRichCrateVersion;
 use kitchen_sink::CError;
@@ -45,16 +46,20 @@ impl<'a> MaintainerDashboard<'a> {
         rows.sort_by(|a, b| b.latest_release.cmp(&a.latest_release));
         rows.truncate(400);
 
-        let (okay_crates, mut warnings): (Vec<_>, Vec<_>) = Self::look_up(kitchen_sink, rows).await.into_iter().map(move |(origin, crate_ranking, res)| {
-            elaborate_warnings(origin, crate_ranking, res, urler)
-        })
-        .partition(|(_,_,w)| w.is_empty());
+        let tmp: Vec<_> = Self::look_up(kitchen_sink, rows)
+            .map(move |(origin, crate_ranking, res)| elaborate_warnings(origin, crate_ranking, res, urler))
+            .buffered(8)
+            .collect().await;
 
-        let okay_crates = okay_crates.into_iter().map(|(origin, ..)| origin).collect();
-
-        warnings.iter_mut().for_each(|(_, _, w)| {
-            w.sort_by(|a, b| b.severity.cmp(&a.severity).then(a.title.cmp(&b.title)))
-        });
+        let mut okay_crates = Vec::new();
+        let mut warnings: Vec<_> = tmp.into_iter()
+            .filter_map(|mut res| if res.2.is_empty() {
+                okay_crates.push(res.0);
+                None
+            } else {
+                res.2.sort_by(|a, b| b.severity.cmp(&a.severity).then(a.title.cmp(&b.title)));
+                Some(res)
+            }).collect();
 
         /// Rows were sorted by most recent first. Keep few most recent crates at the top, which are more relevant than most horribly deprecated crates full of (t)errors.
         fn sort_by_severity(warnings: &mut [(Origin, f32, Vec<StructuredWarning>)]) {
@@ -76,9 +81,8 @@ impl<'a> MaintainerDashboard<'a> {
         })
     }
 
-    async fn look_up(kitchen_sink: &KitchenSink, rows: Vec<CrateOwnerRow>) -> Vec<(Origin, f32, CResult<(ArcRichCrateVersion, RichCrate, HashSet<Warning>)>)> {
+    fn look_up(kitchen_sink: &KitchenSink, rows: Vec<CrateOwnerRow>) -> impl Stream<Item=(Origin, f32, CResult<(ArcRichCrateVersion, RichCrate, HashSet<Warning>)>)> + '_ {
         let deadline = Instant::now() + Duration::from_secs(10);
-
         futures::stream::iter(rows.into_iter())
             .map(move |row| async move {
                 let origin = row.origin;
@@ -92,7 +96,6 @@ impl<'a> MaintainerDashboard<'a> {
                 (origin, crate_ranking, cw)
             })
             .buffered(8)
-            .collect().await
     }
 
     pub fn is_org(&self) -> bool {
@@ -134,7 +137,7 @@ impl<'a> MaintainerDashboard<'a> {
     }
 }
 
-fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult<(ArcRichCrateVersion, RichCrate, HashSet<Warning>)>, urler: &Urler) -> (Origin, f32, Vec<StructuredWarning>) {
+async fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult<(ArcRichCrateVersion, RichCrate, HashSet<Warning>)>, urler: &Urler) -> (Origin, f32, Vec<StructuredWarning>) {
     let (k, _all, w) = match res {
         Ok(res) => res,
         Err(e) => return (origin, 0., vec![StructuredWarning {

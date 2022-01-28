@@ -13,6 +13,7 @@ use kitchen_sink::RichCrateVersion;
 use kitchen_sink::RichDep;
 use kitchen_sink::VersionReq;
 use kitchen_sink::Warning;
+use semver::Op;
 use semver::Version as SemVer;
 use std::collections::HashSet;
 
@@ -138,7 +139,7 @@ pub async fn warnings_for_crate(c: &KitchenSink, k: &RichCrateVersion, all: &Ric
 }
 
 fn find_most_recent_release<'a>(versions: &'a [(SemVer, &CrateVersion)], pre: bool) -> Option<(&'a SemVer, DateTime<FixedOffset>)> {
-    versions.iter().filter(move |(v, _)| pre == v.is_prerelease()).max_by(|a,b| a.1.created_at.cmp(&b.1.created_at))
+    versions.iter().filter(move |(v, _)| pre == !v.pre.is_empty()).max_by(|a,b| a.1.created_at.cmp(&b.1.created_at))
         .and_then(|(v, c)| Some((v, DateTime::parse_from_rfc3339(&c.created_at).ok()?)))
 }
 
@@ -166,7 +167,7 @@ async fn warn_bad_requirements(k: &RichCrateVersion, dependencies: &[RichDep], w
         match req_str.parse::<VersionReq>() {
             Ok(req) => {
                 // allow prerelease match to be exact; binary release likely needs to match
-                if req.is_exact() && !req_str.split('+').next().unwrap().contains('-') && !richdep.package.contains("x86_64-") && !richdep.package.contains("aarch64-") {
+                if req.comparators.iter().all(|c| c.op == Op::Exact) && !req_str.split('+').next().unwrap().contains('-') && !richdep.package.contains("x86_64-") && !richdep.package.contains("aarch64-") {
                     if let Ok(other_crate) = c.rich_crate_version_async(&Origin::from_crates_io_name(&richdep.package)).await {
                         // if they belong to the same repo, they're probably versioned together
                         if other_crate.repository() == k.repository() {

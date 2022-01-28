@@ -73,7 +73,7 @@ async fn crate_compat(crates: &KitchenSink, name: &str) -> kitchen_sink::CResult
     // iterate from newest, propagating newest_bad down
     for (ver, c) in compat.into_iter().rev() {
         // ugh, how to support these!?
-        if ver.is_prerelease() {
+        if !ver.pre.is_empty() {
             continue;
         }
 

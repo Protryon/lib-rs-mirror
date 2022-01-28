@@ -8,4 +8,4 @@ publish = false
 chrono = { version = "0.4.19", default-features = false }
 feat_extractor = { version = "0.1.3", path = "../feat_extractor" }
 kitchen_sink = { version = "0.9.10", path = "../kitchen_sink" }
-semver = { version = "0.10.0" }
+semver = "1.0.4"

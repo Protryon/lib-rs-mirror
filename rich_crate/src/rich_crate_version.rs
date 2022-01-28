@@ -224,7 +224,7 @@ impl RichCrateVersion {
         &self.package().version
     }
 
-    pub fn version_semver(&self) -> Result<semver::Version, semver::SemVerError> {
+    pub fn version_semver(&self) -> Result<semver::Version, semver::Error> {
         semver::Version::parse(self.version())
     }
 

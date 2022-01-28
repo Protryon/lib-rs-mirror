@@ -14,4 +14,4 @@ rich_crate = { path = "../rich_crate" }
 chrono = "0.4.10"
 cargo_toml = "0.11.0"
 render_readme = { path = "../render_readme", version = "0.7" }
-semver = "0.10.0"
+semver = "1.0.4"

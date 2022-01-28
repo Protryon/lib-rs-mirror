@@ -93,7 +93,7 @@ impl<'a> CatPage<'a> {
     /// TODO: Merge with the better version history analysis from the individual crate page.
     pub fn version_class(&self, c: &RichCrateVersion) -> &str {
         let v = c.version_semver().unwrap();
-        match (v.major, v.minor, v.patch, v.is_prerelease()) {
+        match (v.major, v.minor, v.patch, !v.pre.is_empty()) {
             (1..=15, _, _, false) => "stable",
             (0, m, p, false) if m >= 2 && p >= 3 => "stable",
             (m, ..) if m >= 1 => "okay",

@@ -235,7 +235,7 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
                 + if oldest_ok  > 47 { 2 } else { 0 }
                 + if oldest_ok  > 50 { 8 } else { 0 }
                 + if oldest_ok  > 53 { 8 } else { 0 }
-                + if v.is_prerelease() { 0 } else { 2 } // don't waste time testing alphas
+                + if !v.pre.is_empty() { 0 } else { 2 } // don't waste time testing alphas
                 + 5u32.saturating_sub(idx as u32); // prefer latest
 
             if !has_ever_built && has_failed {

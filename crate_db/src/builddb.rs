@@ -246,9 +246,11 @@ impl BuildDb {
     }
 
     fn compat_row(row: &Row) -> Result<CompatibilityInfo> {
+        let rustc_version = row.get_ref_unwrap(0).as_str()?;
+        let crate_version = row.get_ref_unwrap(1).as_str()?;
         Ok(CompatibilityInfo {
-            rustc_version: SemVer::parse(row.get_ref_unwrap(0).as_str()?).expect("semver").minor as RustcMinorVersion,
-            crate_version: SemVer::parse(row.get_ref_unwrap(1).as_str()?).expect("semver"),
+            rustc_version: SemVer::parse(rustc_version).map_err(|e| Error::ToSqlConversionFailure(e.into()))?.minor as RustcMinorVersion,
+            crate_version: garbage_parse(crate_version),
             compat: Compat::from_str(row.get_ref_unwrap(2).as_str()?),
         })
     }
@@ -330,4 +332,14 @@ impl BuildDb {
     pub fn set_compat(&self, origin: &Origin, ver: &str, rustc_version: &str, compat: Compat) -> Result<()> {
         self.set_compat_multi(&[(origin, ver, rustc_version, compat)])
     }
+}
+
+fn garbage_parse(v: &str) -> SemVer {
+    SemVer::parse(v).or_else(|_| SemVer::parse(v.split('-').next().unwrap())).unwrap_or_else(|_| SemVer {
+        major: 0,
+        minor: 0,
+        patch: 0,
+        pre: semver::Prerelease::EMPTY,
+        build: semver::BuildMetadata::new("parse_error").expect("et tu"),
+    })
 }

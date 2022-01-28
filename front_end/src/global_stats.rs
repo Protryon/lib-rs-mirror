@@ -250,11 +250,11 @@ fn rustc_stats(compat: &HashMap<Origin, CompatByCrateVersion>, max_rust_version:
         }
 
         // stats for latest crate version only
-        let latest_ver = match c.iter().rfind(|(v, _)| !v.is_prerelease()).or_else(|| c.iter().rev().nth(0)) {
+        let latest_ver = match c.iter().rfind(|(v, _)| v.pre.is_empty()).or_else(|| c.iter().rev().nth(0)) {
             Some((_, c)) => c,
             None => continue,
         };
-        let latest_ver_bad = match c.iter().rfind(|(v, c)| !v.is_prerelease() && c.newest_bad_raw.is_some()) {
+        let latest_ver_bad = match c.iter().rfind(|(v, c)| v.pre.is_empty() && c.newest_bad_raw.is_some()) {
             Some((_, c)) => c,
             None => latest_ver,
         };

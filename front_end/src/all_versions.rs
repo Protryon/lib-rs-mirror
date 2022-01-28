@@ -279,7 +279,7 @@ impl AllVersions {
 }
 
 fn map_to_major(v: &SemVer) -> (bool, bool, u64) {
-    let pre = v.is_prerelease();
+    let pre = !v.pre.is_empty();
     if v.major == 0 {
         (pre, false, v.minor)
     } else {
@@ -288,5 +288,5 @@ fn map_to_major(v: &SemVer) -> (bool, bool, u64) {
 }
 
 fn semver_major_differs(a: &SemVer, b: &SemVer) -> bool {
-    a.major != b.major || (a.major == 0 && a.minor != b.minor) || a.is_prerelease() != b.is_prerelease()
+    a.major != b.major || (a.major == 0 && a.minor != b.minor) || !a.pre.is_empty() != !b.pre.is_empty()
 }

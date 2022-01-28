@@ -456,22 +456,15 @@ impl<'a> CratePage<'a> {
 
     /// The rule is - last displayed digit may change (except 0.x)
     pub fn pretty_print_req(&self, reqstr: &str) -> String {
-        if let Ok(req) = semver_parser::range::parse(reqstr) {
-            if req.predicates.len() == 1 {
-                let pred = &req.predicates[0];
+        if let Ok(req) = semver::VersionReq::parse(reqstr) {
+            if req.comparators.len() == 1 {
+                let pred = &req.comparators[0];
                 if pred.pre.is_empty() {
-                    use semver_parser::range::Op::*;
-                    use semver_parser::range::WildcardVersion;
+                    use semver::Op::*;
                     match pred.op {
-                        Tilde | Compatible | Wildcard(_) => {
-                            // There's no `Wildcard(*)`
-                            let detailed = pred.op == Tilde || pred.op == Wildcard(WildcardVersion::Patch);
-                            return if detailed || pred.major == 0 {
-                                if detailed || pred.patch.map_or(false, |p| p > 0) {
-                                    format!("{}.{}.{}", pred.major, pred.minor.unwrap_or(0), pred.patch.unwrap_or(0))
-                                } else {
-                                    format!("{}.{}", pred.major, pred.minor.unwrap_or(0))
-                                }
+                        Tilde | Caret | Wildcard => {
+                            return if pred.op == Tilde || (pred.major == 0 && pred.patch.map_or(false, |p| p > 0)) {
+                                format!("{}.{}.{}", pred.major, pred.minor.unwrap_or(0), pred.patch.unwrap_or(0))
                             } else {
                                 format!("{}.{}", pred.major, pred.minor.unwrap_or(0))
                             };
@@ -505,7 +498,7 @@ impl<'a> CratePage<'a> {
                 Occupied(mut e) => {
                     let old = e.get_mut();
                     old.count += v.count;
-                    if old.ver.semver < v.ver.semver && (old.ver.yanked || !v.ver.yanked) && (old.ver.semver.is_prerelease() || !v.ver.semver.is_prerelease()) {
+                    if old.ver.semver < v.ver.semver && (old.ver.yanked || !v.ver.yanked) && (!old.ver.semver.pre.is_empty() || v.ver.semver.pre.is_empty()) {
                         old.ver = v.ver;
                     }
                 },
@@ -595,7 +588,7 @@ impl<'a> CratePage<'a> {
                     }
                 }
             } else {
-                if !v.semver.is_prerelease() {
+                if v.semver.pre.is_empty() {
                     cnt.stable += 1;
                 }
                 if let Some(ref prev) = prev {

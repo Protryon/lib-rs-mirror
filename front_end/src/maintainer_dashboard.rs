@@ -1,3 +1,5 @@
+use kitchen_sink::SemVer;
+use kitchen_sink::VersionReq;
 use crate::Page;
 use crate::templates;
 use crate::urler::Urler;
@@ -47,7 +49,7 @@ impl<'a> MaintainerDashboard<'a> {
         rows.truncate(400);
 
         let tmp: Vec<_> = Self::look_up(kitchen_sink, rows)
-            .map(move |(origin, crate_ranking, res)| elaborate_warnings(origin, crate_ranking, res, urler))
+            .map(move |(origin, crate_ranking, res)| elaborate_warnings(origin, crate_ranking, res, urler, kitchen_sink))
             .buffered(8)
             .collect().await;
 
@@ -137,7 +139,7 @@ impl<'a> MaintainerDashboard<'a> {
     }
 }
 
-async fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult<(ArcRichCrateVersion, RichCrate, HashSet<Warning>)>, urler: &Urler) -> (Origin, f32, Vec<StructuredWarning>) {
+async fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult<(ArcRichCrateVersion, RichCrate, HashSet<Warning>)>, urler: &Urler, kitchen_sink: &KitchenSink) -> (Origin, f32, Vec<StructuredWarning>) {
     let (k, _all, w) = match res {
         Ok(res) => res,
         Err(e) => return (origin, 0., vec![StructuredWarning {
@@ -161,9 +163,8 @@ async fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult
             MaintenanceStatus::LookingForMaintainer => 0.1,
             MaintenanceStatus::Deprecated => 0.01,
         };
-        (origin, crate_ranking, w.into_iter()
-            .filter(|w| !matches!(w, Warning::BrokenLink(..))) // FIXME: these are unreliable ;(
-            .map(|w| {
+        let mut warnings = Vec::with_capacity(w.len());
+        for w in w.into_iter().filter(|w| !matches!(w, Warning::BrokenLink(..))) { // FIXME: BrokenLink these are unreliable ;(
             let mut extended_desc = None;
             let (severity, title, desc, url) = match w {
                 Warning::NoRepositoryProperty => (3, Cow::Borrowed("No repository property"), Cow::Borrowed("Specify git repository URL in Cargo.toml to help users find more information, contribute, and for lib.rs to read more info."), None::<(Cow<'static, str>, Cow<'static, str>)>),
@@ -212,13 +213,33 @@ async fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult
                 },
                 Warning::OutdatedDependency(name, req, severity) => {
                     let origin = Origin::from_crates_io_name(&name);
-                    extended_desc = Some("Easy way to bump dependencies: cargo install cargo-edit; cargo upgrade; Also check out Dependabot service on GitHub.");
+                    let mut upgrade_version = Cow::Borrowed("the latest version");
+                    if let Ok(req) = VersionReq::parse(&req) {
+                        if let Ok(current) = kitchen_sink.rich_crate_async(&origin).await {
+                            let mut versions: Vec<_> = current.versions().iter().filter_map(|v| SemVer::parse(&v.num).ok()).collect();
+                            if let Some(highest_matching_req) = versions.iter().filter(|v| req.matches(v)).max().cloned() {
+                                versions.retain(|v| v > &highest_matching_req);
+                            }
+                            if let Some(latest) = versions.iter().filter(|v| v.pre.is_empty()).max().or_else(|| versions.iter().filter(|v| !v.pre.is_empty()).max()) {
+                                upgrade_version = Cow::Owned(latest.to_string());
+                            }
+                        }
+                    }
+                    extended_desc = Some(if upgrade_version.starts_with("0.") {
+                            "In Cargo, different 0.x versions are considered incompatible, so this is a semver-major upgrade."
+                        } else {
+                            "Easy way to bump dependencies: cargo install cargo-edit; cargo upgrade; Also check out Dependabot service on GitHub."
+                        });
                     (1+severity/40, format!("Dependency {} {} is {}outdated", name, req, match severity {
                         0..=10 => "slightly ",
                         11..=30 => "a bit ",
                         31..=80 => "",
                         81..=255 => "seriously ",
-                    }).into(), if severity > 40 && !k.is_app() { "Upgrade to the latest version to get all the fixes, and avoid causing duplicate dependencies in projects." } else { "Consider upgrading to the latest version to get all the fixes and improvements." }.into(),
+                    }).into(), if severity > 40 && !k.is_app() {
+                        format!("Upgrade to {} to get all the fixes, and avoid causing duplicate dependencies in projects.", upgrade_version)
+                    } else {
+                        format!("Consider upgrading to {} to get all the fixes and improvements.", upgrade_version)
+                    }.into(),
                     Some((
                         format!("{} versions", name).into(),
                         if severity > 40 { urler.reverse_deps(&origin) } else { urler.all_versions(&origin) }.unwrap_or_else(|| urler.crate_by_origin(&origin)).into(),
@@ -291,10 +312,12 @@ async fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult
                     (1, format!("License {} is not in SPDX syntax", k.license().unwrap_or("")).into(), "Use \"OR\" instead of \"/\".".into(), Some(("SPDX license list".into(), "https://spdx.org/licenses/".into())))
                 }
             };
-            StructuredWarning {
+            warnings.push(StructuredWarning {
                 severity, title, desc, url, extended_desc,
-            }
-        }).collect())
+            });
+        }
+        (origin, crate_ranking, warnings)
+
     }
 }
 

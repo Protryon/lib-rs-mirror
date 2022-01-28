@@ -309,7 +309,7 @@ pub(crate) trait Payloadable: Sized {
 }
 
 #[cfg(test)]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn github_contrib() {
     let gh = GitHub::new(
         "../data/github.db",
@@ -323,20 +323,21 @@ async fn github_contrib() {
 }
 
 #[cfg(test)]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn github_releases() {
     let gh = GitHub::new(
         "../data/github.db",
         &std::env::var("GITHUB_TOKEN").expect("GITHUB_TOKEN env var")).unwrap();
     let repo = SimpleRepo{
-        owner:"kornelski".into(),
-        repo:"pngquant".into(),
+        owner:"ImageOptim".into(),
+        repo:"gifski".into(),
     };
-    assert!(gh.releases(&repo, "").await.unwrap().unwrap().len() > 2);
+    let releases = gh.releases(&repo, "").await.unwrap().unwrap();
+    assert!(releases.len() > 4, "{:?}", releases);
 }
 
 #[cfg(test)]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_user_by_email() {
     let gh = GitHub::new(
         "../data/github.db",

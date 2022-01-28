@@ -244,7 +244,7 @@ pub type StatsHistogram = HashMap<u32, (u32, Vec<String>)>;
 
 /// This is a collection of various data sources. It mostly acts as a starting point and a factory for other objects.
 pub struct KitchenSink {
-    pub index: Index,
+    pub index: Arc<Index>,
     crates_io: crates_io_client::CratesIoClient,
     docs_rs: docs_rs_client::DocsRsClient,
     url_check_cache: TempCache<(bool, u8)>,
@@ -319,7 +319,7 @@ impl KitchenSink {
             main_cache_dir: data_path.to_path_buf(),
             crev: Arc::new(crev?),
             crates_io: crates_io?,
-            index: index?,
+            index: Arc::new(index?),
             url_check_cache: TempCache::new(&data_path.join("url_check2.db")).context("urlcheck")?,
             readme_check_cache: TempCache::new(&data_path.join("readme_check.db")).context("readmecheck")?,
             docs_rs: docs_rs_client::DocsRsClient::new(data_path.join("docsrs.db")).context("docs")?,
@@ -1627,7 +1627,8 @@ impl KitchenSink {
 
     #[inline]
     pub async fn prewarm(&self) {
-        let _ = self.index.deps_stats().await;
+        let idx = Arc::clone(&self.index);
+        let _ = tokio::task::spawn(async move { let _ = idx.deps_stats().await; }).await;
     }
 
     pub fn reload_indexed_crate(&self, origin: &Origin) {

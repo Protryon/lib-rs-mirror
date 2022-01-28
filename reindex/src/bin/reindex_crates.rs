@@ -68,6 +68,12 @@ fn main() {
         }
     });
 
+    let _ = rt.spawn({
+        let r = r.clone();
+        async move {
+            r.crates.prewarm().await;
+        }
+    });
     let index_thread = rt.spawn({
         async move {
             let renderer = Arc::new(Renderer::new(None));

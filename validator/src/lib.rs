@@ -100,25 +100,28 @@ pub async fn warnings_for_crate(c: &KitchenSink, k: &RichCrateVersion, all: &Ric
         }
     }
 
-    let compat = c.rustc_compatibility(&all).await?;
-    if let Some(newest_bad) = compat.values().rev().filter_map(|c| c.newest_bad).next() {
-        // if it's not compatible with the old compiler, there's no point using an old-compiler edition
-        if newest_bad >= 55 && k.edition() < Edition::E2021 {
-            warnings.insert(Warning::EditionMSRV(k.edition(), newest_bad+1));
-        }
-        else if newest_bad >= 30 && k.edition() < Edition::E2018 {
-            warnings.insert(Warning::EditionMSRV(k.edition(), newest_bad+1));
-        }
+    let msrv_with_deps = c.rustc_compatibility(&all).await?.values().rev().filter_map(|c| c.newest_bad).next().unwrap_or(0);
+    // if it's not compatible with the old compiler, there's no point using an old-compiler edition
+    if msrv_with_deps >= 55 && k.edition() < Edition::E2021 {
+        warnings.insert(Warning::EditionMSRV(k.edition(), msrv_with_deps+1));
+    }
+    else if msrv_with_deps >= 30 && k.edition() < Edition::E2018 {
+        warnings.insert(Warning::EditionMSRV(k.edition(), msrv_with_deps+1));
+    }
 
-        // rust-version should be set for msrv > 1.56
-        let explicit_msrv = k.explicit_msrv()
-            .and_then(|v| v.split('.').nth(1))
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(0);
-        if newest_bad >= 56 && explicit_msrv <= newest_bad {
-            warnings.insert(Warning::BadMSRV(newest_bad+1, explicit_msrv));
+    // rust-version should be set for msrv > 1.56
+    // but not if it's the deps that cause the breakage - then it's up to the deps to declare correctly
+    let explicit_msrv = k.explicit_msrv()
+        .and_then(|v| v.split('.').nth(1))
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
+    if explicit_msrv <= msrv_with_deps {
+        let msrv_no_deps = c.rustc_compatibility_no_deps(&all)?.values().rev().filter_map(|c| c.newest_bad).next().unwrap_or(0);
+        if msrv_no_deps >= 56 {
+            warnings.insert(Warning::BadMSRV(msrv_with_deps+1, explicit_msrv)); // for UI consistency display MSRV with deps
         }
     }
+
     if !k.is_app() && !c.has_docs_rs(k.origin(), k.short_name(), k.version()).await {
         warnings.insert(Warning::DocsRs);
     }

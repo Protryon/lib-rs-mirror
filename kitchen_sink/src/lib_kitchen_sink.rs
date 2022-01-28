@@ -2161,6 +2161,11 @@ impl KitchenSink {
         Ok(u)
     }
 
+    pub fn rustc_compatibility_no_deps(&self, all: &RichCrate) -> Result<CompatByCrateVersion, KitchenSinkErr> {
+        let db = self.build_db()?;
+        self.rustc_compatibility_inner_non_recursive(all, db)
+    }
+
     fn rustc_compatibility_inner_non_recursive(&self, all: &RichCrate, db: &BuildDb) -> Result<CompatByCrateVersion, KitchenSinkErr> {
         let mut c = db.get_compat(all.origin())
             .map_err(|e| error!("bad compat: {}", e))

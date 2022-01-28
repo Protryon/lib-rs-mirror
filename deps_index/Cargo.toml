@@ -5,7 +5,7 @@ authors = ["Kornel <kornel@geekhood.net>"]
 edition = "2018"
 
 [dependencies]
-crates-index = "0.16.6"
+crates-index = "0.18.2"
 rich_crate = { path = "../rich_crate", version = "0.5" }
 repo_url = { path = "../repo_url", version = "0.3.0" }
 feat_extractor = { path = "../feat_extractor" }
@@ -30,4 +30,5 @@ triomphe = "0.1.1"
 smol_str = "0.1.16"
 fxhash = "0.2.1"
 thiserror = "1.0.26"
+log = "0.4.14"
 

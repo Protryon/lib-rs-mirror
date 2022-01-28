@@ -1,14 +1,14 @@
-use crate::deps_stats::DepsStats;
-use crate::git_crates_index::*;
-use crate::DepsErr;
-use crates_index::Crate;
-use crates_index::Dependency;
 pub use crates_index::DependencyKind;
 pub use crates_index::Version;
+use crate::deps_stats::DepsStats;
+use crate::DepsErr;
+use crate::git_crates_index::*;
+use crates_index::Crate;
+use crates_index::Dependency;
 use double_checked_cell_async::DoubleCheckedCell;
+use log::{debug, info, error};
 use parking_lot::Mutex;
 use parking_lot::RwLock;
-use rayon::prelude::*;
 use rich_crate::Origin;
 use rich_crate::RichCrateVersion;
 use rich_crate::RichDep;
@@ -19,8 +19,9 @@ use smol_str::SmolStr;
 use std::iter;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use string_interner::symbol::SymbolU32 as Sym;
+use std::time::Instant;
 use string_interner::StringInterner;
+use string_interner::symbol::SymbolU32 as Sym;
 
 use feat_extractor::is_deprecated_requirement;
 use triomphe::Arc;
@@ -142,11 +143,12 @@ pub struct Index {
 impl Index {
     pub fn new(data_dir: &Path) -> Result<Self, DepsErr> {
         let crates_index_path = data_dir.join("index");
-        let crates_io_index = crates_index::Index::new(&crates_index_path);
-        #[allow(deprecated)]
-        let indexed_crates: FxHashMap<_,_> = crates_io_index.crate_index_paths().par_bridge()
-                .filter_map(|path| {
-                    let c = crates_index::Crate::new(path).ok()?;
+        debug!("Scanning crates index at {}…", crates_index_path.display());
+        let start = Instant::now();
+        let crates_io_index = crates_index::Index::with_path(&crates_index_path, "https://github.com/rust-lang/crates.io-index")
+        .map_err(|e| DepsErr::Crates(e.to_string()))?;
+        let indexed_crates: FxHashMap<_,_> = crates_io_index.crates()
+                .filter_map(|c| {
                     let name = c.name().to_ascii_lowercase();
                     if name == "test+package" {
                         return None; // crates-io bug
@@ -155,7 +157,8 @@ impl Index {
                     Some((name.into(), c))
                 })
                 .collect();
-        if indexed_crates.len() < 45000 {
+        info!("Scanned crates index in {}…", start.elapsed().as_millis() as u32);
+        if indexed_crates.len() < 72000 {
             return Err(DepsErr::IndexBroken);
         }
         Ok(Self {
@@ -171,9 +174,11 @@ impl Index {
     pub async fn update(&self) {
         let path = self.crates_index_path.to_owned();
         tokio::task::spawn_blocking(move || {
-            eprintln!("Updating crates index");
-            let _ = crates_index::Index::new(&path).update().map_err(|e| eprintln!("crates index update error: {} at {}", e, path.display()));
-            eprintln!("Done updating crates index");
+            info!("Updating crates index");
+            let _ = crates_index::Index::with_path(path, "https://github.com/rust-lang/crates.io-index")
+                .and_then(|mut idx| idx.update())
+                .map_err(|e| error!("crates index update error: {}", e));
+            info!("Done updating crates index");
         }).await.expect("spawn fail");
     }
 
@@ -237,7 +242,7 @@ impl Index {
             .iter()
             .max_by_key(|a| {
                 let ver = SemVer::parse(a.version())
-                    .map_err(|e| eprintln!("{} has invalid version {}: {}", krate.name(), a.version(), e))
+                    .map_err(|e| error!("{} has invalid version {}: {}", krate.name(), a.version(), e))
                     .ok();
                 let bad = a.is_yanked() || (stable_only && !ver.as_ref().map_or(false, |v| v.pre.is_empty()));
                 (!bad, ver)
@@ -348,7 +353,7 @@ impl Index {
             let krate = match self.crates_io_crate_by_lowercase_name(&crate_name) {
                 Ok(k) => k,
                 Err(e) => {
-                    eprintln!("{}@{} depends on missing crate {} (@{}): {}", ver.name(), ver.version(), crate_name, req, e);
+                    error!("{}@{} depends on missing crate {} (@{}): {}", ver.name(), ver.version(), crate_name, req, e);
                     continue;
                 },
             };

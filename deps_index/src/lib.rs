@@ -24,6 +24,8 @@ pub enum DepsErr {
     Stopped,
     #[error("Deps stats timeout")]
     DepsNotAvailable,
+    #[error("Crates index err")]
+    Crates(String),
     #[error("Index is empty or parsing failed")]
     IndexBroken,
     #[error("Error in git index file {0:?}: {1}")]

@@ -38,10 +38,11 @@ const NUM_CRATES: usize = 42000;
 type BoxErr = Box<dyn std::error::Error + Sync + Send>;
 
 #[tokio::main]
-async fn main() -> Result<(), BoxErr> {
+async fn main() {
+    env_logger::init();
     let path = std::env::args_os().nth(1);
 
-    tokio::runtime::Handle::current().spawn(async move {
+    let res: Result<(), BoxErr> = tokio::runtime::Handle::current().spawn(async move {
         let handle = tokio::runtime::Handle::current();
         let ksink = KitchenSink::new_default().await?;
         let mut tmp1;
@@ -154,8 +155,17 @@ async fn main() -> Result<(), BoxErr> {
             Ok(())
         })
     })
-    .await
-    .unwrap()
+    .await.unwrap();
+
+    if let Err(e) = res {
+        eprintln!("datadump failed: {}", e);
+        let mut src = e.source();
+        while let Some(e) = src {
+            eprintln!(" {}", e);
+            src = e.source();
+        }
+        std::process::exit(1);
+    }
 }
 
 // Cap spammed download data to ~prev week's max during incident period

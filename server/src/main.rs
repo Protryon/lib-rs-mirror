@@ -401,7 +401,7 @@ async fn default_handler(req: HttpRequest) -> Result<HttpResponse, ServerError> 
         match crate_maybe {
             Some(c) => Ok((Some(c), None)),
             None => {
-                let inverted_hyphens: String = name.chars().map(|c| if c == '-' {'_'} else if c == '_' {'-'} else {c.to_ascii_lowercase()}).collect();
+                let inverted_hyphens = invert_hyphens(&name);
                 let crate_maybe = match Origin::try_from_crates_io_name(&inverted_hyphens) {
                     Some(o) => Box::pin(crates.rich_crate_async(&o)).await.ok(),
                     _ => None,
@@ -428,6 +428,10 @@ async fn default_handler(req: HttpRequest) -> Result<HttpResponse, ServerError> 
     }
 
     render_404_page(state, path, "crate or category").await
+}
+
+fn invert_hyphens(name: &str) -> String {
+    name.chars().map(|c| if c == '-' {'_'} else if c == '_' {'-'} else {c.to_ascii_lowercase()}).collect()
 }
 
 fn render_404_page(state: &AServerState, path: &str, item_name: &str) -> impl Future<Output = Result<HttpResponse, ServerError>> {
@@ -510,7 +514,13 @@ async fn handle_git_clone(req: HttpRequest) -> HttpResponse {
         let state = state2.clone();
         if let Ok(Ok(url)) = state2.rt.spawn(async move {
             let crates = state.crates.load();
-            let k = crates.rich_crate_version_async(&o).await?;
+            let k = match crates.rich_crate_version_async(&o).await {
+                Ok(k) => k,
+                Err(_) => {
+                    let o = Origin::from_crates_io_name(&invert_hyphens(o.short_crate_name()));
+                    crates.rich_crate_version_async(&o).await?
+                },
+            };
             let r = k.repository().unwrap();
 
             let mut url = r.canonical_git_url().into_owned();

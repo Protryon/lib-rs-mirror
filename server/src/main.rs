@@ -85,7 +85,7 @@ fn main() {
 
     if let Err(e) = res {
         for c in e.chain() {
-            error!("Error: {}", c);
+            error!("Sever Error: {}", c);
         }
         std::process::exit(1);
     }

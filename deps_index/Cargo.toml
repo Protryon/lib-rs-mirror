@@ -30,4 +30,5 @@ smol_str = "0.1.16"
 fxhash = "0.2.1"
 thiserror = "1.0.26"
 log = "0.4.14"
+old_semver = { version = "0.10", package = "semver", features = ["serde"] }
 

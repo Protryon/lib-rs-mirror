@@ -35,18 +35,18 @@ pub struct MiniVer {
     pub minor: u16,
     pub patch: u16,
     pub build: u16,
-    pub pre: Box<[semver::Identifier]>,
+    pub pre: Box<[old_semver::Identifier]>,
 }
 
 impl MiniVer {
     pub fn to_semver(&self) -> SemVer {
-        SemVer {
+        old_semver::Version {
             major: self.major.into(),
             minor: self.minor.into(),
             patch: self.patch.into(),
             pre: self.pre.clone().into(),
-            build: if self.build > 0 { vec![semver::Identifier::Numeric(self.build.into())] } else { Vec::new() },
-        }
+            build: if self.build > 0 { vec![old_semver::Identifier::Numeric(self.build.into())] } else { Vec::new() },
+        }.to_string().parse().unwrap_or(SemVer { major: 0, minor: 0, patch: 0, pre: semver::Prerelease::EMPTY, build: semver::BuildMetadata::EMPTY })
     }
 }
 
@@ -489,12 +489,13 @@ fn semver_parse(ver: &str) -> SemVer {
 
 impl From<SemVer> for MiniVer {
     fn from(s: SemVer) -> Self {
+        let s: old_semver::Version = s.to_string().parse().unwrap_or_else(|_| old_semver::Version::parse("0.0.0").unwrap());
         Self {
             major: s.major as u16,
             minor: s.minor as u16,
             patch: s.patch as u16,
             pre: s.pre.into_boxed_slice(),
-            build: if let Some(semver::Identifier::Numeric(m)) = s.build.get(0) { *m as u16 } else { 0 },
+            build: if let Some(old_semver::Identifier::Numeric(m)) = s.build.get(0) { *m as u16 } else { 0 },
         }
     }
 }

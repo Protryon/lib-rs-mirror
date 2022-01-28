@@ -2174,7 +2174,13 @@ impl KitchenSink {
         // insert versions that aren't in the db, to have the full list.
         // doing so before postproc will copy data to these.
         for ver in all.versions().iter().filter(|v| !v.yanked) {
-            let semver: SemVer = ver.num.parse().map_err(|_| KitchenSinkErr::BadRustcCompatData)?;
+            let semver: SemVer = match ver.num.parse() {
+                Ok(v) => v,
+                Err(e) => {
+                    error!("bad semver: {} {}", ver.num, e);
+                    continue;
+                },
+            };
             let c = c.entry(semver).or_insert_with(Default::default);
 
             let created = DateTime::parse_from_rfc3339(&ver.created_at).map_err(|_| KitchenSinkErr::BadRustcCompatData)?;

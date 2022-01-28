@@ -1095,7 +1095,7 @@ impl KitchenSink {
         let ver = latest.version();
         let origin = Origin::from_crates_io_name(name);
 
-
+        tokio::task::yield_now().await;
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
 
         let (crate_tarball, crates_io_meta) = futures::join!(
@@ -1806,7 +1806,13 @@ impl KitchenSink {
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
         let mut year_data = HashMap::new();
         for (version, date_dls) in by_ver {
-            let version = MiniVer::from(semver::Version::parse(version)?);
+            let version = MiniVer::from(match semver::Version::parse(version) {
+                Ok(v) => v,
+                Err(e) => {
+                    warn!("Bad version: {} {} {}", crates_io_name, version, e);
+                    continue;
+                }
+            });
             for (day, dls, overwrite) in date_dls.iter() {
                 let curr_year = day.year() as u16;
                 let mut curr_year_data = match year_data.entry(curr_year) {

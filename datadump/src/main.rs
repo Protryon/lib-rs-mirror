@@ -126,6 +126,7 @@ async fn main() {
                         if let Some(dependencies) = dependencies.take() {
                             eprintln!("Indexing dependencies for {} crates", dependencies.len());
                             index_active_rev_dependencies(crates, versions, &dependencies, &ksink)?;
+                            eprintln!("Versions histogram");
                             versions_histogram(crates, versions, &dependencies, &ksink)?;
                         }
                     }
@@ -135,8 +136,8 @@ async fn main() {
                         if let Some(mut downloads) = downloads.take() {
                             eprintln!("Despamming");
                             filter_download_spam(crates, versions, &mut downloads);
-                            eprintln!("Indexing {} crates, {} downloads", versions.len(), downloads.len());
-                            index_downloads(crates, versions, &downloads, &ksink)?;
+                            eprintln!("Indexing downloads for {} crates, {} dl-versions", versions.len(), downloads.len());
+                            index_downloads(crates, versions, &downloads, &ksink);
                         }
                     }
                 }
@@ -212,7 +213,7 @@ fn filter_download_spam(crates: &CratesMap, versions: &VersionsMap, downloads: &
 }
 
 #[inline(never)]
-fn index_downloads(crates: &CratesMap, versions: &VersionsMap, downloads: &VersionDownloads, ksink: &KitchenSink) -> Result<(), BoxErr> {
+fn index_downloads(crates: &CratesMap, versions: &VersionsMap, downloads: &VersionDownloads, ksink: &KitchenSink) {
     for (crate_id, name) in crates {
         if let Some(vers) = versions.get(crate_id) {
             let data = vers
@@ -224,12 +225,13 @@ fn index_downloads(crates: &CratesMap, versions: &VersionsMap, downloads: &Versi
                     None
                 })
                 .collect();
-            ksink.index_crate_downloads(name, &data)?;
+            if let Err(e) = ksink.index_crate_downloads(name, &data) {
+                eprintln!("Can't index downloads for {}: {}", name, e);
+            }
         } else {
             eprintln!("Bad crate? {} {}", crate_id, name);
         }
     }
-    Ok(())
 }
 
 const EXAMPLES_PER_BUCKET: usize = 5;

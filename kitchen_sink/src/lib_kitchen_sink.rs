@@ -302,17 +302,21 @@ impl KitchenSink {
     pub async fn new(data_path: &Path, github_token: &str) -> CResult<Self> {
         let _ = env_logger::try_init();
 
-        tokio::task::block_in_place(|| {
-            let main_cache_dir = data_path.to_owned();
+        let ((crates_io, gh), (index, crev)) = tokio::task::spawn_blocking({
+            let data_path = data_path.to_owned();
+            let github_token = github_token.to_owned();
+            let ghdb = data_path.join("github.db");
+            move || {
+                rayon::join(|| rayon::join(
+                    || crates_io_client::CratesIoClient::new(&data_path),
+                    move || github_info::GitHub::new(&ghdb, &github_token)),
+                || rayon::join(|| Index::new(&data_path),
+                    Creviews::new))
+            }
+        }).await?;
 
-            let ((crates_io, gh), (index, crev)) = rayon::join(|| rayon::join(
-                || crates_io_client::CratesIoClient::new(data_path),
-                || github_info::GitHub::new(&data_path.join("github.db"), github_token)),
-            || rayon::join(
-                || Index::new(data_path),
-                Creviews::new,
-            ));
-            Ok(Self {
+        tokio::task::block_in_place(move || Ok(Self {
+            main_cache_dir: data_path.to_path_buf(),
             crev: Arc::new(crev?),
             crates_io: crates_io?,
             index: index?,
@@ -327,8 +331,7 @@ impl KitchenSink {
             git_checkout_path: data_path.join("git"),
             category_crate_counts: DoubleCheckedCell::new(),
             top_crates_cached: Mutex::new(FxHashMap::default()),
-            yearly: AllDownloads::new(&main_cache_dir),
-            main_cache_dir,
+            yearly: AllDownloads::new(data_path),
             category_overrides: Self::load_category_overrides(&data_path.join("category_overrides.txt"))?,
             author_shitlist: Self::load_author_shitlist(&data_path.join("author_shitlist.txt"))?,
             crates_io_owners_cache: TempCache::new(&data_path.join("cio-owners.tmp"))?,
@@ -340,8 +343,7 @@ impl KitchenSink {
             crate_rustc_compat_db: OnceCell::new(),
             event_log: EventLog::new(data_path.join("event_log.db"))?,
             data_path: data_path.into(),
-            })
-        })
+        }))
     }
 
     fn assert_exists(path: PathBuf) -> Result<PathBuf, KitchenSinkErr> {

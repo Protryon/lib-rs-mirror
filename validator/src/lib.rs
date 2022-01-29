@@ -35,6 +35,16 @@ pub async fn warnings_for_crate(c: &KitchenSink, k: &RichCrateVersion, all: &Ric
         return Ok(warnings);
     }
 
+    let bad_ver = all.versions().iter()
+        .filter(|v| !v.yanked)
+        .find_map(|v| match SemVer::parse(&v.num) {
+            Ok(_) => None,
+            Err(err) => Some((&v.num, err))
+        });
+    if let Some((version, err)) = bad_ver {
+        warnings.insert(Warning::BadSemVer(version.as_str().into(), err.to_string().into()));
+    }
+
     let versions = all.versions().iter().filter(|v| !v.yanked).filter_map(|v| {
         Some((v.num.parse::<SemVer>().ok()?, v))
     }).collect::<Vec<_>>();
@@ -152,15 +162,20 @@ async fn warn_bad_requirements(k: &RichCrateVersion, dependencies: &[RichDep], w
         }
 
         if !req_str.contains('.') {
+            let is_breaking = is_breaking_semver(&richdep.package);
             let mut its_fine = false;
-            let required_dep = Origin::from_crates_io_name(&richdep.package);
-            if let Ok(k) = c.rich_crate_version_stale_is_ok(&required_dep).await {
-                if let Ok(v) = k.version_semver() {
-                    its_fine = v.minor == 0; // if there's only 'x.0.y' version, then requirement 'x' is fine
+
+            if !is_breaking {
+                let required_dep = Origin::from_crates_io_name(&richdep.package);
+                if let Ok(k) = c.rich_crate_version_stale_is_ok(&required_dep).await {
+                    if let Ok(v) = k.version_semver() {
+                        its_fine = v.minor == 0; // if there's only 'x.0.y' version, then requirement 'x' is fine
+                    }
                 }
             }
+
             if !its_fine {
-                warnings.insert(Warning::LaxRequirement(richdep.package.clone(), req_str.into()));
+                warnings.insert(Warning::LaxRequirement(richdep.package.clone(), req_str.into(), is_breaking));
             }
         }
 
@@ -175,7 +190,7 @@ async fn warn_bad_requirements(k: &RichCrateVersion, dependencies: &[RichDep], w
                         }
                     }
                     // app-only crates get a free pass (outdated reqs are handled separately)
-                    if !k.has_lib() {
+                    if k.has_lib() {
                         warnings.insert(Warning::ExactRequirement(richdep.package.clone(), req_str.into()));
                     }
                 }
@@ -207,4 +222,10 @@ async fn warn_outdated_deps(dependencies: &[RichDep], warnings: &mut HashSet<War
             }
         }
     }
+}
+
+
+fn is_breaking_semver(name: &str) -> bool {
+    // it is ironic that the new semver maintainer passionately hates semver feature rules.
+    matches!(name, "serde" | "serde_derive" | "serde_json" | "cc" | "fltk" | "anyhow" | "thiserror" | "cxx" | "cxx-build" | "serde_test" | "syn" | "trybuild")
 }

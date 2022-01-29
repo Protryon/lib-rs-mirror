@@ -1,10 +1,8 @@
-use kitchen_sink::SemVer;
-use kitchen_sink::VersionReq;
 use crate::Page;
 use crate::templates;
 use crate::urler::Urler;
-use futures::Stream;
 use futures::stream::StreamExt;
+use futures::Stream;
 use kitchen_sink::ArcRichCrateVersion;
 use kitchen_sink::CError;
 use kitchen_sink::CrateOwnerRow;
@@ -15,7 +13,9 @@ use kitchen_sink::MaintenanceStatus;
 use kitchen_sink::Origin;
 use kitchen_sink::RichAuthor;
 use kitchen_sink::RichCrate;
+use kitchen_sink::SemVer;
 use kitchen_sink::UserType;
+use kitchen_sink::VersionReq;
 use kitchen_sink::Warning;
 use render_readme::Renderer;
 use std::borrow::Cow;
@@ -48,8 +48,9 @@ impl<'a> MaintainerDashboard<'a> {
         rows.sort_by(|a, b| b.latest_release.cmp(&a.latest_release));
         rows.truncate(400);
 
-        let tmp: Vec<_> = Self::look_up(kitchen_sink, rows)
-            .map(move |(origin, crate_ranking, res)| elaborate_warnings(origin, crate_ranking, res, urler, kitchen_sink))
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let tmp: Vec<_> = Self::look_up(kitchen_sink, rows, deadline)
+            .map(move |(origin, crate_ranking, res)| elaborate_warnings(origin, crate_ranking, res, urler, kitchen_sink, deadline))
             .buffered(8)
             .collect().await;
 
@@ -83,8 +84,7 @@ impl<'a> MaintainerDashboard<'a> {
         })
     }
 
-    fn look_up(kitchen_sink: &KitchenSink, rows: Vec<CrateOwnerRow>) -> impl Stream<Item=(Origin, f32, CResult<(ArcRichCrateVersion, RichCrate, HashSet<Warning>)>)> + '_ {
-        let deadline = Instant::now() + Duration::from_secs(10);
+    fn look_up(kitchen_sink: &KitchenSink, rows: Vec<CrateOwnerRow>, deadline: Instant) -> impl Stream<Item=(Origin, f32, CResult<(ArcRichCrateVersion, RichCrate, HashSet<Warning>)>)> + '_ {
         futures::stream::iter(rows.into_iter())
             .map(move |row| async move {
                 let origin = row.origin;
@@ -139,7 +139,7 @@ impl<'a> MaintainerDashboard<'a> {
     }
 }
 
-async fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult<(ArcRichCrateVersion, RichCrate, HashSet<Warning>)>, urler: &Urler, kitchen_sink: &KitchenSink) -> (Origin, f32, Vec<StructuredWarning>) {
+async fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult<(ArcRichCrateVersion, RichCrate, HashSet<Warning>)>, urler: &Urler, kitchen_sink: &KitchenSink, deadline: Instant) -> (Origin, f32, Vec<StructuredWarning>) {
     let (k, _all, w) = match res {
         Ok(res) => res,
         Err(e) => return (origin, 0., vec![StructuredWarning {
@@ -214,16 +214,8 @@ async fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult
                 Warning::OutdatedDependency(name, req, severity) => {
                     let origin = Origin::from_crates_io_name(&name);
                     let mut upgrade_version = Cow::Borrowed("the latest version");
-                    if let Ok(req) = VersionReq::parse(&req) {
-                        if let Ok(current) = kitchen_sink.rich_crate_async(&origin).await {
-                            let mut versions: Vec<_> = current.versions().iter().filter_map(|v| SemVer::parse(&v.num).ok()).collect();
-                            if let Some(highest_matching_req) = versions.iter().filter(|v| req.matches(v)).max().cloned() {
-                                versions.retain(|v| v > &highest_matching_req);
-                            }
-                            if let Some(latest) = versions.iter().filter(|v| v.pre.is_empty()).max().or_else(|| versions.iter().filter(|v| !v.pre.is_empty()).max()) {
-                                upgrade_version = Cow::Owned(latest.to_string());
-                            }
-                        }
+                    if let Some(latest) = latest_version_matching_requirement(&req, deadline, kitchen_sink, &origin).await {
+                        upgrade_version = Cow::Owned(latest.to_string());
                     }
                     extended_desc = Some(if upgrade_version.starts_with("0.") {
                             "In Cargo, different 0.x versions are considered incompatible, so this is a semver-major upgrade."
@@ -245,6 +237,10 @@ async fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult
                         if severity > 40 { urler.reverse_deps(&origin) } else { urler.all_versions(&origin) }.unwrap_or_else(|| urler.crate_by_origin(&origin)).into(),
                     )))
                 },
+                Warning::BadSemVer(ver, err) => {
+                    (2, format!("Syntax error in version {}", ver).into(),
+                    format!("This is not a valid semver: {}. Cargo enforces semver syntax now, so this version is unusable. Please yank it with cargo yank --vers {}", err, ver).into(), None)
+                },
                 Warning::BadRequirement(name, req) => {
                     extended_desc = Some("Cargo used to be more forgiving about the semver syntax, so it's possible that an already-published crate doesn't satisfy the current rules.");
                     (3, format!("Incorrect dependency requirement {} = {}", name, req).into(),
@@ -256,14 +252,21 @@ async fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult
                     (2, format!("Locked dependency version {} {}", name, req).into(), "This can easily cause a dependency resolution conflict. If you must work around a semver-breaking dependency that can't be yanked, use a range of versions or fork it.".into(),
                         Some((format!("{} versions", name).into(), urler.all_versions(&origin).unwrap_or_else(|| urler.crate_by_origin(&origin)).into())))
                 },
-                Warning::LaxRequirement(name, req) => {
+                Warning::LaxRequirement(name, req, is_breaking) => {
                     let origin = Origin::from_crates_io_name(&name);
-                    extended_desc = Some(if is_breaking_semver(&name) {
+                    extended_desc = Some(if is_breaking {
                         "This crate does not follow semver, and is known to add new features in \"patch\" releases!"
                     } else {
                         "If you want to keep using truly minimal dependency requirements, please make sure you test them in CI with -Z minimal-versions Cargo option, because it's very easy to accidentally use a feature added in a later version."
                     });
-                    (1, format!("Imprecise dependency requirement {} = {}", name, req).into(), "Cargo does not always pick latest versions of dependencies. Too-low version requirements can cause breakage, especially when combined with minimal-versions flag used by users of old Rust versions. To fix this: cargo install cargo-edit; cargo upgrade".into(),
+
+                    let mut upgrade_note = String::new();
+                    if let Some(latest) = latest_version_matching_requirement(&req, deadline, kitchen_sink, &origin).await {
+                        upgrade_note = format!("Specify the version as {} = \"{}\". ", name, latest.to_string());
+                    }
+
+                    (if is_breaking {2} else {1}, format!("Imprecise dependency requirement {} = {}", name, req).into(),
+                        format!("Cargo does not always pick latest versions of dependencies. {}Too-low version requirements can cause breakage, especially when combined with minimal-versions flag used by users of old Rust versions. To fix this: cargo install cargo-edit; cargo upgrade", upgrade_note).into(),
                         Some((format!("{} versions", name).into(), urler.all_versions(&origin).unwrap_or_else(|| urler.crate_by_origin(&origin)).into())))
                 },
                 Warning::NotAPackage => (3, "Cargo.toml parse error".into(), w.to_string().into(), None),
@@ -321,15 +324,23 @@ async fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult
     }
 }
 
+async fn latest_version_matching_requirement(req: &Box<str>, deadline: Instant, kitchen_sink: &KitchenSink, origin: &Origin) -> Option<SemVer> {
+    if let Ok(req) = VersionReq::parse(req) {
+        if let Ok(Ok(current)) = timeout_at(deadline.into(), kitchen_sink.rich_crate_async(origin)).await {
+            let mut versions: Vec<_> = current.versions().iter().filter_map(|v| SemVer::parse(&v.num).ok()).collect();
+            if let Some(highest_matching_req) = versions.iter().filter(|v| req.matches(v)).max().cloned() {
+                versions.retain(|v| v > &highest_matching_req);
+            }
+            return versions.iter().filter(|v| v.pre.is_empty()).max().or_else(|| versions.iter().filter(|v| !v.pre.is_empty()).max()).cloned();
+        }
+    }
+    None
+}
+
 fn comma_list<'a>(items: impl Iterator<Item=&'a String>) -> String {
     let mut res = items.take(5).map(|c| format!("\"{}\"", c)).collect::<Vec<_>>().join(", ");
     if res.is_empty() {
         res.push('…');
     }
     res
-}
-
-fn is_breaking_semver(name: &str) -> bool {
-    // it is ironic that the new semver maintainer passionately hates semver feature rules.
-    matches!(name, "serde" | "serde_json" | "cc" | "serde_derive" | "anyhow" | "thiserror" | "cxx" | "cxx-build" | "serde_test" | "syn")
 }

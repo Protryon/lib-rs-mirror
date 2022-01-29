@@ -147,8 +147,11 @@ pub enum Warning {
     BadRequirement(Box<str>, Box<str>),
     #[error("Dependency {} has exact requirement {}", _0, _1)]
     ExactRequirement(Box<str>, Box<str>),
+    // bool = is breaking semver
     #[error("Dependency {} has imprecise requirement {}", _0, _1)]
-    LaxRequirement(Box<str>, Box<str>),
+    LaxRequirement(Box<str>, Box<str>, bool),
+    #[error("Version {} does not parse: {}", _0, _1)]
+    BadSemVer(Box<str>, Box<str>),
     #[error("The crate is classified as a cryptocurrency-related")]
     CryptocurrencyBS,
     #[error("The crate tarball is big: {}MB", _0 / 1000 / 1000)]

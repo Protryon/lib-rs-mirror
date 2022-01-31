@@ -57,7 +57,7 @@ fn parse_package_id(id: Option<&str>) -> Option<(String, String)> {
     Some((name, ver))
 }
 
-const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 447] = [
+const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 462] = [
 // rg  --no-filename -o '\[stable\(feature.*\]' library/ | fgrep 1. | sort -u | sed -E 's/.*feature ?= ?"(.+)", since ?= ?"1\.(..+)\..".*/(\2, "\1"),/' | sort -V | pbcopy
 
 (17, "addr_from_into_ip"),
@@ -506,7 +506,22 @@ const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 447] = [
 (58, "saturating_div"),
 (58, "unix_process_wait_more"),
 (58, "with_options"),
+(59, "asm"),
+(59, "available_parallelism"),
+(59, "case_mapping_double_ended"),
+(59, "control_flow_enum_is"),
+(59, "entry_insert"),
+(59, "global_asm"),
+(59, "iter_zip"),
+(59, "neon_intrinsics"),
 (59, "nonzero_is_power_of_two"),
+(59, "result_cloned"),
+(59, "result_copied"),
+(59, "sync_once_unwind_safe"),
+(59, "try_from_mut_slice_to_array"),
+(59, "u8_from_char"),
+(60, "maybe_uninit_extra"),
+(60, "vec_spare_capacity"),
 ];
 
 fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {

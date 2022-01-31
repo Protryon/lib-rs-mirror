@@ -13,6 +13,7 @@ lazy_static! {
     "dependency", "developers", "do", "don't", "e.g", "easily", "easy", "either",
     "enables", "etc", "even", "every", "example", "examples", "features", "feel",
     "files", "fast", "for", "from", "fully", "function", "get", "given", "had", "has",
+    "hacktoberfest",
     "have", "here", "if", "implementing", "implements", "implementation", "in", "includes",
     "including", "incurring", "installation", "interested", "into", "is", "it",
     "it's", "its", "itself", "just", "known", "large", "later", "library",

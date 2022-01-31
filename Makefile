@@ -11,6 +11,9 @@ Cargo.lock: Cargo.toml
 	rm Cargo.lock; git submodule update --init --recursive
 	cargo update
 
+backup_data:
+	rsync -Praz librs:/var/lib/crates-server/crate_data.db data/crate_data.db;
+
 backup:
 	rsync -Praz librs:/var/lib/crates-server/ data/ --exclude=tarballs --exclude=git --exclude=index --exclude=event_log.db --exclude='.*' --exclude='*.txt' --exclude=data
 	rsync -Praz librs:/var/lib/crates-server/ data/ --exclude=tarballs --exclude='*.mpbr' --exclude=git --exclude=index --exclude=event_log.db --exclude='.*' --exclude='*.txt' --exclude=data

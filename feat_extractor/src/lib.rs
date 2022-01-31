@@ -120,6 +120,9 @@ pub fn is_deprecated(k: &RichCrateVersion) -> bool {
         let desc = orig_desc.to_ascii_lowercase();
         return orig_desc.starts_with("WIP") || orig_desc.ends_with("WIP") ||
             desc.starts_with("deprecated") ||
+            desc.starts_with("this crate was renamed") ||
+            desc.starts_with("this crate is deprecated") ||
+            desc.starts_with("this package was renamed") ||
             desc.starts_with("obsolete") ||
             desc.starts_with("unfinished") ||
             desc.starts_with("an unfinished") ||
@@ -242,8 +245,17 @@ fn is_reserved_boilerplate_text(desc: &str) -> bool {
         desc.contains("reserving this crate") ||
         desc.contains("only to reserve the name") ||
         desc.contains("this crate has been retired") ||
+        desc.contains(" if you want this crate name") ||
         desc.contains("want to use this name") ||
         desc.contains("this is a dummy package") ||
+        desc.contains("if you would like to use this crate name, please contact") ||
+        desc.starts_with("reserving this crate name for") ||
+        desc.starts_with("contact me if you want this name") ||
+        desc.starts_with("unused crate name") ||
+        desc.starts_with("unused. contact me") ||
+        desc.starts_with("crate name not in use") ||
+        desc.starts_with("if you want to use this crate name, please contact ") ||
+        desc.contains("if you want this name, please contact me") ||
         desc2.starts_with("reserved crate ") ||
         desc.contains("this crate is reserved ") ||
         desc == "reserved" ||
@@ -252,6 +264,7 @@ fn is_reserved_boilerplate_text(desc: &str) -> bool {
         desc.ends_with(" placeholder") ||
         desc.ends_with(" reserved for use") ||
         desc2.starts_with("dummy crate") ||
+        desc2.starts_with("available for ownership transfer") ||
         desc2.starts_with("reserved, for") ||
         desc2.starts_with("crate name reserved for") ||
         desc2.starts_with("wip: reserved") ||

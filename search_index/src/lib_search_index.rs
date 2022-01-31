@@ -154,6 +154,7 @@ impl CrateSearchIndex {
     }
 }
 
+#[track_caller]
 fn take_string(val: Option<Vec<Value>>) -> String {
     match val {
         Some(mut val) => match val.remove(0) {
@@ -164,6 +165,7 @@ fn take_string(val: Option<Vec<Value>>) -> String {
     }
 }
 
+#[track_caller]
 fn take_int(val: Option<&Vec<Value>>) -> u64 {
     match val {
         Some(val) => match val.get(0) {

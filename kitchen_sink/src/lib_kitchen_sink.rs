@@ -679,7 +679,7 @@ impl KitchenSink {
         });
         let stream = futures::stream::iter(all.iter())
             .map(move |(name, _)| async move {
-                self.rich_crate_async(&Origin::from_crates_io_name(&*name)).await.map_err(|e| error!("{}: {}", name, e)).ok()
+                self.rich_crate_async(&Origin::from_crates_io_name(&*name)).await.map_err(|e| error!("to reindex {}: {}", name, e)).ok()
             })
             .buffer_unordered(8)
             .filter_map(|x| async {x});
@@ -698,7 +698,7 @@ impl KitchenSink {
         let mut crates2 = futures::stream::iter(self.crate_db.crates_to_reindex().await?.into_iter())
             .map(move |origin| async move {
                 self.force_crate_reindexing(&origin);
-                let _ = self.event_log.post(&SharedEvent::CrateUpdated(origin.to_str())).map_err(|e| error!("{}", e));
+                let _ = self.event_log.post(&SharedEvent::CrateUpdated(origin.to_str())).map_err(|e| error!("even {}", e));
 
                 self.rich_crate_async(&origin).await.map_err(|e| {
                     error!("Can't reindex {:?}: {}", origin, e);
@@ -1855,7 +1855,7 @@ impl KitchenSink {
 
         let (source_data, manifest, mut warnings, cache_key) = self.fetch_rich_crate_version_data(origin).await?;
 
-        let _ = tokio::task::block_in_place(|| self.index_msrv_from_manifest(origin, &manifest)).map_err(|e| error!("{}", e));
+        let _ = tokio::task::block_in_place(|| self.index_msrv_from_manifest(origin, &manifest)).map_err(|e| error!("msrv {}", e));
 
         // direct deps are used as extra keywords for similarity matching,
         // but we're taking only niche deps to group similar niche crates together

@@ -231,12 +231,12 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
 
     let mut is_repo_archived = false;
     if let Some(repo) = k.repository() {
-        if let Some(github_repo) = crates.github_repo(repo).await.map_err(|e| log::error!("{}", e)).ok().and_then(|x| x) {
+        if let Some(github_repo) = crates.github_repo(repo).await.map_err(|e| log::error!("gh repo{}", e)).ok().and_then(|x| x) {
             is_repo_archived = github_repo.archived;
         }
     }
 
-    let contrib_info = crates.all_contributors(k).await.map_err(|e| log::error!("{}", e)).ok();
+    let contrib_info = crates.all_contributors(k).await.map_err(|e| log::error!("contrib {}", e)).ok();
     let contributors_count = if let Some((authors, _owner_only, _, extra_contributors)) = &contrib_info {
         (authors.len() + extra_contributors) as u32
     } else {

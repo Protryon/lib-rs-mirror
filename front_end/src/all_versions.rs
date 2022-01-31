@@ -53,7 +53,7 @@ impl AllVersions {
                 match &origin {
                     Origin::CratesIo(name) => {
                         kitchen_sink.crates_io_meta(name).await
-                            .map_err(|e| log::error!("{}", e))
+                            .map_err(|e| log::error!("allver: {}", e))
                             .map(|m| m.versions)
                             .unwrap_or_default()
                     },

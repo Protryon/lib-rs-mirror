@@ -57,6 +57,7 @@ pub enum Compat {
 }
 
 impl Compat {
+    #[track_caller]
     pub fn from_str(s: &str) -> Self {
         match s {
             "Y" => Compat::VerifiedWorks,

@@ -34,6 +34,7 @@ impl fmt::Debug for Origin {
 
 impl Origin {
     #[inline]
+    #[track_caller]
     pub fn from_crates_io_name(name: &str) -> Self {
         match Self::try_from_crates_io_name(name) {
             Some(n) => n,
@@ -74,6 +75,7 @@ impl Origin {
         }
     }
 
+    #[track_caller]
     pub fn from_str(s: impl AsRef<str>) -> Self {
         let s = s.as_ref();
         let mut n = s.splitn(2, ':');

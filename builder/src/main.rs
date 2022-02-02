@@ -324,11 +324,11 @@ fn run_and_analyze_versions(db: &BuildDb, docker_root: &Path, versions: Vec<(&'s
     }
 
     let tmp = to_set.iter().map(|((rv, o, cv), c)| {
-        eprintln!("https://lib.rs/compat/{}#{} R.1.{}={:?}", o.short_crate_name(), cv, rv, c);
         (o, cv, *rv, *c)
     }).collect::<Vec<(&Origin, &SemVer, RustcMinorVersion, Compat)>>();
     if db.set_compat_multi(&tmp).is_err() {
         // retry, sqlite is flaky
+        std::thread::sleep(std::time::Duration::from_secs(1));
         db.set_compat_multi(&tmp)?;
     }
     Ok(())

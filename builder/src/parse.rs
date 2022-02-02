@@ -4,6 +4,7 @@ use crate_db::builddb::{Compat, RustcMinorVersion};
 use regex::Regex;
 use serde_derive::*;
 use std::collections::HashSet;
+use log::{warn, info, error};
 
 pub const DIVIDER: &str = "---XBdt8MQTMWYwcSsHz---";
 
@@ -42,7 +43,7 @@ pub fn parse_analyses(stdout: &str, stderr: &str) -> Vec<Findings> {
     let divider = format!("{}\n", DIVIDER);
 
     stdout.split(&divider).zip(stderr.split(&divider))
-        .filter_map(|(out, err)| parse_analysis(out, err).map_err(|e| eprintln!("{}", e)).ok()).collect()
+        .filter_map(|(out, err)| parse_analysis(out, err).map_err(|e| warn!("{}", e)).ok()).collect()
 }
 
 fn parse_package_id(id: Option<&str>) -> Option<(String, SemVer)> {
@@ -587,7 +588,7 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Result<Findings, String> {
                             eprintln!("found feature {} >= {} ({} {})", feat, rustc_min, name, ver);
                             findings.crates.insert((Some(rustc_min-1), name.clone(), ver.clone(), Compat::Incompatible));
                         } else {
-                            eprintln!("• err: unknown feature !? {}", feat);
+                            info!("• err: unknown feature !? {}", feat);
                         }
                     }
                     else if desc.starts_with("associated constants are experimental") {
@@ -783,10 +784,10 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Result<Findings, String> {
                     Compat::BrokenDeps
                 }));
             } else {
-                eprintln!("• Odd compiler message: {}", line);
+                warn!("• Odd compiler message: {}", line);
             }
         } else {
-            eprintln!("Does not parse as JSON: {}", line);
+            error!("Does not parse as JSON: {}", line);
         }
     }
 

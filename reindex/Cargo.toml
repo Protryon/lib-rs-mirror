@@ -16,7 +16,7 @@ search_index = { path = "../search_index" }
 render_readme = { path = "../render_readme" }
 feat_extractor = { path = "../feat_extractor" }
 ranking = { path = "../ranking" }
-parking_lot = "0.11"
+parking_lot = "0.12.0"
 udedokei = { path = "../udedokei" }
 tokio = { version = "1.2.0", features = ["rt-multi-thread", "macros", "sync"] }
 futures = "0.3.4"

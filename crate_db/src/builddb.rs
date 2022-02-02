@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::path::Path;
-use log::debug;
+use log::{debug, info};
 
 pub struct BuildDb {
     pub(crate) conn: Mutex<Connection>,
@@ -49,11 +49,14 @@ pub struct CrateCompatInfo {
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[repr(u8)]
 pub enum Compat {
-    VerifiedWorks,
-    ProbablyWorks,
-    BrokenDeps,
-    Incompatible,
+    VerifiedWorks = b'Y',
+    ProbablyWorks = b'y',
+    BrokenDeps = b'n',
+    SuspectedIncompatible = b'N',
+    LikelyIncompatible = b'x',
+    DefinitelyIncompatible = b'X',
 }
 
 impl Compat {
@@ -63,18 +66,35 @@ impl Compat {
             "Y" => Compat::VerifiedWorks,
             "y" => Compat::ProbablyWorks,
             "n" => Compat::BrokenDeps,
-            "N" => Compat::Incompatible,
+            "N" => Compat::SuspectedIncompatible,
+            "x" => Compat::LikelyIncompatible,
+            "X" => Compat::DefinitelyIncompatible,
             _ => panic!("bad compat str {}", s),
         }
     }
 
-    pub fn as_str(self) -> &'static str {
+    pub fn successful(&self) -> bool {
+        matches!(self, Compat::VerifiedWorks | Compat::ProbablyWorks)
+    }
+
+    pub fn certainity(&self) -> u8 {
         match self {
-            Compat::VerifiedWorks => "Y",
-            Compat::ProbablyWorks => "y",
-            Compat::BrokenDeps => "n",
-            Compat::Incompatible => "N",
+            Compat::VerifiedWorks => 3,
+            Compat::ProbablyWorks => 1,
+            Compat::BrokenDeps => 0,
+            Compat::SuspectedIncompatible => 1,
+            Compat::LikelyIncompatible => 2,
+            Compat::DefinitelyIncompatible => 3,
         }
+    }
+
+    pub fn is_better(&self, other: &Compat) -> bool {
+        (self.successful() && !other.successful()) ||
+            (self.successful() == other.successful() && self.certainity() > other.certainity())
+    }
+
+    pub fn as_char(self) -> char {
+        self as u8 as char
     }
 }
 
@@ -229,7 +249,7 @@ impl BuildDb {
                     t.newest_ok = Some(rustc_version);
                 }
             },
-            Compat::Incompatible => {
+            Compat::LikelyIncompatible | Compat::SuspectedIncompatible | Compat::DefinitelyIncompatible => {
                 if t.newest_bad_raw.map_or(true, |v| rustc_version > v) {
                     t.newest_bad_raw = Some(rustc_version);
                 }
@@ -313,20 +333,36 @@ impl BuildDb {
         let mut conn = self.conn.lock();
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
         {
-            let mut clear_speculation = tx.prepare_cached(r"DELETE from build_results WHERE origin = ? AND version = ?2 AND rustc_version = ?3 AND (compat = 'n' OR compat = 'y')")?;
-            let mut ins_ignore = tx.prepare_cached(r"INSERT OR IGNORE INTO build_results(origin, version, rustc_version, compat) VALUES(?1, ?2, ?3, ?4)")?;
-            let mut ins_replace = tx.prepare_cached("INSERT OR REPLACE INTO build_results(origin, version, rustc_version, compat) VALUES(?1, ?2, ?3, ?4)")?;
+            let mut get = tx.prepare_cached(r"SELECT compat FROM build_results WHERE origin = ?1 AND version = ?2 AND rustc_version = ?3")?;
+            let mut insert = tx.prepare_cached(r"INSERT OR REPLACE INTO build_results(origin, version, rustc_version, compat) VALUES(?1, ?2, ?3, ?4)")?;
 
-            for (origin, ver, rustc_version, compat) in rows {
+            let mut to_insert = Vec::with_capacity(rows.len());
+
+            for (origin, ver, rustc_version, new_compat) in rows {
                 let ver = ver.to_string();
                 let rustc_version = format!("1.{}.0", rustc_version);
-
                 let origin_str = origin.to_str();
-                let result_str = compat.as_str();
-                clear_speculation.execute(&[origin_str.as_str(), &ver, &rustc_version])?;
-                // these are weak signals, so don't replace good info with them
-                let ins = if *compat != Compat::VerifiedWorks { &mut ins_ignore } else { &mut ins_replace };
-                ins.execute(&[origin_str.as_str(), &ver, &rustc_version, result_str])?;
+
+                let existing = get.query_row(&[origin_str.as_str(), &ver, &rustc_version], |row| {
+                    Ok(Compat::from_str(row.get_ref_unwrap(2).as_str()?))
+                });
+                match existing {
+                    Ok(existing) => {
+                        if existing.is_better(new_compat) {
+                            continue;
+                        }
+                    },
+                    Err(Error::QueryReturnedNoRows) => {},
+                    Err(e) => return Err(e),
+                }
+
+                to_insert.push((origin, origin_str, ver, rustc_version, new_compat));
+            }
+
+            for (origin, origin_str, ver, rustc_version, new_compat) in to_insert {
+                info!("https://lib.rs/compat/{}#{} R.{}={:?}", origin.short_crate_name(), ver, rustc_version, new_compat);
+                let result_str = new_compat.as_char().to_string();
+                insert.execute(&[origin_str.as_str(), &ver, &rustc_version, &result_str])?;
             }
         }
         tx.commit()?;

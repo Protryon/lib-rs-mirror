@@ -2263,7 +2263,7 @@ impl KitchenSink {
         if msrv > 1 {
             debug!("Detected {:?} as msrv 1.{}", origin, msrv);
             let latest_bad_rustc = msrv - 1;
-            db.set_compat(origin, &SemVer::parse(&package.version)?, latest_bad_rustc, Compat::Incompatible)?;
+            db.set_compat(origin, &SemVer::parse(&package.version)?, latest_bad_rustc, Compat::DefinitelyIncompatible)?;
         }
         Ok(())
     }

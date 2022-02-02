@@ -300,25 +300,17 @@ fn run_and_analyze_versions(db: &BuildDb, docker_root: &Path, versions: Vec<(&'s
     let mut to_set = BTreeMap::new();
     for f in parse_analyses(&stdout, &stderr) {
         if let Some(rustc_version) = f.rustc_version {
-            for (rustc_override, name, version, compat) in f.crates {
-                let origin = Origin::from_crates_io_name(&name);
+            for (rustc_override, crate_name, crate_version, new_compat) in f.crates {
+                let origin = Origin::from_crates_io_name(&crate_name);
                 let rustc_version = rustc_override.unwrap_or(rustc_version);
-                to_set.entry((rustc_version, origin, version))
-                    .and_modify(|c| {
-                        let replace = match (*c, compat) {
-                            (Compat::VerifiedWorks, _) => false,
-                            (_, Compat::VerifiedWorks) => true,
-                            (Compat::Incompatible, _) => false,
-                            (_, Compat::Incompatible) => true,
-                            (Compat::ProbablyWorks, _) => false,
-                            (_, Compat::ProbablyWorks) => true,
-                            _ => false,
-                        };
-                        if replace {
-                            *c = compat;
+
+                to_set.entry((rustc_version, origin, crate_version))
+                    .and_modify(|existing_compat: &mut Compat| {
+                        if new_compat.is_better(&existing_compat) {
+                            *existing_compat = new_compat;
                         }
                     })
-                    .or_insert(compat);
+                    .or_insert(new_compat);
             }
         }
     }

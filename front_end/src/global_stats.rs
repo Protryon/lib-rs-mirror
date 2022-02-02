@@ -245,7 +245,7 @@ fn rustc_stats(compat: &HashMap<Origin, CompatByCrateVersion>, max_rust_version:
 
     for (_, c) in compat {
         // can't compile at all
-        if c.iter().all(|(_, c)| c.oldest_ok.is_none()) {
+        if !c.iter().any(|(_, c)| c.has_ever_built()) {
             continue;
         }
 
@@ -254,14 +254,14 @@ fn rustc_stats(compat: &HashMap<Origin, CompatByCrateVersion>, max_rust_version:
             Some((_, c)) => c,
             None => continue,
         };
-        let latest_ver_bad = match c.iter().rfind(|(v, c)| v.pre.is_empty() && c.newest_bad_raw.is_some()) {
+        let latest_ver_bad = match c.iter().rfind(|(v, c)| v.pre.is_empty() && c.newest_bad_likely().is_some()) {
             Some((_, c)) => c,
             None => latest_ver,
         };
-        let newest_bad_raw = latest_ver_bad.newest_bad_raw.unwrap_or(0);
-        let newest_bad = latest_ver.newest_bad.unwrap_or(0);
-        let oldest_ok = latest_ver.oldest_ok.unwrap_or(999);
-        let oldest_ok_raw = latest_ver.oldest_ok_raw.unwrap_or(999);
+        let newest_bad_raw = latest_ver_bad.newest_bad_likely().unwrap_or(0);
+        let newest_bad = latest_ver.newest_bad().unwrap_or(0);
+        let oldest_ok = latest_ver.oldest_ok().unwrap_or(999);
+        let oldest_ok_raw = latest_ver.oldest_ok_certain().unwrap_or(999);
         for (ver, c) in rustc_versions.iter_mut().enumerate() {
             let ver = ver as u16;
             if ver >= oldest_ok {

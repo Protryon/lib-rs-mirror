@@ -208,9 +208,9 @@ impl AllVersions {
             feat_removed.sort();
 
             let msrv = compat.get(&version).and_then(|c| {
-                c.oldest_ok.map(|oldest_ok| {
-                    let exact = c.newest_bad.is_some();
-                    (c.newest_bad.map(|n| n + 1).unwrap_or(oldest_ok), oldest_ok, exact)
+                c.oldest_ok().map(|oldest_ok| {
+                    let exact = c.newest_bad().is_some();
+                    (c.newest_bad().map(|n| n + 1).unwrap_or(oldest_ok), oldest_ok, exact)
                 })
             });
 

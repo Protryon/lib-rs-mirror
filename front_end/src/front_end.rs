@@ -275,13 +275,17 @@ pub async fn render_trending_crates(out: &mut impl Write, kitchen_sink: &Kitchen
 
 pub async fn render_debug_page(out: &mut impl Write, all: RichCrate, kitchen_sink: &KitchenSink) -> Result<(), anyhow::Error> {
     let mut rustc_versions = HashSet::new();
+    rustc_versions.insert(55);
+    rustc_versions.insert(50);
+    rustc_versions.insert(45);
+    rustc_versions.insert(40);
+    rustc_versions.insert(35);
+    rustc_versions.insert(30);
 
     let by_crate_ver = kitchen_sink.rustc_compatibility(&all).await?;
 
     for c in by_crate_ver.values() {
-        if let Some(v) = c.oldest_ok { rustc_versions.insert(v); }
-        if let Some(v) = c.newest_ok { rustc_versions.insert(v); }
-        if let Some(v) = c.newest_bad { rustc_versions.insert(v); }
+        for v in c.all_rustc_versions() { rustc_versions.insert(v); }
     }
 
     let mut rustc_versions = rustc_versions.into_iter().collect::<Vec<u16>>();

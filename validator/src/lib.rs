@@ -111,13 +111,15 @@ pub async fn warnings_for_crate(c: &KitchenSink, k: &RichCrateVersion, all: &Ric
         }
     }
 
-    let msrv_with_deps = c.rustc_compatibility(&all).await?.values().rev().filter_map(|c| c.newest_bad).next().unwrap_or(0);
+    let verified_msrv = c.rustc_compatibility(&all).await?.values().rev().filter_map(|c| c.newest_bad_certain()).next().unwrap_or(0);
+    let displayed_msrv = c.rustc_compatibility(&all).await?.values().rev().filter_map(|c| c.newest_bad()).next().unwrap_or(0);
+
     // if it's not compatible with the old compiler, there's no point using an old-compiler edition
-    if msrv_with_deps >= 55 && k.edition() < Edition::E2021 {
-        warnings.insert(Warning::EditionMSRV(k.edition(), msrv_with_deps+1));
+    if verified_msrv >= 55 && k.edition() < Edition::E2021 {
+        warnings.insert(Warning::EditionMSRV(k.edition(), displayed_msrv+1));
     }
-    else if msrv_with_deps >= 30 && k.edition() < Edition::E2018 {
-        warnings.insert(Warning::EditionMSRV(k.edition(), msrv_with_deps+1));
+    else if verified_msrv >= 30 && k.edition() < Edition::E2018 {
+        warnings.insert(Warning::EditionMSRV(k.edition(), displayed_msrv+1));
     }
 
     // rust-version should be set for msrv > 1.56
@@ -126,10 +128,10 @@ pub async fn warnings_for_crate(c: &KitchenSink, k: &RichCrateVersion, all: &Ric
         .and_then(|v| v.split('.').nth(1))
         .and_then(|v| v.parse().ok())
         .unwrap_or(0);
-    if explicit_msrv <= msrv_with_deps {
-        let msrv_no_deps = c.rustc_compatibility_no_deps(&all)?.values().rev().filter_map(|c| c.newest_bad).next().unwrap_or(0);
+    if explicit_msrv <= verified_msrv {
+        let msrv_no_deps = c.rustc_compatibility_no_deps(&all)?.values().rev().filter_map(|c| c.newest_bad_certain()).next().unwrap_or(0);
         if msrv_no_deps >= 56 {
-            warnings.insert(Warning::BadMSRV(msrv_with_deps+1, explicit_msrv)); // for UI consistency display MSRV with deps
+            warnings.insert(Warning::BadMSRV(displayed_msrv+1, explicit_msrv)); // for UI consistency display MSRV with deps
         }
     }
 

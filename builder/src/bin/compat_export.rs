@@ -63,8 +63,7 @@ async fn crate_compat(crates: &KitchenSink, name: &str) -> kitchen_sink::CResult
 
     // if the raw ones are all missing, then it has never been tested with cargo check
     // so all the data is assumed based on release dates
-    let no_real_data_collected = compat.values()
-        .all(|c| c.oldest_ok_raw.is_none() && c.newest_bad_raw.is_none());
+    let no_real_data_collected = !compat.values().any(|c| c.has_ever_built() || c.oldest_ok_certain().is_some());
 
     // TODO: check versions from oldest to find very broken crates
 
@@ -84,7 +83,7 @@ async fn crate_compat(crates: &KitchenSink, name: &str) -> kitchen_sink::CResult
 
         // TODO: this is biased towards keeping versions that aren't sure to work
         // it should probably reject more aggressively?
-        let mut rustc_minor_ver = match (c.newest_bad, c.oldest_ok) {
+        let mut rustc_minor_ver = match (c.newest_bad(), c.oldest_ok()) {
             (Some(bad), Some(ok)) => (bad+1).min(ok), // shouldn't matter, unless the data is bad (it is :)
             (Some(bad), _) => bad+1,
             (_, Some(ok)) => ok,
@@ -94,7 +93,7 @@ async fn crate_compat(crates: &KitchenSink, name: &str) -> kitchen_sink::CResult
 
         // if lacking data, then be more lenient allowing more crates through
         // assuming they support their current stable + one older version at least
-        if no_real_data_collected && c.newest_bad.is_none() {
+        if no_real_data_collected && c.newest_bad().is_none() {
             rustc_minor_ver = rustc_minor_ver.saturating_sub(1);
         }
 

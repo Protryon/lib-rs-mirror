@@ -26,7 +26,7 @@ pub use crate::nonblock::*;
 
 pub use crate_db::builddb::Compat;
 pub use crate_db::builddb::CompatByCrateVersion;
-pub use crate_db::builddb::CompatRange;
+pub use crate_db::builddb::CompatRanges;
 pub use crate_db::CrateOwnerRow;
 pub use crates_io_client::CrateDepKind;
 pub use crates_io_client::CrateDependency;
@@ -2200,14 +2200,7 @@ impl KitchenSink {
             let created = DateTime::parse_from_rfc3339(&ver.created_at).map_err(|_| KitchenSinkErr::BadRustcCompatData)?;
             if let Some(mut expected_rust) = Self::rustc_release_from_date(&created) {
                 expected_rust += bump_min_expected_rust;
-
-                if c.newest_bad.map_or(false, |bad| bad >= expected_rust) {
-                    c.newest_bad = None; // bad data?
-                }
-                // assume it compiled with the latest stable at the time of the release
-                if c.oldest_ok.map_or(true, |n| n > expected_rust) {
-                    c.oldest_ok = Some(expected_rust);
-                }
+                c.add_compat(expected_rust, Compat::ProbablyWorks);
             }
         }
         // this is needed to copy build failures from non-matching versions to matching versions
@@ -2368,24 +2361,36 @@ impl KitchenSink {
                     };
                     // find known-bad dep to bump msrv
                     let dep_newest_bad = dep_compat.iter()
-                        .filter_map(|(semver, compat)| Some((semver, compat.newest_bad?)))
                         .filter(|(semver, _)| req.matches(semver))
+                        .filter_map(|(semver, compat)| Some((semver, compat.newest_bad()?)))
                         .min_by_key(|&(_, n)| n);
                     // but don't let one broken build override known-good builds
                     let dep_oldest_ok = dep_compat.iter()
-                        .filter_map(|(semver, compat)| Some((semver, compat.oldest_ok?)))
                         .filter(|(semver, _)| req.matches(semver))
+                        .filter_map(|(semver, compat)| Some((semver, compat.oldest_ok()?)))
                         .map(|(_, n)| n)
                         .min()
                         .unwrap_or(999);
                     if let Some((dep_found_ver, mut dep_newest_bad)) = dep_newest_bad {
-                        dep_newest_bad = dep_newest_bad.min(dep_oldest_ok);
-                        if c.newest_bad.unwrap_or(0) < dep_newest_bad && dep_newest_bad < c.oldest_ok.unwrap_or(9999) {
-                            if dep_newest_bad > 31 {
-                                debug!("{} {} MSRV went from {} to {} because of https://lib.rs/compat/{} {} = {}", all.name(), crate_ver, c.newest_bad.unwrap_or(0), dep_newest_bad, dep_origin.short_crate_name(), req, dep_found_ver);
+                        dep_newest_bad = dep_newest_bad.min(dep_oldest_ok.saturating_sub(1));
+
+                        if c.newest_bad().unwrap_or(0) < dep_newest_bad {
+                            // older rust is so borked it's not even worth debug-printing
+                            if dep_newest_bad > 30 {
+                                debug!("{} {} MSRV went from {} to {} because of https://lib.rs/compat/{} {} = {}", all.name(), crate_ver, c.newest_bad().unwrap_or(0), dep_newest_bad, dep_origin.short_crate_name(), req, dep_found_ver);
                             }
-                            c.newest_bad = Some(dep_newest_bad);
-                            let _ = db.set_compat(all.origin(), &crate_ver, dep_newest_bad, Compat::BrokenDeps);
+                            c.add_compat(dep_newest_bad, Compat::BrokenDeps);
+
+                            // setting this will make builder skip this version.
+                            // propagate problem only if the failure is certain
+                            let dep_newest_bad_certain = dep_compat.iter()
+                                .filter(|(semver, _)| req.matches(semver))
+                                .filter_map(|(_, compat)| compat.newest_bad_certain())
+                                .min()
+                                .unwrap_or(0);
+                            if c.newest_bad().unwrap_or(0) < dep_newest_bad_certain {
+                                let _ = db.set_compat(all.origin(), &crate_ver, dep_newest_bad, Compat::BrokenDeps);
+                            }
                         }
                     }
                 }

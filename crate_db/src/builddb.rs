@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::path::Path;
-use log::{debug, info};
+use log::info;
 
 pub struct BuildDb {
     pub(crate) conn: Mutex<Connection>,
@@ -22,16 +22,112 @@ pub struct CompatibilityInfo {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct CompatRange {
-    // rustc version
-    pub oldest_ok: Option<RustcMinorVersion>,
-    pub newest_bad: Option<RustcMinorVersion>,
-    pub newest_ok: Option<RustcMinorVersion>,
-    pub oldest_ok_raw: Option<RustcMinorVersion>, // actual test data, no assumptions
-    pub newest_bad_raw: Option<RustcMinorVersion>, // actual test data, no assumptions
+pub struct CompatRanges {
+    has_ever_built: bool,
+    ok: BTreeMap<RustcMinorVersion, Compat>,
+    bad: BTreeMap<RustcMinorVersion, Compat>,
 }
 
-pub type CompatByCrateVersion = BTreeMap<SemVer, CompatRange>;
+impl CompatRanges {
+    pub fn has_ever_built(&self) -> bool {
+        self.has_ever_built
+    }
+
+    /// note that it compiled fine with this version
+    pub fn add_compat(&mut self, rustc_minor_ver: RustcMinorVersion, new_compat: Compat) {
+        if new_compat.successful() {
+            if new_compat == Compat::VerifiedWorks {
+                self.has_ever_built = true;
+            }
+            &mut self.ok
+        } else {
+            &mut self.bad
+        }
+        .entry(rustc_minor_ver)
+            .and_modify(|existing_compat| {
+                if new_compat.is_better(existing_compat) {
+                    *existing_compat = new_compat;
+                }
+            })
+            .or_insert(new_compat);
+    }
+
+    pub fn compat_data_for_rustc(&self, rustc_version: RustcMinorVersion) -> Option<Compat> {
+        match (self.ok.get(&rustc_version).copied(), self.bad.get(&rustc_version).copied()) {
+            (Some(ok), Some(bad)) => {
+                Some(if ok.is_better(&bad) {
+                    ok
+                } else {
+                    bad
+                })
+            }
+            (Some(any), _) | (_, Some(any)) => Some(any),
+            _ => None,
+        }
+    }
+
+    pub fn oldest_ok(&self) -> Option<RustcMinorVersion> {
+        self.ok.keys().copied().next()
+    }
+
+    pub fn newest_bad(&self) -> Option<RustcMinorVersion> {
+        self.bad.keys().rev().copied().next()
+    }
+
+    pub fn newest_bad_compat(&self) -> Option<(RustcMinorVersion, Compat)> {
+        self.bad.iter().rev().map(|(&c, &v)| (c, v)).next()
+    }
+
+    pub fn remove_uncertain(&mut self) {
+        self.ok.retain(|_, c| *c == Compat::VerifiedWorks);
+        self.bad.retain(|_, c| *c == Compat::DefinitelyIncompatible);
+    }
+
+    pub fn normalize(&mut self) {
+        // First delete false positives. Cargo has this problem that it fails open when
+        // it's too old to even recognize new unstable features. Non-contiguous MSRV ranges would be confusing,
+        // so we simplify it to first stable version that does support the feature.
+        if let Some(newest_bad) = self.newest_bad_certain() {
+            self.ok.retain(|&ok_ver, _| {
+                ok_ver > newest_bad
+            });
+        }
+        // Then remove all spurious failures
+        if let Some(oldest_ok) = self.oldest_ok() {
+            self.bad.retain(|&bad_ver, _| {
+                bad_ver < oldest_ok
+            });
+        }
+    }
+
+    pub fn newest_bad_certain(&self) -> Option<RustcMinorVersion> {
+        self.bad.iter().rev()
+            .filter(|(_, &c)| c == Compat::DefinitelyIncompatible)
+            .map(|(&v, _)| v)
+            .next()
+    }
+
+    pub fn newest_bad_likely(&self) -> Option<RustcMinorVersion> {
+        self.bad.iter().rev()
+        // TODO: remove SuspectedIncompatible once we have data
+            .filter(|(_, &c)| c == Compat::DefinitelyIncompatible || c == Compat::LikelyIncompatible|| c == Compat::SuspectedIncompatible)
+            .map(|(&v, _)| v)
+            .next()
+    }
+
+    pub fn oldest_ok_certain(&self) -> Option<RustcMinorVersion> {
+        self.ok.iter()
+            .filter(|(_, &c)| c == Compat::DefinitelyIncompatible)
+            .map(|(&v, _)| v)
+            .next()
+    }
+
+    pub fn all_rustc_versions(&self) -> impl Iterator<Item=RustcMinorVersion> + '_ {
+        self.ok.keys().copied().chain(self.bad.keys().copied())
+    }
+}
+
+pub type CompatByCrateVersion = BTreeMap<SemVer, CompatRanges>;
 
 #[derive(Debug)]
 pub struct RustcCompatRange {
@@ -138,30 +234,16 @@ impl BuildDb {
         // some crates used 2018 edition without using 2018 features,
         // allowing very old edition-unaware Rust to compile it.
         for v in compat.values_mut() {
-            if v.oldest_ok.is_some() {
+            if v.has_ever_built() {
                 any_version_has_built = true;
             }
-
-            if let (Some(oldest_ok), Some(newest_bad)) = (v.oldest_ok, v.newest_bad) {
-                if oldest_ok <= newest_bad {
-                    if oldest_ok < 29 {
-                        v.oldest_ok = Some(newest_bad + 1);
-                    } else {
-                        v.newest_bad = Some(oldest_ok - 1);
-                    }
-                }
-            }
+            v.normalize();
         }
 
         if !any_version_has_built {
-            // Remove broken data
+            // if it never built, it may be garbage data
             for c in compat.values_mut() {
-                // if it never built, it may be garbage data
-                // but keep deps broken info to help the builder narrow target ranges
-                if c.oldest_ok.is_none() && c.newest_bad.is_some() {
-                    debug!("{:?} never built; so ignoring failures ({:?})", origin, c.newest_bad);
-                    c.newest_bad = None;
-                }
+                c.remove_uncertain();
             }
         }
         Ok(compat)
@@ -169,8 +251,9 @@ impl BuildDb {
 
     pub fn postprocess_compat(compat: &mut CompatByCrateVersion) {
         let mut prev_oldest_ok = None;
+
         for c in compat.values_mut().rev() {
-            if let (Some(prev_ok), Some(newest_bad)) = (prev_oldest_ok, c.newest_bad) {
+            if let (Some(prev_ok), Some(newest_bad)) = (prev_oldest_ok, c.newest_bad()) {
                 // bad data or unexpected change in compatibility?
                 if prev_ok < newest_bad {
                     prev_oldest_ok = None;
@@ -178,40 +261,42 @@ impl BuildDb {
             }
 
             // assume that if the new version built with old rust, then older version will too
-            match (c.oldest_ok, prev_oldest_ok) {
-                (None, _) => { c.oldest_ok = prev_oldest_ok; }
-                (Some(curr), Some(prev)) if prev < curr => { c.oldest_ok = Some(prev); }
-                (Some(curr), _) => { prev_oldest_ok = Some(curr); }
+            if let Some(prev_oldest_ok) = prev_oldest_ok {
+                c.add_compat(prev_oldest_ok, Compat::ProbablyWorks);
             }
+            prev_oldest_ok = c.oldest_ok();
         }
 
         // assume that once support for old Rust is dropped, it's not restored
         let mut prev_newest_bad = None;
-        for c in compat.values_mut() {
+        for (ver, c) in compat.iter_mut() {
             // if it never built, it may be garbage data
-            if c.oldest_ok.is_none() {
-                c.newest_bad = None;
+            if !c.has_ever_built() {
+                c.bad.clear();
             }
 
-            if let (Some(prev_bad), Some(oldest_ok)) = (prev_newest_bad, c.oldest_ok) {
+            if let (Some((prev_bad, _)), Some(oldest_ok)) = (prev_newest_bad, c.oldest_ok()) {
                 // bad data or unexpected change in compatibility?
                 if prev_bad >= oldest_ok {
                     prev_newest_bad = None;
                 }
             }
 
-            match (c.newest_bad, prev_newest_bad) {
-                (None, _) => { c.newest_bad = prev_newest_bad; }
-                (Some(curr), Some(prev)) if prev > curr => { c.newest_bad = Some(prev); }
-                (Some(curr), _) => { prev_newest_bad = Some(curr); }
+            if let Some((prev_newest_bad, compat)) = prev_newest_bad {
+                c.add_compat(prev_newest_bad, match compat {
+                    Compat::VerifiedWorks => Compat::ProbablyWorks,
+                    Compat::DefinitelyIncompatible | Compat::LikelyIncompatible => Compat::SuspectedIncompatible,
+                    other => other,
+                });
+            }
+
+            // skip over prerelease versions, because breakage during beta may not be indicative of stable versions
+            if ver.pre.is_empty() {
+                prev_newest_bad = c.newest_bad_compat();
             }
 
             // fix data after all the changes
-            if let (Some(oldest_ok), Some(newest_ok)) = (c.oldest_ok, c.newest_ok) {
-                if newest_ok < oldest_ok {
-                    c.newest_ok = Some(oldest_ok);
-                }
-            }
+            c.normalize();
         }
     }
 
@@ -234,36 +319,9 @@ impl BuildDb {
     }
 
     fn append_compat(by_ver: &mut CompatByCrateVersion, c: CompatibilityInfo) {
-        let t = by_ver.entry(c.crate_version).or_insert_with(CompatRange::default);
-
-        let rustc_version = c.rustc_version;
-        match c.compat {
-            Compat::VerifiedWorks | Compat::ProbablyWorks => {
-                if t.oldest_ok.map_or(true, |v| rustc_version < v) {
-                    t.oldest_ok = Some(rustc_version);
-                    if c.compat != Compat::ProbablyWorks {
-                        t.oldest_ok_raw = Some(rustc_version);
-                    }
-                }
-                else if t.newest_ok.map_or(true, |v| rustc_version > v) {
-                    t.newest_ok = Some(rustc_version);
-                }
-            },
-            Compat::LikelyIncompatible | Compat::SuspectedIncompatible | Compat::DefinitelyIncompatible => {
-                if t.newest_bad_raw.map_or(true, |v| rustc_version > v) {
-                    t.newest_bad_raw = Some(rustc_version);
-                }
-            },
-            Compat::BrokenDeps => {
-                if t.newest_bad.map_or(true, |v| rustc_version > v) {
-                    t.newest_bad = Some(rustc_version);
-                }
-            },
-        }
-
-        if t.newest_bad.map_or(true, |v| v < t.newest_bad_raw.unwrap_or(0)) {
-            t.newest_bad = t.newest_bad_raw;
-        }
+        by_ver.entry(c.crate_version)
+            .or_insert_with(CompatRanges::default)
+            .add_compat(c.rustc_version, c.compat);
     }
 
     fn compat_row(row: &Row) -> Result<CompatibilityInfo> {
@@ -287,15 +345,15 @@ impl BuildDb {
             for (crate_ver, c) in &compat {
                 // there are pre-rust-1.0 crates that are broken in their 1.0 versions
                 if !seen_any_ok_build {
-                    if c.oldest_ok.is_some() || c.newest_ok.is_some() {
+                    if c.has_ever_built() {
                         seen_any_ok_build = true;
-                    } else if c.newest_bad.is_some() {
+                    } else if c.newest_bad().is_some() {
                         old_crates_broken_up_to = Some(crate_ver);
                     }
                 }
-                if let Some(v) = c.oldest_ok {rustc_versions.insert(v);}
-                if let Some(v) = c.newest_bad {rustc_versions.insert(v);}
-                if let Some(v) = c.newest_ok {rustc_versions.insert(v);}
+                for v in c.all_rustc_versions() {
+                    rustc_versions.insert(v);
+                }
             }
             // if everything is broken, we just don't know if it's a pre-1.0 problem or bad crate.
             // assume only 0.x crates are rotten. If someone released 1.x then it should have been usable!
@@ -305,14 +363,14 @@ impl BuildDb {
             let rustc_versions = rustc_versions.into_iter().map(|rv| {
                 let crate_oldest_bad = compat.iter()
                     .filter(|(crate_ver, _)| old_crates_broken_up_to.map_or(true, |b| *crate_ver > b))
-                    .filter(|(_, rustc)| rustc.newest_bad.map_or(true, |v| rv <= v))
+                    .filter(|(_, rustc)| rustc.newest_bad().map_or(true, |v| rv <= v))
                     .map(|(crate_ver, _)| crate_ver).min();
                 let crate_newest_bad = compat.iter()
-                    .filter(|(_, rustc)| rustc.newest_bad.map_or(true, |v| rv <= v))
+                    .filter(|(_, rustc)| rustc.newest_bad().map_or(true, |v| rv <= v))
                     .map(|(crate_ver, _)| crate_ver).max();
                 let crate_newest_ok = compat.iter()
                     .filter(|(crate_ver, _)| old_crates_broken_up_to.map_or(true, |b| *crate_ver > b))
-                    .filter(|(_, rustc)| rustc.oldest_ok.map_or(true, |v| rv >= v))
+                    .filter(|(_, rustc)| rustc.oldest_ok().map_or(true, |v| rv >= v))
                     .map(|(crate_ver, _)| crate_ver).max();
                 (rv, RustcCompatRange {
                     crate_newest_bad: crate_newest_bad.cloned(),
@@ -344,7 +402,7 @@ impl BuildDb {
                 let origin_str = origin.to_str();
 
                 let existing = get.query_row(&[origin_str.as_str(), &ver, &rustc_version], |row| {
-                    Ok(Compat::from_str(row.get_ref_unwrap(2).as_str()?))
+                    Ok(Compat::from_str(row.get_ref_unwrap(0).as_str()?))
                 });
                 match existing {
                     Ok(existing) => {

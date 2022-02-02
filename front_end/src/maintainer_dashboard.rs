@@ -75,6 +75,10 @@ impl<'a> MaintainerDashboard<'a> {
         sort_by_severity(top);
         sort_by_severity(rest);
 
+        if !warnings.is_empty() && warnings.iter().all(|(_, _, w)| w.iter().all(|w| w.title == "Internal error")) {
+            return Err(anyhow::anyhow!("Temporary error fetching crates. Please try again."));
+        }
+
         Ok(Self {
             aut,
             markup,

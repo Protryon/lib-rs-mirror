@@ -48,7 +48,7 @@ impl<'a> MaintainerDashboard<'a> {
         rows.sort_by(|a, b| b.latest_release.cmp(&a.latest_release));
         rows.truncate(400);
 
-        let deadline = Instant::now() + Duration::from_secs(10);
+        let deadline = Instant::now() + Duration::from_secs(12);
         let tmp: Vec<_> = Self::look_up(kitchen_sink, rows, deadline)
             .map(move |(origin, crate_ranking, res)| elaborate_warnings(origin, crate_ranking, res, urler, kitchen_sink, deadline))
             .buffered(8)

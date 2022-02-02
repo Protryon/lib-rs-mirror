@@ -1,12 +1,11 @@
-use std::borrow::Cow;
+use kitchen_sink::SemVer;
 use std::collections::HashMap;
-use crate_db::builddb::Compat;
+use crate_db::builddb::{Compat, RustcMinorVersion};
 use regex::Regex;
 use serde_derive::*;
 use std::collections::HashSet;
 
 pub const DIVIDER: &str = "---XBdt8MQTMWYwcSsHz---";
-
 
 #[derive(Deserialize)]
 pub struct CompilerMessageInner {
@@ -34,8 +33,8 @@ pub struct CompilerMessage {
 
 #[derive(Default, Debug)]
 pub struct Findings {
-    pub crates: HashSet<(Option<Cow<'static, str>>, String, String, Compat)>,
-    pub rustc_version: Option<String>,
+    pub crates: HashSet<(Option<RustcMinorVersion>, String, SemVer, Compat)>,
+    pub rustc_version: Option<RustcMinorVersion>,
     pub check_time: Option<f32>,
 }
 
@@ -542,7 +541,9 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
         eprintln!("----------\nBad first line {}", first_line);
         return None;
     }
-    findings.rustc_version = Some(fl.next()?.to_owned());
+    let rustc_version_semver = SemVer::parse(fl.next()?).ok()?;
+    assert_eq!(rustc_version_semver.major, 1);
+    findings.rustc_version = Some(rustc_version_semver.minor as u16);
     let top_level_crate_name = fl.next()?;
     let top_level_crate_ver = fl.next()?;
 

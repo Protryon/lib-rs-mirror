@@ -132,7 +132,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 existing_info.retain(|inf| inf.crate_version == x.ver);
 
                 let possible_rusts = available_rust_versions.iter().enumerate().map(|(i, v)| {
-                    (i, v, SemVer::parse(v).unwrap().minor as u16)
+                    (i, v, SemVer::parse(v).unwrap().minor as RustcMinorVersion)
                 })
                 .filter(|&(_, _, minor)| {
                     minor > min_ver && minor < max_ver

@@ -42,13 +42,13 @@ pub fn parse_analyses(stdout: &str, stderr: &str) -> Vec<Findings> {
     let divider = format!("{}\n", DIVIDER);
 
     stdout.split(&divider).zip(stderr.split(&divider))
-        .filter_map(|(out, err)| parse_analysis(out, err)).collect()
+        .filter_map(|(out, err)| parse_analysis(out, err).map_err(|e| eprintln!("{}", e)).ok()).collect()
 }
 
-fn parse_package_id(id: Option<&str>) -> Option<(String, String)> {
+fn parse_package_id(id: Option<&str>) -> Option<(String, SemVer)> {
     let mut parts = id?.splitn(3, ' ');
     let name = parts.next()?.to_owned();
-    let ver = parts.next()?.to_owned();
+    let ver = SemVer::parse(parts.next()?).ok()?;
     let rest = parts.next()?;
     if !rest.starts_with('(') {
         return None;
@@ -523,10 +523,10 @@ const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 462] = [
 (60, "vec_spare_capacity"),
 ];
 
-fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
+fn parse_analysis(stdout: &str, stderr: &str) -> Result<Findings, String> {
     let stdout = stdout.trim();
     if stdout.is_empty() {
-        return None;
+        return Err("no input".into());
     }
 
     let feature_flags: HashMap<_,_> = RUSTC_FEATURES_STABLE_SINCE.iter().map(|&(v, k)| (k, v)).collect();
@@ -535,17 +535,16 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
     let user_time = Regex::new(r"^user\s+(\d+)m(\d+\.\d+)s$").expect("regex");
 
     let mut lines = stdout.split('\n');
-    let first_line = lines.next()?;
+    let first_line = lines.next().ok_or("no first line!?")?;
     let mut fl = first_line.split(' ');
     if fl.next().unwrap() != "CHECKING" {
-        eprintln!("----------\nBad first line {}", first_line);
-        return None;
+        return Err(format!("----------\nBad first line {}", first_line));
     }
-    let rustc_version_semver = SemVer::parse(fl.next()?).ok()?;
+    let rustc_version_semver = SemVer::parse(fl.next().ok_or("first line 1")?).map_err(|e| e.to_string())?;
     assert_eq!(rustc_version_semver.major, 1);
     findings.rustc_version = Some(rustc_version_semver.minor as u16);
-    let top_level_crate_name = fl.next()?;
-    let top_level_crate_ver = fl.next()?;
+    let top_level_crate_name = fl.next().ok_or("no top-level crate name")?;
+    let top_level_crate_ver = SemVer::parse(fl.next().ok_or("first line 2")?).map_err(|e| e.to_string())?;
 
     let mut printed = HashSet::new();
     for line in lines.filter(|l| l.starts_with('{')) {
@@ -575,45 +574,43 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                         desc.contains("No such file or directory") ||
                         desc.starts_with("error: could not parse/generate dep") ||
                         desc.starts_with("couldn't create a temp dir:") {
-                        eprintln!("• err: broken build, ignoring: {}", desc);
-                        return None; // oops, our bad
+                        return Err(format!("• err: broken build, ignoring: {}", desc)); // oops, our bad
                     }
 
                     if desc.starts_with("`#![feature]` may not be used on the stable release channel") {
-                        eprintln!("Nightly crate (or unstable features enabled), can't check");
-                        return None;
+                        return Err(format!("Nightly crate (or unstable features enabled), can't check"));
                     }
 
                     if let Some(feat) = desc.strip_prefix("use of unstable library feature '") {
                         let feat = feat.splitn(2, '\'').next().unwrap();
                         if let Some(rustc_min) = feature_flags.get(feat) {
                             eprintln!("found feature {} >= {} ({} {})", feat, rustc_min, name, ver);
-                            findings.crates.insert((Some(format!("1.{}.0", rustc_min-1).into()), name.clone(), ver.clone(), Compat::Incompatible));
+                            findings.crates.insert((Some(rustc_min-1), name.clone(), ver.clone(), Compat::Incompatible));
                         } else {
                             eprintln!("• err: unknown feature !? {}", feat);
                         }
                     }
                     else if desc.starts_with("associated constants are experimental") {
-                        findings.crates.insert((Some("1.19.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some(19), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("no method named `trim_start`") ||
                         desc.starts_with("`crate` in paths is experimental") ||
                         desc.starts_with("no method named `trim_start_matches` found for type `std::") {
-                        findings.crates.insert((Some("1.29.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some(29), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("use of unstable library feature 'split_ascii_whitespace") ||
                         desc.starts_with("unresolved import `core::convert::Infallible`") ||
                         desc.starts_with("cannot find type `NonZeroI") ||
                         desc.starts_with("cannot find trait `TryFrom` in this") ||
                         desc.starts_with("use of unstable library feature 'const_integer_atomics") {
-                        findings.crates.insert((Some("1.33.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some(33), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("cannot find trait `Unpin` in this scope") ||
                         desc.starts_with("use of unstable library feature 'pin'") {
-                        findings.crates.insert((Some("1.32.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some(32), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("const fn is unstable") {
-                        findings.crates.insert((Some("1.30.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some(30), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("use of unstable library feature 'int_to_from_bytes") ||
                         desc.starts_with("`core::mem::size_of` is not yet stable as a const fn") ||
@@ -621,32 +618,32 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                         desc.contains(">::to_be` is not yet stable as a const fn") ||
                         desc.contains(">::to_le` is not yet stable as a const fn") ||
                         desc.contains(">::from_le` is not yet stable as a const fn") {
-                        findings.crates.insert((Some("1.31.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some(31), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("unresolved import `std::ops::RangeBounds`") ||
                         desc.starts_with("the `#[repr(transparent)]` attribute is experimental") ||
                         desc.starts_with("unresolved import `std::alloc::Layout") {
-                        findings.crates.insert((Some("1.27.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some(27), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("no method named `align_to` found for type `&") ||
                         desc.starts_with("no method named `trim_end` found for type `&str`") ||
                         desc.starts_with("scoped attribute `rustfmt::skip` is experimental") {
-                        findings.crates.insert((Some("1.29.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some(29), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("`dyn Trait` syntax is unstable") ||
                         desc.starts_with("unresolved import `self::std::hint`") ||
                         desc.starts_with("`cfg(target_feature)` is experimental and subject") {
-                        findings.crates.insert((Some("1.26.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some(26), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("128-bit type is unstable") ||
                         desc.starts_with("128-bit integers are not stable") ||
                         desc.starts_with("underscore lifetimes are unstable") ||
                         desc.starts_with("`..=` syntax in patterns is experimental") ||
                         desc.starts_with("inclusive range syntax is experimental") {
-                        findings.crates.insert((Some("1.25.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some(25), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("unresolved import `std::ptr::NonNull`") {
-                        findings.crates.insert((Some("1.24.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some(24), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("use of unstable library feature 'maybe_uninit'") ||
                         desc.starts_with("no function or associated item named `uninit` found for type `core::me") ||
@@ -660,20 +657,20 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                         desc.starts_with("unresolved import `std::task::Context`") ||
                         desc.starts_with("unresolved imports `io::IoSlice") ||
                         desc.starts_with("unresolved import `std::io::IoSlice") {
-                        findings.crates.insert((Some("1.35.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some(35), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("use of unstable library feature 'matches_macro'") ||
                         desc.starts_with("cannot find macro `matches!`") ||
                         desc.starts_with("cannot find macro `matches` in") ||
                         desc.starts_with("no associated item named `MAX` found for type `u") ||
                         desc.starts_with("no associated item named `MIN` found for type `u") {
-                        findings.crates.insert((Some("1.41.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some(41), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("arbitrary `self` types are unstable") ||
                         desc.contains("type of `self` without the `arbitrary_self_types`") ||
                         desc.contains("no method named `map_or` found for type `std::result::Result") ||
                         desc.contains("unexpected `self` parameter in function") {
-                        findings.crates.insert((Some("1.40.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some(40), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("no associated item named `MAX` found for type `u") ||
                         desc.starts_with("attributes are not yet allowed on `if` expressions") ||
@@ -683,27 +680,27 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                         desc.starts_with("no associated item named `MIN` found for type `i") ||
                         desc.starts_with("no associated item named `MIN` found for type `u") ||
                         desc.starts_with("no associated item named `MAX` found for type `i") {
-                        findings.crates.insert((Some("1.42.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some(42), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("no method named `strip_prefix` found for type `&str`") {
-                        findings.crates.insert((Some("1.44.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some(44), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("use of unstable library feature 'inner_deref'") ||
                         desc.starts_with("arrays only have std trait implementations for lengths 0..=32") {
-                        findings.crates.insert((Some("1.46.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some(46), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("#[doc(alias = \"...\")] is experimental") {
-                        findings.crates.insert((Some("1.47.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some(47), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("unions with non-`Copy` fields are unstable") {
-                        findings.crates.insert((Some("1.48.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some(48), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("const generics are unstable") ||
                         desc.starts_with("const generics in any position are currently unsupported") {
-                        findings.crates.insert((Some("1.49.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some(49), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("no method named `fill_with` found for mutable reference `&mut [") {
-                        findings.crates.insert((Some("1.50.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some(50), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("the `#[track_caller]` attribute is an experimental") ||
                         desc.starts_with("`while` is not allowed in a `const fn`") ||
@@ -713,7 +710,7 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                         desc.starts_with("loops are not allowed in const fn") ||
                         desc.starts_with("`if`, `match`, `&&` and `||` are not stable in const fn") ||
                         desc.starts_with("`match` is not allowed in a `const fn`") {
-                        findings.crates.insert((Some("1.45.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some(45), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("use of unstable library feature 'ptr_cast") ||
                        desc.starts_with("unresolved import `core::any::type_name") ||
@@ -722,7 +719,7 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                        desc.starts_with("cannot find function `type_name` in module `std::any") ||
                        desc.starts_with("no method named `cast` found for type `*") ||
                        desc.starts_with("use of unstable library feature 'euclidean_division") {
-                        findings.crates.insert((Some("1.37.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some(37), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("use of unstable library feature 'option_flattening") ||
                         desc.starts_with("cannot find function `take` in module `mem") ||
@@ -738,19 +735,19 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                         desc.starts_with("the `#[non_exhaustive]` attribute is an experimental") ||
                         desc.starts_with("syntax for subslices in slice patterns is not yet stabilized") ||
                         desc.starts_with("non exhaustive is an experimental feature") {
-                        findings.crates.insert((Some("1.39.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some(39), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("cannot bind by-move into a pattern") ||
                         desc.starts_with("async/await is unstable") ||
                         desc.starts_with("async blocks are unstable") ||
                         desc.starts_with("`await` is a keyword in the 2018 edition") ||
                         desc.starts_with("async fn is unstable") {
-                        findings.crates.insert((Some("1.38.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some(38), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("use of unstable library feature 'copy_within") ||
                        desc.starts_with("naming constants with `_` is unstable") ||
                        desc.starts_with("enum variants on type aliases are experimental") {
-                        findings.crates.insert((Some("1.36.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                        findings.crates.insert((Some(36), name.clone(), ver.clone(), Compat::Incompatible));
                     }
                     else if desc.starts_with("For more information about an error") ||
                         desc.starts_with("Some errors have detailed explanations") ||
@@ -767,10 +764,10 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
                 }
 
                 if msg.target.as_ref().and_then(|t| t.edition.as_ref()).map_or(false, |e| e == "2018") {
-                    findings.crates.insert((Some("1.30.1".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                    findings.crates.insert((Some(30), name.clone(), ver.clone(), Compat::Incompatible));
                 }
                 if msg.target.as_ref().and_then(|t| t.edition.as_ref()).map_or(false, |e| e == "2021") {
-                    findings.crates.insert((Some("1.55.0".into()), name.clone(), ver.clone(), Compat::Incompatible));
+                    findings.crates.insert((Some(55), name.clone(), ver.clone(), Compat::Incompatible));
                 }
                 if level == "error" {
                     findings.crates.insert((None, name, ver, Compat::Incompatible));
@@ -793,7 +790,7 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
         }
     }
 
-    let mut last_broken_manifest_crate: Option<(String, String)> = None;
+    let mut last_broken_manifest_crate: Option<(String, SemVer)> = None;
     for line in stderr.split('\n') {
         if line.trim_start().starts_with("error:") || // there may be multiple errors, not all referring to the last known crate
         line.starts_with("  process didn't exit successfully:") || // handled elsewhere
@@ -803,41 +800,43 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
         else if let Some(rest) = line.strip_prefix("  failed to parse manifest at `/home/rustyuser/.cargo/registry/src/github.com-1ecc6299db9ec823/") {
             let pattern = regex::Regex::new(r"([^.+/; ]+?)-([0-9]+\.[^/; ]+)/Cargo.toml").expect("regex syntax");
             if let Some(cap) = pattern.captures(rest) {
-                last_broken_manifest_crate = Some((cap[1].to_string(), cap[2].to_string()));
+                if let Ok(ver) = SemVer::parse(&cap[2]) {
+                    last_broken_manifest_crate = Some((cap[1].to_string(), ver));
+                }
             } else {
                 log::error!("bad crate name in path? {}", rest);
             }
         }
         else if line.starts_with("  feature `profile-overrides` is required") {
             if let Some((name, ver)) = last_broken_manifest_crate.take() {
-                findings.crates.insert((Some("1.40.0".into()), name, ver, Compat::Incompatible));
+                findings.crates.insert((Some(40), name, ver, Compat::Incompatible));
             }
         }
         else if line.starts_with("  invalid type: boolean `true`, expected a string for key `package.readme`") {
             if let Some((name, ver)) = last_broken_manifest_crate.take() {
-                findings.crates.insert((Some("1.45.0".into()), name, ver, Compat::Incompatible)); // not sure which version, may be a later one
+                findings.crates.insert((Some(45), name, ver, Compat::Incompatible)); // not sure which version, may be a later one
             }
         }
         else if line.starts_with("  feature `default-run` is required") {
             if let Some((name, ver)) = last_broken_manifest_crate.take() {
-                findings.crates.insert((Some("1.36.0".into()), name, ver, Compat::Incompatible));
+                findings.crates.insert((Some(36), name, ver, Compat::Incompatible));
             }
         }
         else if line.starts_with("  editions are unstable") || line.starts_with("  feature `rename-dependency` is required") {
             if let Some((name, ver)) = last_broken_manifest_crate.take() {
-                findings.crates.insert((Some("1.30.0".into()), name, ver, Compat::Incompatible));
+                findings.crates.insert((Some(30), name, ver, Compat::Incompatible));
             }
         }
         else if line.starts_with("  unknown cargo feature `resolver`") || line.starts_with("  feature `resolver` is required") {
             if let Some((name, ver)) = last_broken_manifest_crate.take() {
-                findings.crates.insert((Some("1.50.0".into()), name, ver, Compat::Incompatible));
+                findings.crates.insert((Some(50), name, ver, Compat::Incompatible));
             }
         }
         else if line.starts_with("  this version of Cargo is older than the `2021` edition") ||
         line.starts_with("  supported edition values are `2015` or `2018`, but `2021` is unknown") ||
         line.starts_with("  feature `edition2021` is required") {
             if let Some((name, ver)) = last_broken_manifest_crate.take() {
-                findings.crates.insert((Some("1.55.0".into()), name, ver, Compat::Incompatible));
+                findings.crates.insert((Some(55), name, ver, Compat::Incompatible));
             }
         }
         else if let Some(c) = user_time.captures(line) {
@@ -847,7 +846,7 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
         }
     }
     if findings.crates.is_empty() {
-        return None;
+        return Err("no info found".into());
     }
 
     // this is slightly inaccurate, because we don't know if older deps would work
@@ -857,7 +856,7 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Option<Findings> {
     if !has_toplevel_crate_compat && some_deps_broken {
         findings.crates.insert((None, top_level_crate_name.to_owned(), top_level_crate_ver.to_owned(), Compat::BrokenDeps));
     }
-    Some(findings)
+    Ok(findings)
 }
 
 #[test]
@@ -884,13 +883,13 @@ Caused by:
   failed to parse manifest at `/home/rustyuser/.cargo/registry/src/github.com-1ecc6299db9ec823/search-autocompletion-0.3.0/Cargo.toml`
 "##;
 
-    let f = parse_analysis("CHECKING 1.37.0 wat ever", stderr).unwrap();
+    let f = parse_analysis("CHECKING 1.37.0 watever 1.2.3", stderr).unwrap();
 
     assert_eq!(f.crates.len(), 1);
     let f = f.crates.into_iter().next().unwrap();
-    assert_eq!("1.40.0", f.0.unwrap());
+    assert_eq!(40, f.0.unwrap());
     assert_eq!("search-autocompletion", f.1);
-    assert_eq!("0.3.0", f.2);
+    assert_eq!("0.3.0", f.2.to_string());
 }
 
 #[test]
@@ -899,12 +898,12 @@ fn parse_test() {
 
 garbage
 ---XBdt8MQTMWYwcSsHz---
-CHECKING 1.37.0 wat ever
+CHECKING 1.37.0 wat 6.7.8
 
 {"reason":"compiler-artifact","package_id":"proc_vector2d 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)","target":{"kind":["proc-macro"],"crate_types":["proc-macro"],"name":"proc_vector2d","src_path":"/usr/local/cargo/registry/src/-18c1fa267ed022ff/proc_vector2d-1.0.2/src/lib.rs","edition":"2018","doctest":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/tmp/cargo-target-dir/debug/deps/libproc_vector2d-a0e1c737778cdd0d.so"],"executable":null,"fresh":false}
 {"reason":"compiler-artifact","package_id":"vector2d 2.2.0 (path+file:///crate)","target":{"kind":["lib"],"crate_types":["lib"],"name":"vector2d","src_path":"/crate/src/lib.rs","edition":"2018","doctest":true},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/tmp/cargo-target-dir/debug/deps/libvector2d-f9ac6cbd40409fbe.rmeta"],"executable":null,"fresh":false}
 ---XBdt8MQTMWYwcSsHz---
-CHECKING 1.34.2 wat ever
+CHECKING 1.34.2 wat 6.7.8
 
 {"reason":"compiler-artifact","package_id":"proc_vector2d 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)","target":{"kind":["proc-macro"],"crate_types":["proc-macro"],"name":"proc_vector2d","src_path":"/usr/local/cargo/registry/src/-18c1fa267ed022ff/proc_vector2d-1.0.2/src/lib.rs","edition":"2018"},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/tmp/cargo-target-dir/debug/deps/libproc_vector2d-9470d66afa730e34.so"],"executable":null,"fresh":false}
 {"reason":"compiler-artifact","package_id":"vector2d 2.2.0 (path+file:///crate)","target":{"kind":["lib"],"crate_types":["lib"],"name":"vector2d","src_path":"/crate/src/lib.rs","edition":"2018"},"profile":{"opt_level":"0","debuginfo":2,"debug_assertions":true,"overflow_checks":true,"test":false},"features":[],"filenames":["/tmp/cargo-target-dir/debug/deps/libvector2d-59c2022ebc0120a6.rmeta"],"executable":null,"fresh":false}
@@ -961,11 +960,11 @@ exit failure
 "##;
 
     let res = parse_analyses(out, err);
-    assert!(res[0].crates.get(&(None, "vector2d".into(), "2.2.0".into(), Compat::VerifiedWorks)).is_some());
+    assert!(res[0].crates.get(&(None, "vector2d".into(), "2.2.0".parse().unwrap(), Compat::VerifiedWorks)).is_some(), "{:#?}", res);
     assert!((res[0].check_time.unwrap() - 0.880) < 0.001);
-    assert!(res[0].crates.get(&(Some("1.30.1".into()), "proc_vector2d".into(), "1.0.2".into(), Compat::Incompatible)).is_some());
-    assert!(res[1].crates.get(&(None, "vector2d".into(), "2.2.0".into(), Compat::VerifiedWorks)).is_some());
-    assert!(res[1].crates.get(&(Some("1.30.1".into()), "proc_vector2d".into(), "1.0.2".into(), Compat::Incompatible)).is_some());
-    assert!(res[2].crates.get(&(None, "proc_vector2d".into(), "1.0.2".into(), Compat::Incompatible)).is_some());
-    assert!(res[2].crates.get(&(None, "toplevelcrate".into(), "1.0.1-testcrate".into(), Compat::BrokenDeps)).is_some());
+    assert!(res[0].crates.get(&(Some(30), "proc_vector2d".into(), "1.0.2".parse().unwrap(), Compat::Incompatible)).is_some());
+    assert!(res[1].crates.get(&(None, "vector2d".into(), "2.2.0".parse().unwrap(), Compat::VerifiedWorks)).is_some());
+    assert!(res[1].crates.get(&(Some(30), "proc_vector2d".into(), "1.0.2".parse().unwrap(), Compat::Incompatible)).is_some());
+    assert!(res[2].crates.get(&(None, "proc_vector2d".into(), "1.0.2".parse().unwrap(), Compat::Incompatible)).is_some());
+    assert!(res[2].crates.get(&(None, "toplevelcrate".into(), "1.0.1-testcrate".parse().unwrap(), Compat::BrokenDeps)).is_some());
 }

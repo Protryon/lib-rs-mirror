@@ -309,7 +309,7 @@ impl BuildDb {
     }
 
 
-    pub fn set_compat_multi(&self, rows: &[(&Origin, &str, &str, Compat)]) -> Result<()> {
+    pub fn set_compat_multi(&self, rows: &[(&Origin, &SemVer, RustcMinorVersion, Compat)]) -> Result<()> {
         let mut conn = self.conn.lock();
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
         {
@@ -318,19 +318,22 @@ impl BuildDb {
             let mut ins_replace = tx.prepare_cached("INSERT OR REPLACE INTO build_results(origin, version, rustc_version, compat) VALUES(?1, ?2, ?3, ?4)")?;
 
             for (origin, ver, rustc_version, compat) in rows {
+                let ver = ver.to_string();
+                let rustc_version = format!("1.{}.0", rustc_version);
+
                 let origin_str = origin.to_str();
                 let result_str = compat.as_str();
-                clear_speculation.execute(&[origin_str.as_str(), ver, rustc_version])?;
+                clear_speculation.execute(&[origin_str.as_str(), &ver, &rustc_version])?;
                 // these are weak signals, so don't replace good info with them
                 let ins = if *compat != Compat::VerifiedWorks { &mut ins_ignore } else { &mut ins_replace };
-                ins.execute(&[origin_str.as_str(), ver, rustc_version, result_str])?;
+                ins.execute(&[origin_str.as_str(), &ver, &rustc_version, result_str])?;
             }
         }
         tx.commit()?;
         Ok(())
     }
 
-    pub fn set_compat(&self, origin: &Origin, ver: &str, rustc_version: &str, compat: Compat) -> Result<()> {
+    pub fn set_compat(&self, origin: &Origin, ver: &SemVer, rustc_version: RustcMinorVersion, compat: Compat) -> Result<()> {
         self.set_compat_multi(&[(origin, ver, rustc_version, compat)])
     }
 }

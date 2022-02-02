@@ -2262,8 +2262,8 @@ impl KitchenSink {
 
         if msrv > 1 {
             debug!("Detected {:?} as msrv 1.{}", origin, msrv);
-            let latest_bad_rustc = format!("1.{}.0", msrv - 1);
-            db.set_compat(origin, &package.version, &latest_bad_rustc, Compat::Incompatible)?;
+            let latest_bad_rustc = msrv - 1;
+            db.set_compat(origin, &SemVer::parse(&package.version)?, latest_bad_rustc, Compat::Incompatible)?;
         }
         Ok(())
     }
@@ -2385,7 +2385,7 @@ impl KitchenSink {
                                 debug!("{} {} MSRV went from {} to {} because of https://lib.rs/compat/{} {} = {}", all.name(), crate_ver, c.newest_bad.unwrap_or(0), dep_newest_bad, dep_origin.short_crate_name(), req, dep_found_ver);
                             }
                             c.newest_bad = Some(dep_newest_bad);
-                            let _ = db.set_compat(all.origin(), &crate_ver.to_string(), &format!("1.{}.0", dep_newest_bad), Compat::BrokenDeps);
+                            let _ = db.set_compat(all.origin(), &crate_ver, dep_newest_bad, Compat::BrokenDeps);
                         }
                     }
                 }

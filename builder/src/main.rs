@@ -302,8 +302,8 @@ fn run_and_analyze_versions(db: &BuildDb, docker_root: &Path, versions: Vec<(&'s
         if let Some(rustc_version) = f.rustc_version {
             for (rustc_override, name, version, compat) in f.crates {
                 let origin = Origin::from_crates_io_name(&name);
-                let rustc_version = rustc_override.as_deref().unwrap_or(&rustc_version);
-                to_set.entry((rustc_version.to_string(), origin, version))
+                let rustc_version = rustc_override.unwrap_or(rustc_version);
+                to_set.entry((rustc_version, origin, version))
                     .and_modify(|c| {
                         let replace = match (*c, compat) {
                             (Compat::VerifiedWorks, _) => false,
@@ -324,9 +324,9 @@ fn run_and_analyze_versions(db: &BuildDb, docker_root: &Path, versions: Vec<(&'s
     }
 
     let tmp = to_set.iter().map(|((rv, o, cv), c)| {
-        eprintln!("https://lib.rs/compat/{}#{} R.{}={:?}", o.short_crate_name(), cv, rv, c);
-        (o, cv.as_str(), rv.as_str(), *c)
-    }).collect::<Vec<(&Origin, &str, &str, Compat)>>();
+        eprintln!("https://lib.rs/compat/{}#{} R.1.{}={:?}", o.short_crate_name(), cv, rv, c);
+        (o, cv, *rv, *c)
+    }).collect::<Vec<(&Origin, &SemVer, RustcMinorVersion, Compat)>>();
     if db.set_compat_multi(&tmp).is_err() {
         // retry, sqlite is flaky
         db.set_compat_multi(&tmp)?;

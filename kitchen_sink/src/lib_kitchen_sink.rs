@@ -2223,40 +2223,47 @@ impl KitchenSink {
     pub fn index_msrv_from_manifest(&self, origin: &Origin, manifest: &Manifest) -> CResult<()> {
         let db = self.build_db()?;
         let package = manifest.package();
-        let mut msrv = match package.edition {
-            Edition::E2015 => 1u16,
-            Edition::E2018 => 31,
-            Edition::E2021 => 56,
+
+        let (mut msrv, mut reason) = match package.edition {
+            Edition::E2015 => (1u16, "???"),
+            Edition::E2018 => (31, "edition 2018"),
+            Edition::E2021 => (56, "edition 2021"),
         };
 
         if package.default_run.is_some() {
             msrv = msrv.max(37);
-        }
-
-        if let Some(ver) = &package.rust_version {
-            msrv = msrv.max(56); // rust-version added at all
-            if let Some(minor) = ver.split('.').nth(1).and_then(|minor| minor.parse().ok()) {
-                msrv = msrv.max(minor);
-            }
+            reason = "default-run";
         }
 
         // uses Option as iter
         let mut profiles = manifest.profile.release.iter().chain(&manifest.profile.dev).chain(&manifest.profile.test).chain(&manifest.profile.bench).chain(&manifest.profile.doc);
         if profiles.any(|p| p.build_override.is_some() || !p.package.is_empty()) {
             msrv = msrv.max(41);
-        }
-        if profiles.any(|p| p.strip.is_some()) {
-            msrv = msrv.max(59); // FIXME: not released as of yet
+            reason = "build-override";
         }
 
         if matches!(package.resolver, Some(rich_crate::Resolver::V2)) {
             msrv = msrv.max(51);
+            reason = "resolver = 2";
+        }
+
+        if let Some(ver) = &package.rust_version {
+            msrv = msrv.max(56); // rust-version added at all
+            reason = "rust-version";
+            if let Some(minor) = ver.split('.').nth(1).and_then(|minor| minor.parse().ok()) {
+                msrv = msrv.max(minor);
+            }
+        }
+
+        if profiles.any(|p| p.strip.is_some()) {
+            msrv = msrv.max(59); // FIXME: not released as of yet
+            reason = "strip";
         }
 
         if msrv > 1 {
-            debug!("Detected {:?} as msrv 1.{}", origin, msrv);
+            debug!("Detected {:?} as msrv 1.{} ({})", origin, msrv, reason);
             let latest_bad_rustc = msrv - 1;
-            db.set_compat(origin, &SemVer::parse(&package.version)?, latest_bad_rustc, Compat::DefinitelyIncompatible)?;
+            db.set_compat(origin, &SemVer::parse(&package.version)?, latest_bad_rustc, Compat::DefinitelyIncompatible, reason)?;
         }
         Ok(())
     }
@@ -2371,25 +2378,27 @@ impl KitchenSink {
                         .map(|(_, n)| n)
                         .min()
                         .unwrap_or(999);
+
                     if let Some((dep_found_ver, mut dep_newest_bad)) = dep_newest_bad {
                         dep_newest_bad = dep_newest_bad.min(dep_oldest_ok.saturating_sub(1));
 
                         if c.newest_bad().unwrap_or(0) < dep_newest_bad {
-                            // older rust is so borked it's not even worth debug-printing
-                            if dep_newest_bad > 30 {
-                                debug!("{} {} MSRV went from {} to {} because of https://lib.rs/compat/{} {} = {}", all.name(), crate_ver, c.newest_bad().unwrap_or(0), dep_newest_bad, dep_origin.short_crate_name(), req, dep_found_ver);
-                            }
-                            c.add_compat(dep_newest_bad, Compat::BrokenDeps);
+                            debug!("{} {} MSRV went from {} to {} because of https://lib.rs/compat/{} {} = {}", all.name(), crate_ver, c.newest_bad().unwrap_or(0), dep_newest_bad, dep_origin.short_crate_name(), req, dep_found_ver);
+                            if dep_newest_bad > 19 {
+                                c.add_compat(dep_newest_bad, Compat::BrokenDeps);
 
-                            // setting this will make builder skip this version.
-                            // propagate problem only if the failure is certain
-                            let dep_newest_bad_certain = dep_compat.iter()
-                                .filter(|(semver, _)| req.matches(semver))
-                                .filter_map(|(_, compat)| compat.newest_bad_certain())
-                                .min()
-                                .unwrap_or(0);
-                            if c.newest_bad().unwrap_or(0) < dep_newest_bad_certain {
-                                let _ = db.set_compat(all.origin(), &crate_ver, dep_newest_bad, Compat::BrokenDeps);
+                                // setting this will make builder skip this version.
+                                // propagate problem only if the failure is certain, because dep_newest_bad
+                                // may be too pessimistic if the dep lacks positive build data.
+                                let dep_newest_bad_certain = dep_compat.iter()
+                                    .filter(|(semver, _)| req.matches(semver))
+                                    .filter_map(|(_, compat)| compat.newest_bad_certain())
+                                    .min()
+                                    .unwrap_or(0);
+                                if c.newest_bad().unwrap_or(0) < dep_newest_bad_certain {
+                                    let reason = format!("{} {}={} has MSRV {}", dep_origin.short_crate_name(), req, dep_found_ver, dep_newest_bad);
+                                    let _ = db.set_compat(all.origin(), &crate_ver, dep_newest_bad, Compat::BrokenDeps, &reason);
+                                }
                             }
                         }
                     }

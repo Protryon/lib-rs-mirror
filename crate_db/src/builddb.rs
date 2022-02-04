@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::path::Path;
-use log::info;
+use log::{info, error};
 
 pub struct BuildDb {
     pub(crate) conn: Mutex<Connection>,
@@ -19,6 +19,7 @@ pub struct CompatibilityInfo {
     pub rustc_version: RustcMinorVersion, // 1.x.0
     pub crate_version: SemVer,
     pub compat: Compat,
+    pub reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -202,7 +203,8 @@ impl BuildDb {
                 origin TEXT NOT NULL,
                 version TEXT NOT NULL,
                 rustc_version TEXT NOT NULL,
-                compat TEXT NOT NULL
+                compat TEXT NOT NULL,
+                reason TEXT
             );
             CREATE UNIQUE INDEX IF NOT EXISTS build_results_ver on build_results(origin, version, rustc_version);
             ")?;
@@ -213,7 +215,7 @@ impl BuildDb {
 
     pub fn get_compat_raw(&self, origin: &Origin) -> Result<Vec<CompatibilityInfo>> {
         let conn = self.conn.lock();
-        let mut get = conn.prepare_cached(r"SELECT rustc_version, version, compat FROM build_results WHERE origin = ?1")?;
+        let mut get = conn.prepare_cached(r"SELECT rustc_version, version, compat, reason FROM build_results WHERE origin = ?1")?;
         let origin_str = origin.to_str();
         let res = get.query_map(&[origin_str.as_str()], Self::compat_row)?;
         res.collect()
@@ -221,7 +223,7 @@ impl BuildDb {
 
     pub fn get_compat(&self, origin: &Origin) -> Result<CompatByCrateVersion> {
         let conn = self.conn.lock();
-        let mut get = conn.prepare_cached(r"SELECT rustc_version, version, compat FROM build_results WHERE origin = ?1")?;
+        let mut get = conn.prepare_cached(r"SELECT rustc_version, version, compat, reason FROM build_results WHERE origin = ?1")?;
         let origin_str = origin.to_str();
         let mut rows = get.query(&[origin_str.as_str()])?;
         let mut compat = CompatByCrateVersion::new();
@@ -302,14 +304,14 @@ impl BuildDb {
 
     pub fn get_all_compat_by_crate(&self) -> Result<HashMap<Origin, CompatByCrateVersion>> {
         let conn = self.conn.lock();
-        let mut get = conn.prepare_cached(r"SELECT rustc_version, version, compat, origin FROM build_results")?;
+        let mut get = conn.prepare_cached(r"SELECT rustc_version, version, compat, reason, origin FROM build_results")?;
 
         let mut by_crate = HashMap::with_capacity(20000);
 
         let mut rows = get.query([])?;
         while let Some(row) = rows.next()? {
             let compat = Self::compat_row(row)?;
-            let origin = Origin::from_str(row.get_ref(3)?.as_str()?);
+            let origin = Origin::from_str(row.get_ref(4)?.as_str()?);
 
             let mut by_ver = by_crate.entry(origin).or_insert_with(BTreeMap::default);
 
@@ -327,10 +329,13 @@ impl BuildDb {
     fn compat_row(row: &Row) -> Result<CompatibilityInfo> {
         let rustc_version = row.get_ref_unwrap(0).as_str()?;
         let crate_version = row.get_ref_unwrap(1).as_str()?;
+        let compat = Compat::from_str(row.get_ref_unwrap(2).as_str()?);
+        let reason = row.get_unwrap(3);
         Ok(CompatibilityInfo {
             rustc_version: SemVer::parse(rustc_version).map_err(|e| Error::ToSqlConversionFailure(e.into()))?.minor as RustcMinorVersion,
             crate_version: garbage_parse(crate_version),
-            compat: Compat::from_str(row.get_ref_unwrap(2).as_str()?),
+            compat,
+            reason,
         })
     }
 
@@ -387,16 +392,20 @@ impl BuildDb {
     }
 
 
-    pub fn set_compat_multi(&self, rows: &[(&Origin, &SemVer, RustcMinorVersion, Compat)]) -> Result<()> {
+    pub fn set_compat_multi(&self, rows: &[SetCompatMulti]) -> Result<()> {
         let mut conn = self.conn.lock();
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
         {
             let mut get = tx.prepare_cached(r"SELECT compat FROM build_results WHERE origin = ?1 AND version = ?2 AND rustc_version = ?3")?;
-            let mut insert = tx.prepare_cached(r"INSERT OR REPLACE INTO build_results(origin, version, rustc_version, compat) VALUES(?1, ?2, ?3, ?4)")?;
+            let mut insert = tx.prepare_cached(r"INSERT OR REPLACE INTO build_results(origin, version, rustc_version, compat, reason) VALUES(?1, ?2, ?3, ?4, ?5)")?;
 
             let mut to_insert = Vec::with_capacity(rows.len());
 
-            for (origin, ver, rustc_version, new_compat) in rows {
+            for &SetCompatMulti { origin, ver, rustc_version, compat: new_compat, reason } in rows {
+                if rustc_version < 18 {
+                    error!("Bogus compat data: {:?}", (origin, ver, rustc_version, new_compat));
+                    continue;
+                }
                 let ver = ver.to_string();
                 let rustc_version = format!("1.{}.0", rustc_version);
                 let origin_str = origin.to_str();
@@ -406,7 +415,7 @@ impl BuildDb {
                 });
                 match existing {
                     Ok(existing) => {
-                        if existing.is_better(new_compat) {
+                        if existing.is_better(&new_compat) {
                             continue;
                         }
                     },
@@ -414,22 +423,30 @@ impl BuildDb {
                     Err(e) => return Err(e),
                 }
 
-                to_insert.push((origin, origin_str, ver, rustc_version, new_compat));
+                to_insert.push((origin, origin_str, ver, rustc_version, new_compat, reason));
             }
 
-            for (origin, origin_str, ver, rustc_version, new_compat) in to_insert {
-                info!("https://lib.rs/compat/{}#{} R.{}={:?}", origin.short_crate_name(), ver, rustc_version, new_compat);
+            for (origin, origin_str, ver, rustc_version, new_compat, reason) in to_insert {
+                info!("https://lib.rs/compat/{}#{} R.{}={:?} ({})", origin.short_crate_name(), ver, rustc_version, new_compat, reason);
                 let result_str = new_compat.as_char().to_string();
-                insert.execute(&[origin_str.as_str(), &ver, &rustc_version, &result_str])?;
+                insert.execute(&[origin_str.as_str(), &ver, &rustc_version, &result_str, reason])?;
             }
         }
         tx.commit()?;
         Ok(())
     }
 
-    pub fn set_compat(&self, origin: &Origin, ver: &SemVer, rustc_version: RustcMinorVersion, compat: Compat) -> Result<()> {
-        self.set_compat_multi(&[(origin, ver, rustc_version, compat)])
+    pub fn set_compat(&self, origin: &Origin, ver: &SemVer, rustc_version: RustcMinorVersion, compat: Compat, reason: &str) -> Result<()> {
+        self.set_compat_multi(&[SetCompatMulti {origin, ver, rustc_version, compat, reason}])
     }
+}
+
+pub struct SetCompatMulti<'a> {
+    pub origin: &'a Origin,
+    pub ver: &'a SemVer,
+    pub rustc_version: RustcMinorVersion,
+    pub compat: Compat,
+    pub reason: &'a str,
 }
 
 fn garbage_parse(v: &str) -> SemVer {

@@ -136,7 +136,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     !existing_info.iter().any(|inf| inf.rustc_version == v)
                 });
                 let rustc_idx = if !x.rustc.has_ever_built() {
-                    let v = possible_rusts.max_by_key(|&(_, minor)| minor)?; // avoid building 2018 with oldest compiler
+                    let v = possible_rusts.min_by_key(|&(_, &v)| (upper_limit as i32 - v as i32).abs())?; // avoid building 2018 with oldest compiler
                     debug!("{}-{} never built, trying latest R.{}", x.crate_name, x.ver, v.1);
                     v
                 } else {
@@ -166,17 +166,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         eprintln!("builder end");
     });
 
-    let filter = std::env::args().nth(1);
+    let filters: Vec<_> = std::env::args().skip(1).collect();
 
     for all in crates.all_crates_io_crates().values() {
         if stopped() {
             break;
         }
-        if let Some(f) = &filter {
-            if !all.name().contains(f) {
+
+        if filters.len() == 1 {
+            if !all.name().contains(&filters[0]) {
+                continue;
+            }
+        } else if filters.len() > 1 {
+            if !filters.iter().any(|f| f == all.name()) {
                 continue;
             }
         }
+
         if all.versions().len() == 1 || all.versions().len() > 500 {
             continue; // junk?
         }
@@ -209,7 +215,7 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
     let mut rng = rand::thread_rng();
     let mut candidates: Vec<_> = all.versions().iter().rev() // rev() starts from most recent
         .filter(|v| !v.is_yanked())
-        .take(100)
+        .take(10)
         .filter_map(|v| SemVer::parse(v.version()).ok())
         .map(|v| {
             let c = compat_info.remove(&v).unwrap_or_default();
@@ -223,12 +229,16 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
             let no_compat_bottom = compat.newest_bad().is_none();
             let oldest_ok = compat.oldest_ok().unwrap_or(999);
             let newest_bad = compat.newest_bad().unwrap_or(0).max(19); // we don't test rust < 19
+            let oldest_ok_certain = compat.oldest_ok_certain().unwrap_or(999);
+            let newest_bad_certain = compat.newest_bad_likely().unwrap_or(0).max(19); // we don't test rust < 19
             let gap = oldest_ok.saturating_sub(newest_bad) as u32; // unknown version gap
+            let gap_certain = oldest_ok_certain.saturating_sub(newest_bad_certain) as u32; // unknown version gap
             let score = rng.gen_range(0..if has_anything_built_ok_yet { 3 } else { 20 }) // spice it up a bit
+                + gap_certain.min(10)
                 + if gap > 4 { gap * 2 } else { gap }
                 + if gap > 10 { gap } else { 0 }
                 + if !has_ever_built && has_failed && has_anything_built_ok_yet { 15 } else { 0 } // unusable data? try fixing first
-                + if has_ever_built { 0 } else { 1 } // move to better ones
+                + if has_ever_built { 0 } else { 2 } // move to better ones
                 + if newest_bad < compat.newest_bad_certain().unwrap_or(0) { 5 } else { 0 } // really unusable data
                 + if compat.oldest_ok_certain().unwrap_or(999) > oldest_ok { 2 } else { 0 } // haven't really checked min ver yet
                 + if newest_bad > 29 { 1 } else { 0 } // don't want to check old crap
@@ -238,8 +248,8 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
                 + if oldest_ok  > 47 { 2 } else { 0 }
                 + if oldest_ok  > 50 { 8 } else { 0 }
                 + if oldest_ok  > 53 { 8 } else { 0 }
-                + if !v.pre.is_empty() { 0 } else { 2 } // don't waste time testing alphas
-                + if idx == 0 { 10 } else { 0 } // prefer latest
+                + if v.pre.is_empty() { 10 } else { 0 } // don't waste time testing alphas
+                + if idx == 0 { 20 } else { 0 } // prefer latest
                 + 5u32.saturating_sub(idx as u32); // prefer newer
 
             ToCheck {
@@ -256,6 +266,9 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
 
 
     let popularity_factor = if candidates.is_empty() { 0. } else { crates.crate_ranking_for_builder(origin).await.unwrap_or(0.3) };
+    if popularity_factor < 0.2 {
+        return Ok(vec![]);
+    }
 
     for c in candidates.iter_mut() {
         c.score = (c.score as f64 * popularity_factor) as u32;
@@ -264,7 +277,7 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
     if has_anything_built_ok_yet {
         // biggest gap, then latest ver
         candidates.sort_unstable_by(|a,b| b.score.cmp(&a.score).then(b.ver.cmp(&a.ver)));
-        candidates.truncate(5);
+        candidates.truncate(4);
     } else {
         candidates.shuffle(&mut rng); // dunno which versions will build
         candidates.truncate(10); // don't waste time on broken crates
@@ -279,7 +292,6 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
     Ok(candidates)
 }
 
-
 fn run_and_analyze_versions(db: &BuildDb, docker_root: &Path, versions: Vec<(RustcMinorVersion, Arc<str>, SemVer)>) -> Result<(), Box<dyn std::error::Error>> {
     if versions.is_empty() {
         return Ok(());
@@ -290,11 +302,11 @@ fn run_and_analyze_versions(db: &BuildDb, docker_root: &Path, versions: Vec<(Rus
     let mut to_set = BTreeMap::new();
     for f in parse_analyses(&stdout, &stderr) {
         if let Some(rustc_version) = f.rustc_version {
-            for (rustc_override, crate_name, crate_version, new_compat) in f.crates {
+            for (rustc_override, crate_name, crate_version, new_compat, reason) in f.crates {
                 let origin = Origin::from_crates_io_name(&crate_name);
                 let rustc_version = rustc_override.unwrap_or(rustc_version);
 
-                to_set.entry((rustc_version, origin, crate_version))
+                to_set.entry((rustc_version, origin, crate_version, reason))
                     .and_modify(|existing_compat: &mut Compat| {
                         if new_compat.is_better(&existing_compat) {
                             *existing_compat = new_compat;
@@ -305,9 +317,9 @@ fn run_and_analyze_versions(db: &BuildDb, docker_root: &Path, versions: Vec<(Rus
         }
     }
 
-    let tmp = to_set.iter().map(|((rv, o, cv), c)| {
-        (o, cv, *rv, *c)
-    }).collect::<Vec<(&Origin, &SemVer, RustcMinorVersion, Compat)>>();
+    let tmp = to_set.iter().map(|((rv, o, cv, reason), c)| {
+        (o, cv, *rv, *c, Some(reason.as_str()))
+    }).collect::<Vec<_>>();
     if db.set_compat_multi(&tmp).is_err() {
         // retry, sqlite is flaky
         std::thread::sleep(std::time::Duration::from_secs(1));
@@ -432,8 +444,8 @@ fn do_builds(docker_root: &Path, versions: &[(RustcMinorVersion, Arc<str>, SemVe
         .arg("bash").arg("-c").arg(script)
         .spawn()?;
 
-    let stdout = streamfetch("out", child.stdout.take().unwrap());
-    let stderr = streamfetch("err", child.stderr.take().unwrap());
+    let stdout = streamfetch("stdout", child.stdout.take().unwrap());
+    let stderr = streamfetch("stderr", child.stderr.take().unwrap());
 
     let status = child.wait()?;
 

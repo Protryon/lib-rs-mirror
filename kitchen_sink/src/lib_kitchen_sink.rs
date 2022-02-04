@@ -3387,7 +3387,7 @@ fn fetch_uppercase_name() {
     })).unwrap();
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn index_test() {
     let idx = Index::new(&KitchenSink::data_path().unwrap()).unwrap();
     let stats = idx.deps_stats().await.unwrap();

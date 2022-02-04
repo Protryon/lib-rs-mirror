@@ -1,3 +1,4 @@
+use rayon::prelude::*;
 pub use crates_index::DependencyKind;
 pub use crates_index::Version;
 use crate::deps_stats::DepsStats;
@@ -147,8 +148,9 @@ impl Index {
         let start = Instant::now();
         let crates_io_index = crates_index::Index::with_path(&crates_index_path, "https://github.com/rust-lang/crates.io-index")
         .map_err(|e| DepsErr::Crates(e.to_string()))?;
-        let indexed_crates: FxHashMap<_,_> = crates_io_index.crates()
+        let indexed_crates: FxHashMap<_,_> = crates_io_index.crates_parallel()
                 .filter_map(|c| {
+                    let c = c.unwrap();
                     let name = c.name().to_ascii_lowercase();
                     if name == "test+package" {
                         return None; // crates-io bug

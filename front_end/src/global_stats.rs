@@ -193,7 +193,7 @@ pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSin
             t.insert(0, '≤'); t
         }),
         hs_deps1, hs_deps2,
-        hs_maintenance: Histogram::new(kitchen_sink.get_stats_histogram("maintenance")?.expect("hs_maintenance"), false, &[0, 1, 5, 26, 52, 52*2, 52*3, 52*5, 52*7, 52*9], |n| match n {
+        hs_maintenance: Histogram::new(kitchen_sink.get_stats_histogram("maintenance")?.expect("hs_maintenance"), false, &[0, 1, 5, 26, 52, 52*2, 52*3, 52*5, 52*6, 52*8], |n| match n {
             0 => "one-off".to_string(),
             1 => "≤1 week".to_string(),
             2..=4 => format!("≤{} weeks", n),

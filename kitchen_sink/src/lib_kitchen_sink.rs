@@ -2200,7 +2200,7 @@ impl KitchenSink {
             let created = DateTime::parse_from_rfc3339(&ver.created_at).map_err(|_| KitchenSinkErr::BadRustcCompatData)?;
             if let Some(mut expected_rust) = Self::rustc_release_from_date(&created) {
                 expected_rust += bump_min_expected_rust;
-                c.add_compat(expected_rust, Compat::ProbablyWorks);
+                c.add_compat(expected_rust, Compat::ProbablyWorks, Some("Assumed from release date".into()));
             }
         }
         // this is needed to copy build failures from non-matching versions to matching versions
@@ -2385,7 +2385,8 @@ impl KitchenSink {
                         if c.newest_bad().unwrap_or(0) < dep_newest_bad {
                             debug!("{} {} MSRV went from {} to {} because of https://lib.rs/compat/{} {} = {}", all.name(), crate_ver, c.newest_bad().unwrap_or(0), dep_newest_bad, dep_origin.short_crate_name(), req, dep_found_ver);
                             if dep_newest_bad > 19 {
-                                c.add_compat(dep_newest_bad, Compat::BrokenDeps);
+                                let reason = format!("{} {}={} has MSRV {}", dep_origin.short_crate_name(), req, dep_found_ver, dep_newest_bad);
+                                c.add_compat(dep_newest_bad, Compat::BrokenDeps, Some(reason.clone()));
 
                                 // setting this will make builder skip this version.
                                 // propagate problem only if the failure is certain, because dep_newest_bad
@@ -2396,7 +2397,6 @@ impl KitchenSink {
                                     .min()
                                     .unwrap_or(0);
                                 if c.newest_bad().unwrap_or(0) < dep_newest_bad_certain {
-                                    let reason = format!("{} {}={} has MSRV {}", dep_origin.short_crate_name(), req, dep_found_ver, dep_newest_bad);
                                     let _ = db.set_compat(all.origin(), &crate_ver, dep_newest_bad, Compat::BrokenDeps, &reason);
                                 }
                             }

@@ -788,8 +788,12 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Result<Findings, String> {
                 let (compat, reason) = if success {
                     (Compat::ProbablyWorks, "bin?".into())
                 } else {
-                    (Compat::BrokenDeps, findings.crates.iter().filter_map(|(_, name, ver, c, reason)| {
+                    (Compat::BrokenDeps, findings.crates.iter().filter_map(|(rustc_ver, name, ver, c, reason)| {
                         if c.successful() { return None; }
+                        match (findings.rustc_version, *rustc_ver) {
+                            (Some(build), Some(other)) if other < build => return None,
+                            _ => {},
+                        };
                         Some(format!("{}@{}: {}", name, ver, reason))
                     }).collect::<Vec<_>>().join("\n"))
                 };
@@ -866,8 +870,12 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Result<Findings, String> {
     let has_toplevel_crate_compat = findings.crates.iter().any(|c| c.1 == top_level_crate_name);
     let some_deps_broken = findings.crates.iter().any(|c| c.0.is_none() && !c.3.successful());
     if !has_toplevel_crate_compat && some_deps_broken {
-        let reason = findings.crates.iter().filter_map(|(_, name, ver, c, reason)| {
+        let reason = findings.crates.iter().filter_map(|(rustc_ver, name, ver, c, reason)| {
             if c.successful() { return None; }
+            match (findings.rustc_version, *rustc_ver) {
+                (Some(build), Some(other)) if other < build => return None,
+                _ => {},
+            };
             Some(format!("{}@{}: {}", name, ver, reason))
         }).collect::<Vec<_>>().join("\n");
         findings.crates.insert((None, top_level_crate_name.to_owned(), top_level_crate_ver.to_owned(), Compat::BrokenDeps, reason));

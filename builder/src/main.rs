@@ -318,7 +318,7 @@ fn run_and_analyze_versions(db: &BuildDb, docker_root: &Path, versions: Vec<(Rus
     }
 
     let tmp = to_set.iter().map(|((rv, o, cv, reason), c)| {
-        (o, cv, *rv, *c, Some(reason.as_str()))
+        SetCompatMulti { origin: o, ver: cv, rustc_version: *rv, compat: *c, reason: &reason }
     }).collect::<Vec<_>>();
     if db.set_compat_multi(&tmp).is_err() {
         // retry, sqlite is flaky

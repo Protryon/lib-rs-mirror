@@ -25,8 +25,8 @@ pub struct CompatibilityInfo {
 #[derive(Debug, Clone, Default)]
 pub struct CompatRanges {
     has_ever_built: bool,
-    ok: BTreeMap<RustcMinorVersion, Compat>,
-    bad: BTreeMap<RustcMinorVersion, Compat>,
+    ok: BTreeMap<RustcMinorVersion, (Compat, Option<String>)>,
+    bad: BTreeMap<RustcMinorVersion, (Compat, Option<String>)>,
 }
 
 impl CompatRanges {
@@ -35,7 +35,7 @@ impl CompatRanges {
     }
 
     /// note that it compiled fine with this version
-    pub fn add_compat(&mut self, rustc_minor_ver: RustcMinorVersion, new_compat: Compat) {
+    pub fn add_compat(&mut self, rustc_minor_ver: RustcMinorVersion, new_compat: Compat, reason: Option<String>) {
         if new_compat.successful() {
             if new_compat == Compat::VerifiedWorks {
                 self.has_ever_built = true;
@@ -46,23 +46,23 @@ impl CompatRanges {
         }
         .entry(rustc_minor_ver)
             .and_modify(|existing_compat| {
-                if new_compat.is_better(existing_compat) {
-                    *existing_compat = new_compat;
+                if new_compat.is_better(&existing_compat.0) {
+                    *existing_compat = (new_compat, reason.clone());
                 }
             })
-            .or_insert(new_compat);
+            .or_insert((new_compat, reason));
     }
 
-    pub fn compat_data_for_rustc(&self, rustc_version: RustcMinorVersion) -> Option<Compat> {
-        match (self.ok.get(&rustc_version).copied(), self.bad.get(&rustc_version).copied()) {
-            (Some(ok), Some(bad)) => {
-                Some(if ok.is_better(&bad) {
-                    ok
+    pub fn compat_data_for_rustc(&self, rustc_version: RustcMinorVersion) -> Option<(Compat, Option<&str>)> {
+        match (self.ok.get(&rustc_version), self.bad.get(&rustc_version)) {
+            (Some((ok, ok_reason)), Some((bad, bad_reason))) => {
+                Some(if ok.is_better(bad) {
+                    (*ok, ok_reason.as_deref())
                 } else {
-                    bad
+                    (*bad, bad_reason.as_deref())
                 })
             }
-            (Some(any), _) | (_, Some(any)) => Some(any),
+            (Some(any), _) | (_, Some(any)) => Some((any.0, any.1.as_deref())),
             _ => None,
         }
     }
@@ -76,12 +76,12 @@ impl CompatRanges {
     }
 
     pub fn newest_bad_compat(&self) -> Option<(RustcMinorVersion, Compat)> {
-        self.bad.iter().rev().map(|(&c, &v)| (c, v)).next()
+        self.bad.iter().rev().map(|(&c, v)| (c, v.0)).next()
     }
 
     pub fn remove_uncertain(&mut self) {
-        self.ok.retain(|_, c| *c == Compat::VerifiedWorks);
-        self.bad.retain(|_, c| *c == Compat::DefinitelyIncompatible);
+        self.ok.retain(|_, c| c.0 == Compat::VerifiedWorks);
+        self.bad.retain(|_, c| c.0 == Compat::DefinitelyIncompatible);
     }
 
     pub fn normalize(&mut self) {
@@ -103,7 +103,7 @@ impl CompatRanges {
 
     pub fn newest_bad_certain(&self) -> Option<RustcMinorVersion> {
         self.bad.iter().rev()
-            .filter(|(_, &c)| c == Compat::DefinitelyIncompatible)
+            .filter(|(_, c)| c.0 == Compat::DefinitelyIncompatible)
             .map(|(&v, _)| v)
             .next()
     }
@@ -111,14 +111,14 @@ impl CompatRanges {
     pub fn newest_bad_likely(&self) -> Option<RustcMinorVersion> {
         self.bad.iter().rev()
         // TODO: remove SuspectedIncompatible once we have data
-            .filter(|(_, &c)| c == Compat::DefinitelyIncompatible || c == Compat::LikelyIncompatible|| c == Compat::SuspectedIncompatible)
+            .filter(|(_, c)| c.0 == Compat::DefinitelyIncompatible || c.0 == Compat::LikelyIncompatible|| c.0 == Compat::SuspectedIncompatible)
             .map(|(&v, _)| v)
             .next()
     }
 
     pub fn oldest_ok_certain(&self) -> Option<RustcMinorVersion> {
         self.ok.iter()
-            .filter(|(_, &c)| c == Compat::DefinitelyIncompatible)
+            .filter(|(_, c)| c.0 == Compat::DefinitelyIncompatible)
             .map(|(&v, _)| v)
             .next()
     }
@@ -264,7 +264,7 @@ impl BuildDb {
 
             // assume that if the new version built with old rust, then older version will too
             if let Some(prev_oldest_ok) = prev_oldest_ok {
-                c.add_compat(prev_oldest_ok, Compat::ProbablyWorks);
+                c.add_compat(prev_oldest_ok, Compat::ProbablyWorks, Some("assumed from newer version".into()));
             }
             prev_oldest_ok = c.oldest_ok();
         }
@@ -289,7 +289,7 @@ impl BuildDb {
                     Compat::VerifiedWorks => Compat::ProbablyWorks,
                     Compat::DefinitelyIncompatible | Compat::LikelyIncompatible => Compat::SuspectedIncompatible,
                     other => other,
-                });
+                }, Some("assumed from older version".into()));
             }
 
             // skip over prerelease versions, because breakage during beta may not be indicative of stable versions
@@ -323,7 +323,7 @@ impl BuildDb {
     fn append_compat(by_ver: &mut CompatByCrateVersion, c: CompatibilityInfo) {
         by_ver.entry(c.crate_version)
             .or_insert_with(CompatRanges::default)
-            .add_compat(c.rustc_version, c.compat);
+            .add_compat(c.rustc_version, c.compat, c.reason);
     }
 
     fn compat_row(row: &Row) -> Result<CompatibilityInfo> {

@@ -5,13 +5,15 @@
 
 <h1>Crate compatibility matrix</h1>
 <style>
-    td.bad @{  background: #fee; @}
-    td.bad.certain @{  background: #faa; @}
-    td.ok @{  background: #efe; @}
-    td.ok.certain @{  background: #afa; @}
-    td.ok.bad @{  background: #aaa; @}
+    #compat-debug td @{ cursor: default; @}
+    #compat-debug td[title] @{ cursor: help; @}
+    #compat-debug td.bad @{  background: #fee; @}
+    #compat-debug td.bad.certain @{  background: #faa; @}
+    #compat-debug td.ok @{  background: #efe; @}
+    #compat-debug td.ok.certain @{  background: #afa; @}
+    #compat-debug td.ok.bad @{  background: #aaa; @}
 </style>
-<table>
+<table id="compat-debug">
     <thead><tr><th></th>
         @for rustc_ver in table.0.iter().rev() {
             <th>1.@rustc_ver</th>
@@ -22,27 +24,31 @@
             <tr>
                 <th>@v</th>
                 @for rustc_ver in table.0.iter().rev().copied() {
-                    <td class='
+                    <td
+                        @if let Some((_, Some(reason))) = row.compat_data_for_rustc(rustc_ver) {title="@reason"}
+                        class='
                         @if rustc_ver <= row.newest_bad().unwrap_or(0) {bad}
                         @if rustc_ver <= row.newest_bad_certain().unwrap_or(0) {bad certain}
                         @if rustc_ver >= row.oldest_ok().unwrap_or(999) {ok}
                         @if rustc_ver >= row.oldest_ok_certain().unwrap_or(999) {ok certain}
                     '>
-                        @if let Some(compat) = row.compat_data_for_rustc(rustc_ver) {
-                            @if compat == Compat::VerifiedWorks {
-                                ✅
-                            }
-                            @if compat == Compat::ProbablyWorks {
-                                ✓
-                            }
-                            @if compat == Compat::DefinitelyIncompatible || compat == Compat::LikelyIncompatible {
-                                ❌
-                            }
-                            @if compat == Compat::SuspectedIncompatible {
-                                𐄂
-                            }
-                            @if compat == Compat::BrokenDeps {
-                                d
+                        @if let Some((compat, reason)) = row.compat_data_for_rustc(rustc_ver) {
+                            @if reason.unwrap_or("").starts_with("assumed from ") {.} else {
+                                @if compat == Compat::VerifiedWorks {
+                                    ✅
+                                }
+                                @if compat == Compat::ProbablyWorks {
+                                    ✓
+                                }
+                                @if compat == Compat::DefinitelyIncompatible || compat == Compat::LikelyIncompatible {
+                                    ❌
+                                }
+                                @if compat == Compat::SuspectedIncompatible {
+                                    𐄂
+                                }
+                                @if compat == Compat::BrokenDeps {
+                                    d
+                                }
                             }
                        }
                     </td>

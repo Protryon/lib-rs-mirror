@@ -79,9 +79,8 @@ impl CompatRanges {
         self.bad.iter().rev().map(|(&c, v)| (c, v.0)).next()
     }
 
-    pub fn remove_uncertain(&mut self) {
-        self.ok.retain(|_, c| c.0 == Compat::VerifiedWorks);
-        self.bad.retain(|_, c| c.0 == Compat::DefinitelyIncompatible);
+    pub fn remove_uncertain_self_failures(&mut self) {
+        self.bad.retain(|_, c| c.0 == Compat::DefinitelyIncompatible || c.0 == Compat::BrokenDeps);
     }
 
     pub fn normalize(&mut self) {
@@ -245,7 +244,7 @@ impl BuildDb {
         if !any_version_has_built {
             // if it never built, it may be garbage data
             for c in compat.values_mut() {
-                c.remove_uncertain();
+                c.remove_uncertain_self_failures();
             }
         }
         Ok(compat)
@@ -274,7 +273,7 @@ impl BuildDb {
         for (ver, c) in compat.iter_mut() {
             // if it never built, it may be garbage data
             if !c.has_ever_built() {
-                c.bad.clear();
+                c.remove_uncertain_self_failures();
             }
 
             if let (Some((prev_bad, _)), Some(oldest_ok)) = (prev_newest_bad, c.oldest_ok()) {

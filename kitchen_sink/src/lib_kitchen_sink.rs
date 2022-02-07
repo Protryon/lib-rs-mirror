@@ -2230,20 +2230,20 @@ impl KitchenSink {
             Edition::E2021 => (56, "edition 2021"),
         };
 
-        if package.default_run.is_some() {
-            msrv = msrv.max(37);
+        if msrv < 37 && package.default_run.is_some() {
+            msrv = 37;
             reason = "default-run";
         }
 
         // uses Option as iter
         let mut profiles = manifest.profile.release.iter().chain(&manifest.profile.dev).chain(&manifest.profile.test).chain(&manifest.profile.bench).chain(&manifest.profile.doc);
-        if profiles.any(|p| p.build_override.is_some() || !p.package.is_empty()) {
-            msrv = msrv.max(41);
+        if msrv < 41 && profiles.any(|p| p.build_override.is_some() || !p.package.is_empty()) {
+            msrv = 41;
             reason = "build-override";
         }
 
-        if matches!(package.resolver, Some(rich_crate::Resolver::V2)) {
-            msrv = msrv.max(51);
+        if msrv < 51 && matches!(package.resolver, Some(rich_crate::Resolver::V2)) {
+            msrv = 51;
             reason = "resolver = 2";
         }
 
@@ -2255,8 +2255,8 @@ impl KitchenSink {
             }
         }
 
-        if profiles.any(|p| p.strip.is_some()) {
-            msrv = msrv.max(59); // FIXME: not released as of yet
+        if msrv < 59 && profiles.any(|p| p.strip.is_some()) {
+            msrv = 59; // FIXME: not released as of yet
             reason = "strip";
         }
 

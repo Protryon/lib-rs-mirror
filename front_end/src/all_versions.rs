@@ -28,7 +28,7 @@ pub(crate) struct VerRow {
     pub is_semver_major_change: bool,
     pub version: SemVer,
     pub release_date: String,
-    pub git_rev: Option<String>,
+    // pub git_rev: Option<String>,
     pub deps_added: Vec<String>,
     pub deps_removed: Vec<String>,
     pub deps_upgraded: Vec<(String, String)>,
@@ -130,7 +130,7 @@ impl AllVersions {
                 }
             };
 
-            let git_rev = None;
+            // let git_rev = None;
             let mut feat_added = Vec::new();
             let mut feat_removed = Vec::new();
             let mut deps_added = Vec::new();
@@ -155,7 +155,7 @@ impl AllVersions {
                     version,
                     release_date,
                     is_semver_major_change,
-                    git_rev,
+                    // git_rev,
                     deps_added,
                     deps_removed,
                     deps_upgraded,
@@ -219,7 +219,7 @@ impl AllVersions {
                 version,
                 release_date,
                 is_semver_major_change,
-                git_rev,
+                // git_rev,
                 deps_removed,
                 deps_added,
                 deps_upgraded,

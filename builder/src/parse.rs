@@ -57,7 +57,7 @@ fn parse_package_id(id: Option<&str>) -> Option<(String, SemVer)> {
     Some((name, ver))
 }
 
-const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 462] = [
+const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 470] = [
 // rg  --no-filename -o '\[stable\(feature.*\]' library/ | fgrep 1. | sort -u | sed -E 's/.*feature ?= ?"(.+)", since ?= ?"1\.(..+)\..".*/(\2, "\1"),/' | sort -V | pbcopy
 
 (17, "addr_from_into_ip"),
@@ -501,6 +501,7 @@ const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 462] = [
 (57, "try_reserve"),
 (58, "copy_clone_array_lib"),
 (58, "cstring_from_vec_with_nul"),
+(58, "is_symlink"),
 (58, "option_result_unwrap_unchecked"),
 (58, "rc_ref_unwind_safe"),
 (58, "saturating_div"),
@@ -520,8 +521,15 @@ const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 462] = [
 (59, "sync_once_unwind_safe"),
 (59, "try_from_mut_slice_to_array"),
 (59, "u8_from_char"),
-(60, "maybe_uninit_extra"),
+(60, "arc_new_cyclic"),
+(60, "inherent_ascii_escape"),
+(60, "int_abs_diff"),
+(60, "io_errorkind_display"),
+(55, "maybe_uninit_extra"), // .write used to belong to it, and was partially stabilized
+(60, "not_never"),
+(60, "simd_aarch64"),
 (60, "vec_spare_capacity"),
+(60, "wrapping_int_assign_impl"),
 ];
 
 fn parse_analysis(stdout: &str, stderr: &str) -> Result<Findings, String> {

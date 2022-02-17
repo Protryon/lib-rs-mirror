@@ -29,13 +29,15 @@ RUN rustup toolchain add 1.52.0
 RUN rustup toolchain add 1.56.0
 RUN rustup toolchain add 1.57.0
 RUN rustup toolchain add 1.32.0
+RUN rustup toolchain add 1.40.0
+RUN rustup toolchain add 1.36.0
 RUN rustup toolchain list
 # RUN cargo new lts-dummy; cd lts-dummy; cargo lts setup; echo 'itoa = "*"' >> Cargo.toml; cargo update;
 "##;
 
 const TEMP_JUNK_DIR: &str = "/var/tmp/crates_env";
 
-const RUST_VERSIONS: [RustcMinorVersion; 8] = [
+const RUST_VERSIONS: [RustcMinorVersion; 10] = [
     46,
     48,
     50,
@@ -44,6 +46,8 @@ const RUST_VERSIONS: [RustcMinorVersion; 8] = [
     56,
     57,
     32,
+    40,
+    36,
 ];
 
 use crate_db::builddb::*;
@@ -434,7 +438,7 @@ fn do_builds(docker_root: &Path, versions: &[(RustcMinorVersion, Arc<str>, SemVe
         // .arg("-e").arg("CC=true")
         // .arg("-e").arg("CCXX=true")
         // .arg("-e").arg("AR=true")
-        .arg("-e").arg("CARGO_BUILD_JOBS=6")
+        .arg("-e").arg("CARGO_BUILD_JOBS=3")
         .arg("-m3000m")
         .arg("--cpus=3")
         .stdin(Stdio::null())

@@ -188,8 +188,7 @@ async fn run_server(rt: Handle) -> Result<(), anyhow::Error> {
             state.crates.load().prewarm().await;
             loop {
                 tokio::time::sleep(Duration::from_secs(1)).await;
-                let elapsed = state.start_time.elapsed().as_secs() as u32;
-                timestamp.store(elapsed, Ordering::SeqCst);
+                timestamp.store(state.start_time.elapsed().as_secs() as u32, Ordering::SeqCst);
                 let should_reload = if 1 == HUP_SIGNAL.swap(0, Ordering::SeqCst) {
                     info!("HUP!");
                     true
@@ -203,6 +202,7 @@ async fn run_server(rt: Handle) -> Result<(), anyhow::Error> {
                     match KitchenSink::new(&data_dir, &github_token).await {
                         Ok(k) => {
                             info!("Reloading state");
+                            timestamp.store(state.start_time.elapsed().as_secs() as u32, Ordering::SeqCst);
                             state.crates.load().cleanup();
                             let k = Arc::new(k);
                             let _ = tokio::task::spawn({

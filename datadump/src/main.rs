@@ -21,7 +21,7 @@ use tar::Archive;
 
 // start end crates affected
 const DOWNLOAD_SPAM_INCIDENTS: [(&str, &str, &[&str]); 2] = [
-    ("2021-12-10", "2022-02-10", &[
+    ("2021-12-10", "2022-04-10", &[
         "vsdb", "btm", "vsdbsled", "vsdb_derive","ruc",
     ]),
     ("2021-12-21", "2022-01-22", &[

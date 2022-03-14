@@ -621,6 +621,7 @@ async fn handle_compat(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let origin = get_origin_from_subpath(req.match_info()).ok_or(anyhow!("boo"))?;
     let state: &AServerState = req.app_data().expect("appdata");
     let crates = state.crates.load();
+    crates.reload_indexed_crate(&origin);
     let page = rt_run_timeout(&state.rt, "dbgcrate", 60, async move {
         let all = crates.rich_crate_async(&origin).await?;
         let mut page: Vec<u8> = Vec::with_capacity(32000);

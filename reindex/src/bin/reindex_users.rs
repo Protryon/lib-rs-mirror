@@ -1,4 +1,4 @@
-use anyhow::anyhow;
+use anyhow::bail;
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
 use kitchen_sink::{stopped, KitchenSink};
@@ -37,7 +37,7 @@ async fn main() {
                 let _f = concurrency.acquire().await?;
                 println!("{}…", o.short_crate_name());
                 let c = crates.rich_crate_version_async(&o).await?;
-                if stopped() {anyhow!("stop");}
+                if stopped() {bail!("stop");}
                 for a in c.authors().iter().filter(|a| a.email.is_some()) {
                     if let Some(email) = a.email.as_ref() {
                         {

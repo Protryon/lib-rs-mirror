@@ -1113,7 +1113,7 @@ impl KitchenSink {
         let crates_io_krate = crates_io_meta?.krate;
         let crate_tarball = crate_tarball?;
         let crate_compressed_size = crate_tarball.len();
-        let mut meta = timeout("untar", 10, spawn_blocking({
+        let mut meta = timeout("untar1", 40, spawn_blocking({
             let name = name.to_owned();
             let ver = ver.to_owned();
             move || {
@@ -3414,6 +3414,7 @@ fn watch<'a, T>(label: &'static str, f: impl Future<Output = T> + Send + 'a) -> 
     debug!("starting: {}", label);
     Box::pin(NonBlock::new(label, async move {
         let mut is_ok = DropWatch(false, label); // await dropping will run this
+        tokio::task::yield_now().await;
         let res = f.await;
         is_ok.0 = true;
         res
@@ -3422,7 +3423,9 @@ fn watch<'a, T>(label: &'static str, f: impl Future<Output = T> + Send + 'a) -> 
 
 #[inline(always)]
 fn timeout<'a, T, E: From<KitchenSinkErr>>(label: &'static str, time: u16, f: impl Future<Output = Result<T, E>> + Send + 'a) -> Pin<Box<dyn Future<Output = Result<T, E>> + Send + 'a>> {
-    let f = tokio::time::timeout(Duration::from_secs(time.into()), f);
+    // yield in case something is blocking-busy and would cause a timeout just by starving the runtime
+    let f = tokio::task::yield_now()
+        .then(move |_| tokio::time::timeout(Duration::from_secs(time.into()), f));
     watch(label, f.map(move |r| r.map_err(|_| {
         info!("Timed out: {} {}", label, time);
         E::from(KitchenSinkErr::TimedOut(label, time))

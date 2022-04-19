@@ -129,7 +129,7 @@ impl SimpleCache {
         let mut retries = 5;
         loop {
             match cb() {
-                Err(Error::Db(SqliteFailure(ref e, _))) if retries > 0 && e.code == DatabaseLocked => {
+                Err(Error::Db(_, SqliteFailure(ref e, _))) if retries > 0 && e.code == DatabaseLocked => {
                     eprintln!("Retrying: {}", e);
                     retries -= 1;
                     thread::sleep(Duration::from_secs(1));
@@ -141,20 +141,23 @@ impl SimpleCache {
 
     fn get_inner(&self, key: (&str, &str)) -> Result<Option<Vec<u8>>, Error> {
         self.with_connection(|conn| {
-            let mut q = conn.prepare_cached("SELECT data FROM cache2 WHERE key = ?1 AND ver = ?2")?;
+            let mut q = conn.prepare_cached("SELECT data FROM cache2 WHERE key = ?1 AND ver = ?2")
+                .map_err(|e| Error::Db(self.url.clone(), e))?;
             let row: Result<Vec<u8>, _> = q.query_row(&[&key.0, &key.1], |r| r.get(0));
             match row {
                 Ok(row) => Ok(Some(row)),
                 Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-                Err(err) => Err(err.into()),
+                Err(err) => Err(Error::Db(self.url.clone(), err)),
             }
         })
     }
 
     pub fn delete(&self, key: (&str, &str)) -> Result<(), Error> {
         self.with_connection(|conn| {
-            let mut q = conn.prepare_cached("DELETE FROM cache2 WHERE key = ?1")?;
-            q.execute(&[&key.0])?;
+            let mut q = conn.prepare_cached("DELETE FROM cache2 WHERE key = ?1")
+                .map_err(|e| Error::Db(self.url.clone(), e))?;
+            q.execute(&[&key.0])
+                .map_err(|e| Error::Db(self.url.clone(), e))?;
             Ok(())
         })
     }
@@ -204,9 +207,11 @@ impl SimpleCache {
 
     fn set_inner(&self, key: (&str, &str), data: &[u8]) -> Result<(), Error> {
         self.with_connection(|conn| {
-            let mut q = conn.prepare_cached("INSERT OR REPLACE INTO cache2(key, ver, data) VALUES(?1, ?2, ?3)")?;
+            let mut q = conn.prepare_cached("INSERT OR REPLACE INTO cache2(key, ver, data) VALUES(?1, ?2, ?3)")
+                .map_err(|e| Error::Db(self.url.clone(), e))?;
             let arr: &[&dyn ToSql] = &[&key.0, &key.1, &data];
-            q.execute(arr)?;
+            q.execute(arr)
+                .map_err(|e| Error::Db(self.url.clone(), e))?;
             Ok(())
         })
     }

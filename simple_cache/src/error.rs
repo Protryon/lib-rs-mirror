@@ -14,9 +14,8 @@ quick_error! {
             display("{}", err)
             source(err)
         }
-        Db(err: rusqlite::Error) {
-            from()
-            display("Simple cache db: {}", err)
+        Db(url: String, err: rusqlite::Error) {
+            display("Simple cache db @{}: {}", url, err)
             source(err)
         }
         RmpEnc(err:  rmp_serde::encode::Error) {

@@ -18,7 +18,7 @@ use thread_local::ThreadLocal;
 #[derive(Debug)]
 pub struct SimpleCache {
     url: String,
-    conn: ThreadLocal<Result<Connection, rusqlite::Error>>,
+    conn: ThreadLocal<Result<Connection, Arc<rusqlite::Error>>>,
     pub cache_only: bool,
     compress: bool,
 }
@@ -114,10 +114,10 @@ impl SimpleCache {
 
     #[inline]
     fn with_connection<F, T>(&self, cb: F) -> Result<T, Error> where F: FnOnce(&Connection) -> Result<T, Error> {
-        let conn = self.conn.get_or(|| self.connect());
+        let conn = self.conn.get_or(|| self.connect().map_err(Arc::new));
         match conn {
             Ok(conn) => cb(conn),
-            Err(err) => Err(Error::Other(err.to_string())),
+            Err(err) => Err(Error::Db(self.url.clone(), Arc::clone(&err))),
         }
     }
 
@@ -129,7 +129,7 @@ impl SimpleCache {
         let mut retries = 5;
         loop {
             match cb() {
-                Err(Error::Db(_, SqliteFailure(ref e, _))) if retries > 0 && e.code == DatabaseLocked => {
+                Err(Error::Db(_, ref e)) if retries > 0 && matches!(**e, SqliteFailure(ref e, _) if e.code == DatabaseLocked) => {
                     eprintln!("Retrying: {}", e);
                     retries -= 1;
                     thread::sleep(Duration::from_secs(1));
@@ -142,12 +142,12 @@ impl SimpleCache {
     fn get_inner(&self, key: (&str, &str)) -> Result<Option<Vec<u8>>, Error> {
         self.with_connection(|conn| {
             let mut q = conn.prepare_cached("SELECT data FROM cache2 WHERE key = ?1 AND ver = ?2")
-                .map_err(|e| Error::Db(self.url.clone(), e))?;
+                .map_err(|e| Error::Db(self.url.clone(), Arc::new(e)))?;
             let row: Result<Vec<u8>, _> = q.query_row(&[&key.0, &key.1], |r| r.get(0));
             match row {
                 Ok(row) => Ok(Some(row)),
                 Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-                Err(err) => Err(Error::Db(self.url.clone(), err)),
+                Err(err) => Err(Error::Db(self.url.clone(), Arc::new(err))),
             }
         })
     }
@@ -155,9 +155,9 @@ impl SimpleCache {
     pub fn delete(&self, key: (&str, &str)) -> Result<(), Error> {
         self.with_connection(|conn| {
             let mut q = conn.prepare_cached("DELETE FROM cache2 WHERE key = ?1")
-                .map_err(|e| Error::Db(self.url.clone(), e))?;
+                .map_err(|e| Error::Db(self.url.clone(), Arc::new(e)))?;
             q.execute(&[&key.0])
-                .map_err(|e| Error::Db(self.url.clone(), e))?;
+                .map_err(|e| Error::Db(self.url.clone(), Arc::new(e)))?;
             Ok(())
         })
     }
@@ -208,10 +208,10 @@ impl SimpleCache {
     fn set_inner(&self, key: (&str, &str), data: &[u8]) -> Result<(), Error> {
         self.with_connection(|conn| {
             let mut q = conn.prepare_cached("INSERT OR REPLACE INTO cache2(key, ver, data) VALUES(?1, ?2, ?3)")
-                .map_err(|e| Error::Db(self.url.clone(), e))?;
+                .map_err(|e| Error::Db(self.url.clone(), Arc::new(e)))?;
             let arr: &[&dyn ToSql] = &[&key.0, &key.1, &data];
             q.execute(arr)
-                .map_err(|e| Error::Db(self.url.clone(), e))?;
+                .map_err(|e| Error::Db(self.url.clone(), Arc::new(e)))?;
             Ok(())
         })
     }

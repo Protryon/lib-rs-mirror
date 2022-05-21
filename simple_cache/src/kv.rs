@@ -214,7 +214,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
                 return Ok(false);
             }
             let new_size = file.into_inner()
-                .map_err(|e| Error::Other(e.error().to_string()))? // uuuuugh
+                .map_err(|e| Error::Other(format!("{} @ {}", e.error(), self.path.display())))? // uuuuugh
                 .metadata()?.st_size();
             d.expected_size.store(new_size, SeqCst);
             tmp_path.persist(self.path.with_extension("mpbr")).map_err(|e| e.error)?;

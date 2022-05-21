@@ -1,4 +1,4 @@
-#![allow(renamed_and_removed_lints)]
+use std::sync::Arc;
 use std::io;
 
 quick_error! {
@@ -14,7 +14,7 @@ quick_error! {
             display("{}", err)
             source(err)
         }
-        Db(url: String, err: rusqlite::Error) {
+        Db(url: String, err: Arc<rusqlite::Error>) {
             display("Simple cache db @{}: {}", url, err)
             source(err)
         }
@@ -34,7 +34,7 @@ quick_error! {
             source(err)
         }
         Other(err: String) {
-            display("{}", err)
+            display("{} (other cache err)", err)
         }
     }
 }

@@ -11,43 +11,30 @@ use std::io::BufReader;
 use std::io::Write;
 use std::sync::Arc;
 
-const DOCKERFILE: &str = r##"
+const DOCKERFILE_DEFAULT_RUSTC: RustcMinorVersion = 60;
+const DOCKERFILE_PRELUDE: &str = r##"
 FROM rustops/crates-build-env
 RUN useradd -u 4321 --create-home --user-group -s /bin/bash rustyuser
 RUN chown -R 4321:4321 /home/rustyuser
 USER rustyuser
 WORKDIR /home/rustyuser
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.55.0 --verbose # wat
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.60.0 --verbose # wat
 ENV PATH="$PATH:/home/rustyuser/.cargo/bin"
-RUN cargo install lts --vers ^0.3.1
 RUN rustup set profile minimal
 RUN cargo install libc --vers 99.9.9 || true # force index update
-RUN rustup toolchain add 1.46.0
-RUN rustup toolchain add 1.48.0
-RUN rustup toolchain add 1.50.0
-RUN rustup toolchain add 1.52.0
-RUN rustup toolchain add 1.56.0
-RUN rustup toolchain add 1.57.0
-RUN rustup toolchain add 1.32.0
-RUN rustup toolchain add 1.40.0
-RUN rustup toolchain add 1.36.0
-RUN rustup toolchain list
-# RUN cargo new lts-dummy; cd lts-dummy; cargo lts setup; echo 'itoa = "*"' >> Cargo.toml; cargo update;
-"##;
+"##; // must have newline!
 
 const TEMP_JUNK_DIR: &str = "/var/tmp/crates_env";
 
-const RUST_VERSIONS: [RustcMinorVersion; 10] = [
-    46,
-    48,
-    50,
-    52,
-    55,
-    56,
-    57,
-    32,
+const RUST_VERSIONS: [RustcMinorVersion; 8] = [
+    60,
+    35,
     40,
-    36,
+    45,
+    51,
+    53,
+    58,
+    61,
 ];
 
 use crate_db::builddb::*;
@@ -219,7 +206,7 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
     let mut rng = rand::thread_rng();
     let mut candidates: Vec<_> = all.versions().iter().rev() // rev() starts from most recent
         .filter(|v| !v.is_yanked())
-        .take(10)
+        .take(4)
         .filter_map(|v| SemVer::parse(v.version()).ok())
         .map(|v| {
             let c = compat_info.remove(&v).unwrap_or_default();
@@ -281,10 +268,10 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
     if has_anything_built_ok_yet {
         // biggest gap, then latest ver
         candidates.sort_unstable_by(|a,b| b.score.cmp(&a.score).then(b.ver.cmp(&a.ver)));
-        candidates.truncate(4);
+        candidates.truncate(2);
     } else {
         candidates.shuffle(&mut rng); // dunno which versions will build
-        candidates.truncate(10); // don't waste time on broken crates
+        candidates.truncate(2); // don't waste time on broken crates
     }
 
     for c in &candidates {
@@ -353,7 +340,13 @@ fn prepare_docker(docker_root: &Path) -> Result<(), Box<dyn std::error::Error>> 
         .spawn()?;
 
     let mut stdin = child.stdin.take().unwrap();
-    stdin.write_all(DOCKERFILE.as_bytes())?;
+    stdin.write_all(DOCKERFILE_PRELUDE.as_bytes())?;
+    for v in RUST_VERSIONS {
+        if v != DOCKERFILE_DEFAULT_RUSTC {
+            writeln!(stdin, "RUN rustup toolchain add 1.{}.0", v)?;
+        }
+    }
+    stdin.write_all(b"RUN rustup toolchain list\n")?;
     drop(stdin);
 
     let res = child.wait()?;

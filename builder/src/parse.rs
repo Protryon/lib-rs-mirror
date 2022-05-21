@@ -57,7 +57,7 @@ fn parse_package_id(id: Option<&str>) -> Option<(String, SemVer)> {
     Some((name, ver))
 }
 
-const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 470] = [
+const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 494] = [
 // rg  --no-filename -o '\[stable\(feature.*\]' library/ | fgrep 1. | sort -u | sed -E 's/.*feature ?= ?"(.+)", since ?= ?"1\.(..+)\..".*/(\2, "\1"),/' | sort -V | pbcopy
 
 (17, "addr_from_into_ip"),
@@ -526,10 +526,34 @@ const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 470] = [
 (60, "int_abs_diff"),
 (60, "io_errorkind_display"),
 (55, "maybe_uninit_extra"), // .write used to belong to it, and was partially stabilized
+(60, "arc_new_cyclic"),
+(60, "inherent_ascii_escape"),
+(60, "int_abs_diff"),
+(60, "io_errorkind_display"),
+(60, "maybe_uninit_extra"),
 (60, "not_never"),
 (60, "simd_aarch64"),
 (60, "vec_spare_capacity"),
 (60, "wrapping_int_assign_impl"),
+(61, "cursor_array"),
+(61, "pin_static_ref"),
+(61, "process_exitcode"),
+(61, "termination_trait_lib"),
+(61, "thread_is_running"),
+(61, "unix_socket_creation"),
+(61, "vec_retain_mut"),
+(62, "assertunwindsafe_default"),
+(62, "bool_to_option"),
+(62, "encode_wide_fused_iterator"),
+(62, "shared_from_str"),
+(62, "stdin_forwarders"),
+(62, "total_cmp"),
+(62, "windows_process_extensions_raw_arg"),
+(63, "array_from_fn"),
+(63, "cell_filter_map"),
+(63, "ipv6_to_ipv4_mapped"),
+(63, "slice_ptr_len_nonnull"),
+(63, "toowned_clone_into"),
 ];
 
 fn parse_analysis(stdout: &str, stderr: &str) -> Result<Findings, String> {

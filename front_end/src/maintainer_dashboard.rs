@@ -230,7 +230,7 @@ async fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult
                         0..=10 => "slightly ",
                         11..=30 => "a bit ",
                         31..=80 => "",
-                        81..=255 => "seriously ",
+                        81..=255 => "significantly ",
                     }).into(), if severity > 40 && !k.is_app() {
                         format!("Upgrade to {} to get all the fixes, and avoid causing duplicate dependencies in projects.", upgrade_version)
                     } else {

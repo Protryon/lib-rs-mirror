@@ -4,7 +4,7 @@ CACHE_FILES=data/crate_data.db data/users.db data/2019.rmpz
 all: website
 
 website: data/index/1 styles Cargo.lock
-	cd front_end && cargo run --release --bin website
+	cd server && cargo run --release
 	cd style && npm start
 
 Cargo.lock: Cargo.toml

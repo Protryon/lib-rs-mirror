@@ -1,4 +1,5 @@
 use rich_crate::Origin;
+use tantivy::TantivyError;
 use std::cmp::Ordering;
 use std::{fs, path::Path};
 use tantivy::{self, collector::TopDocs, query::QueryParser, schema::*, Index, IndexWriter};
@@ -44,7 +45,7 @@ pub struct Indexer {
 
 impl CrateSearchIndex {
     pub fn new(index_dir: impl AsRef<Path>) -> tantivy::Result<Self> {
-        let index_dir = index_dir.as_ref().join("tantivy16");
+        let index_dir = index_dir.as_ref().join("tantivy18");
         if !index_dir.exists() {
             return Self::reset_db_to_empty(&index_dir);
         }
@@ -183,7 +184,7 @@ impl Indexer {
     }
 
     /// score is float 0..=1 range
-    pub fn add(&mut self, origin: &Origin, crate_name: &str, version: &str, description: &str, keywords: &[&str], readme: Option<&str>, monthly_downloads: u64, score: f64) {
+    pub fn add(&mut self, origin: &Origin, crate_name: &str, version: &str, description: &str, keywords: &[&str], readme: Option<&str>, monthly_downloads: u64, score: f64) -> Result<(), TantivyError> {
         let origin = origin.to_str();
         // delete old doc if any
         let pkey = Term::from_field_text(self.index.origin_pkey, &origin);
@@ -201,7 +202,8 @@ impl Indexer {
         doc.add_text(self.index.crate_version, version);
         doc.add_u64(self.index.monthly_downloads, monthly_downloads);
         doc.add_u64(self.index.crate_score, (score * CRATE_SCORE_MAX).ceil() as u64);
-        self.writer.add_document(doc);
+        self.writer.add_document(doc)?;
+        Ok(())
     }
 
     pub fn commit(&mut self) -> tantivy::Result<()> {

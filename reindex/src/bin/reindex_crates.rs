@@ -221,7 +221,7 @@ fn index_search(indexer: &mut Indexer, lines: &TempCache<(String, f64), [u8; 16]
         dedup.add_text(&renderer.visible_text(&markup));
     }
 
-    indexer.add(k.origin(), k.short_name(), version, k.description().unwrap_or(""), &keywords, Some(unique_text.as_str()).filter(|s| !s.trim_start().is_empty()), downloads_per_month as u64, score);
+    indexer.add(k.origin(), k.short_name(), version, k.description().unwrap_or(""), &keywords, Some(unique_text.as_str()).filter(|s| !s.trim_start().is_empty()), downloads_per_month as u64, score)?;
     Ok(())
 }
 

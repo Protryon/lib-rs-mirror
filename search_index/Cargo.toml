@@ -10,7 +10,7 @@ name = "search_index"
 path = "src/lib_search_index.rs"
 
 [dependencies]
-tantivy = "0.16.1"
+tantivy = "0.18.0"
 rich_crate = { path = "../rich_crate" }
 rayon = "1.5.0"
 rand = "0.8"

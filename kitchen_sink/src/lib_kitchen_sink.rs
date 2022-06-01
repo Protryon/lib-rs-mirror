@@ -2247,16 +2247,15 @@ impl KitchenSink {
             reason = "resolver = 2";
         }
 
-        if let Some(ver) = &package.rust_version {
-            msrv = msrv.max(56); // rust-version added at all
-            reason = "rust-version";
-            if let Some(minor) = ver.split('.').nth(1).and_then(|minor| minor.parse().ok()) {
-                msrv = msrv.max(minor);
+        if let Some(minor) = package.rust_version.as_ref().and_then(|v| v.split('.').nth(1)).and_then(|minor| minor.parse().ok()) {
+            if msrv < minor {
+                reason = "rust-version";
+                msrv = minor;
             }
         }
 
         if msrv < 59 && profiles.any(|p| p.strip.is_some()) {
-            msrv = 59; // FIXME: not released as of yet
+            msrv = 59;
             reason = "strip";
         }
 

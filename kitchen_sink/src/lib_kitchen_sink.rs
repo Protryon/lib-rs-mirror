@@ -2156,10 +2156,10 @@ impl KitchenSink {
         tokio::task::yield_now().await;
         let db_fetched = tokio::task::block_in_place(|| self.user_db.user_by_github_login(github_login));
         if let Ok(Some(gh)) = db_fetched.map_err(|e| eprintln!("db user {}: {}", github_login, e)) {
-            if gh.name.is_some() && gh.created_at.is_some() {
+            if gh.created_at.is_some() { // unfortunately name is optional and can be None
                 return Ok(Some(gh));
             } else {
-                debug!("db gh user missing columns {}", github_login);
+                debug!("db gh user missing created_at {}", github_login);
             }
         } else {
             debug!("gh user cache miss {}", github_login);

@@ -30,6 +30,7 @@ impl UserDb {
                 name          TEXT
             );
             CREATE UNIQUE INDEX IF NOT EXISTS github_emails_idx on github_emails(github_id, email);
+            CREATE INDEX IF NOT EXISTS github_login_idx on github_users(login);
             COMMIT;"#)?;
         Ok(conn)
     }

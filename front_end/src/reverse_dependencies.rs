@@ -8,11 +8,12 @@ use kitchen_sink::RevDependencies;
 use kitchen_sink::SemVer;
 use locale::Numeric;
 use render_readme::Renderer;
-
 use rich_crate::RichCrateVersion;
 use semver::VersionReq;
-
 use std::fmt::Display;
+use std::time::Duration;
+use tokio::time::Instant;
+use tokio::time::timeout_at;
 
 pub struct CratePageRevDeps<'a> {
     pub ver: &'a RichCrateVersion,
@@ -77,10 +78,12 @@ impl<'a> CratePageRevDeps<'a> {
         let mut downloads_by_ver: Vec<_> = kitchen_sink.recent_downloads_by_version(ver.origin()).await?.into_iter().map(|(v, d)| (v.to_semver(), d)).collect();
         downloads_by_ver.sort_unstable_by(|a, b| b.0.cmp(&a.0));
 
+        let deadline = Instant::now() + Duration::from_secs(8);
         let mut deps: Vec<_> = match stats {
             Some(s) => futures::future::join_all(s.rev_dep_names.iter().map(|rev_dep| async move {
                 let origin = Origin::from_crates_io_name(rev_dep);
-                let downloads = kitchen_sink.downloads_per_month(&origin).await.ok().and_then(|x| x).unwrap_or(0) as u32;
+                let downloads = timeout_at(deadline, kitchen_sink.downloads_per_month(&origin)).await;
+                let downloads = downloads.ok().and_then(|x| x.ok()).and_then(|x| x).unwrap_or(0) as u32;
                 let depender = kitchen_sink.index.crate_highest_version(&rev_dep.to_ascii_lowercase(), true).expect("rev dep integrity");
                 let (is_optional, req, kind) = depender.dependencies().iter().find(|d| {
                     own_name.eq_ignore_ascii_case(d.crate_name())
@@ -110,10 +113,10 @@ impl<'a> CratePageRevDeps<'a> {
                 a.depender.name().cmp(b.depender.name())
             })
         });
-        deps.truncate(1000);
         for d in deps.iter_mut() {
             d.rev_dep_count = all_deps_stats.counts.get(d.depender.name()).map(|s| s.direct.all()).unwrap_or(0);
         }
+        deps.truncate(1000);
         let has_download_columns = deps.iter().any(|d| d.rev_dep_count > 0 || d.downloads > 100);
 
         let changes = kitchen_sink.depender_changes(ver.origin())?;

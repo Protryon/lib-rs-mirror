@@ -449,16 +449,30 @@ impl Index {
         let pop = stats.counts.get(crate_name)
         .map(|stats| {
             let mut matches = 0;
+            let mut matches_max = 0;
             let mut unmatches = 0;
+            let mut unmatches_max = 0;
             for (ver, count) in &stats.versions {
                 if requirement.matches(&ver.to_semver()) {
                     matches += count; // TODO: this should be (slighly) weighed by crate's popularity?
+                    matches_max = matches_max.max(*count);
                 } else {
                     unmatches += count;
+                    unmatches_max = unmatches_max.max(*count);
                 }
             }
             matches += 1; // one to denoise unpopular crates; div/0
-            matches as f32 / (matches + unmatches) as f32
+            matches_max += 1; // one to denoise unpopular crates; div/0
+
+            let real_ratio = matches as f32 / (matches + unmatches) as f32;
+
+            // when major versions are shifting in popularity, matching second-most-popular crate
+            // is still not that terrible.
+            // This also helps with crates that have very fragmented users and no
+            // version is popular.
+            let ratio_of_maxes = matches_max as f32 / (matches_max + unmatches_max) as f32;
+
+            (real_ratio + ratio_of_maxes) * 0.5
         })
         .unwrap_or(0.);
 

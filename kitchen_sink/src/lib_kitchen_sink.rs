@@ -417,6 +417,7 @@ impl KitchenSink {
             if categories.is_empty() {
                 continue;
             }
+            categories.iter().for_each(|k| debug_assert!(categories::CATEGORIES.from_slug(k).1, "'{}' is invalid for override '{}'", k, crate_name));
             out.insert(crate_name.into(), categories);
         }
         Ok(out)
@@ -1902,6 +1903,8 @@ impl KitchenSink {
         if let Some(overrides) = self.category_overrides.get(origin.short_crate_name()) {
             category_slugs = overrides;
         }
+
+        category_slugs.iter().for_each(|k| debug_assert!(categories::CATEGORIES.from_slug(k).1, "'{}' must exist", k));
 
         let extracted_auto_keywords = feat_extractor::auto_keywords(&manifest, source_data.github_description.as_deref(), readme_text.as_deref());
 

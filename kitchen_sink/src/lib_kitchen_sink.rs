@@ -2029,16 +2029,21 @@ impl KitchenSink {
     // deps that are closely related to crates in some category
     fn dep_interesting_for_index(name: &str) -> Option<bool> {
         match name {
-            "futures" | "tokio" | "actix-web" | "rocket_codegen" | "iron" | "rusoto_core" | "rocket" | "router" |
-            "quoted_printable" | "mime" | "rustls" | "websocket" |
-            "piston2d-graphics" | "amethyst_core" | "amethyst" | "specs" | "piston" | "allegro" | "minifb" |
-            "rgb" | "imgref" |
+            "futures" | "tokio" | "actix-web" | "rocket_codegen" | "iron" | "rusoto_core" | "rocket" | "router" | "async-std" |
+            "constant_time_eq" | "digest" |
+            "quoted_printable" | "mime" | "rustls" | "websocket" | "hyper" |
+            "piston2d-graphics" | "amethyst_core" | "amethyst" | "specs" | "piston" | "allegro" | "minifb" | "bevy" |
+            "rgb" | "imgref" | "gstreamer" | "gtk" | "gtk4" |
+            "bare-metal" |
             "core-foundation" |
-            "proc-macro2" | "cargo" | "cargo_metadata" | "git2" | "dbus" |
+            "proc-macro2" | "proc-macro-hack" | "darling" | "quote" |
+            "cargo" | "cargo_metadata" | "git2" | "dbus" |
             "hound" | "lopdf" |
-            "nom" | "lalrpop" | "combine" |
-            "clap" | "structopt" |
-            "syntect" | "stdweb" | "parity-wasm" => Some(true),
+            "nom" | "lalrpop" | "combine" | "pest" |
+            "clap" | "structopt" | "ansi_term" |
+            "alga" | "bio" | "nalgebra" |
+            "syntect" | "stdweb" | "parity-wasm" |
+            "solana-program" | "ethabi" | "bitcoin" | "ink_primitives" | "parity-scale-codec" | "ethnum" | "borsh" | "solana-sdk" | "anchor-lang" | "mpl-token-metadata" | "spl-token" => Some(true),
             /////////
             "threadpool" | "rayon" | "md5" | "arrayref" | "memmmap" | "xml" | "crossbeam" | "pyo3" |
             "rustc_version" | "crossbeam-channel" | "cmake" | "errno" | "zip" | "enum_primitive" | "pretty_env_logger" |

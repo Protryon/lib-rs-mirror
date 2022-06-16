@@ -1335,7 +1335,7 @@ impl KitchenSink {
             if cat.as_bytes().iter().any(|c| c.is_ascii_uppercase()) {
                 *cat = cat.to_lowercase();
             }
-            if (cat == "development-tools" || (cat == "command-line-utilities" && has_cargo_bin)) && package.keywords.iter().any(|k| k.eq_ignore_ascii_case("cargo-subcommand") || k.eq_ignore_ascii_case("subcommand")) {
+            if has_cargo_bin && (cat == "development-tools" || cat == "command-line-utilities") && package.keywords.iter().any(|k| k.eq_ignore_ascii_case("cargo-subcommand") || k.eq_ignore_ascii_case("subcommand")) {
                 *cat = "development-tools::cargo-plugins".into();
             }
             if cat == "localization" {
@@ -1350,7 +1350,7 @@ impl KitchenSink {
                     })) {
                 *cat = "parser-implementations".into();
             }
-            if (cat == "cryptography" || cat == "database" || cat == "rust-patterns" || cat == "development-tools") && package.keywords.iter().any(|k| eq(k, "bitcoin") || eq(k, "ethereum") || eq(k, "ledger") || eq(k, "exonum") || eq(k, "blockchain")) {
+            if (cat == "cryptography" || cat == "database" || cat == "rust-patterns" || cat == "development-tools") && package.keywords.iter().any(|k| eq(k, "bitcoin") || eq(k, "ethereum") || eq(k, "exonum") || eq(k, "blockchain")) {
                 *cat = "cryptography::cryptocurrencies".into();
             }
             // crates-io added a better category
@@ -1383,6 +1383,9 @@ impl KitchenSink {
             }
             if cat == "aerospace::unmanned-aerial-vehicles" {
                 *cat = "science::robotics".to_string();
+            }
+            if cat == "aerospace::space-protocols" {
+                *cat = "science".to_string();
             }
             if cat == "os::linix-apis" {
                 *cat = "os::unix-apis".to_string();

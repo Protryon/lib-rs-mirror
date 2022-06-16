@@ -178,6 +178,8 @@ impl Category {
 
 #[test]
 fn cat() {
+    assert!(CATEGORIES.from_slug("database").1);
+
     Categories::new().expect("categories").root.get("parsing").expect("parsing");
 
     CATEGORIES.root.get("development-tools").expect("development-tools").sub.get("build-utils").expect("build-utils");

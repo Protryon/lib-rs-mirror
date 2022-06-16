@@ -317,11 +317,23 @@ impl CrateDb {
             clear_categories.execute(&[&crate_id]).map_err(|e| Error::DbCtx(e, "clear cat"))?;
             insert_keyword.pre_commit(tx, crate_id)?;
 
-            let (categories, had_explicit_categories) = {
+            for (i, k) in c.authors.iter().filter_map(|a| a.email.as_ref().or(a.name.as_ref())).enumerate() {
+                let w: f64 = 50. / (100 + i) as f64;
+                insert_keyword.add_raw(k.into(), w, false);
+            }
+
+            if let Some(repo) = c.repository {
+                let url = repo.canonical_git_url();
+                insert_keyword.add_raw(format!("repo:{}", url), 1., false); // crates in monorepo probably belong together
+            }
+
+            // guessing categories if needed
+            let categories = {
                 let keywords = insert_keyword.keywords.iter().map(|(k,_)| k.to_string());
                 self.extract_crate_categories(tx, &c, keywords, is_important_ish)?
             };
 
+            let had_explicit_categories = categories.iter().any(|c| c.explicit);
             if !had_explicit_categories {
                 let mut tmp = insert_keyword.keywords.iter().collect::<Vec<_>>();
                 tmp.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
@@ -331,10 +343,12 @@ impl CrateDb {
             if categories.is_empty() {
                 write!(&mut out, "[no categories] {:?}", prev_c).unwrap();
             }
+
             if !had_explicit_categories && !categories.is_empty() {
                 write!(&mut out, "[guessed]: ").unwrap();
             }
-            for CategoryCandidate {rank_weight, category_relevance, slug} in &categories {
+
+            for CategoryCandidate {rank_weight, category_relevance, slug, explicit} in &categories {
                 if !prev_c.contains(&slug) {
                     write!(&mut out, ">NEW {}, ", slug).unwrap();
                 } else {
@@ -342,7 +356,7 @@ impl CrateDb {
                 }
                 let args: &[&dyn ToSql] = &[&crate_id, slug, rank_weight, category_relevance];
                 insert_category.execute(args).map_err(|e| Error::DbCtx(e, "insert cat"))?;
-                if had_explicit_categories {
+                if *explicit {
                     insert_keyword.add_raw(slug.to_string(), category_relevance/3., false);
                 }
             }
@@ -351,16 +365,6 @@ impl CrateDb {
                 if !categories.iter().any(|old| old.slug == *slug) {
                     write!(&mut out, ">LOST {}", slug).unwrap();
                 }
-            }
-
-            for (i, k) in c.authors.iter().filter_map(|a| a.email.as_ref().or(a.name.as_ref())).enumerate() {
-                let w: f64 = 50. / (100 + i) as f64;
-                insert_keyword.add_raw(k.into(), w, false);
-            }
-
-            if let Some(repo) = c.repository {
-                let url = repo.canonical_git_url();
-                insert_keyword.add_raw(format!("repo:{}", url), 1., false); // crates in monorepo probably belong together
             }
 
             // yanked crates may contain garbage, or needlessly come up in similar crates
@@ -384,8 +388,10 @@ impl CrateDb {
     /// (rank-relevance, relevance, slug)
     ///
     /// Rank relevance is normalized and biased towards one top category
-    fn extract_crate_categories(&self, conn: &Connection, c: &CrateVersionData<'_>, keywords: impl Iterator<Item=String>, is_important_ish: bool) -> FResult<(Vec<CategoryCandidate>, bool)> {
+    fn extract_crate_categories(&self, conn: &Connection, c: &CrateVersionData<'_>, keywords: impl Iterator<Item=String>, is_important_ish: bool) -> FResult<Vec<CategoryCandidate>> {
         let keywords = keywords.chain(c.bad_categories.iter().cloned()).collect();
+
+        c.category_slugs.iter().for_each(|k| debug_assert!(categories::CATEGORIES.from_slug(k).1, "'{}' must exist", k));
 
         let had_explicit_categories = !c.category_slugs.is_empty();
         let mut categories: Vec<_> = if had_explicit_categories {
@@ -424,11 +430,11 @@ impl CrateDb {
                 let rank_weight = category_relevance / max_weight
                     * if category_relevance >= max_weight * 0.99 { 1. } else { 0.4 } // a crate is only in 1 category
                     * if category_relevance > 0.2 { 1. } else { 0.75 }; // keep bad category guesses out of sight
-                CategoryCandidate {rank_weight, category_relevance, slug}
+                CategoryCandidate {rank_weight, category_relevance, slug, explicit: had_explicit_categories}
             })
             .collect();
 
-        Ok((categories, had_explicit_categories))
+        Ok(categories)
     }
 
     /// Update crate <> repo association
@@ -696,7 +702,9 @@ impl CrateDb {
         order by 2 desc
         limit 10"#)?;
         let candidates = query.query_map(&[&origin.to_str()], |row| Ok((row.get_unwrap(0), row.get_unwrap(1))))?;
-        let candidates = candidates.collect::<std::result::Result<_, _>>()?;
+        let candidates = candidates.collect::<std::result::Result<HashMap<_,_>, _>>()?;
+
+        candidates.keys().for_each(|k| debug_assert!(categories::CATEGORIES.from_slug(k).1, "'{}' must exist", k));
 
         Ok(categories::adjusted_relevance(candidates, kebab_keywords, threshold, 2))
     }
@@ -1163,6 +1171,8 @@ struct CategoryCandidate {
     rank_weight: f64,
     category_relevance: f64,
     slug: Box<str>,
+    /// false if guessed
+    explicit: bool,
 }
 
 #[derive(Debug)]

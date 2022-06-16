@@ -355,7 +355,7 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
         is_crates_io_published: k.origin().is_crates_io(),
         is_yanked: k.is_yanked(),
         is_squatspam: is_squatspam(k) || is_on_shitlist,
-        is_unwanted_category: k.category_slugs().iter().any(|c| c == "cryptography::cryptocurrencies"),
+        is_unwanted_category: k.category_slugs().iter().any(|c| &**c == "cryptography::cryptocurrencies"),
     });
 
     (downloads_per_month as usize, score)

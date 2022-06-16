@@ -78,7 +78,7 @@ impl RichCrateVersion {
         &self.derived.capitalized_name
     }
 
-    pub fn category_slugs(&self) -> &[String] {
+    pub fn category_slugs(&self) -> &[Box<str>] {
         &self.derived.categories
     }
 
@@ -484,7 +484,7 @@ impl RichDep {
 /// Metadata guessed
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Derived {
-    pub categories: Vec<String>,
+    pub categories: Vec<Box<str>>,
     pub keywords: Vec<String>,
     pub path_in_repo: Option<String>,
     pub language_stats: udedokei::Stats,

@@ -18,7 +18,7 @@ use semver::Version as SemVer;
 use std::collections::HashSet;
 
 pub async fn warnings_for_crate(c: &KitchenSink, k: &RichCrateVersion, all: &RichCrate) -> CResult<HashSet<Warning>> {
-    if k.category_slugs().iter().any(|c| c == "cryptography::cryptocurrencies") {
+    if k.category_slugs().iter().any(|c| &**c == "cryptography::cryptocurrencies") {
         return Ok(HashSet::from([Warning::CryptocurrencyBS]));
     }
 

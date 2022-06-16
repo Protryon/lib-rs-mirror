@@ -1011,7 +1011,7 @@ impl KitchenSink {
 
         // allow overrides to take effect without reindexing
         if let Some(overrides) = self.category_overrides.get(package.name.as_str()) {
-            data.derived.categories = overrides.iter().map(|c| c.to_string()).collect();
+            data.derived.categories = overrides.iter().map(|c| (**c).into()).collect();
         }
 
         // allow forced deprecations to take effect without reindexing
@@ -1744,7 +1744,7 @@ impl KitchenSink {
     }
 
     /// Returns (nth, slug)
-    pub async fn top_category(&self, krate: &RichCrateVersion) -> Option<(u32, String)> {
+    pub async fn top_category(&self, krate: &RichCrateVersion) -> Option<(u32, Box<str>)> {
         let crate_origin = krate.origin();
         let cats = join_all(krate.category_slugs().iter().cloned().map(|slug| async move {
             let c = timeout("top category", 6, self.top_crates_in_category(&slug)).await?;

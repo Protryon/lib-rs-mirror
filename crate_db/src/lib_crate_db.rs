@@ -72,7 +72,7 @@ pub struct CrateVersionData<'a> {
 
 /// Metadata guessed
 pub struct DbDerived {
-    pub categories: Vec<String>,
+    pub categories: Vec<Box<str>>,
     pub keywords: Vec<String>,
 }
 
@@ -313,7 +313,7 @@ impl CrateDb {
                 delete_repo.execute(&[&crate_id])?;
             }
 
-            let prev_c = prev_categories.query_map(&[&crate_id], |row| row.get(0))?.collect::<Result<Vec<String>,_>>()?;
+            let prev_c = prev_categories.query_map(&[&crate_id], |row| row.get(0))?.collect::<Result<Vec<Box<str>>,_>>()?;
             clear_categories.execute(&[&crate_id]).map_err(|e| Error::DbCtx(e, "clear cat"))?;
             insert_keyword.pre_commit(tx, crate_id)?;
 
@@ -334,21 +334,21 @@ impl CrateDb {
             if !had_explicit_categories && !categories.is_empty() {
                 write!(&mut out, "[guessed]: ").unwrap();
             }
-            for (rank, rel, slug) in &categories {
-                if !prev_c.contains(slug) {
+            for CategoryCandidate {rank_weight, category_relevance, slug} in &categories {
+                if !prev_c.contains(&slug) {
                     write!(&mut out, ">NEW {}, ", slug).unwrap();
                 } else {
                     write!(&mut out, ">{}, ", slug).unwrap();
                 }
-                let args: &[&dyn ToSql] = &[&crate_id, slug, rank, rel];
+                let args: &[&dyn ToSql] = &[&crate_id, slug, rank_weight, category_relevance];
                 insert_category.execute(args).map_err(|e| Error::DbCtx(e, "insert cat"))?;
                 if had_explicit_categories {
-                    insert_keyword.add_raw(slug.into(), rel/3., false);
+                    insert_keyword.add_raw(slug.to_string(), category_relevance/3., false);
                 }
             }
 
             for slug in &prev_c {
-                if !categories.iter().any(|(_,_,old)| old == slug) {
+                if !categories.iter().any(|old| old.slug == *slug) {
                     write!(&mut out, ">LOST {}", slug).unwrap();
                 }
             }
@@ -375,7 +375,7 @@ impl CrateDb {
             mark_updated.execute(&[&crate_id, &next_timestamp])?;
             println!("{}", out);
             Ok(DbDerived {
-                categories: categories.iter().map(|(_,_,slug)| slug.to_owned()).collect::<Vec<_>>(),
+                categories: categories.iter().map(|cc| cc.slug.to_owned()).collect::<Vec<_>>(),
                 keywords,
             })
         }).await
@@ -384,7 +384,7 @@ impl CrateDb {
     /// (rank-relevance, relevance, slug)
     ///
     /// Rank relevance is normalized and biased towards one top category
-    fn extract_crate_categories(&self, conn: &Connection, c: &CrateVersionData<'_>, keywords: impl Iterator<Item=String>, is_important_ish: bool) -> FResult<(Vec<(f64, f64, String)>, bool)> {
+    fn extract_crate_categories(&self, conn: &Connection, c: &CrateVersionData<'_>, keywords: impl Iterator<Item=String>, is_important_ish: bool) -> FResult<(Vec<CategoryCandidate>, bool)> {
         let keywords = keywords.chain(c.bad_categories.iter().cloned()).collect();
 
         let had_explicit_categories = !c.category_slugs.is_empty();
@@ -395,7 +395,7 @@ impl CrateDb {
                 .enumerate()
                 .map(|(i, slug)| {
                     let w = 100. / (5 + i.pow(2)) as f64 * cat_w;
-                    (slug.to_string(), w)
+                    ((&**slug).into(), w)
                 })
                 .collect();
 
@@ -424,7 +424,7 @@ impl CrateDb {
                 let rank_weight = category_relevance / max_weight
                     * if category_relevance >= max_weight * 0.99 { 1. } else { 0.4 } // a crate is only in 1 category
                     * if category_relevance > 0.2 { 1. } else { 0.75 }; // keep bad category guesses out of sight
-                (rank_weight, category_relevance, slug)
+                CategoryCandidate {rank_weight, category_relevance, slug}
             })
             .collect();
 
@@ -671,7 +671,7 @@ impl CrateDb {
         }).await
     }
 
-    fn guess_crate_categories_tx(conn: &Connection, origin: &Origin, kebab_keywords: &HashSet<String>, threshold: f64) -> FResult<Vec<(f64, String)>> {
+    fn guess_crate_categories_tx(conn: &Connection, origin: &Origin, kebab_keywords: &HashSet<String>, threshold: f64) -> FResult<Vec<(f64, Box<str>)>> {
         let mut query = conn.prepare_cached(r#"
         select cc.slug, sum(cc.relevance_weight * ck.weight * relk.relevance)/(8+count(*)) as w
         from (
@@ -1159,6 +1159,12 @@ fn hex_hash(s: &str) -> String {
     format!("*{}", blake3::hash(s.as_bytes()).to_hex())
 }
 
+struct CategoryCandidate {
+    rank_weight: f64,
+    category_relevance: f64,
+    slug: Box<str>,
+}
+
 #[derive(Debug)]
 pub struct CrateOwnerRow {
     pub origin: Origin,
@@ -1211,7 +1217,7 @@ categories = ["1", "two", "GAMES", "science", "::science::math::"]
     }).await.unwrap();
     assert_eq!(1, db.crates_with_keyword("test-crate").await.unwrap());
     assert_eq!(new_derived.categories.len(), 1); // uses slugs, not manifest
-    assert_eq!(new_derived.categories[0], "science");
+    assert_eq!(&*new_derived.categories[0], "science");
     assert_eq!(new_derived.keywords.len(), 1); // only keywords from manifest
     });
     rt.block_on(f).unwrap();

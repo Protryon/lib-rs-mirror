@@ -190,7 +190,7 @@ async fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult
                 Warning::NoCategories => {
                     extended_desc = Some("Even if there are no categories that fit precisely, pick one that is least bad. You can also propose new categories in crates.io issue tracker.");
                     if k.has_own_categories() {
-                        (if k.category_slugs().is_empty() {2} else {1}, "Needs more categories".into(), format!("Please more specific categories that describe functionality of the crate. Expand categories = [{}] in your Cargo.toml.", comma_list(k.category_slugs().iter().chain(k.manifest_raw_categories()))).into(), Some(("List of available categories".into(), "https://crates.io/category_slugs".into())))
+                        (if k.category_slugs().is_empty() {2} else {1}, "Needs more categories".into(), format!("Please more specific categories that describe functionality of the crate. Expand categories = [{}] in your Cargo.toml.", comma_list(k.category_slugs().iter().map(|c| &**c).chain(k.manifest_raw_categories().iter().map(|c| &**c)))).into(), Some(("List of available categories".into(), "https://crates.io/category_slugs".into())))
                     } else {
                         (if k.category_slugs().is_empty() {3} else {2}, "Missing categories".into(), format!("Categories improve browsing of lib.rs and crates.io. Add categories = [{}] to the Cargo.toml.", comma_list(k.category_slugs().iter())).into(), Some(("List of available categories".into(), "https://crates.io/category_slugs".into())))
                     }
@@ -341,7 +341,7 @@ async fn latest_version_matching_requirement(req: &Box<str>, deadline: Instant, 
     None
 }
 
-fn comma_list<'a>(items: impl Iterator<Item=&'a String>) -> String {
+fn comma_list<'a>(items: impl Iterator<Item=impl std::fmt::Display>) -> String {
     let mut res = items.take(5).map(|c| format!("\"{}\"", c)).collect::<Vec<_>>().join(", ");
     if res.is_empty() {
         res.push('…');

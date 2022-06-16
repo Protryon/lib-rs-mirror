@@ -209,13 +209,13 @@ impl<'a> CratePage<'a> {
     pub fn page_title(&self) -> String {
         let slugs = self.ver.category_slugs();
         let kind = if self.ver.has_bin() {
-            if slugs.iter().any(|s| s == "development-tools::cargo-plugins") {
+            if slugs.iter().any(|s| &**s == "development-tools::cargo-plugins") {
                 "Rust/Cargo add-on"
-            } else if slugs.iter().any(|s| s == "development-tools::build-utils" || s == "development-tools") {
+            } else if slugs.iter().any(|s| &**s == "development-tools::build-utils" || &**s == "development-tools") {
                 "utility for Rust"
-            } else if slugs.iter().any(|s| s == "emulators") {
+            } else if slugs.iter().any(|s| &**s == "emulators") {
                 "Rust emulator"
-            } else if slugs.iter().any(|s| s == "command-line-utilities") {
+            } else if slugs.iter().any(|s| &**s == "command-line-utilities") {
                 "command-line utility in Rust"
             } else if self.ver.is_app() {
                 "Rust application"

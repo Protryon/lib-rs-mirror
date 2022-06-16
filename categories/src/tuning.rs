@@ -1408,7 +1408,7 @@ lazy_static! {
 /// Based on the set of keywords, adjust relevance of given categories
 ///
 /// Returns (weight, slug)
-pub fn adjusted_relevance(mut candidates: HashMap<String, f64>, keywords: &HashSet<String>, min_category_match_threshold: f64, max_num_categories: usize) -> Vec<(f64, String)> {
+pub fn adjusted_relevance(mut candidates: HashMap<Box<str>, f64>, keywords: &HashSet<String>, min_category_match_threshold: f64, max_num_categories: usize) -> Vec<(f64, Box<str>)> {
     for (cond, actions) in KEYWORD_CATEGORIES.iter() {
         let matched_times = match cond {
             Cond::All(reqs) => {
@@ -1427,7 +1427,7 @@ pub fn adjusted_relevance(mut candidates: HashMap<String, f64>, keywords: &HashS
             for &(slug, mul, add) in actions.iter() {
                 debug_assert!(CATEGORIES.from_slug(slug).1, "{}", slug);
                 debug_assert!(mul >= 1.0 || add < 0.0000001, "{}", slug);
-                let score = candidates.entry(slug.to_string()).or_insert(0.);
+                let score = candidates.entry(slug.into()).or_insert(0.);
                 *score *= mul.powf(match_relevance);
                 *score += add * match_relevance + 0.000001;
             }
@@ -1603,10 +1603,10 @@ pub fn adjusted_relevance(mut candidates: HashMap<String, f64>, keywords: &HashS
 /// categories are related.
 /// propagate half of parent category's score to children,
 /// and 1/6th of best child category to parent cat.
-fn relate_subcategory_candidates(candidates: &mut HashMap<String, f64>, categories: &BTreeMap<String, crate::Category>, add_to_children: f64) -> f64 {
+fn relate_subcategory_candidates(candidates: &mut HashMap<Box<str>, f64>, categories: &BTreeMap<String, crate::Category>, add_to_children: f64) -> f64 {
     let mut max = 0.;
     for cat in categories.values() {
-        let propagage = match candidates.get_mut(&cat.slug) {
+        let propagage = match candidates.get_mut(cat.slug.as_str()) {
             Some(score) => {
                 if *score > max {
                     max = *score;
@@ -1617,14 +1617,14 @@ fn relate_subcategory_candidates(candidates: &mut HashMap<String, f64>, categori
             None => 0.,
         };
         let max_of_children = relate_subcategory_candidates(candidates, &cat.sub, propagage);
-        if let Some(score) = candidates.get_mut(&cat.slug) {
+        if let Some(score) = candidates.get_mut(cat.slug.as_str()) {
             *score = *score + max_of_children / 6.;
         }
     }
     max
 }
 
-fn if_this_then_not_that(candidates: &mut HashMap<String, f64>, if_this: &str, not_that: &str) {
+fn if_this_then_not_that(candidates: &mut HashMap<Box<str>, f64>, if_this: &str, not_that: &str) {
     if let Some(has) = candidates.get(if_this).copied() {
         if let Some(shouldnt) = candidates.get_mut(not_that) {
             *shouldnt -= has.min(*shouldnt / 3.);
@@ -1634,7 +1634,7 @@ fn if_this_then_not_that(candidates: &mut HashMap<String, f64>, if_this: &str, n
 
 /// Sometimes a crate half-fits in two categories, and this can push threshold to one of item.
 /// (not for hierarchy of crates)
-fn either_or_category(candidates: &mut HashMap<String, f64>, a_slug: &str, b_slug: &str) {
+fn either_or_category(candidates: &mut HashMap<Box<str>, f64>, a_slug: &str, b_slug: &str) {
     if let (Some(a), Some(b)) = (candidates.get(a_slug).copied(), candidates.get(b_slug).copied()) {
         if a * 0.66 > b {
             *candidates.get_mut(a_slug).unwrap() += b/2.;

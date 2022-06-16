@@ -281,13 +281,23 @@ impl CrateDb {
         }
 
         for &(dep, weight) in c.deps_stats {
-            insert_keyword.add_raw(format!("dep:{}", dep), (weight / 2.0).into(), false);
+            insert_keyword.add_raw(format!("dep:{}", dep), weight.into(), false);
         }
 
         let mut out = String::with_capacity(200);
         write!(&mut out, "https://lib.rs/{} ", if c.origin.is_crates_io() { c.origin.short_crate_name() } else { &origin }).unwrap();
 
         let next_timestamp = (Utc::now().timestamp() + 3600 * 24 * 31) as u32;
+
+        for (i, k) in c.authors.iter().filter_map(|a| a.email.as_ref().or(a.name.as_ref())).enumerate() {
+            let w: f64 = 50. / (100 + i) as f64;
+            insert_keyword.add_raw(k.into(), w, false);
+        }
+
+        if let Some(repo) = c.repository {
+            let url = repo.canonical_git_url();
+            insert_keyword.add_raw(format!("repo:{}", url), 1., false); // crates in monorepo probably belong together
+        }
 
         self.with_write("insert_crate", |tx| {
             let mut insert_crate = tx.prepare_cached("INSERT OR IGNORE INTO crates (origin, recent_downloads, ranking) VALUES (?1, ?2, ?3)")?;
@@ -317,16 +327,6 @@ impl CrateDb {
             clear_categories.execute(&[&crate_id]).map_err(|e| Error::DbCtx(e, "clear cat"))?;
             insert_keyword.pre_commit(tx, crate_id)?;
 
-            for (i, k) in c.authors.iter().filter_map(|a| a.email.as_ref().or(a.name.as_ref())).enumerate() {
-                let w: f64 = 50. / (100 + i) as f64;
-                insert_keyword.add_raw(k.into(), w, false);
-            }
-
-            if let Some(repo) = c.repository {
-                let url = repo.canonical_git_url();
-                insert_keyword.add_raw(format!("repo:{}", url), 1., false); // crates in monorepo probably belong together
-            }
-
             // guessing categories if needed
             let categories = {
                 let keywords = insert_keyword.keywords.iter().map(|(k,_)| k.to_string());
@@ -335,35 +335,38 @@ impl CrateDb {
 
             let had_explicit_categories = categories.iter().any(|c| c.explicit);
             if !had_explicit_categories {
-                let mut tmp = insert_keyword.keywords.iter().collect::<Vec<_>>();
-                tmp.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
-                write!(&mut out, "#{} ", tmp.into_iter().take(10).map(|(k, _)| k.to_string()).collect::<Vec<_>>().join(" #")).unwrap();
-            }
-
-            if categories.is_empty() {
-                write!(&mut out, "[no categories] {:?}", prev_c).unwrap();
-            }
-
-            if !had_explicit_categories && !categories.is_empty() {
-                write!(&mut out, "[guessed]: ").unwrap();
+                if categories.is_empty() {
+                    write!(&mut out, "[no categories] {:?}", prev_c)
+                } else {
+                    write!(&mut out, "[guessed]: ")
+                }.unwrap();
             }
 
             for CategoryCandidate {rank_weight, category_relevance, slug, explicit} in &categories {
                 if !prev_c.contains(&slug) {
-                    write!(&mut out, ">NEW {}, ", slug).unwrap();
+                    write!(&mut out, ">NEW {}, ", slug)
                 } else {
-                    write!(&mut out, ">{}, ", slug).unwrap();
-                }
-                let args: &[&dyn ToSql] = &[&crate_id, slug, rank_weight, category_relevance];
-                insert_category.execute(args).map_err(|e| Error::DbCtx(e, "insert cat"))?;
-                if *explicit {
-                    insert_keyword.add_raw(slug.to_string(), category_relevance/3., false);
-                }
+                    write!(&mut out, ">{}, ", slug)
+                }.unwrap();
             }
 
             for slug in &prev_c {
                 if !categories.iter().any(|old| old.slug == *slug) {
                     write!(&mut out, ">LOST {}", slug).unwrap();
+                }
+            }
+
+            if !had_explicit_categories {
+                let mut tmp = insert_keyword.keywords.iter().collect::<Vec<_>>();
+                tmp.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
+                write!(&mut out, " #{}", tmp.into_iter().take(10).map(|(k, _)| k.as_str()).collect::<Vec<_>>().join(" #")).unwrap();
+            }
+
+            for CategoryCandidate {rank_weight, category_relevance, slug, explicit} in &categories {
+                let args: &[&dyn ToSql] = &[&crate_id, slug, rank_weight, category_relevance];
+                insert_category.execute(args).map_err(|e| Error::DbCtx(e, "insert cat"))?;
+                if *explicit {
+                    insert_keyword.add_raw(slug.to_string(), category_relevance/3., false);
                 }
             }
 

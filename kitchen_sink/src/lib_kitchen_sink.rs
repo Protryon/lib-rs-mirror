@@ -1876,7 +1876,7 @@ impl KitchenSink {
         for (deps, overall_weight) in all_deps.iter() {
             for dep in deps {
                 if let Some(rev) = raw_deps_stats.counts.get(&*dep.package) {
-                    let right_popularity = rev.direct.all() > 1 && rev.direct.all() < 150 && rev.runtime.def < 500 && rev.runtime.opt < 800;
+                    let right_popularity = rev.direct.all() > 2 && rev.direct.all() < 200 && rev.runtime.def < 500 && rev.runtime.opt < 800;
                     if Self::dep_interesting_for_index(&dep.package).unwrap_or(right_popularity) {
                         let weight = overall_weight / (1 + rev.direct.all()) as f32;
                         weighed_deps.push((&dep.package, weight));
@@ -2029,20 +2029,20 @@ impl KitchenSink {
     // deps that are closely related to crates in some category
     fn dep_interesting_for_index(name: &str) -> Option<bool> {
         match name {
-            "futures" | "tokio" | "actix-web" | "rocket_codegen" | "iron" | "rusoto_core" | "rocket" | "router" | "async-std" |
-            "constant_time_eq" | "digest" |
+            "futures" | "async-trait" | "tokio" | "actix-web" | "warp" | "rocket_codegen" | "iron" | "rusoto_core" | "rocket" | "router" | "async-std" |
+            "constant_time_eq" | "digest" | "subtle" |
             "quoted_printable" | "mime" | "rustls" | "websocket" | "hyper" |
             "piston2d-graphics" | "amethyst_core" | "amethyst" | "specs" | "piston" | "allegro" | "minifb" | "bevy" |
             "rgb" | "imgref" | "gstreamer" | "gtk" | "gtk4" |
-            "bare-metal" |
+            "bare-metal" | "usb-device" |
             "core-foundation" |
             "proc-macro2" | "proc-macro-hack" | "darling" | "quote" |
             "cargo" | "cargo_metadata" | "git2" | "dbus" |
             "hound" | "lopdf" |
-            "nom" | "lalrpop" | "combine" | "pest" |
+            "nom" | "lalrpop" | "combine" | "pest" | "unicode-xid" |
             "clap" | "structopt" | "ansi_term" |
             "alga" | "bio" | "nalgebra" |
-            "syntect" | "stdweb" | "parity-wasm" |
+            "syntect" | "stdweb" | "parity-wasm" | "wasm-bindgen" |
             "solana-program" | "ethabi" | "bitcoin" | "ink_primitives" | "parity-scale-codec" | "ethnum" | "borsh" | "solana-sdk" | "anchor-lang" | "mpl-token-metadata" | "spl-token" => Some(true),
             /////////
             "threadpool" | "rayon" | "md5" | "arrayref" | "memmmap" | "xml" | "crossbeam" | "pyo3" |

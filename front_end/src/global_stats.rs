@@ -299,6 +299,9 @@ fn rustc_stats(compat: &HashMap<Origin, CompatByCrateVersion>, max_rust_version:
 fn cat_slugs(sub: &'static CategoryMap) -> Vec<TreeBox> {
     let mut out = Vec::with_capacity(sub.len());
     for c in sub.values() {
+        if c.slug == "uncategorized" {
+            continue;
+        }
         out.push(TreeBox {
             cat: c,
             label: c.name.clone(),
@@ -353,7 +356,7 @@ async fn category_stats(kitchen_sink: &KitchenSink) -> Result<Vec<TreeBox>, anyh
         items.swap_remove(pos)
     }
     #[track_caller]
-    fn find_cat<'a>(slug: &str, items: &'a mut Vec<TreeBox>) -> &'a mut TreeBox {
+    fn get_cat<'a>(slug: &str, items: &'a mut Vec<TreeBox>) -> &'a mut TreeBox {
         let pos = items.iter().position(|i| i.cat.slug == slug).unwrap_or_else(|| panic!("{} in {:?}", slug, items));
         &mut items[pos]
     }
@@ -372,19 +375,19 @@ async fn category_stats(kitchen_sink: &KitchenSink) -> Result<Vec<TreeBox>, anyh
     }
 
     // names don't fit
-    find_cat("database-implementations", &mut roots).label = "Database".into();
-    find_cat("simulation", &mut roots).label = "Sim".into();
-    find_cat("caching", &mut roots).label = "Cache".into();
-    find_cat("config", &mut roots).label = "Config".into();
-    find_cat("os", &mut roots).label = "OS".into();
-    find_cat("internationalization", &mut roots).label = "i18n".into();
-    find_cat("authentication", &mut roots).label = "Auth".into();
-    find_cat("visualization", &mut roots).label = "Visualize".into();
-    find_cat("accessibility", &mut roots).label = "a11y".into();
-    find_cat("compilers", &mut roots).label = "Lang".into();
-    find_cat("os::macos-apis", &mut find_cat("os", &mut roots).sub).label = "Apple".into();
-    find_cat("rendering::engine", &mut find_cat("rendering", &mut roots).sub).label = "Engine".into();
-    find_cat("rendering::data-formats", &mut find_cat("rendering", &mut roots).sub).label = "Formats".into();
+    get_cat("database-implementations", &mut roots).label = "Database".into();
+    get_cat("simulation", &mut roots).label = "Sim".into();
+    get_cat("caching", &mut roots).label = "Cache".into();
+    get_cat("config", &mut roots).label = "Config".into();
+    get_cat("os", &mut roots).label = "OS".into();
+    get_cat("internationalization", &mut roots).label = "i18n".into();
+    get_cat("authentication", &mut roots).label = "Auth".into();
+    get_cat("visualization", &mut roots).label = "Visualize".into();
+    get_cat("accessibility", &mut roots).label = "a11y".into();
+    get_cat("compilers", &mut roots).label = "Lang".into();
+    get_cat("os::macos-apis", &mut get_cat("os", &mut roots).sub).label = "Apple".into();
+    get_cat("rendering::engine", &mut get_cat("rendering", &mut roots).sub).label = "Engine".into();
+    get_cat("rendering::data-formats", &mut get_cat("rendering", &mut roots).sub).label = "Formats".into();
 
     // group them in a more sensible way
     let parsers = vec![take_cat("parsing", &mut roots), take_cat("parser-implementations", &mut roots)];
@@ -414,20 +417,20 @@ async fn category_stats(kitchen_sink: &KitchenSink) -> Result<Vec<TreeBox>, anyh
     roots.push(new_cat(txt));
 
     let wasm = take_cat("wasm", &mut roots);
-    find_cat("web-programming", &mut roots).sub.push(wasm);
+    get_cat("web-programming", &mut roots).sub.push(wasm);
 
     let mut asyn = take_cat("asynchronous", &mut roots);
     asyn.label = "Async".into();
-    find_cat("network-programming", &mut roots).sub.push(asyn);
+    get_cat("network-programming", &mut roots).sub.push(asyn);
 
-    let mut proc = take_cat("development-tools::procedural-macro-helpers", &mut find_cat("development-tools", &mut roots).sub);
+    let mut proc = take_cat("development-tools::procedural-macro-helpers", &mut get_cat("development-tools", &mut roots).sub);
     proc.label = "Proc macros".into();
-    find_cat("rust-patterns", &mut roots).sub.push(proc);
+    get_cat("rust-patterns", &mut roots).sub.push(proc);
 
     let concurrency = take_cat("concurrency", &mut roots);
-    find_cat("rust-patterns", &mut roots).sub.push(concurrency);
+    get_cat("rust-patterns", &mut roots).sub.push(concurrency);
 
-    let mut cr = find_cat("cryptography", &mut roots).sub.remove(0);
+    let mut cr = get_cat("cryptography", &mut roots).sub.remove(0);
     cr.label = "Crypto Magic Beans".into();
     roots.push(cr);
 

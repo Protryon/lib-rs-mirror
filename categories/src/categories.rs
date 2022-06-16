@@ -150,9 +150,6 @@ impl Categories {
             if s == "external-ffi-bindings" { // We pretend it doesn't exist
                 return false;
             }
-            if s == "api-bindings" { // We pretend it doesn't exist
-                return false;
-            }
             if !CATEGORIES.from_slug(s).1 {
                 // this is invalid for lib.rs, but may contain slus valid for crates.io
                 invalid_lib_rs_categories.push(orig_name.to_string());

@@ -262,7 +262,7 @@ pub struct KitchenSink {
     git_checkout_path: PathBuf,
     main_cache_dir: PathBuf,
     yearly: AllDownloads,
-    category_overrides: HashMap<Box<str>, Vec<Cow<'static, str>>>,
+    category_overrides: HashMap<Box<str>, Vec<String>>,
     crates_io_owners_cache: TempCache<Vec<CrateOwner>>,
     depender_changes: TempCache<Vec<DependerChanges>>,
     stats_histograms: TempCache<StatsHistogram>,
@@ -408,7 +408,7 @@ impl KitchenSink {
         Ok(out)
     }
 
-    fn load_category_overrides(path: &Path) -> CResult<HashMap<Box<str>, Vec<Cow<'static, str>>>> {
+    fn load_category_overrides(path: &Path) -> CResult<HashMap<Box<str>, Vec<String>>> {
         let p = std::fs::read_to_string(path)?;
         let mut out = HashMap::new();
         for line in p.lines() {
@@ -418,7 +418,7 @@ impl KitchenSink {
                 continue;
             }
             let categories: Vec<_> = parts.next().expect("overrides broken").split(',')
-                .map(|s| s.trim().to_string().into()).collect();
+                .map(|s| s.trim().to_owned()).collect();
             if categories.is_empty() {
                 continue;
             }
@@ -1891,7 +1891,7 @@ impl KitchenSink {
         let authors = package.authors.iter().map(|a| Author::new(a)).collect::<Vec<_>>();
 
         let mut bad_categories = Vec::new();
-        let mut category_slugs = &categories::Categories::fixed_category_slugs(&package.categories, &mut bad_categories);
+        let mut category_slugs = categories::Categories::fixed_category_slugs(&package.categories, &mut bad_categories);
         for c in &bad_categories {
             // categories invalid for lib.rs may still be valid for crates.io (they've drifted over time)
             if is_valid_crates_io_category_not_on_lib_rs(&c) {
@@ -1909,7 +1909,7 @@ impl KitchenSink {
         }
 
         if let Some(overrides) = self.category_overrides.get(origin.short_crate_name()) {
-            category_slugs = overrides;
+            category_slugs = categories::Categories::fixed_category_slugs(overrides, &mut bad_categories);
         }
 
         category_slugs.iter().for_each(|k| debug_assert!(categories::CATEGORIES.from_slug(k).1, "'{}' must exist", k));
@@ -1918,7 +1918,7 @@ impl KitchenSink {
 
         let db_index = self.crate_db.index_latest(CrateVersionData {
             cache_key,
-            category_slugs,
+            category_slugs: &category_slugs,
             bad_categories: &bad_categories,
             authors: &authors,
             origin,

@@ -248,9 +248,9 @@ impl Index {
             .iter()
             .max_by_key(|a| {
                 let ver = SemVer::parse(a.version())
-                    .map_err(|e| error!("{} has invalid version {}: {}", krate.name(), a.version(), e))
+                    .map_err(|e| info!("{} has invalid version {}: {}", krate.name(), a.version(), e))
                     .ok();
-                let bad = a.is_yanked() || (stable_only && !ver.as_ref().map_or(false, |v| v.pre.is_empty()));
+                let bad = a.is_yanked() || ver.is_none() || (stable_only && !ver.as_ref().map_or(false, |v| v.pre.is_empty()));
                 (!bad, ver)
             })
             .unwrap_or_else(|| krate.latest_version()) // latest_version = most recently published version

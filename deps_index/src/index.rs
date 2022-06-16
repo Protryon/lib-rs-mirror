@@ -359,7 +359,7 @@ impl Index {
             let krate = match self.crates_io_crate_by_lowercase_name(&crate_name) {
                 Ok(k) => k,
                 Err(e) => {
-                    error!("{}@{} depends on missing crate {} (@{}): {}", ver.name(), ver.version(), crate_name, req, e);
+                    info!("{}@{} depends on missing crate {} (@{}): {}", ver.name(), ver.version(), crate_name, req, e);
                     continue;
                 },
             };

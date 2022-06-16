@@ -303,7 +303,12 @@ impl KitchenSink {
     }
 
     pub async fn new(data_path: &Path, github_token: &str) -> CResult<Self> {
-        let _ = env_logger::try_init();
+        let _ = env_logger::Builder::from_default_env()
+            .filter(Some("html5ever"), log::LevelFilter::Error)
+            .filter(Some("html5ever::tree_builder"), log::LevelFilter::Error)
+            .filter(Some("html5ever::tokenizer::char_ref"), log::LevelFilter::Error)
+            .filter(Some("tantivy"), log::LevelFilter::Error)
+            .try_init();
 
         let ((crates_io, gh), (index, crev)) = tokio::task::spawn_blocking({
             let data_path = data_path.to_owned();

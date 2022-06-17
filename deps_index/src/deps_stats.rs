@@ -247,6 +247,8 @@ pub struct CompactStringSet(String);
 
 impl CompactStringSet {
     pub fn push(&mut self, s: &str) {
+        debug_assert!(s.bytes().all(|c| c > 0));
+
         if !self.0.is_empty() {
             self.0.reserve(1 + s.len());
             self.0.push('\0');
@@ -255,6 +257,18 @@ impl CompactStringSet {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &str> {
-        self.0.split('\0')
+        if !self.0.is_empty() { Some(self.0.as_str()) } else { None }
+            .into_iter().flat_map(|s| s.split('\0'))
     }
+}
+
+
+#[test]
+fn compact_str() {
+    let mut c = CompactStringSet::default();
+    assert_eq!(0, c.iter().count());
+    c.push("aaa");
+    assert_eq!(1, c.iter().count());
+    c.push("bb");
+    assert_eq!(2, c.iter().count());
 }

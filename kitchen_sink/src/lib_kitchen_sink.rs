@@ -2769,6 +2769,8 @@ impl KitchenSink {
             }
         }
 
+        authors.truncate(20); // long lists look spammy
+
         let owners_partial = authors.iter().any(|a| a.owner);
         Ok((authors, owners, owners_partial, if hit_max_contributor_count { 100 } else { contributors }))
     }

@@ -26,7 +26,7 @@ RUN cargo install libc --vers 99.9.9 || true # force index update
 
 const TEMP_JUNK_DIR: &str = "/var/tmp/crates_env";
 
-const RUST_VERSIONS: [RustcMinorVersion; 8] = [
+const RUST_VERSIONS: [RustcMinorVersion; 11] = [
     60,
     35,
     40,
@@ -35,6 +35,9 @@ const RUST_VERSIONS: [RustcMinorVersion; 8] = [
     53,
     58,
     61,
+    56,
+    57,
+    31,
 ];
 
 use crate_db::builddb::*;
@@ -157,9 +160,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         eprintln!("builder end");
     });
 
-    let filters: Vec<_> = std::env::args().skip(1).collect();
+    let mut filters: Vec<_> = std::env::args().skip(1).collect();
+    let mut do_all = false;
+    filters.retain(|v| if v == "--all" { do_all = true; false } else { true });
 
-    for all in crates.all_crates_io_crates().values() {
+    let all_crates_map = crates.all_crates_io_crates();
+    let mut map_iter;
+    let mut recent_iter;
+    let all_crates: &mut dyn Iterator<Item = _> = if !do_all {
+        recent_iter = crates.notable_recently_updated_crates(5000).await?.into_iter().filter_map(|(o, _)| {
+            all_crates_map.get(o.short_crate_name())
+        });
+        &mut recent_iter
+    } else {
+        map_iter = all_crates_map.values();
+        &mut map_iter
+    };
+
+    for all in all_crates {
         if stopped() {
             break;
         }
@@ -224,7 +242,7 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
             let newest_bad_certain = compat.newest_bad_likely().unwrap_or(0).max(19); // we don't test rust < 19
             let gap = oldest_ok.saturating_sub(newest_bad) as u32; // unknown version gap
             let gap_certain = oldest_ok_certain.saturating_sub(newest_bad_certain) as u32; // unknown version gap
-            let score = rng.gen_range(0..if has_anything_built_ok_yet { 3 } else { 20 }) // spice it up a bit
+            let score = rng.gen_range(0..if has_anything_built_ok_yet { 3 } else { 10 }) // spice it up a bit
                 + gap_certain.min(10)
                 + if gap > 4 { gap * 2 } else { gap }
                 + if gap > 10 { gap } else { 0 }
@@ -237,10 +255,10 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
                 + if oldest_ok  > 35 { 1 } else { 0 }
                 + if oldest_ok  > 40 { 4 } else { 0 }
                 + if oldest_ok  > 47 { 2 } else { 0 }
-                + if oldest_ok  > 50 { 8 } else { 0 }
+                + if oldest_ok  > 50 { 5 } else { 0 }
                 + if oldest_ok  > 53 { 8 } else { 0 }
-                + if v.pre.is_empty() { 10 } else { 0 } // don't waste time testing alphas
-                + if idx == 0 { 20 } else { 0 } // prefer latest
+                + if v.pre.is_empty() { 15 } else { 0 } // don't waste time testing alphas
+                + if idx == 0 { 10 } else { 0 } // prefer latest
                 + 5u32.saturating_sub(idx as u32); // prefer newer
 
             ToCheck {

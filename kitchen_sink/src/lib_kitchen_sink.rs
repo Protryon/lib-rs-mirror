@@ -2214,9 +2214,8 @@ impl KitchenSink {
             let c = c.entry(semver).or_insert_with(Default::default);
 
             let created = DateTime::parse_from_rfc3339(&ver.created_at).map_err(|_| KitchenSinkErr::BadRustcCompatData)?;
-            if let Some(mut expected_rust) = Self::rustc_release_from_date(&created) {
-                expected_rust += bump_min_expected_rust;
-                c.add_compat(expected_rust, Compat::ProbablyWorks, Some("Assumed from release date".into()));
+            if let Some(expected_rust) = Self::rustc_release_from_date(&created) {
+                c.add_compat(expected_rust.saturating_sub(bump_min_expected_rust), Compat::ProbablyWorks, Some("Assumed from release date".into()));
             }
         }
         // this is needed to copy build failures from non-matching versions to matching versions

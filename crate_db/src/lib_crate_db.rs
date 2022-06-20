@@ -342,11 +342,11 @@ impl CrateDb {
                 }.unwrap();
             }
 
-            for CategoryCandidate {rank_weight, category_relevance, slug, explicit} in &categories {
-                if !prev_c.contains(&slug) {
-                    write!(&mut out, ">NEW {}, ", slug)
+            for c in &categories {
+                if !prev_c.contains(&c.slug) {
+                    write!(&mut out, ">NEW {}, ", c.slug)
                 } else {
-                    write!(&mut out, ">{}, ", slug)
+                    write!(&mut out, ">{}, ", c.slug)
                 }.unwrap();
             }
 

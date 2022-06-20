@@ -244,7 +244,7 @@
                           @if d.former_glory < 0.3 {
                             <a href="@link">This crate has lost popularity</a>
                           } else {
-                            Used in <a href="@link">@if d.direct > 5 {less than} <b>@c.format_number(d.direct)</b>&nbsp;crate@if d.direct != 1 {s}</a>
+                            Used in <a href="@link">@if d.direct > 5 {fewer than} <b>@c.format_number(d.direct)</b>&nbsp;crate@if d.direct != 1 {s}</a>
                           }
                         }
                       }

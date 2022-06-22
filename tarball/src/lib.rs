@@ -14,7 +14,7 @@ use udedokei::LanguageExt;
 
 #[derive(Debug, thiserror::Error)]
 pub enum UnarchiverError {
-    #[error("Cargo.toml not found. Got files: {0}")]
+    #[error("Cargo.toml not found.\nGot files: {0}")]
     TomlNotFound(String),
     #[error("I/O error during unarchiving")]
     Io(#[from] #[source] io::Error),
@@ -22,6 +22,8 @@ pub enum UnarchiverError {
     Toml(#[from] #[source] cargo_toml::Error),
     #[error("Git checkout failure")]
     Checkout(#[from] #[source] crate_git_checkout::Error),
+    #[error("JSON parse")]
+    Parse(#[from] #[source] serde_json::Error)
 }
 
 fn read_archive_files<R: Read>(archive: R, mut cb: impl FnMut(Entry<'_, Decoder<R>>) -> Result<(), UnarchiverError>) -> Result<(), UnarchiverError> {
@@ -41,6 +43,7 @@ enum ReadAs {
     Lib,
     Bin,
     GetStatsOfFile(udedokei::Language),
+    CargoVcsInfo,
     Skip,
 }
 
@@ -76,16 +79,43 @@ pub fn read_archive(archive: &[u8], name: &str, ver: &str) -> Result<CrateFile, 
     collect.finish()
 }
 
+#[derive(Debug, Clone)]
+pub struct CrateFile {
+    pub manifest: Manifest,
+    /// Rust source
+    pub lib_file: Option<String>,
+    pub bin_file: Option<String>,
+    pub files: Vec<PathBuf>,
+    /// relative path and markdown
+    pub readme: Option<(String, Markup)>,
+    pub compressed_size: usize,
+    pub decompressed_size: usize,
+    pub is_nightly: bool,
+
+    /// From .cargo_vcs_info.json
+    pub vcs_info_path: Option<String>,
+    pub vcs_info_git_sha1: Option<[u8; 20]>,
+
+    /// From all code-like files
+    pub language_stats: udedokei::Stats,
+}
+
 struct Collector {
     manifest: Option<Manifest>,
-    markup: Option<(String, Markup)>,
-    files: Vec<PathBuf>,
     lib_file: Option<String>,
     bin_file: Option<String>,
-    stats: udedokei::Collect,
-    decompressed_size: usize,
+    files: Vec<PathBuf>,
+    markup: Option<(String, Markup)>,
     compressed_size: usize,
+    decompressed_size: usize,
     is_nightly: bool,
+
+    // From .cargo_vcs_info.json
+    vcs_info_path: Option<String>,
+    vcs_info_git_sha1: Option<[u8; 20]>,
+
+    // From all code-like files
+    stats: udedokei::Collect,
 }
 
 impl Collector {
@@ -100,6 +130,8 @@ impl Collector {
             decompressed_size: 0,
             compressed_size,
             is_nightly: false,
+            vcs_info_path: None,
+            vcs_info_git_sha1: None,
         }
     }
 
@@ -107,6 +139,7 @@ impl Collector {
         let path_match = {
             match &relpath {
                 p if p == Path::new("Cargo.toml") || p == Path::new("cargo.toml") => ReadAs::Toml,
+                p if p == Path::new(".cargo_vcs_info.json") => ReadAs::CargoVcsInfo,
                 p if is_lib_filename(p, self.manifest.as_ref()) => ReadAs::Lib,
                 p if is_bin_filename(p, self.manifest.as_ref()) => ReadAs::Bin,
                 p if is_readme_filename(p, self.manifest.as_ref().and_then(|m| m.package.as_ref())) => {
@@ -161,6 +194,11 @@ impl Collector {
                 }
                 self.bin_file = Some(data);
             },
+            ReadAs::CargoVcsInfo => {
+                let vcs: CargoVcsInfo = serde_json::from_str(&data)?;
+                self.vcs_info_path = vcs.path_in_vcs;
+                self.vcs_info_git_sha1 = vcs.git.map(|g| g.sha1);
+            },
             ReadAs::Toml => {
                 self.manifest = Some(Manifest::from_str(&data)?);
             },
@@ -196,8 +234,22 @@ impl Collector {
             bin_file: self.bin_file,
             language_stats: self.stats.finish(),
             is_nightly: self.is_nightly,
+            vcs_info_path: self.vcs_info_path,
+            vcs_info_git_sha1: self.vcs_info_git_sha1,
         })
     }
+}
+
+#[derive(serde::Deserialize)]
+struct CargoVcsInfo {
+    git: Option<CargoVcsInfoGit>,
+    path_in_vcs: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct CargoVcsInfoGit {
+    #[serde(with = "hex")]
+    sha1: [u8; 20],
 }
 
 struct FilesFs<'a>(&'a [PathBuf]);
@@ -235,20 +287,6 @@ fn is_source_code_file(path: &Path) -> Option<udedokei::Language> {
         return None;
     }
     udedokei::from_path(path)
-}
-
-#[derive(Debug, Clone)]
-pub struct CrateFile {
-    pub manifest: Manifest,
-    pub lib_file: Option<String>,
-    pub bin_file: Option<String>,
-    pub files: Vec<PathBuf>,
-    // relative path and markdown
-    pub readme: Option<(String, Markup)>,
-    pub language_stats: udedokei::Stats,
-    pub compressed_size: usize,
-    pub decompressed_size: usize,
-    pub is_nightly: bool,
 }
 
 impl CrateFile {

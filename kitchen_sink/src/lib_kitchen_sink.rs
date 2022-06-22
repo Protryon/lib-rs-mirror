@@ -185,6 +185,8 @@ pub enum KitchenSinkErr {
     NotAPackage(Origin),
     #[error("data not found, wanted {}", _0)]
     DataNotFound(String),
+    #[error("tarball unarchiving error in {}", _0)]
+    UnarchiverError(String, #[source] Arc<tarball::UnarchiverError>),
     #[error("crate has no versions")]
     NoVersions,
     #[error("cached data has different version than the index")]
@@ -1091,20 +1093,19 @@ impl KitchenSink {
         self.rich_crate_version_data_common(origin.clone(), meta, false, path_in_repo, warnings).await
     }
 
-    async fn tarball(&self, name: &str, ver: &str) -> Result<Vec<u8>, KitchenSinkErr> {
-        self.crates_io.crate_data(name, ver).await
-            .map_err(|e| KitchenSinkErr::DataNotFound(format!("{}-{}: {}", name, ver, e)))
-    }
+    async fn rich_crate_version_tarball_from_crates_io(&self, krate: &CratesIndexVersion) -> Result<CrateFile, KitchenSinkErr> {
+        let name = krate.name();
+        let ver = krate.version();
+        let tarball = timeout("tarball fetch", 16, self.crates_io.crate_data(name, ver)
+            .map_err(|e| KitchenSinkErr::DataNotFound(format!("{}-{}: {}", name, ver, e)))).await?;
 
-    async fn rich_crate_version_tarball_from_crates_io(&self, latest: &CratesIndexVersion) -> CResult<CrateFile> {
-        let tarball = timeout("tarball fetch", 16, self.tarball(latest.name(), latest.version())).await?;
         let meta = timeout("untar1", 40, spawn_blocking({
-            let name = latest.name().to_owned();
-            let ver = latest.version().to_owned();
-            move || {
-                tarball::read_archive(&tarball[..], &name, &ver)
-            }
-        }).map_err(|e| KitchenSinkErr::Internal(std::sync::Arc::new(e)))).await??;
+                let name = name.to_owned();
+                let ver = ver.to_owned();
+                move || tarball::read_archive(&tarball[..], &name, &ver)
+            })
+            .map_err(|e| KitchenSinkErr::Internal(std::sync::Arc::new(e)))).await?
+            .map_err(|e| KitchenSinkErr::UnarchiverError(format!("{}-{}", name, ver), Arc::new(e)))?;
         Ok(meta)
     }
 
@@ -3398,12 +3399,18 @@ fn is_build_or_dev_test() {
 }
 
 #[test]
-fn fetch_uppercase_name() {
+fn fetch_uppercase_name_and_tarball() {
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(rt.spawn(async move {
         let k = KitchenSink::new_default().await.expect("Test if configured");
         let _ = k.rich_crate_async(&Origin::from_crates_io_name("Inflector")).await.unwrap();
         let _ = k.rich_crate_async(&Origin::from_crates_io_name("inflector")).await.unwrap();
+
+
+        let testk = k.index.crates_io_crate_by_lowercase_name("dssim-core").unwrap();
+        let meta = k.rich_crate_version_tarball_from_crates_io(&testk.versions()[8]).await.unwrap();
+        assert_eq!(meta.vcs_info_path.as_deref(), Some("dssim-core"), "{:#?}", meta);
+        assert_eq!(meta.vcs_info_git_sha1.as_ref().unwrap(), b"\xba\x0a\x40\xd1\x3b\x1d\x11\xb0\x19\xf6\xb6\x6a\x77\x2e\xbd\xa7\xd0\xf9\x45\x0c");
     })).unwrap();
 }
 

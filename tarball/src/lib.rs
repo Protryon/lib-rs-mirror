@@ -47,7 +47,7 @@ enum ReadAs {
 const MAX_FILE_SIZE: u64 = 50_000_000;
 
 pub fn read_repo(repo: &crate_git_checkout::Repository, path_in_tree: crate_git_checkout::Oid) -> Result<CrateFile, UnarchiverError> {
-    let mut collect = Collector::new();
+    let mut collect = Collector::new(0);
     crate_git_checkout::iter_blobs::<UnarchiverError, _>(repo, Some(path_in_tree), |path, _, name, blob| {
         // FIXME: skip directories that contain other crates
         let mut blob_content = blob.content();
@@ -57,9 +57,9 @@ pub fn read_repo(repo: &crate_git_checkout::Repository, path_in_tree: crate_git_
     Ok(collect.finish()?)
 }
 
-pub fn read_archive(archive: impl Read, name: &str, ver: &str) -> Result<CrateFile, UnarchiverError> {
+pub fn read_archive(archive: &[u8], name: &str, ver: &str) -> Result<CrateFile, UnarchiverError> {
     let prefix = PathBuf::from(format!("{}-{}", name, ver));
-    let mut collect = Collector::new();
+    let mut collect = Collector::new(archive.len());
     read_archive_files(archive, |mut file| {
         let header = file.header();
         match header.entry_type() {
@@ -84,11 +84,12 @@ struct Collector {
     bin_file: Option<String>,
     stats: udedokei::Collect,
     decompressed_size: usize,
+    compressed_size: usize,
     is_nightly: bool,
 }
 
 impl Collector {
-    pub fn new() -> Self {
+    pub fn new(compressed_size: usize) -> Self {
         Self {
             manifest: None,
             markup: None,
@@ -97,6 +98,7 @@ impl Collector {
             bin_file: None,
             stats: udedokei::Collect::new(),
             decompressed_size: 0,
+            compressed_size,
             is_nightly: false,
         }
     }
@@ -186,6 +188,7 @@ impl Collector {
 
         Ok(CrateFile {
             decompressed_size: self.decompressed_size,
+            compressed_size: self.compressed_size,
             readme: self.markup,
             manifest,
             files: self.files,
@@ -243,6 +246,7 @@ pub struct CrateFile {
     // relative path and markdown
     pub readme: Option<(String, Markup)>,
     pub language_stats: udedokei::Stats,
+    pub compressed_size: usize,
     pub decompressed_size: usize,
     pub is_nightly: bool,
 }

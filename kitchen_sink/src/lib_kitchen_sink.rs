@@ -1088,12 +1088,24 @@ impl KitchenSink {
             warnings.insert(Warning::NoReadmeProperty);
             warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()).await);
         }
-        self.rich_crate_version_data_common(origin.clone(), meta, 0, false, path_in_repo, warnings).await
+        self.rich_crate_version_data_common(origin.clone(), meta, false, path_in_repo, warnings).await
     }
 
     async fn tarball(&self, name: &str, ver: &str) -> Result<Vec<u8>, KitchenSinkErr> {
         self.crates_io.crate_data(name, ver).await
             .map_err(|e| KitchenSinkErr::DataNotFound(format!("{}-{}: {}", name, ver, e)))
+    }
+
+    async fn rich_crate_version_tarball_from_crates_io(&self, latest: &CratesIndexVersion) -> CResult<CrateFile> {
+        let tarball = timeout("tarball fetch", 16, self.tarball(latest.name(), latest.version())).await?;
+        let meta = timeout("untar1", 40, spawn_blocking({
+            let name = latest.name().to_owned();
+            let ver = latest.version().to_owned();
+            move || {
+                tarball::read_archive(&tarball[..], &name, &ver)
+            }
+        }).map_err(|e| KitchenSinkErr::Internal(std::sync::Arc::new(e)))).await??;
+        Ok(meta)
     }
 
     async fn rich_crate_version_data_from_crates_io(&self, latest: &CratesIndexVersion) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
@@ -1111,22 +1123,13 @@ impl KitchenSink {
         tokio::task::yield_now().await;
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
 
-        let (crate_tarball, crates_io_meta) = futures::join!(
-            timeout("tarball fetch", 16, self.tarball(name, ver)),
+        let (meta, crates_io_meta) = futures::join!(
+            self.rich_crate_version_tarball_from_crates_io(latest),
             timeout("cio meta fetch", 16, self.crates_io_meta(&name_lower)),
         );
 
+        let mut meta = meta?;
         let crates_io_krate = crates_io_meta?.krate;
-        let crate_tarball = crate_tarball?;
-        let crate_compressed_size = crate_tarball.len();
-        let mut meta = timeout("untar1", 40, spawn_blocking({
-            let name = name.to_owned();
-            let ver = ver.to_owned();
-            move || {
-                tarball::read_archive(&crate_tarball[..], &name, &ver)
-            }
-        }).map_err(|e| KitchenSinkErr::Internal(std::sync::Arc::new(e)))).await??;
-
         let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
 
         // it may contain data from "nowhere"! https://github.com/rust-lang/crates.io/issues/1624
@@ -1177,11 +1180,11 @@ impl KitchenSink {
             None => None,
         }.unwrap_or_default();
 
-        watch("data-common", self.rich_crate_version_data_common(origin, meta, crate_compressed_size as u32, latest.is_yanked(), path_in_repo, warnings)).await
+        watch("data-common", self.rich_crate_version_data_common(origin, meta, latest.is_yanked(), path_in_repo, warnings)).await
     }
 
     ///// Fixing and faking the data
-    async fn rich_crate_version_data_common(&self, origin: Origin, mut meta: CrateFile, crate_compressed_size: u32, is_yanked: bool, path_in_repo: String, mut warnings: Warnings) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
+    async fn rich_crate_version_data_common(&self, origin: Origin, mut meta: CrateFile, is_yanked: bool, path_in_repo: String, mut warnings: Warnings) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
 
         Self::override_bad_categories(&mut meta.manifest);
@@ -1310,6 +1313,7 @@ impl KitchenSink {
             }
         });
 
+        let crate_compressed_size = meta.compressed_size.min(u32::MAX as _) as u32;
         let src = CrateVersionSourceData {
             capitalized_name,
             language_stats: meta.language_stats,

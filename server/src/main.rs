@@ -22,6 +22,7 @@ use locale::Numeric;
 use render_readme::{Highlighter, Markup, Renderer};
 use repo_url::SimpleRepo;
 use search_index::CrateSearchIndex;
+use std::collections::HashMap;
 use std::convert::TryInto;
 use std::env;
 use std::path::PathBuf;
@@ -32,6 +33,7 @@ use std::time::{Duration, Instant, SystemTime};
 use tokio::runtime::Handle;
 use urlencoding::decode;
 use urlencoding::Encoded;
+use once_cell::sync::Lazy;
 
 #[macro_use]
 extern crate log;
@@ -42,6 +44,9 @@ mod writer;
 static ALLOCATOR: Cap<std::alloc::System> = Cap::new(std::alloc::System, 4 * 1024 * 1024 * 1024);
 
 static HUP_SIGNAL: AtomicU32 = AtomicU32::new(0);
+
+/// Makes sure that the same page isn't rendered multiple times in parallel
+static PAGES_RENDER: Lazy<std::sync::Mutex<HashMap<Box<str>, Arc<tokio::sync::Mutex<()>>>>> = Lazy::new(|| std::sync::Mutex::new(HashMap::new()));
 
 struct ServerState {
     markup: Renderer,
@@ -881,10 +886,54 @@ async fn handle_global_stats(req: HttpRequest) -> Result<HttpResponse, ServerErr
 
 const CACHE_MAGIC_TAG: &[u8; 4] = b"  <c";
 
+
+struct RenderLock<'k> {
+    key: &'k str,
+    lock: Arc<tokio::sync::Mutex<()>>,
+}
+
+struct RenderLockGuard<'k, 'l> {
+    key: &'k str,
+    _guard: tokio::sync::MutexGuard<'l, ()>,
+}
+
+impl Drop for RenderLockGuard<'_, '_> {
+    fn drop(&mut self) {
+        // this is a bit crap, it should check refcount?
+        PAGES_RENDER.lock().unwrap().remove(self.key);
+    }
+}
+
+impl<'k> RenderLock<'k> {
+    pub fn new(key: &'k str) -> Self {
+        let lock = PAGES_RENDER.lock().unwrap().entry(key.into()).or_default().clone();
+        Self { key, lock }
+    }
+
+    async fn lock(&self) -> RenderLockGuard<'k, '_> {
+        let guard = match self.lock.try_lock() {
+            Ok(g) => g,
+            Err(_) => {
+                debug!("throttling rendering of {}, because one is already running", self.key);
+                self.lock.lock().await
+            },
+        };
+        RenderLockGuard {
+            key: self.key,
+            _guard: guard,
+        }
+    }
+}
+
+
 /// takes path to storage, freshness in seconds, and a function to call on cache miss
 /// returns (page, fresh in seconds)
 async fn with_file_cache<F: Send>(state: &AServerState, cache_file_name: &str, cache_time: u32, generate: F) -> Result<Rendered, anyhow::Error>
     where F: Future<Output=Result<(Vec<u8>, Option<DateTime<FixedOffset>>), anyhow::Error>> + 'static {
+
+    let l = RenderLock::new(cache_file_name);
+    let _g = l.lock().await;
+
     let cache_file = state.page_cache_dir.join(cache_file_name);
     if let Ok(modified) = std::fs::metadata(&cache_file).and_then(|m| m.modified()) {
         let now = SystemTime::now();

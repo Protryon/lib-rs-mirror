@@ -54,7 +54,7 @@ pub use rich_crate::RichDep;
 pub use rich_crate::{Cfg, Target};
 pub use semver::Version as SemVer;
 
-use tarball::CrateFile;
+use tarball::CrateFilesSummary;
 use cargo_toml::Manifest;
 use cargo_toml::Package;
 use categories::Category;
@@ -1044,7 +1044,7 @@ impl KitchenSink {
         None
     }
 
-    async fn package_in_repo_host(&self, origin: Origin) -> CResult<CrateFile> {
+    async fn crate_files_summary_from_repo(&self, origin: Origin) -> CResult<CrateFilesSummary> {
         let (repo, package): (Repo, _) = match &origin {
             Origin::GitHub { repo, package } => (RepoHost::GitHub(repo.clone()).try_into().expect("repohost"), package.clone()),
             Origin::GitLab { repo, package } => (RepoHost::GitLab(repo.clone()).try_into().expect("repohost"), package.clone()),
@@ -1082,7 +1082,7 @@ impl KitchenSink {
         let _f = self.throttle.acquire().await;
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
 
-        let mut meta = self.package_in_repo_host(origin.clone()).await?;
+        let mut meta = self.crate_files_summary_from_repo(origin.clone()).await?;
 
         let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
         let mut warnings = HashSet::new();
@@ -1095,7 +1095,7 @@ impl KitchenSink {
         self.rich_crate_version_data_common(origin.clone(), meta, false, warnings).await
     }
 
-    pub async fn rich_crate_version_tarball_from_crates_io(&self, name: &str, ver: &str) -> Result<CrateFile, KitchenSinkErr> {
+    pub async fn crate_files_summary_from_crates_io_tarball(&self, name: &str, ver: &str) -> Result<CrateFilesSummary, KitchenSinkErr> {
         let tarball = timeout("tarball fetch", 16, self.crates_io.crate_data(name, ver)
             .map_err(|e| KitchenSinkErr::DataNotFound(format!("{}-{}: {}", name, ver, e)))).await?;
 
@@ -1125,7 +1125,7 @@ impl KitchenSink {
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
 
         let (meta, crates_io_meta) = futures::join!(
-            self.rich_crate_version_tarball_from_crates_io(name, ver),
+            self.crate_files_summary_from_crates_io_tarball(name, ver),
             timeout("cio meta fetch", 16, self.crates_io_meta(&name_lower)),
         );
 
@@ -1186,7 +1186,7 @@ impl KitchenSink {
     }
 
     ///// Fixing and faking the data
-    async fn rich_crate_version_data_common(&self, origin: Origin, mut meta: CrateFile, is_yanked: bool, mut warnings: Warnings) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
+    async fn rich_crate_version_data_common(&self, origin: Origin, mut meta: CrateFilesSummary, is_yanked: bool, mut warnings: Warnings) -> CResult<(CrateVersionSourceData, Manifest, Warnings)> {
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
 
         Self::override_bad_categories(&mut meta.manifest);
@@ -1460,7 +1460,7 @@ impl KitchenSink {
         .unwrap_or((false, false)))
     }
 
-    async fn add_readme_from_repo(&self, meta: &mut CrateFile, maybe_repo: Option<&Repo>) -> Warnings {
+    async fn add_readme_from_repo(&self, meta: &mut CrateFilesSummary, maybe_repo: Option<&Repo>) -> Warnings {
         let mut warnings = HashSet::new();
         let package = match meta.manifest.package.as_ref() {
             Some(p) => p,
@@ -1497,7 +1497,7 @@ impl KitchenSink {
         warnings
     }
 
-    async fn add_readme_from_crates_io(&self, meta: &mut CrateFile, name: &str, ver: &str) {
+    async fn add_readme_from_crates_io(&self, meta: &mut CrateFilesSummary, name: &str, ver: &str) {
         let key = format!("{}/{}", name, ver);
         if let Ok(Some(_)) = self.readme_check_cache.get(key.as_str()) {
             return;
@@ -3410,7 +3410,7 @@ fn fetch_uppercase_name_and_tarball() {
 
 
         let testk = k.index.crates_io_crate_by_lowercase_name("dssim-core").unwrap();
-        let meta = k.rich_crate_version_tarball_from_crates_io("dssim-core", &testk.versions()[8].version()).await.unwrap();
+        let meta = k.crate_files_summary_from_crates_io_tarball("dssim-core", &testk.versions()[8].version()).await.unwrap();
         assert_eq!(meta.vcs_info_path.as_deref(), Some("dssim-core"), "{:#?}", meta);
         assert_eq!(meta.vcs_info_git_sha1.as_ref().unwrap(), b"\xba\x0a\x40\xd1\x3b\x1d\x11\xb0\x19\xf6\xb6\x6a\x77\x2e\xbd\xa7\xd0\xf9\x45\x0c");
     })).unwrap();

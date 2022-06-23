@@ -49,7 +49,7 @@ enum ReadAs {
 
 const MAX_FILE_SIZE: u64 = 50_000_000;
 
-pub fn read_repo(repo: &crate_git_checkout::Repository, path_in_tree: crate_git_checkout::Oid) -> Result<CrateFile, UnarchiverError> {
+pub fn read_repo(repo: &crate_git_checkout::Repository, path_in_tree: crate_git_checkout::Oid) -> Result<CrateFilesSummary, UnarchiverError> {
     let mut collect = Collector::new(0);
     crate_git_checkout::iter_blobs::<UnarchiverError, _>(repo, Some(path_in_tree), |path, _, name, blob| {
         // FIXME: skip directories that contain other crates
@@ -60,7 +60,7 @@ pub fn read_repo(repo: &crate_git_checkout::Repository, path_in_tree: crate_git_
     Ok(collect.finish()?)
 }
 
-pub fn read_archive(archive: &[u8], name: &str, ver: &str) -> Result<CrateFile, UnarchiverError> {
+pub fn read_archive(archive: &[u8], name: &str, ver: &str) -> Result<CrateFilesSummary, UnarchiverError> {
     let prefix = PathBuf::from(format!("{}-{}", name, ver));
     let mut collect = Collector::new(archive.len());
     read_archive_files(archive, |mut file| {
@@ -80,7 +80,7 @@ pub fn read_archive(archive: &[u8], name: &str, ver: &str) -> Result<CrateFile, 
 }
 
 #[derive(Debug, Clone)]
-pub struct CrateFile {
+pub struct CrateFilesSummary {
     pub manifest: Manifest,
     /// Rust source
     pub lib_file: Option<String>,
@@ -216,7 +216,7 @@ impl Collector {
         Ok(())
     }
 
-    fn finish(self) -> Result<CrateFile, UnarchiverError> {
+    fn finish(self) -> Result<CrateFilesSummary, UnarchiverError> {
         let mut manifest = match self.manifest {
             Some(m) => m,
             None => return Err(UnarchiverError::TomlNotFound(self.files.iter().map(|p| p.display().to_string()).collect::<Vec<_>>().join(", "))),
@@ -224,7 +224,7 @@ impl Collector {
 
         manifest.complete_from_abstract_filesystem(FilesFs(&self.files))?;
 
-        Ok(CrateFile {
+        Ok(CrateFilesSummary {
             decompressed_size: self.decompressed_size,
             compressed_size: self.compressed_size,
             readme: self.markup,
@@ -289,7 +289,7 @@ fn is_source_code_file(path: &Path) -> Option<udedokei::Language> {
     udedokei::from_path(path)
 }
 
-impl CrateFile {
+impl CrateFilesSummary {
     /// Checks whether tarball contained given file path,
     /// relative to project root.
     pub fn has(&self, path: impl AsRef<Path>) -> bool {

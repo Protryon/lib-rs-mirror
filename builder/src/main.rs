@@ -2,8 +2,11 @@ use std::collections::BTreeMap;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::time::Duration;
+use futures::future::try_join_all;
 use log::debug;
+use log::error;
 use log::info;
+use log::warn;
 use parking_lot::Mutex;
 use rand::Rng;
 use rand::seq::SliceRandom;
@@ -56,7 +59,7 @@ use std::process::Stdio;
 struct ToCheck {
     score: u32,
     crate_name: Arc<str>,
-    ver: SemVer,
+    version: SemVer,
     rustc_compat: CompatRanges,
 }
 
@@ -67,7 +70,7 @@ fn out_of_disk_space() -> bool {
             size < 5_000_000_000 // cargo easily chews gigabytes of disk space per build
         },
         Err(e) => {
-            log::error!("disk space check: {}", e);
+            error!("disk space check: {}", e);
             true
         },
     }
@@ -102,7 +105,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             // biggest gap, then latest ver; best at the end, because pops
-            candidates.sort_unstable_by(|a,b| a.score.cmp(&b.score).then(a.ver.cmp(&b.ver)));
+            candidates.sort_unstable_by(|a,b| a.score.cmp(&b.score).then(a.version.cmp(&b.version)));
 
             let mut available_rust_versions = RUST_VERSIONS.to_vec();
             available_rust_versions.shuffle(&mut rng);
@@ -123,7 +126,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 let origin = Origin::from_crates_io_name(&x.crate_name);
                 let mut existing_info = db.get_compat_raw(&origin).unwrap_or_default();
-                existing_info.retain(|inf| inf.crate_version == x.ver);
+                existing_info.retain(|inf| inf.crate_version == x.version);
 
                 let possible_rusts = available_rust_versions.iter().enumerate()
                 .filter(|&(_, &minor)| {
@@ -134,7 +137,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 });
                 let rustc_idx = if !x.rustc_compat.has_ever_built() {
                     let v = possible_rusts.min_by_key(|&(_, &v)| (upper_limit as i32 - v as i32).abs())?; // avoid building 2018 with oldest compiler
-                    debug!("{}-{} never built, trying latest R.{}", x.crate_name, x.ver, v.1);
+                    debug!("{}-{} never built, trying latest R.{}", x.crate_name, x.version, v.1);
                     v
                 } else {
                     possible_rusts.min_by_key(|&(_, &minor)| ((minor as i32) - best_ver as i32).abs())?
@@ -148,7 +151,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Some(CrateToRun {
                     rustc_ver: available_rust_versions.swap_remove(rustc_idx),
                     crate_name: x.crate_name,
-                    version: x.ver
+                    version: x.version
                 })
             })
             .take(RUST_VERSIONS.len() *2/3)
@@ -272,7 +275,7 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
 
             ToCheck {
                 score,
-                ver: v,
+                version: v,
                 rustc_compat: compat,
                 crate_name: crate_name.clone()
             }
@@ -294,15 +297,20 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
 
     if has_anything_built_ok_yet {
         // biggest gap, then latest ver
-        candidates.sort_unstable_by(|a,b| b.score.cmp(&a.score).then(b.ver.cmp(&a.ver)));
+        candidates.sort_unstable_by(|a,b| b.score.cmp(&a.score).then(b.version.cmp(&a.version)));
         candidates.truncate(2);
     } else {
         candidates.shuffle(&mut rng); // dunno which versions will build
         candidates.truncate(2); // don't waste time on broken crates
     }
 
+    try_join_all(candidates.iter().map(|c| async move {
+        let meta = crates.crate_files_summary_from_crates_io_tarball(&c.crate_name, &c.version.to_string()).await?;
+        crates.index_msrv_from_manifest(&Origin::from_crates_io_name(&c.crate_name), &meta.manifest)
+    })).await?;
+
     for c in &candidates {
-        println!("{} {}\t^{}\t{}~{} r{}~{}", crate_name, c.ver, c.score,
+        println!("{} {}\t^{}\t{}~{} r{}~{}", crate_name, c.version, c.score,
             c.rustc_compat.oldest_ok().unwrap_or(0), c.rustc_compat.newest_bad().unwrap_or(0),
             c.rustc_compat.oldest_ok_certain().unwrap_or(0), c.rustc_compat.newest_bad_likely().unwrap_or(0));
     }
@@ -319,6 +327,15 @@ struct CrateToRun {
 fn run_and_analyze_versions(db: &BuildDb, docker_root: &Path, versions: Vec<CrateToRun>) -> Result<(), Box<dyn std::error::Error>> {
     if versions.is_empty() {
         return Ok(());
+    }
+
+    // reuse tarballs cached by our crates-io client
+    for c in &versions {
+        let dest = Path::new(TEMP_JUNK_DIR).join("registry/cache/github.com-1ecc6299db9ec823").join(format!("{}-{}.crate", c.crate_name, c.version));
+        if !dest.exists() {
+            let src = Path::new("/var/lib/crates-server/tarballs").join(format!("{}/{}.crate", c.crate_name, c.version));
+            let _ = std::fs::hard_link(&src, &dest).map_err(|e| warn!("tarball {} -> {}: {}", src.display(), dest.display(), e));
+        }
     }
 
     let (stdout, stderr) = do_builds(docker_root, &versions)?;

@@ -155,10 +155,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     return None;
                 }
 
+                let rustc_ver = available_rust_versions.swap_remove(rustc_idx);
+                let mut required_deps = Vec::new();
+                for (c,(v, newest_bad)) in x.rustc_compat.required_deps() {
+                    if newest_bad >= rustc_ver {
+                        required_deps.push((c.into(), v.clone()));
+                    }
+                }
+
                 Some(CrateToRun {
-                    rustc_ver: available_rust_versions.swap_remove(rustc_idx),
+                    rustc_ver,
                     crate_name: x.crate_name,
-                    version: x.version
+                    version: x.version,
+                    required_deps,
                 })
             })
             .take(RUST_VERSIONS.len() *2/3)
@@ -325,6 +334,9 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
         println!("{} {}\t^{}\t{}~{} r{}~{}", crate_name, c.version, c.score,
             c.rustc_compat.oldest_ok().unwrap_or(0), c.rustc_compat.newest_bad().unwrap_or(0),
             c.rustc_compat.oldest_ok_certain().unwrap_or(0), c.rustc_compat.newest_bad_likely().unwrap_or(0));
+        for (k,(v,r)) in c.rustc_compat.required_deps() {
+            println!(" + {}@{} for r{}", k, v, r);
+        }
     }
 
     Ok(candidates)
@@ -334,6 +346,7 @@ struct CrateToRun {
     rustc_ver: RustcMinorVersion,
     crate_name: Arc<str>,
     version: SemVer,
+    required_deps: Vec<(Box<str>, SemVer)>,
 }
 
 fn run_and_analyze_versions(db: &BuildDb, docker_root: &Path, versions: Vec<CrateToRun>) -> Result<(), Box<dyn std::error::Error>> {
@@ -441,7 +454,13 @@ fn do_builds(docker_root: &Path, versions: &[CrateToRun]) -> Result<(String, Str
         let dir = job_inputs_dir(&job_inputs_root, c);
         let _ = std::fs::create_dir(&dir);
 
-        std::fs::write(dir.join("Cargo.toml"), format!("[package]\nname=\"_____\"\nversion=\"0.0.0\"\n[profile.dev]\ndebug=false\n[dependencies]\n{} = \"{}\"\n", c.crate_name, c.version))?;
+        let mut cargo_toml = format!("[package]\nname=\"_____\"\nversion=\"0.0.0\"\n[profile.dev]\ndebug=false\n[dependencies]\n{} = \"{}\"\n", c.crate_name, c.version);
+        for (c, v) in &c.required_deps {
+            use std::fmt::Write;
+            let _ = writeln!(&mut cargo_toml, "{} = \"<= {}, {}\"", c, v, v.major);
+        }
+        debug!("{}", cargo_toml);
+        std::fs::write(dir.join("Cargo.toml"), cargo_toml)?;
     }
 
     let script = format!(r##"
@@ -469,7 +488,6 @@ fn do_builds(docker_root: &Path, versions: &[CrateToRun]) -> Result<(String, Str
             cd "crate-$crate_name-$libver";
             touch src/lib.rs
             cp "$job_inputs_dir/Cargo.toml" Cargo.toml
-            cp "$job_inputs_dir/Cargo.lock" Cargo.lock || true # optional
             export CARGO_TARGET_DIR=/home/rustyuser/cargo_target/$rustver;
             {{
                 echo >"$stdoutfile" "CHECKING $rustver $crate_name $libver"

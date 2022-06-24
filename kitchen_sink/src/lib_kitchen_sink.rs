@@ -87,6 +87,7 @@ use simple_cache::TempCache;
 use smol_str::SmolStr;
 use std::borrow::Cow;
 use std::cmp::Ordering;
+use std::cmp::Reverse;
 use std::collections::hash_map::Entry::*;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -2355,6 +2356,10 @@ impl KitchenSink {
                     if dep.kind() == DependencyKind::Dev {
                         continue;
                     }
+                    if let Some(t) = dep.target() {
+                        debug!("ignoring {} because target {}", dep.name(), t);
+                        continue;
+                    }
                     if let Ok(req) = VersionReq::parse(dep.requirement()) {
                         let dep_origin = Origin::from_crates_io_name(dep.crate_name());
                         if &dep_origin == all.origin() {
@@ -2399,25 +2404,32 @@ impl KitchenSink {
                             c.get_mut(&crate_ver).unwrap()
                         },
                     };
+
+                    // make note of dependencies that affect their dependee's msrv
+                    let parent_newest_bad = c.newest_bad().unwrap_or(31);
+                    // but for crates where we don't know real msrv yet, don't freak out about super old rustc compat
+                    let parent_oldest_ok_lower_limit = c.oldest_ok().unwrap_or(0).saturating_sub(17); // min. 2 years back-compat assumed
+                    let mut dependency_affects_msrv = false;
+
                     // find known-bad dep to bump msrv
                     let dep_newest_bad = dep_compat.iter()
                         .filter(|(semver, _)| req.matches(semver))
                         .filter_map(|(semver, compat)| Some((semver, compat.newest_bad()?)))
-                        .min_by_key(|&(_, n)| n);
-                    // but don't let one broken build override known-good builds
-                    let dep_oldest_ok = dep_compat.iter()
-                        .filter(|(semver, _)| req.matches(semver))
-                        .filter_map(|(semver, compat)| Some((semver, compat.oldest_ok()?)))
-                        .map(|(_, n)| n)
-                        .min()
-                        .unwrap_or(999);
+                        .chain(dep_compat.iter()
+                            .filter(|(semver, _)| req.matches(semver))
+                            .filter_map(|(semver, compat)| Some((semver, compat.oldest_ok()?.saturating_sub(1))))
+                        )
+                        .inspect(|&(_, n)| {
+                            if n > parent_newest_bad && n >= parent_oldest_ok_lower_limit {
+                                dependency_affects_msrv = true;
+                            }
+                        })
+                        .min_by_key(|&(v, n)| (n, Reverse(v)));
 
-                    if let Some((dep_found_ver, mut dep_newest_bad)) = dep_newest_bad {
-                        dep_newest_bad = dep_newest_bad.min(dep_oldest_ok.saturating_sub(1));
-
+                    if let Some((dep_found_ver, dep_newest_bad)) = dep_newest_bad {
                         if c.newest_bad().unwrap_or(0) < dep_newest_bad {
-                            debug!("{} {} MSRV went from {} to {} because of https://lib.rs/compat/{} {} = {}", all.name(), crate_ver, c.newest_bad().unwrap_or(0), dep_newest_bad, dep_origin.short_crate_name(), req, dep_found_ver);
                             if dep_newest_bad > 19 {
+                                debug!("{} {} MSRV went from {} to {} because of https://lib.rs/compat/{} {} = {}", all.name(), crate_ver, c.newest_bad().unwrap_or(0), dep_newest_bad, dep_origin.short_crate_name(), req, dep_found_ver);
                                 let reason = format!("{} {}={} has MSRV {}", dep_origin.short_crate_name(), req, dep_found_ver, dep_newest_bad);
                                 c.add_compat(dep_newest_bad, Compat::BrokenDeps, Some(reason.clone()));
 
@@ -2426,13 +2438,16 @@ impl KitchenSink {
                                 // may be too pessimistic if the dep lacks positive build data.
                                 let dep_newest_bad_certain = dep_compat.iter()
                                     .filter(|(semver, _)| req.matches(semver))
-                                    .filter_map(|(_, compat)| compat.newest_bad_certain())
+                                    .filter_map(|(_, compat)| compat.newest_bad_likely())
                                     .min()
                                     .unwrap_or(0);
                                 if c.newest_bad().unwrap_or(0) < dep_newest_bad_certain {
                                     let _ = db.set_compat(all.origin(), &crate_ver, dep_newest_bad, Compat::BrokenDeps, &reason);
                                 }
                             }
+                        } else if dependency_affects_msrv {
+                            // keep track of this only if it's not reflected in `BrokenDeps` (i.e. happens sometimes, not always)
+                            c.requires_dependency_version(dep_origin.short_crate_name(), dep_found_ver.clone(), dep_newest_bad);
                         }
                     }
                 }

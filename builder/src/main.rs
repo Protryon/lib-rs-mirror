@@ -32,18 +32,22 @@ RUN rustup set profile minimal
 
 const TEMP_JUNK_DIR: &str = "/var/tmp/crates_env";
 
-const RUST_VERSIONS: [RustcMinorVersion; 11] = [
+const RUST_VERSIONS: [RustcMinorVersion; 15] = [
     61,
     60,
     59,
     58,
     57,
-    56,
-    53,
-    51,
-    45,
-    40,
-    35,
+    54,
+    52,
+    49,
+    46,
+    42,
+    41,
+    38,
+    32,
+    31,
+    30,
 ];
 
 use crate_db::builddb::*;
@@ -61,6 +65,7 @@ struct ToCheck {
     crate_name: Arc<str>,
     version: SemVer,
     rustc_compat: CompatRanges,
+    is_app: bool,
 }
 
 fn out_of_disk_space() -> bool {
@@ -119,9 +124,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let max_ver = x.rustc_compat.oldest_ok_certain().unwrap_or(999);
                 let min_ver = x.rustc_compat.newest_bad_likely().unwrap_or(18);
 
-                let upper_limit = x.rustc_compat.oldest_ok().unwrap_or(55);
+                // cargo install --message-format is v1.58+ :(
+                let upper_limit = x.rustc_compat.oldest_ok().unwrap_or(if x.is_app {62} else {55});
                 // don't pick 1.29 as the first choice
-                let lower_limit = x.rustc_compat.newest_bad().unwrap_or(43);
+                let lower_limit = x.rustc_compat.newest_bad().unwrap_or(if x.is_app {58} else {43});
 
                 // min_ver ignores bad deps, but that often leads it to be stuck on last edition
                 // which is super wasteful
@@ -168,6 +174,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     crate_name: x.crate_name,
                     version: x.version,
                     required_deps,
+                    is_app: x.is_app,
                 })
             })
             .take(RUST_VERSIONS.len() *2/3)
@@ -252,13 +259,13 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
     let mut rng = rand::thread_rng();
     let mut candidates: Vec<_> = all.versions().iter().rev() // rev() starts from most recent
         .filter(|v| !v.is_yanked())
-        .take(4)
+        .take(8)
         .filter_map(|v| SemVer::parse(v.version()).ok())
         .map(|v| {
             let c = compat_info.remove(&v).unwrap_or_default();
             (v, c)
         })
-        .filter(|(_, c)| c.oldest_ok().unwrap_or(999) > 25) // old crates, don't bother
+        .filter(|(_, c)| c.oldest_ok().unwrap_or(999) > 20) // old crates, don't bother
         .enumerate()
         .map(|(idx, (version, compat))| {
             let has_ever_built = compat.has_ever_built();
@@ -293,7 +300,8 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
                 score,
                 version,
                 rustc_compat: compat,
-                crate_name: crate_name.clone()
+                crate_name: crate_name.clone(),
+                is_app: false,
             }
         })
         .filter(|c| {
@@ -314,10 +322,10 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
     if has_anything_built_ok_yet {
         // biggest gap, then latest ver
         candidates.sort_unstable_by(|a,b| b.score.cmp(&a.score).then(b.version.cmp(&a.version)));
-        candidates.truncate(3);
+        candidates.truncate(4);
     } else {
         candidates.shuffle(&mut rng); // dunno which versions will build
-        candidates.truncate(2); // don't waste time on broken crates
+        candidates.truncate(3); // don't waste time on broken crates
     }
 
     try_join_all(candidates.iter_mut().map(|c| { async move {
@@ -326,6 +334,9 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
         if msrv > 1 {
             c.rustc_compat.add_compat(msrv - 1, Compat::DefinitelyIncompatible, None);
             c.rustc_compat.add_compat(msrv + 1, Compat::ProbablyWorks, None); // leave a gap so that builder has something to do
+        }
+        if meta.lib_file.is_none() && meta.bin_file.is_some() {
+            c.is_app = true;
         }
         Ok::<_, CError>(())
     }})).await?;
@@ -339,6 +350,10 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
         }
     }
 
+    if candidates.is_empty() {
+        println!("{} ???\tno candidates", crate_name);
+    }
+
     Ok(candidates)
 }
 
@@ -347,6 +362,7 @@ struct CrateToRun {
     crate_name: Arc<str>,
     version: SemVer,
     required_deps: Vec<(Box<str>, SemVer)>,
+    is_app: bool,
 }
 
 fn run_and_analyze_versions(db: &BuildDb, docker_root: &Path, versions: Vec<CrateToRun>) -> Result<(), Box<dyn std::error::Error>> {
@@ -443,7 +459,7 @@ fn prepare_docker(docker_root: &Path) -> Result<(), Box<dyn std::error::Error>> 
 
 // must match bash script below
 fn job_inputs_dir(root: &Path, c: &CrateToRun) -> PathBuf {
-    root.join(format!("crate-{}-{}--1.{}.0-job", c.crate_name, c.version, c.rustc_ver))
+    root.join(format!("crate-{}-{}--{}-job", c.crate_name, c.version, rustc_minor_ver_to_version(c.rustc_ver)))
 }
 
 // versions is (rustc version, crate version)
@@ -457,7 +473,7 @@ fn do_builds(docker_root: &Path, versions: &[CrateToRun]) -> Result<(String, Str
         let mut cargo_toml = format!("[package]\nname=\"_____\"\nversion=\"0.0.0\"\n[profile.dev]\ndebug=false\n[dependencies]\n{} = \"{}\"\n", c.crate_name, c.version);
         for (c, v) in &c.required_deps {
             use std::fmt::Write;
-            let _ = writeln!(&mut cargo_toml, "{} = \"<= {}, {}\"", c, v, v.major);
+            let _ = writeln!(&mut cargo_toml, "{} = \"<= {}, {}{}\"", c, v, if v.major == 0 {"0."} else {""}, if v.major == 0 { v.minor } else { v.major });
         }
         debug!("{}", cargo_toml);
         std::fs::write(dir.join("Cargo.toml"), cargo_toml)?;
@@ -492,7 +508,7 @@ fn do_builds(docker_root: &Path, versions: &[CrateToRun]) -> Result<(String, Str
             {{
                 echo >"$stdoutfile" "CHECKING $rustver $crate_name $libver"
                 RUSTC_BOOTSTRAP=1 timeout 20 cargo +$rustver -Z no-index-update fetch || CARGO_NET_GIT_FETCH_WITH_CLI=true timeout 60 cargo +$rustver fetch --color=always -vv;
-                timeout 90 nice cargo +$rustver check -j3 --locked --message-format=json >>"$stdoutfile" 2>"$stderrfile";
+                timeout 90 nice cargo +$rustver {check_command} -j3 --locked --message-format=json >>"$stdoutfile" 2>"$stderrfile";
             }} || {{
                 local rustfetchver="$rustver"
                 if [ "$rustver" == "1.20.0" ]; then
@@ -502,7 +518,7 @@ fn do_builds(docker_root: &Path, versions: &[CrateToRun]) -> Result<(String, Str
                 printf > Cargo.toml '[package]\nname="_____"\nversion="0.0.0"\n[profile.dev]\ndebug=false\n[dependencies]\n%s = "=%s"\n[dev-dependencies]\nminimal-versions-are-broken="1"' "$crate_name" "$libver";
                 rm -f Cargo.lock
                 RUSTC_BOOTSTRAP=1 timeout 20 cargo +$rustfetchver -Z no-index-update -Z minimal-versions generate-lockfile;
-                timeout 40 nice cargo +$rustver check -j3 --locked --message-format=json >>"$stdoutfile" 2>>"$stderrfile";
+                timeout 40 nice cargo +$rustver {check_command} -j3 --locked --message-format=json >>"$stdoutfile" 2>>"$stderrfile";
             }}
         }}
         for job in {jobs}; do
@@ -519,6 +535,7 @@ fn do_builds(docker_root: &Path, versions: &[CrateToRun]) -> Result<(String, Str
             cleanup $job
         done
     "##,
+        check_command = if versions.iter().all(|v| v.is_app && v.rustc_ver >= 58) { "install \"$crate_name\" --version \"$libver\" --debug --root=./install-test" } else { "check" },
         divider = parse::DIVIDER,
         jobs = versions.iter().map(|c| format!("\"{} {} {}\"", rustc_minor_ver_to_version(c.rustc_ver), c.crate_name, c.version)).collect::<Vec<_>>().join(" "),
     );
@@ -561,7 +578,11 @@ fn do_builds(docker_root: &Path, versions: &[CrateToRun]) -> Result<(String, Str
 }
 
 fn rustc_minor_ver_to_version(rustc_minor_ver: u16) -> String {
-    format!("1.{}.0", rustc_minor_ver)
+    if rustc_minor_ver == 56 {
+        "1.56.1".into()
+    } else {
+        format!("1.{}.0", rustc_minor_ver)
+    }
 }
 
 fn streamfetch(prefix: &'static str, inp: impl std::io::Read + Send + 'static) -> Arc<Mutex<String>> {

@@ -5,6 +5,7 @@ extern crate serde_derive;
 extern crate log;
 
 mod yearly;
+use crate_db::builddb::RustcMinorVersion;
 use crate_git_checkout::FoundManifest;
 use event_log::EventLog;
 use anyhow::Context;
@@ -2242,9 +2243,10 @@ impl KitchenSink {
         w.insert(origin, val);
     }
 
-    pub fn index_msrv_from_manifest(&self, origin: &Origin, manifest: &Manifest) -> CResult<()> {
+    pub fn index_msrv_from_manifest(&self, origin: &Origin, manifest: &Manifest) -> CResult<RustcMinorVersion> {
         let db = self.build_db()?;
         let package = manifest.package();
+        let mut working_msrv = None;
 
         let (mut msrv, mut reason) = match package.edition {
             Edition::E2015 => (1u16, "???"),
@@ -2269,24 +2271,34 @@ impl KitchenSink {
             reason = "resolver = 2";
         }
 
-        if let Some(minor) = package.rust_version.as_ref().and_then(|v| v.split('.').nth(1)).and_then(|minor| minor.parse().ok()) {
-            if msrv < minor {
-                reason = "rust-version";
-                msrv = minor;
-            }
-        }
-
         if msrv < 59 && profiles.any(|p| p.strip.is_some()) {
             msrv = 59;
             reason = "strip";
         }
 
+        if msrv < 60 && manifest.features.values().flat_map(|f| f.iter()).any(|req| req.starts_with("dep:") || req.contains('?')) {
+            msrv = 60;
+            reason = "dep:feature";
+        }
+
+        if let Some(minor) = package.rust_version.as_ref().and_then(|v| v.split('.').nth(1)).and_then(|minor| minor.parse().ok()) {
+            if msrv < minor {
+                reason = "rust-version";
+                msrv = minor;
+                working_msrv = Some(minor);
+            }
+        }
+
         if msrv > 1 {
             debug!("Detected {:?} as msrv 1.{} ({})", origin, msrv, reason);
             let latest_bad_rustc = msrv - 1;
-            db.set_compat(origin, &SemVer::parse(&package.version)?, latest_bad_rustc, Compat::DefinitelyIncompatible, reason)?;
+            let ver = SemVer::parse(&package.version)?;
+            db.set_compat(origin, &ver, latest_bad_rustc, Compat::DefinitelyIncompatible, reason)?;
+            if let Some(working_msrv) = working_msrv {
+                db.set_compat(origin, &ver, working_msrv, Compat::ProbablyWorks, "rust-version")?;
+            }
         }
-        Ok(())
+        Ok(msrv)
     }
 
     pub async fn rustc_compatibility(&self, all: &RichCrate) -> Result<CompatByCrateVersion, KitchenSinkErr> {

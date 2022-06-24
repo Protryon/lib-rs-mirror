@@ -117,11 +117,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .take(max_to_waste_trying)
             .filter_map(|x| {
                 let max_ver = x.rustc_compat.oldest_ok_certain().unwrap_or(999);
-                let min_ver = x.rustc_compat.newest_bad_likely().unwrap_or(0);
+                let min_ver = x.rustc_compat.newest_bad_likely().unwrap_or(18);
 
                 let upper_limit = x.rustc_compat.oldest_ok().unwrap_or(55);
                 // don't pick 1.29 as the first choice
                 let lower_limit = x.rustc_compat.newest_bad().unwrap_or(43);
+
+                // min_ver ignores bad deps, but that often leads it to be stuck on last edition
+                // which is super wasteful
+                let min_ver = min_ver.max(lower_limit.saturating_sub(3));
+                // same for approx max ver that may come from msrv or binaries
+                let max_ver = max_ver.min(upper_limit + 1);
+
                 let best_ver = (upper_limit * 5 + lower_limit * 11)/16; // bias towards lower ver, because lower versions see features from newer versions
 
                 let origin = Origin::from_crates_io_name(&x.crate_name);
@@ -244,7 +251,7 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
         })
         .filter(|(_, c)| c.oldest_ok().unwrap_or(999) > 25) // old crates, don't bother
         .enumerate()
-        .map(|(idx, (v, compat))| {
+        .map(|(idx, (version, compat))| {
             let has_ever_built = compat.has_ever_built();
             let has_failed = compat.newest_bad_likely().is_some();
             let no_compat_bottom = compat.newest_bad().is_none();
@@ -269,13 +276,13 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
                 + if oldest_ok  > 47 { 2 } else { 0 }
                 + if oldest_ok  > 50 { 5 } else { 0 }
                 + if oldest_ok  > 53 { 8 } else { 0 }
-                + if v.pre.is_empty() { 15 } else { 0 } // don't waste time testing alphas
+                + if version.pre.is_empty() { 15 } else { 0 } // don't waste time testing alphas
                 + if idx == 0 { 10 } else { 0 } // prefer latest
                 + 5u32.saturating_sub(idx as u32); // prefer newer
 
             ToCheck {
                 score,
-                version: v,
+                version,
                 rustc_compat: compat,
                 crate_name: crate_name.clone()
             }
@@ -298,16 +305,21 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
     if has_anything_built_ok_yet {
         // biggest gap, then latest ver
         candidates.sort_unstable_by(|a,b| b.score.cmp(&a.score).then(b.version.cmp(&a.version)));
-        candidates.truncate(2);
+        candidates.truncate(3);
     } else {
         candidates.shuffle(&mut rng); // dunno which versions will build
         candidates.truncate(2); // don't waste time on broken crates
     }
 
-    try_join_all(candidates.iter().map(|c| async move {
+    try_join_all(candidates.iter_mut().map(|c| { async move {
         let meta = crates.crate_files_summary_from_crates_io_tarball(&c.crate_name, &c.version.to_string()).await?;
-        crates.index_msrv_from_manifest(&Origin::from_crates_io_name(&c.crate_name), &meta.manifest)
-    })).await?;
+        let msrv = crates.index_msrv_from_manifest(&Origin::from_crates_io_name(&c.crate_name), &meta.manifest)?;
+        if msrv > 1 {
+            c.rustc_compat.add_compat(msrv - 1, Compat::DefinitelyIncompatible, None);
+            c.rustc_compat.add_compat(msrv + 1, Compat::ProbablyWorks, None); // leave a gap so that builder has something to do
+        }
+        Ok::<_, CError>(())
+    }})).await?;
 
     for c in &candidates {
         println!("{} {}\t^{}\t{}~{} r{}~{}", crate_name, c.version, c.score,

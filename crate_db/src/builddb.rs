@@ -109,8 +109,7 @@ impl CompatRanges {
 
     pub fn newest_bad_likely(&self) -> Option<RustcMinorVersion> {
         self.bad.iter().rev()
-        // TODO: remove SuspectedIncompatible once we have data
-            .filter(|(_, c)| c.0 == Compat::DefinitelyIncompatible || c.0 == Compat::LikelyIncompatible|| c.0 == Compat::SuspectedIncompatible)
+            .filter(|(_, c)| c.0 == Compat::DefinitelyIncompatible || c.0 == Compat::LikelyIncompatible)
             .map(|(&v, _)| v)
             .next()
     }

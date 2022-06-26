@@ -131,15 +131,16 @@ impl Repo {
     /// URL for links in readmes hosted on the git website
     ///
     /// Base dir is without leading or trailing `/`, i.e. `""` for root, `"foo/bar"`, etc.
-    pub fn readme_base_url(&self, base_dir_in_repo: &str) -> String {
+    pub fn readme_base_url(&self, base_dir_in_repo: &str, treeish_revision: Option<&str>) -> String {
         assert!(!base_dir_in_repo.starts_with('/'));
+        let treeish_revision = treeish_revision.unwrap_or("HEAD");
         let slash = if !base_dir_in_repo.is_empty() && !base_dir_in_repo.ends_with('/') { "/" } else { "" };
         match self.host {
             RepoHost::GitHub(SimpleRepo {ref owner, ref repo}) => {
-                format!("https://github.com/{}/{}/blob/HEAD/{}{}", owner, repo, base_dir_in_repo, slash)
+                format!("https://github.com/{owner}/{repo}/blob/{treeish_revision}/{base_dir_in_repo}{slash}")
             },
             RepoHost::GitLab(SimpleRepo {ref owner, ref repo}) => {
-                format!("https://gitlab.com/{}/{}/blob/HEAD/{}{}", owner, repo, base_dir_in_repo, slash)
+                format!("https://gitlab.com/{owner}/{repo}/blob/{treeish_revision}/{base_dir_in_repo}{slash}")
             },
             RepoHost::BitBucket(_) |  // FIXME: needs commit hash!
             RepoHost::Other => self.url.to_string() // FIXME: how to add base dir?
@@ -155,10 +156,10 @@ impl Repo {
         let slash = if !base_dir_in_repo.is_empty() && !base_dir_in_repo.ends_with('/') { "/" } else { "" };
         match self.host {
             RepoHost::GitHub(SimpleRepo {ref owner, ref repo}) => {
-                format!("https://raw.githubusercontent.com/{}/{}/{}/{}{}", owner, repo, treeish_revision, base_dir_in_repo, slash)
+                format!("https://raw.githubusercontent.com/{owner}/{repo}/{treeish_revision}/{base_dir_in_repo}{slash}")
             },
             RepoHost::GitLab(SimpleRepo {ref owner, ref repo}) => {
-                format!("https://gitlab.com/{}/{}/raw/{}/{}{}", owner, repo, treeish_revision, base_dir_in_repo, slash)
+                format!("https://gitlab.com/{owner}/{repo}/raw/{treeish_revision}/{base_dir_in_repo}{slash}")
             },
             RepoHost::BitBucket(_) |  // FIXME: needs commit hash!
             RepoHost::Other => self.url.to_string() // FIXME: how to add base dir?
@@ -266,9 +267,9 @@ fn repo_parse() {
 
     let repo = Repo::new("HTTPS://GITlaB.COM/FOO/BAR").unwrap();
     assert_eq!("https://gitlab.com/foo/bar.git", repo.canonical_git_url());
-    assert_eq!("https://gitlab.com/foo/bar/blob/HEAD/", repo.readme_base_url(""));
-    assert_eq!("https://gitlab.com/foo/bar/blob/HEAD/foo/", repo.readme_base_url("foo"));
-    assert_eq!("https://gitlab.com/foo/bar/blob/HEAD/foo/bar/", repo.readme_base_url("foo/bar"));
+    assert_eq!("https://gitlab.com/foo/bar/blob/HEAD/", repo.readme_base_url("", None));
+    assert_eq!("https://gitlab.com/foo/bar/blob/main/foo/", repo.readme_base_url("foo", Some("main")));
+    assert_eq!("https://gitlab.com/foo/bar/blob/HEAD/foo/bar/", repo.readme_base_url("foo/bar", None));
     assert_eq!("https://gitlab.com/foo/bar/raw/HEAD/baz/", repo.readme_base_image_url("baz/", None));
     assert_eq!("https://gitlab.com/foo/bar/raw/main/baz/", repo.readme_base_image_url("baz/", Some("main")));
     assert_eq!("https://gitlab.com/foo/bar/tree/HEAD/sub/dir", repo.canonical_http_url("sub/dir"));

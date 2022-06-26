@@ -1300,6 +1300,7 @@ impl KitchenSink {
         let has_code_of_conduct = meta.has("CODE_OF_CONDUCT.md") || meta.has("docs/CODE_OF_CONDUCT.md") || meta.has(".github/CODE_OF_CONDUCT.md");
 
         let path_in_repo = meta.vcs_info_path.as_deref().unwrap_or_default();
+        let treeish_revision = meta.vcs_info_git_sha1.as_ref().map(|sha1| hex::encode(sha1));
         let readme = meta.readme.map(|(readme_path, markup)| {
             let (base_url, base_image_url) = match maybe_repo {
                 Some(repo) => {
@@ -1307,7 +1308,7 @@ impl KitchenSink {
                     // but it needs to normalize ../readme paths
                     let url = url::Url::parse(&format!("http://localhost/{}", path_in_repo)).and_then(|u| u.join(&readme_path));
                     let in_repo_url_path = url.as_ref().map_or("", |u| u.path().trim_start_matches('/'));
-                    (Some(repo.readme_base_url(in_repo_url_path)), Some(repo.readme_base_image_url(in_repo_url_path, None)))
+                    (Some(repo.readme_base_url(in_repo_url_path, treeish_revision.as_deref())), Some(repo.readme_base_image_url(in_repo_url_path, treeish_revision.as_deref())))
                 },
                 None => (None, None),
             };

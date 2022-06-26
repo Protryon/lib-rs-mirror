@@ -273,6 +273,7 @@ async fn run_server(rt: Handle) -> Result<(), anyhow::Error> {
             .route("/keywords/{keyword}", web::get().to(handle_keyword))
             .route("/crates/{crate}", web::get().to(handle_crate))
             .route("/crates/{crate}/versions", web::get().to(handle_crate_all_versions))
+            .route("/crates/{crate}/source", web::get().to(handle_crate_source_redirect))
             .route("/crates/{crate}/rev", web::get().to(handle_crate_reverse_dependencies))
             .route("/crates/{crate}/reverse_dependencies", web::get().to(handle_crate_reverse_dependencies_redir))
             .route("/crates/{crate}/crev", web::get().to(handle_crate_reviews))
@@ -811,6 +812,29 @@ async fn handle_crate_all_versions(req: HttpRequest) -> Result<HttpResponse, Ser
         None => return render_404_page(state, crate_name, "git crate").await,
     };
     Ok(serve_page(render_crate_all_versions(state.clone(), origin).await?))
+}
+
+async fn handle_crate_source_redirect(req: HttpRequest) -> Result<HttpResponse, ServerError> {
+    let crate_name = req.match_info().query("crate");
+    let qs = qstring::QString::from(req.query_string());
+    let at_ver = qs.get("at").unwrap_or_default();
+    debug!("git redirect for {:?} {:?}", crate_name, at_ver);
+
+    let state: &AServerState = req.app_data().expect("appdata");
+    let crates = state.crates.load();
+    let origin = match Origin::try_from_crates_io_name(crate_name).filter(|o| crates.crate_exists(o)) {
+        Some(o) => o,
+        None => return render_404_page(state, crate_name, "git crate").await,
+    };
+
+    let at_ver = at_ver.to_owned();
+    let state = Arc::clone(&state);
+    let git_url = rt_run_timeout(&state.clone().rt, "git revision lookup", 5, async move {
+        let crates = state.crates.load();
+        crates.canonical_http_of_crate_at_version(&origin, &at_ver).await
+    })
+    .await?;
+    return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", git_url)).finish());
 }
 
 async fn handle_crate_reverse_dependencies(req: HttpRequest) -> Result<HttpResponse, ServerError> {

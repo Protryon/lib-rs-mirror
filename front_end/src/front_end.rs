@@ -212,7 +212,7 @@ pub async fn render_all_versions_page(out: &mut impl Write, all: RichCrate, ver:
         return Err(KitchenSinkErr::Stopped.into());
     }
     let urler = Urler::new(None); // Don't set self-crate, because we want to link back to crate page
-    let c = crate::all_versions::AllVersions::new(all, ver, kitchen_sink).await?;
+    let c = crate::all_versions::AllVersions::new(all, ver, kitchen_sink, &urler).await?;
     templates::all_versions(out, &urler, &c).context("all_versions page io")?;
     Ok(())
 }

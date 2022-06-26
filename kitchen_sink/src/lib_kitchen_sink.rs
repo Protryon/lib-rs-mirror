@@ -1340,6 +1340,28 @@ impl KitchenSink {
         Ok((src, meta.manifest, warnings))
     }
 
+    pub async fn canonical_http_of_crate_at_version(&self, origin: &Origin, crate_version: &str) -> CResult<String> {
+        let ver = self.crate_files_summary_from_crates_io_tarball(origin.short_crate_name(), crate_version).await?;
+        if let Some(sha) = ver.vcs_info_git_sha1 {
+            let package = ver.manifest.package.as_ref().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
+            if let Some(Ok(repo)) = package.repository.as_deref().map(Repo::new) {
+                let path_in_repo = match ver.vcs_info_path {
+                    Some(p) => p,
+                    None => self.crate_db.path_in_repo(&repo, &package.name).await?.unwrap_or_default(),
+                };
+                if let Some(url) = repo.canonical_http_url_at(&path_in_repo, &hex::encode(sha)) {
+                    return Ok(url);
+                }
+            }
+        }
+        let mut url = format!("https://docs.rs/crate/{crate_name}/{version}/source/", crate_name = urlencoding::Encoded(origin.short_crate_name()), version = urlencoding::Encoded(crate_version));
+        if let Some(sha) = ver.vcs_info_git_sha1 {
+            use std::fmt::Write;
+            let _ = write!(&mut url, "#{}", hex::encode(sha));
+        }
+        Ok(url)
+    }
+
     fn override_bad_categories(manifest: &mut Manifest) {
         let direct_dependencies = &manifest.dependencies;
         let has_cargo_bin = manifest.has_cargo_bin();

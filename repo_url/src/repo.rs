@@ -142,7 +142,9 @@ impl Repo {
             RepoHost::GitLab(SimpleRepo {ref owner, ref repo}) => {
                 format!("https://gitlab.com/{owner}/{repo}/blob/{treeish_revision}/{base_dir_in_repo}{slash}")
             },
-            RepoHost::BitBucket(_) |  // FIXME: needs commit hash!
+            RepoHost::BitBucket(SimpleRepo {ref owner, ref repo}) => {
+                format!("https://bitbucket.org/{owner}/{repo}/src/{treeish_revision}/{base_dir_in_repo}{slash}")
+            },
             RepoHost::Other => self.url.to_string() // FIXME: how to add base dir?
         }
     }
@@ -161,15 +163,17 @@ impl Repo {
             RepoHost::GitLab(SimpleRepo {ref owner, ref repo}) => {
                 format!("https://gitlab.com/{owner}/{repo}/raw/{treeish_revision}/{base_dir_in_repo}{slash}")
             },
-            RepoHost::BitBucket(_) |  // FIXME: needs commit hash!
+            RepoHost::BitBucket(SimpleRepo {ref owner, ref repo}) => {
+                format!("https://bitbucket.org/{owner}/{repo}/raw/{treeish_revision}/{base_dir_in_repo}{slash}")
+            },
             RepoHost::Other => self.url.to_string() // FIXME: how to add base dir?
         }
     }
 
     /// URL for browsing the repository via web browser
     pub fn canonical_http_url(&self, base_dir_in_repo: &str) -> Cow<'_, str> {
-        self.host.canonical_http_url(base_dir_in_repo)
-            .unwrap_or_else(|| self.url.as_str().into()) // FIXME: how to add base dir?
+        self.host.canonical_http_url(base_dir_in_repo) // todo: add git sha1
+            .unwrap_or_else(|| self.url.as_str().into())
     }
 
     pub fn canonical_git_url(&self) -> Cow<'_, str> {
@@ -177,6 +181,10 @@ impl Repo {
             Some(s) => s.into(),
             None => self.url.as_str().into(),
         }
+    }
+
+    pub fn canonical_http_url_at(&self, base_dir_in_repo: &str, treeish_revision: &str) -> Option<String> {
+        self.host.canonical_http_url_at(base_dir_in_repo, treeish_revision)
     }
 
     pub fn owner_name(&self) -> Option<&str> {
@@ -218,6 +226,23 @@ impl RepoHost {
             },
             RepoHost::BitBucket(SimpleRepo {ref owner, ref repo}) => {
                 Some(format!("https://bitbucket.org/{}/{}", owner, repo).into()) // FIXME: needs hash
+            },
+            RepoHost::Other => None,
+        }
+    }
+
+    /// URL for browsing the repository via web browser
+    pub fn canonical_http_url_at(&self, base_dir_in_repo: &str, treeish_revision: &str) -> Option<String> {
+        assert!(!base_dir_in_repo.starts_with('/'));
+        match self {
+            RepoHost::GitHub(SimpleRepo {ref owner, ref repo}) => {
+                Some(format!("https://github.com/{owner}/{repo}/tree/{treeish_revision}/{base_dir_in_repo}"))
+            },
+            RepoHost::GitLab(SimpleRepo {ref owner, ref repo}) => {
+                Some(format!("https://gitlab.com/{owner}/{repo}/tree/{treeish_revision}/{base_dir_in_repo}"))
+            },
+            RepoHost::BitBucket(SimpleRepo {ref owner, ref repo}) => {
+                Some(format!("https://bitbucket.org/{owner}/{repo}/src/{treeish_revision}/{base_dir_in_repo}"))
             },
             RepoHost::Other => None,
         }

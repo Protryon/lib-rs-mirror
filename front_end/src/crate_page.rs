@@ -652,7 +652,7 @@ impl<'a> CratePage<'a> {
     }
 
     /// `(url, label)`
-    pub fn repository_links(&self) -> Vec<(Cow<'_, str>, String)> {
+    pub fn repository_links(&self, urler: &Urler) -> Vec<(Cow<'_, str>, String)> {
         let mut repo_links = Vec::new();
         if let Some((repo, url)) = self.ver.repository_http_url() {
             let label_prefix = repo.site_link_label();
@@ -661,7 +661,7 @@ impl<'a> CratePage<'a> {
                     if self.ver.has_path_in_repo() {
                         format!("{} ({})", label_prefix, host.owner)
                     } else {
-                        repo_links.push((format!("https://docs.rs/crate/{}/{}/source/", self.ver.short_name(), self.ver.version()).into(), "Source".into()));
+                        repo_links.push((urler.docs_rs_source(self.ver.short_name(), self.ver.version()).into(), "Source".into()));
                         "Repository link".to_owned()
                     }
                 },

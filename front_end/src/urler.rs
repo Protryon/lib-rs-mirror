@@ -109,6 +109,17 @@ impl Urler {
         format!("https://crates.io/crates/{}", Encoded(crate_name))
     }
 
+    pub fn docs_rs_source(&self, crate_name: &str, version: &str) -> String {
+        format!("https://docs.rs/crate/{crate_name}/{version}/source/")
+    }
+
+    pub fn git_source(&self, origin: &Origin, version: &str) -> String {
+        let mut url = self.crate_abs_path_by_origin(origin);
+        use std::fmt::Write;
+        let _ = write!(&mut url, "/source?at={}", Encoded(version));
+        url
+    }
+
     /// Link to crate individual page
     pub fn krate(&self, krate: &RichCrateVersion) -> String {
         self.crate_by_origin(krate.origin())
@@ -149,14 +160,6 @@ impl Urler {
             out.push_str(s);
         }
         out
-    }
-
-    /// n-th page (1-indexed) of category listing
-    pub fn category_page(&self, cat: &Category, p: usize) -> String {
-        if p < 2 {
-            return self.category(cat);
-        }
-        format!("https://crates.io/categories/{}?page={}", cat.slug, p)
     }
 
     /// Crate author's URL

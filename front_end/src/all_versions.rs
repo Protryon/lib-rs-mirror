@@ -1,3 +1,4 @@
+use crate::Urler;
 use crate::reverse_dependencies::DownloadsBar;
 use crate::Page;
 use chrono::DateTime;
@@ -38,15 +39,17 @@ pub(crate) struct VerRow {
     pub published_by: Option<(String, Option<String>)>,
     pub yanked_by: Option<(String, Option<String>)>,
     pub msrv: Option<(u16, u16, bool)>, // min version, max version, both are rustc minor v; true if certain
+    pub version_url: Option<String>,
+    pub version_url_label: &'static str,
 }
 
 impl AllVersions {
-    pub(crate) async fn new(all: RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink) -> Result<AllVersions, KitchenSinkErr> {
+    pub(crate) async fn new(all: RichCrate, krate: &RichCrateVersion, kitchen_sink: &KitchenSink, urler: &Urler) -> Result<AllVersions, KitchenSinkErr> {
         let origin = all.origin().clone();
         let is_yanked = all.is_yanked();
 
         let (changelog_url, downloads, all_owners, release_meta) = futures::join!(
-            kitchen_sink.changelog_url(ver),
+            kitchen_sink.changelog_url(krate),
             kitchen_sink.recent_downloads_by_version(&origin),
             kitchen_sink.crate_owners(&origin),
             async {
@@ -67,7 +70,7 @@ impl AllVersions {
             .map(|v| (v.num, v.audit_actions))
             .collect();
         let downloads = downloads.map_err(|e| log::error!("d/l: {}", e)).unwrap_or_default();
-        let capitalized_name = ver.capitalized_name().to_string();
+        let capitalized_name = krate.capitalized_name().to_string();
 
         let ver_dates = all.versions();
         let ver_dates: HashMap<_, _> = ver_dates.iter().map(|v| (v.num.as_str(), v)).collect();
@@ -165,6 +168,8 @@ impl AllVersions {
                     yanked_by,
                     published_by,
                     msrv: None,
+                    version_url: None,
+                    version_url_label: "",
                 }
             }
 
@@ -214,6 +219,12 @@ impl AllVersions {
                 })
             });
 
+            let (version_url, version_url_label) = if krate.repository().is_some() {
+                (urler.git_source(&origin, version_meta.version()), "git")
+            } else {
+                (urler.docs_rs_source(version_meta.name(), version_meta.version()), "src")
+            };
+
             VerRow {
                 yanked,
                 version,
@@ -229,6 +240,8 @@ impl AllVersions {
                 yanked_by,
                 published_by,
                 msrv,
+                version_url: Some(version_url),
+                version_url_label,
             }
         }).collect();
 

@@ -256,6 +256,7 @@ pub struct KitchenSink {
     docs_rs: docs_rs_client::DocsRsClient,
     url_check_cache: TempCache<(bool, u8)>,
     readme_check_cache: TempCache<()>,
+    canonical_http_of_crate_at_version_cache: TempCache<String>,
     crate_db: CrateDb,
     derived_storage: SimpleCache,
     user_db: user_db::UserDb,
@@ -334,6 +335,7 @@ impl KitchenSink {
             index: Arc::new(index?),
             url_check_cache: TempCache::new(&data_path.join("url_check2.db")).context("urlcheck")?,
             readme_check_cache: TempCache::new(&data_path.join("readme_check.db")).context("readmecheck")?,
+            canonical_http_of_crate_at_version_cache: TempCache::new(&data_path.join("canonical_http_url_at.db")).context("readmecheck")?,
             docs_rs: docs_rs_client::DocsRsClient::new(data_path.join("docsrs.db")).context("docs")?,
             crate_db: CrateDb::new(Self::assert_exists(data_path.join("crate_data.db"))?).context("db")?,
             derived_storage: SimpleCache::new(data_path.join("derived.db"), true)?,
@@ -1340,7 +1342,19 @@ impl KitchenSink {
         Ok((src, meta.manifest, warnings))
     }
 
+    fn canonical_http_of_crate_at_version_cache_key(origin: &Origin, crate_version: &str) -> String {
+        format!("{}-{crate_version}", origin.short_crate_name())
+    }
+
+    pub fn canonical_http_of_crate_at_version_cached(&self, origin: &Origin, crate_version: &str) -> Option<String> {
+        self.canonical_http_of_crate_at_version_cache.get(Self::canonical_http_of_crate_at_version_cache_key(origin, crate_version).as_str()).ok().flatten()
+    }
+
     pub async fn canonical_http_of_crate_at_version(&self, origin: &Origin, crate_version: &str) -> CResult<String> {
+        if let Some(s) = self.canonical_http_of_crate_at_version_cached(origin, crate_version) {
+            return Ok(s);
+        }
+
         let ver = self.crate_files_summary_from_crates_io_tarball(origin.short_crate_name(), crate_version).await?;
         if let Some(sha) = ver.vcs_info_git_sha1 {
             let package = ver.manifest.package.as_ref().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
@@ -1350,6 +1364,7 @@ impl KitchenSink {
                     None => self.crate_db.path_in_repo(&repo, &package.name).await?.unwrap_or_default(),
                 };
                 if let Some(url) = repo.canonical_http_url_at(&path_in_repo, &hex::encode(sha)) {
+                    self.canonical_http_of_crate_at_version_cache.set(Self::canonical_http_of_crate_at_version_cache_key(origin, crate_version), &url)?;
                     return Ok(url);
                 }
             }
@@ -1359,6 +1374,7 @@ impl KitchenSink {
             use std::fmt::Write;
             let _ = write!(&mut url, "#{}", hex::encode(sha));
         }
+        self.canonical_http_of_crate_at_version_cache.set(Self::canonical_http_of_crate_at_version_cache_key(origin, crate_version), &url)?;
         Ok(url)
     }
 

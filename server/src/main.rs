@@ -829,7 +829,7 @@ async fn handle_crate_source_redirect(req: HttpRequest) -> Result<HttpResponse, 
 
     let at_ver = at_ver.to_owned();
     let state = Arc::clone(&state);
-    let git_url = rt_run_timeout(&state.clone().rt, "git revision lookup", 5, async move {
+    let git_url = rt_run_timeout(&state.clone().rt, "git revision lookup", 15, async move {
         let crates = state.crates.load();
         crates.canonical_http_of_crate_at_version(&origin, &at_ver).await
     })

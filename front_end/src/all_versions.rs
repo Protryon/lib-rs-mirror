@@ -219,7 +219,10 @@ impl AllVersions {
                 })
             });
 
-            let (version_url, version_url_label) = if krate.repository().is_some() {
+            let (version_url, version_url_label) = if let Some(url) = kitchen_sink.canonical_http_of_crate_at_version_cached(&origin, version_meta.version()) {
+                let label = if url.starts_with("https://docs.rs") {"src"} else {"git"};
+                (url, label)
+            } else if krate.repository().is_some() {
                 (urler.git_source(&origin, version_meta.version()), "git")
             } else {
                 (urler.docs_rs_source(version_meta.name(), version_meta.version()), "src")

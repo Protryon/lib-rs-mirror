@@ -761,7 +761,7 @@ dachshund: data-structures
 dag-cbor: cryptography::cryptocurrencies, encoding
 dag: cryptography::cryptocurrencies
 daml: cryptography::cryptocurrencies
-dantalian: multimedia::encoding
+dantalian: multimedia::video
 darklua: games, compilers
 darkroom: development-tools::testing
 darling_core: development-tools::procedural-macro-helpers

@@ -590,18 +590,18 @@ Process or make images.
 obvious-keywords = ["image", "images", "graphics"]
 preference = 1.1
 
-[multimedia.categories.encoding]
-name = "Encoding"
-standalone-name = "Encoding media"
-title = "Rust media encoding library"
-description = """
-Crates that encode or decode binary data in multimedia formats.
-"""
-short-description = """
-Encode or decode binary data in multimedia formats.
-"""
-obvious-keywords = ["codec", "encoding"]
-preference = 0.9
+# [multimedia.categories.encoding]
+# name = "Encoding"
+# standalone-name = "Encoding media"
+# title = "Rust media encoding library"
+# description = """
+# Crates that encode or decode binary data in multimedia formats.
+# """
+# short-description = """
+# Encode or decode binary data in multimedia formats.
+# """
+# obvious-keywords = ["codec", "encoding"]
+# preference = 0.9
 
 [network-programming]
 name = "Network programming"

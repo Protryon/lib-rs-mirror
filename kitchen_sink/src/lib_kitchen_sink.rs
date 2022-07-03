@@ -1428,6 +1428,10 @@ impl KitchenSink {
             if cat == "blockchain" {
                 *cat = "cryptography::cryptocurrencies".to_string();
             }
+            // useless category
+            if cat == "multimedia::encoding" {
+                *cat = "multimedia".to_string();
+            }
             if cat == "aerospace::simulation" {
                 *cat = "simulation".to_string();
             }

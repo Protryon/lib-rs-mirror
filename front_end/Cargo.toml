@@ -38,6 +38,6 @@ anyhow = "1.0.41"
 peeking_take_while = "1.0.0"
 rand = "0.8.4"
 treemap = { git = "https://github.com/kornelski/treemap-rs", rev = "4a0beac18a61780b5f9e5910851c7b94c45be8b3" }
-textwrap = "0.14.2"
+textwrap = "0.15.0"
 validator = { version = "0.1.0", path = "../validator" }
 blake3 = "1.3.0"

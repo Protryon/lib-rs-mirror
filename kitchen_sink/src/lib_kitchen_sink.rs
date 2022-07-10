@@ -2485,7 +2485,7 @@ impl KitchenSink {
                                     .min()
                                     .unwrap_or(0);
                                 if c.newest_bad().unwrap_or(0) < dep_newest_bad_certain {
-                                    let _ = db.set_compat(all.origin(), &crate_ver, dep_newest_bad, Compat::BrokenDeps, &reason);
+                                    let _ = db.set_compat(all.origin(), &crate_ver, dep_newest_bad, Compat::BrokenDepsLikely, &reason);
                                 }
                             }
                         } else if dependency_affects_msrv {

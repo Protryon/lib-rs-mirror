@@ -57,7 +57,7 @@ fn parse_package_id(id: Option<&str>) -> Option<(String, SemVer)> {
     Some((name, ver))
 }
 
-const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 501] = [
+const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 505] = [
 // rg  --no-filename -o '\[stable\(feature.*\]' library/ | fgrep 1. | sort -u | sed -E 's/.*feature ?= ?"(.+)", since ?= ?"1\.(..+)\..".*/(\2, "\1"),/' | sort -V | pbcopy
 
 (17, "addr_from_into_ip"),
@@ -551,6 +551,7 @@ const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 501] = [
 (62, "total_cmp"),
 (62, "windows_process_extensions_raw_arg"),
 (63, "array_from_fn"),
+(63, "asrawfd_ptrs"),
 (63, "box_into_pin"),
 (63, "cell_filter_map"),
 (63, "io_safety"),
@@ -561,6 +562,9 @@ const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 501] = [
 (63, "toowned_clone_into"),
 (63, "try_reserve_2"),
 (63, "vecdeque_read_write"),
+(64, "into_future"),
+(64, "nonzero_checked_ops"),
+(64, "tcp_listener_incoming_fused_iterator"),
 ];
 
 fn parse_analysis(stdout: &str, stderr: &str) -> Result<Findings, String> {
@@ -572,6 +576,7 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Result<Findings, String> {
     let feature_flags: HashMap<_,_> = RUSTC_FEATURES_STABLE_SINCE.iter().map(|&(v, k)| (k, v)).collect();
 
     let mut findings = Findings::default();
+    let mut some_deps_broken = false;
     let user_time = Regex::new(r"^user\s+(\d+)m(\d+\.\d+)s$").expect("regex");
 
     let mut lines = stdout.split('\n');
@@ -749,6 +754,12 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Result<Findings, String> {
                     else if desc.starts_with("no method named `fill_with` found for mutable reference `&mut [") {
                         findings.crates.insert((Some(50), name.clone(), ver.clone(), Compat::SuspectedIncompatible, desc.into()));
                     }
+                    else if desc.starts_with("there is no argument named `") {
+                        findings.crates.insert((Some(57), name.clone(), ver.clone(), Compat::LikelyIncompatible, desc.into()));
+                    }
+                    else if desc.starts_with("type parameters must be declared prior to const parameters") {
+                        findings.crates.insert((Some(58), name.clone(), ver.clone(), Compat::LikelyIncompatible, desc.into()));
+                    }
                     else if desc.starts_with("the `#[track_caller]` attribute is an experimental") ||
                         desc.starts_with("`while` is not allowed in a `const fn`") ||
                         desc.starts_with("`while` is not allowed in a `const`") ||
@@ -851,7 +862,23 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Result<Findings, String> {
         line.starts_with("  process didn't exit successfully:") || // handled elsewhere
         line.starts_with("  no targets specified in the manifest") {
             last_broken_manifest_crate = None;
+
+            // error: msg handling
+            if line.starts_with("error: failed to select a version for the requirement ") || line.starts_with("error: cyclic package dependency: package `") {
+                some_deps_broken = true;
+            } else if line.contains("cannot be built because it requires rustc") {
+                some_deps_broken = true;
+                last_broken_manifest_crate = None;
+                let pattern = regex::Regex::new(r"package `([^ ]+) v([^` ]+)` cannot be built because it requires rustc 1.([0-9]+)[^ ]* or newer, while the currently active rustc version is 1.").expect("regex syntax2");
+                if let Some(cap) = pattern.captures(line) {
+                    if let Ok(ver) = SemVer::parse(&cap[2]) {
+                        let rustc_version: u16 = cap[3].parse().expect("cargo rustc ver?");
+                        findings.crates.insert((Some(rustc_version - 1), cap[1].to_string(), ver, Compat::DefinitelyIncompatible, line.into()));
+                    }
+                }
+            }
         }
+        // manifest parsing handling
         else if let Some(rest) = line.strip_prefix("  failed to parse manifest at `/home/rustyuser/.cargo/registry/src/github.com-1ecc6299db9ec823/") {
             let pattern = regex::Regex::new(r"([^.+/; ]+?)-([0-9]+\.[^/; ]+)/Cargo.toml").expect("regex syntax");
             if let Some(cap) = pattern.captures(rest) {
@@ -907,7 +934,7 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Result<Findings, String> {
     // this is slightly inaccurate, because we don't know if older deps would work
     // but not marking it as failure makes builder retry the crate over and over again
     let has_toplevel_crate_compat = findings.crates.iter().any(|c| c.1 == top_level_crate_name);
-    let some_deps_broken = findings.crates.iter().any(|c| c.0.is_none() && !c.3.successful());
+    some_deps_broken = some_deps_broken || findings.crates.iter().any(|c| c.0.is_none() && !c.3.successful());
     if !has_toplevel_crate_compat && some_deps_broken {
         let reason = findings.crates.iter().filter_map(|(rustc_ver, name, ver, c, reason)| {
             if c.successful() { return None; }
@@ -953,6 +980,21 @@ Caused by:
     assert_eq!(40, f.0.unwrap());
     assert_eq!("search-autocompletion", f.1);
     assert_eq!("0.3.0", f.2.to_string());
+}
+
+#[test]
+fn parse_rustc_version_cargo() {
+    let stderr = r##"
+error: package `fooo v0.1.230` cannot be built because it requires rustc 1.999.2 or newer, while the currently active rustc version is 1.61.0
+"##;
+
+    let f = parse_analysis("CHECKING 1.61.0 watever 1.2.3", stderr).unwrap();
+
+    assert_eq!(f.crates.len(), 1);
+    let f = f.crates.into_iter().next().unwrap();
+    assert_eq!(998, f.0.unwrap());
+    assert_eq!("fooo", f.1);
+    assert_eq!("0.1.230", f.2.to_string());
 }
 
 #[test]

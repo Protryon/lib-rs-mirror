@@ -118,7 +118,7 @@ impl CompatRanges {
 
     pub fn newest_bad_likely(&self) -> Option<RustcMinorVersion> {
         self.bad.iter().rev()
-            .filter(|(_, c)| c.0 == Compat::DefinitelyIncompatible || c.0 == Compat::LikelyIncompatible)
+            .filter(|(_, c)| c.0 == Compat::DefinitelyIncompatible || c.0 == Compat::LikelyIncompatible || c.0 == Compat::BrokenDepsLikely)
             .map(|(&v, _)| v)
             .next()
     }
@@ -158,6 +158,7 @@ pub enum Compat {
     VerifiedWorks = b'Y',
     ProbablyWorks = b'y',
     BrokenDeps = b'n',
+    BrokenDepsLikely = b'D',
     SuspectedIncompatible = b'N',
     LikelyIncompatible = b'x',
     DefinitelyIncompatible = b'X',
@@ -170,6 +171,7 @@ impl Compat {
             "Y" => Compat::VerifiedWorks,
             "y" => Compat::ProbablyWorks,
             "n" => Compat::BrokenDeps,
+            "D" => Compat::BrokenDepsLikely,
             "N" => Compat::SuspectedIncompatible,
             "x" => Compat::LikelyIncompatible,
             "X" => Compat::DefinitelyIncompatible,
@@ -187,8 +189,9 @@ impl Compat {
             Compat::ProbablyWorks => 1,
             Compat::BrokenDeps => 0,
             Compat::SuspectedIncompatible => 1,
-            Compat::LikelyIncompatible => 2,
-            Compat::DefinitelyIncompatible => 3,
+            Compat::BrokenDepsLikely => 2,
+            Compat::LikelyIncompatible => 3,
+            Compat::DefinitelyIncompatible => 4,
         }
     }
 
@@ -295,6 +298,7 @@ impl BuildDb {
                 c.add_compat(prev_newest_bad, match compat {
                     Compat::VerifiedWorks => Compat::ProbablyWorks,
                     Compat::DefinitelyIncompatible | Compat::LikelyIncompatible => Compat::SuspectedIncompatible,
+                    Compat::BrokenDepsLikely => Compat::BrokenDeps,
                     other => other,
                 }, Some("assumed from older version".into()));
             }

@@ -402,7 +402,7 @@ pub fn combined_score(base_score: Score, temp_score: Score, f: &OverallScoreInpu
     }
 
     if f.is_unwanted_category {
-        score *= 0.6;
+        score *= 0.5;
     }
 
     if !f.is_crates_io_published {

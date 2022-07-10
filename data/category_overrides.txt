@@ -1,4 +1,4 @@
-a11ywatch_cli: accessibility
+a11ywatch_cli: accessibility, command-line-utilities
 aabb-quadtree: data-structures
 abci-rs: cryptography::cryptocurrencies
 abci-storage: cryptography::cryptocurrencies
@@ -117,6 +117,7 @@ aptos-fallible: cryptography::cryptocurrencies
 aptos-faucet: cryptography::cryptocurrencies
 aptos-framework: cryptography::cryptocurrencies
 aptos-genesis-tool: cryptography::cryptocurrencies
+aptos-log-derive: cryptography::cryptocurrencies
 aptos-mempool: cryptography::cryptocurrencies
 aptos-parallel-executor: cryptography::cryptocurrencies
 aptos-transaction-builder: cryptography::cryptocurrencies
@@ -124,6 +125,7 @@ aptos-writeset-generator: cryptography::cryptocurrencies
 apub-actix-web: web-programming
 aq: accessibility
 aquaenv: os::macos-apis, command-line-utilities, gui
+aqueue: asynchronous
 arber: cryptography::cryptocurrencies, data-structures
 arch-audit-gtk: os, gui
 archivelib: compression
@@ -256,6 +258,7 @@ below: os, gui
 bevy_ascii_terminal: game-development, command-line-interface
 bevy_box2d: simulation
 bevy_lazy_prefabs: game-development
+bevy_prototype_debug_lines: game-development, development-tools::debugging
 bevy_retro: game-development
 bevy_tiled_prototype: game-development
 bfc: emulators
@@ -273,6 +276,7 @@ binwrite: encoding
 bio-types: science, rust-patterns
 bio: science, algorithms, data-structures
 bio_edit: science
+biodiff: algorithms
 bit-io: rust-patterns
 bit-set: data-structures
 bit-vec: data-structures
@@ -396,6 +400,9 @@ candid_derive: cryptography::cryptocurrencies
 candidate-validation: cryptography::cryptocurrencies
 canonicalize: value-formatting
 cansi: parser-implementations
+cap-common: cryptography::cryptocurrencies
+cap-sdk-core: cryptography::cryptocurrencies
+cap-sdk: cryptography::cryptocurrencies
 capricorn: parser-implementations
 capstone-sys: development-tools::debugging
 capstone3: development-tools::debugging
@@ -636,6 +643,8 @@ cosmos_gravity_utils: cryptography::cryptocurrencies
 cosmos_sdk: cryptography::cryptocurrencies
 cosmrs: cryptography::cryptocurrencies
 cosmwasm-crypto: cryptography::cryptocurrencies
+cosmwasm-derive: cryptography::cryptocurrencies
+cosmwasm-math: cryptography::cryptocurrencies
 cosmwasm-vm: cryptography::cryptocurrencies
 count_constant_sites: science, parser-implementations
 cov-mark: development-tools::testing
@@ -784,6 +793,7 @@ debug_macros: development-tools::debugging
 debug_tree: development-tools::debugging, command-line-interface
 deck_codes: games
 deckofcards: game-development
+decode_raw: encoding, development-tools::debugging
 deeprox: network-programming
 deepspeech: multimedia::audio, text-processing
 default-env: rust-patterns
@@ -935,6 +945,7 @@ eetf: encoding
 eff-wordlist: authentication
 egaku2d_core: rendering::graphics-api, game-development
 egg-mode: web-programming
+egui: game-development, gui
 eip-712: cryptography::cryptocurrencies
 eip-utils: cryptography::cryptocurrencies
 eip1193: cryptography::cryptocurrencies
@@ -1329,6 +1340,7 @@ geos: science::math
 get-year: date-and-time
 getch: command-line-interface, os
 getch: os
+gff: game-development, parser-implementations
 gflags: command-line-interface
 gfx-swap: cryptography::cryptocurrencies
 ghakuf: parser-implementations
@@ -2064,6 +2076,7 @@ mieli: database, command-line-utilities
 migra-cli: database, command-line-utilities
 migrator: cryptography::cryptocurrencies
 mil: cryptography::cryptocurrencies
+mime: web-programming, multimedia
 mindjuice: emulators
 mine_sweeper: games
 minecraftrs: games
@@ -2137,6 +2150,7 @@ mrt-rs: parser-implementations, network-programming
 msgpack-rs: encoding
 mslnk: os::windows-apis
 msql-srv: database
+mssql-pool: database
 multiboot2: os
 multican: hardware-support
 multiproof-rs: cryptography::cryptocurrencies
@@ -2747,6 +2761,7 @@ redwood: science::ml
 reef: command-line-interface, os
 refinery-core: database
 refinery_cli: command-line-utilities
+reframe: development-tools
 reign: web-programming
 reign_boot: web-programming
 releasetag: development-tools::debugging
@@ -2982,6 +2997,7 @@ sass-sys: web-programming
 sauron-parse: parser-implementations
 savannah: os::macos-apis
 savory-core: gui
+sawtooth-sabre: cryptography::cryptocurrencies
 sc-block-builder: cryptography::cryptocurrencies
 sc-chain-spec-derive: cryptography::cryptocurrencies
 sc-client-db: cryptography::cryptocurrencies
@@ -3203,6 +3219,10 @@ sszt: value-formatting, cryptography::cryptocurrencies
 stable-pattern: rust-patterns, parser-implementations
 stable_borrow: rust-patterns
 stack_dst: rust-patterns
+stack_test_epicbox: cryptography::cryptocurrencies
+stack_test_epicboxlib: cryptography::cryptocurrencies
+stack_test_progpow: cryptography::cryptocurrencies
+stack_test_progpow_cpu: cryptography::cryptocurrencies
 stamm: science::ml
 star-history: command-line-utilities
 state-sync-driver: cryptography::cryptocurrencies
@@ -3460,6 +3480,7 @@ three_em_evm: cryptography::cryptocurrencies
 thrift_codec: encoding, web-programming
 thud: games
 thumbs: command-line-interface
+tiberius: database
 tiltify: web-programming
 time-parse: date-and-time, parser-implementations
 time: date-and-time, parser-implementations, value-formatting, no-std
@@ -3858,6 +3879,7 @@ xml-rs: parser-implementations, encoding
 xml_dom: web-programming
 xml_sax: parser-implementations, web-programming
 xmltree: parser-implementations
+xmp_toolkit: multimedia::images, encoding
 xpc-connection-sys: os::macos-apis
 xpc-connection: os::macos-apis
 xpring-rs: cryptography::cryptocurrencies

@@ -35,7 +35,9 @@ github:bbodi/rust-voxlap/voxlap
 github:benanders/rjni/rjni
 github:benschza/pier/pier
 github:bexxmodd/paleatra/paleatra
+github:bitshifter/bevy-physics-weekend/bevy-physics-weekend
 github:bitshifter/mathbench-rs/mathbench
+github:bobox214/kataster/kataster
 github:bolcom/unftp/unftp
 github:breeswish/slog-global/slog-global
 github:bytecodealliance/wasmtime/wasmtime-cli
@@ -143,6 +145,7 @@ github:flxzt/rnote/rnote
 github:foxboxpdx/macrotis/macrotis
 github:fraunhofer-aisec/rabe/rabe
 github:freaky/compactor/compactor
+github:fsmaxb/bevy-pong-clone/pong
 github:game4all/vx_bevy/vx_bevy
 github:gamozolabs/chocolate_milk/aht
 github:gamozolabs/chocolate_milk/bootloader
@@ -188,6 +191,7 @@ github:jeremychone-channel/rust-invaders/invaders
 github:jharrilim/pong-amethyst/pong-amethyst
 github:joaoh82/rust_sqlite/rust_sqlite
 github:johalun/echo/module
+github:johanhelsing/extreme_bevy/extreme_bevy
 github:joyent/rust-cueball/cueball
 github:jussiniinikoski/wasm-pdf/wasm-pdf
 github:katharostech/arsenal/arsenal_blender_core
@@ -306,10 +310,13 @@ github:mozilla/neqo/neqo-qpack
 github:mozilla/neqo/neqo-server
 github:mozilla/neqo/neqo-transport
 github:mrdimas/rusty-shooter/rusty-shooter
+github:mrk-its/bevy-robbo/bevy-robbo
 github:mullvad/mullvadvpn-app/mullvad-cli
 github:mullvad/mullvadvpn-app/talpid-core
 github:mvdnes/rboy/rboy
+github:mvlabat/muddle-run/mr_web_client
 github:mwbryant/bevy_survival_crafting_game/bevy_survival_crafting_game
+github:mwbryant/monster-fighter/monster_fighter
 github:myfreeweb/freepass/freepass-cli
 github:nasso/screensnap/screensnap
 github:nearprotocol/nearcore/near
@@ -337,6 +344,7 @@ github:oreboot/oreboot/payloads
 github:oreboot/oreboot/uart
 github:osrg/rustybgp/daemon
 github:osrg/rustybgp/proto
+github:ostwilkens/arugio/arugio_client
 github:ozkriff/zemeroth/zemeroth
 github:ozkriff/zoc/zoc
 github:pacmancoder/rust-ayumi/ayumi
@@ -459,6 +467,7 @@ github:simias/rustation/rustation
 github:skytrias/everpuzzle/everpuzzle
 github:snowplow/factotum/factotum
 github:sorpaas/rux/kernel
+github:sotora-game/sotora/sotora
 github:spejss/image-processing-cli-in-rust/ipcli
 github:spotifyd/spotifyd/spotifyd
 github:stencillogic/db-core/db-core
@@ -474,6 +483,7 @@ github:team-plover/warlocks-gambit/warlocks-gambit
 github:tesselode/kira/kira
 github:tesselode/kira/kira-lua
 github:thebracket/rltk_rs/rltk
+github:theneikos/bevy_spicy_gamebase/bevy_spicy_gamebase
 github:thephet/bevyroguelike/bevyroguelike
 github:thepowersgang/rust_os/kernel
 github:thinkofname/rust-quake/quake

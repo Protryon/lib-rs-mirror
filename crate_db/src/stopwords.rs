@@ -89,12 +89,12 @@ lazy_static! {
         ("database", Some(&["embedded"])),
         ("robotics", Some(&["localization"])),
         ("thread", Some(&["storage"])),
-        ("bitcoin", Some(&["http", "day", "database", "key-value", "network", "wasm", "secp256k1", "client", "rpc"])),
+        ("bitcoin", Some(&["http", "day", "database", "key-value", "network", "wasm", "secp256k1", "client", "rpc", "websocket"])),
         ("solana", Some(&["http", "day", "database", "key-value", "network", "wasm", "secp256k1", "client", "cryptographic", "gfx", "sdk"])),
         ("exonum", Some(&["http", "day", "database", "key-value", "network", "wasm", "client"])),
-        ("blockchain", Some(&["database", "key-value", "network", "wasm", "nosql", "orm", "driver", "fun", "rpc", "client", "server", "p2p", "networking"])),
-        ("cryptocurrencies", Some(&["database", "key-value", "network", "wasm", "nosql", "orm", "driver", "fun", "rpc", "client", "server", "p2p", "networking"])),
-        ("ethereum", Some(&["http", "day", "nosql", "log", "generic", "network", "wasm", "key-value", "orm", "client", "database", "secp256k1"])),
+        ("blockchain", Some(&["database", "key-value", "network", "wasm", "nosql", "orm", "driver", "fun", "rpc", "client", "server", "p2p", "networking", "websocket"])),
+        ("cryptocurrencies", Some(&["database", "key-value", "network", "wasm", "nosql", "orm", "driver", "fun", "rpc", "client", "server", "p2p", "networking", "websocket"])),
+        ("ethereum", Some(&["http", "day", "nosql", "log", "generic", "network", "wasm", "key-value", "orm", "client", "database", "secp256k1", "websocket"])),
         ("iter", Some(&["math"])),
         ("macro", Some(&["no-std", "no_std", "feature:no_std"])),
         ("macros", Some(&["no-std", "no_std", "feature:no_std"])),
@@ -158,8 +158,8 @@ lazy_static! {
         ("rest", Some(&["api"])),
         ("cargo-subcommand", None),
         ("substrate", None),
+        ("twitch", Some(&["kraken"])),
 
-        ("google", None), // there's a ton of auto-generated crates
         ("ethereum", None), // there's a ton of auto-generated crates
 
         ("placeholder", None), // spam

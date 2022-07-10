@@ -119,6 +119,7 @@ pub fn is_deprecated(k: &RichCrateVersion) -> bool {
         let orig_desc = orig_desc.trim_matches(|c: char| !c.is_ascii_alphabetic());
         let desc = orig_desc.to_ascii_lowercase();
         return orig_desc.starts_with("WIP") || orig_desc.ends_with("WIP") ||
+            desc.starts_with("unmaintained ") ||
             desc.starts_with("deprecated") ||
             desc.starts_with("this crate was renamed") ||
             desc.starts_with("this crate is deprecated") ||

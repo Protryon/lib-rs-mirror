@@ -97,17 +97,29 @@ impl AllVersions {
 
                 let dep_name = req.crate_name().to_ascii_lowercase();
                 let ver_req = req.requirement();
-                let (actual_version, _) = match kitchen_sink.newest_crates_io_version_matching_requirement_by_lowercase_name(&dep_name, ver_req) {
-                    Ok(d) => d,
+                let actual_version = match kitchen_sink.newest_crates_io_version_matching_requirement_by_lowercase_name(&dep_name, ver_req) {
+                    Ok((semver, _)) => semver,
                     Err(e) => {
                         log::warn!("{} requires broken {} {}: {}", capitalized_name, dep_name, ver_req, e);
                         continue;
                     },
                 };
 
-                let r_dep = required_deps.entry(dep_name).or_insert_with(HashMap::new);
+                let display_version = match kitchen_sink.lowest_crates_io_version_matching_requirement_by_lowercase_name(&dep_name, ver_req) {
+                    Ok((semver, _)) => if !semver_major_differs(&semver, &actual_version) {
+                        semver
+                    } else {
+                        actual_version.clone()
+                    },
+                    Err(e) => {
+                        log::debug!("{}", e);
+                        actual_version.clone()
+                    },
+                };
+
                 // TODO: track changes to req.is_optional()?
-                r_dep.insert(map_to_major(&actual_version), actual_version);
+                required_deps.entry(dep_name).or_insert_with(HashMap::new)
+                    .insert(map_to_major(&actual_version), display_version);
             }
 
             Some((sem, version_meta, release_date, required_deps, audit))

@@ -1693,6 +1693,13 @@ impl KitchenSink {
             .ok_or(KitchenSinkErr::NoVersions)
     }
 
+    pub fn lowest_crates_io_version_matching_requirement_by_lowercase_name(&self, crate_name: &str, req: &str) -> Result<(SemVer, CratesIndexVersion), KitchenSinkErr> {
+        self.iter_crates_io_version_matching_requirement_by_lowercase_name(crate_name, req)?
+            .min_by(|(a, _), (b, _)| a.cmp(b))
+            .map(|(s, v)| (s, v.clone()))
+            .ok_or(KitchenSinkErr::NoVersions)
+    }
+
     #[inline]
     pub async fn prewarm(&self) {
         let idx = Arc::clone(&self.index);

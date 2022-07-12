@@ -20,11 +20,11 @@ use std::io::Read;
 use tar::Archive;
 
 // start end crates affected
-const DOWNLOAD_SPAM_INCIDENTS: [(&str, &str, &[&str]); 2] = [
-    ("2021-12-10", "2022-04-10", &[
+const DOWNLOAD_SPAM_INCIDENTS: [(&str, &str, u32, &[&str]); 6] = [
+    ("2021-12-10", "2022-04-10", 4000, &[
         "vsdb", "btm", "vsdbsled", "vsdb_derive","ruc",
     ]),
-    ("2021-12-21", "2022-01-22", &[
+    ("2021-12-21", "2022-01-22", 4000, &[
         "ppv-lite86", "serde_cbor","time","fast-math","ieee754","time-macros","once_cell", "clap", "serde", "memoffset",
         "rand", "rand_core", "lazy_static", "half", "nix","cfg-if", "log", "libc", "num-traits", "serde_derive", "getrandom", "rand_chacha", "parking_lot", "lock_api",
         "instant", "parking_lot_core", "smallvec", "scopeguard", "sha3", "digest", "keccak", "proc-macro2", "unicode-xid", "quote", "syn", "fs2", "crc32fast", "fxhash",
@@ -32,6 +32,42 @@ const DOWNLOAD_SPAM_INCIDENTS: [(&str, &str, &[&str]); 2] = [
         "rocksdb", "librocksdb-sys", "zstd", "zstd-safe", "zstd-sys", "cc", "jobserver", "crypto-common", "generic-array", "version_check", "typenum", "block-buffer",
         "unicode-width", "atty", "itoa",
     ]),
+    ("2022-06-24", "2022-07-15", 1000, &[
+        "audiopus_sys",
+        "mmids-core",
+        "proc-mounts",
+        "serde-pickle",
+        "speexdsp-resampler",
+        "stdext", "azure_data_cosmos",
+        "tonic-web",
+        "wav",
+        "webrtc",
+        "ccm",
+        "debug-helper",
+        "interceptor",
+        "mock_instant",
+        "sdp",
+        "stdext",
+        "turn",
+        "webrtc-data",
+        "webrtc-mdns",
+        "webrtc-media",
+    ]),
+    ("2022-06-29", "2022-07-04", 0, SOURCEGRAPH_SPAMMED),
+    ("2022-07-06", "2022-07-13", 0, SOURCEGRAPH_SPAMMED),
+    ("2022-07-06", "2022-07-13", 100, &[]),
+];
+
+const SOURCEGRAPH_SPAMMED: &[&str] = &[
+    "abomonation", "alsa", "assimp-sys", "aster", "atom_syndication", "aws-smithy-protocol-test", "bio", "bootloader", "cargo", "cargo-edit",
+    "cargo-outdated", "cargo-readme ", "cobs", "compiletest_rs", "conrod", "coreaudio-sys", "cortex-a", "cpython", "cron", "crust", "datetime",
+    "decimal", "devicemapper", "elastic-array ", "elastic-array", "euclid", "flame", "flexi_logger", "freetype-rs", "ftp", "gdk", "generator",
+    "genmesh", "gleam", "gstreamer", "gtk", "igd", "imageproc", "immeta", "jsonrpc", "kuchiki", "liquid", "llvm-sys", "lodepng", "mp4parse",
+    "mysql", "nalgebra", "notify-rust", "obj", "opencv", "pbr", "pcap", "piston2d-gfx_graphics ", "piston2d-opengl_graphics", "piston_window",
+    "pistoncore-sdl2_window ", "plist", "pnet_macros", "polars-core", "postgis", "primal-sieve ", "primal-sieve", "pty", "r2d2-diesel",
+    "r2d2_mysql", "racer", "regex_macros", "router", "routing", "rss", "rust-htslib", "rustfmt", "rustler", "select", "self_encryption",
+    "servo-fontconfig-sys", "servo-glutin", "servo-skia", "signal", "sprs", "stb_truetype", "symbolic-debuginfo", "symbolic_demangle",
+    "sysfs_gpio", "sysinfo", "systemd", "systemstat", "timely", "tobj", "tokei", "utime", "va_list", "wavefront_obj", "xcb",
 ];
 
 const NUM_CRATES: usize = 42000;
@@ -75,7 +111,7 @@ async fn main() {
                     continue;
                 }
                 if let Some(path) = file.path()?.file_name().and_then(|f| f.to_str()) {
-                    eprint!("{} ({}KB): ", path, file.header().size()? / 1000);
+                    eprint!("{} ({}MB): ", path, file.header().size()? / 1000 / 1000);
                     match path {
                         "crate_owners.csv" => {
                             eprintln!("parse_crate_owners…");
@@ -173,37 +209,32 @@ async fn main() {
 // TODO: it'd be nice to interpolate week prior to week after
 #[inline(never)]
 fn filter_download_spam(crates: &CratesMap, versions: &VersionsMap, downloads: &mut VersionDownloads) {
-    let incidents = DOWNLOAD_SPAM_INCIDENTS.map(|(start,end,names)| {
-        (date_from_str(start).unwrap(), date_from_str(end).unwrap(), names.iter().copied().collect::<HashSet<_>>())
+    let incidents = DOWNLOAD_SPAM_INCIDENTS.map(|(start,end,headroom,names)| {
+        (date_from_str(start).unwrap(), date_from_str(end).unwrap(), headroom, names.iter().copied().collect::<HashSet<_>>())
     });
     for (crate_id, name) in crates.iter() {
-        for (start, end, names) in incidents.iter().filter(|(_, _, names)| names.contains(name.as_str())) {
+        for &(start, end, headroom, _) in incidents.iter().filter(|(_, _, _, names)| names.is_empty() || names.contains(name.as_str())) {
             let versions = versions.get(crate_id).expect(name);
 
-            let min_date = *start - chrono::Duration::weeks(1);
-            let any_version_max_dl = 4000 + versions.iter()
-                .filter_map(|row| downloads.get(&row.id))
-                .flatten()
-                .filter(|(day, _, _)| *day >= min_date && day < start)
-                .map(|&(_, dl, _)| dl)
-                .max()
-                .unwrap_or(0);
+            let min_date = start - chrono::Duration::days(3);
+            let max_date = end + chrono::Duration::days(3);
 
             for version_id in versions.iter().map(|row| row.id) {
                 if let Some(mut dl) = downloads.get_mut(&version_id) {
-                    // per-version cap leaves more data untouched
-                    // but needs to include some max of any verison for new releases
-                    let max_dl = any_version_max_dl / 4 + dl.iter()
-                        .filter(|(day, _, _)| *day >= min_date && day < start)
-                        .map(|&(_, dl, _)| dl)
-                        .max()
-                        .unwrap_or(5000); // new release?
+                    let before = dl.iter().filter(|(day, _, _)| (*day >= min_date && *day < start) )
+                        .map(|&(_, dl, _)| dl).max().unwrap_or(0);
+                    let after = dl.iter().filter(|(day, _, _)| (*day <= max_date && *day > end) )
+                        .map(|&(_, dl, _)| dl).max().unwrap_or(0);
+                    let max_dl = headroom + before.max(after);
+                    let expected = (before + after)/2;
 
                     dl.iter_mut()
-                        .filter(|(day, dl, _)| *dl > max_dl && day >= start && day <= end)
+                        .filter(|(day, dl, _)| {
+                            *dl > max_dl && *day >= start && *day <= end
+                        })
                         .for_each(|(day, dl, ovr)| {
-                            eprintln!("cut {} {} to {}", day, dl, max_dl);
-                            *dl = max_dl;
+                            eprintln!("cut {day} {dl} to {max_dl} for {name} in {start}-{end} incident");
+                            *dl = expected;
                             *ovr = true;
                         });
                 }

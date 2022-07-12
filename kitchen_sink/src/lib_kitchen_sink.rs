@@ -3051,7 +3051,9 @@ impl KitchenSink {
     }
 
     pub async fn index_crates_io_crate_all_owners(&self, all_owners: Vec<(Origin, Vec<CrateOwner>)>) -> CResult<()> {
+        if stopped() {return Err(KitchenSinkErr::Stopped.into());}
         self.crate_db.index_crate_all_owners(&all_owners).await?;
+
         let users = all_owners.iter().flat_map(|(_, owners)| owners.iter().filter_map(|o| {
             let login = if o.login.starts_with("github:") {
                 o.login.split(':').nth(1).unwrap().to_owned()
@@ -3074,7 +3076,10 @@ impl KitchenSink {
                 two_factor_authentication: None,
             })
         })).collect::<Vec<_>>();
+
+        if stopped() {return Err(KitchenSinkErr::Stopped.into());}
         self.user_db.index_users(&users)?;
+
         for (origin, owners) in all_owners {
             if let Origin::CratesIo(name) = origin {
                 self.crates_io_owners_cache.set(name, owners)?;

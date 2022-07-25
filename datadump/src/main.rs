@@ -19,48 +19,48 @@ use std::io::BufReader;
 use std::io::Read;
 use tar::Archive;
 
+struct Incident<Date, Set> {
+    start: Date, end: Date,
+    headroom: u32, lookaround: u8,
+    names: Set,
+}
+
 // start end crates affected
-const DOWNLOAD_SPAM_INCIDENTS: [(&str, &str, u32, &[&str]); 6] = [
-    ("2021-12-10", "2022-04-10", 4000, &[
+const DOWNLOAD_SPAM_INCIDENTS: [Incident<&'static str, &'static [&'static str]>; 7] = [
+    Incident { start: "2021-12-10", end: "2022-04-10", headroom: 4000, lookaround: 7, names: &[
         "vsdb", "btm", "vsdbsled", "vsdb_derive","ruc",
-    ]),
-    ("2021-12-21", "2022-01-22", 4000, &[
+    ]},
+    Incident { start: "2021-12-21", end: "2022-01-22", headroom: 4000, lookaround: 7, names: &[
         "ppv-lite86", "serde_cbor","time","fast-math","ieee754","time-macros","once_cell", "clap", "serde", "memoffset",
         "rand", "rand_core", "lazy_static", "half", "nix","cfg-if", "log", "libc", "num-traits", "serde_derive", "getrandom", "rand_chacha", "parking_lot", "lock_api",
         "instant", "parking_lot_core", "smallvec", "scopeguard", "sha3", "digest", "keccak", "proc-macro2", "unicode-xid", "quote", "syn", "fs2", "crc32fast", "fxhash",
         "byteorder", "crossbeam-epoch", "crossbeam-utils", "memoffset", "autocfg", "const_fn", "rio", "bitflags",
         "rocksdb", "librocksdb-sys", "zstd", "zstd-safe", "zstd-sys", "cc", "jobserver", "crypto-common", "generic-array", "version_check", "typenum", "block-buffer",
         "unicode-width", "atty", "itoa",
-    ]),
-    ("2022-06-24", "2022-07-15", 1000, &[
-        "audiopus_sys",
-        "mmids-core",
-        "proc-mounts",
-        "serde-pickle",
-        "speexdsp-resampler",
-        "stdext", "azure_data_cosmos",
-        "tonic-web",
-        "wav",
-        "webrtc",
-        "ccm",
-        "debug-helper",
-        "interceptor",
-        "mock_instant",
-        "sdp",
-        "stdext",
-        "turn",
-        "webrtc-data",
-        "webrtc-mdns",
-        "webrtc-media",
-    ]),
-    ("2022-06-29", "2022-07-04", 0, SOURCEGRAPH_SPAMMED),
-    ("2022-07-06", "2022-07-13", 0, SOURCEGRAPH_SPAMMED),
-    ("2022-07-06", "2022-07-13", 100, &[]),
+    ]},
+    Incident { start: "2022-06-15", end: "2022-07-17", headroom: 0, lookaround: 7, names: &[
+        "audiopus_sys", "mmids-core", "proc-mounts", "serde-pickle", "speexdsp-resampler", "stdext", "azure_data_cosmos",
+        "azure_core", "tonic-web", "wav", "webrtc", "ccm", "debug-helper", "interceptor", "mock_instant", "sdp", "stdext",
+        "turn", "webrtc-data", "webrtc-ice", "webrtc-dtls", "webrtc-mdns", "webrtc-media", "cranelift-isle", "str_stack", "ed25519-consensus", "igd",
+        "riff", "webrtc-srtp", "webrtc-sctp", "partition-identity", "substring", "iter-read", "cidr-utils", "der-oid-macro",
+        "x509-parser", "yasna"
+    ]},
+    Incident { start: "2022-06-29", end: "2022-07-14", headroom: 0, lookaround: 7, names: &[
+        "va_list", "vkrs", "xmpp-parsers", "vpncloud", "symbolic-sourcemap", "symbolic-symcache", "tag_safe", "ydcv-rs", "way-cooler", "superlu-sys",
+        "symbolic-proguard", "wemo", "xhtmlchardet", "tinysearch", "tenacious", "tofu", "tojson_macros", "urdict", "twitter-api",
+        "uchardet", "task_queue", "yatlv", "table", "zmq-rs", "unixbar", "unrar", "zombie", "toml-config", "vorbis",
+        "symbolic-debuginfo", "telemetry", "xcolor", "syntaxext_lint", "treena", "traverse", "symbolic_polynomials",
+        "symbolic-unreal", "skeletal_animation", "td_revent", "symbolic-symcache", "telegram-bot", "v8-sys", "secp256k1",
+        "test-assembler",
+    ]},
+    Incident { start: "2022-06-29", end: "2022-07-13", headroom: 0, lookaround: 2, names: SOURCEGRAPH_SPAMMED},
+    Incident { start: "2022-06-29", end: "2022-07-13", headroom: 300, lookaround: 7, names: &[]},
+    Incident { start: "2022-07-06", end: "2022-07-13", headroom: 100, lookaround: 2, names: &[]},
 ];
 
 const SOURCEGRAPH_SPAMMED: &[&str] = &[
     "abomonation", "alsa", "assimp-sys", "aster", "atom_syndication", "aws-smithy-protocol-test", "bio", "bootloader", "cargo", "cargo-edit",
-    "cargo-outdated", "cargo-readme ", "cobs", "compiletest_rs", "conrod", "coreaudio-sys", "cortex-a", "cpython", "cron", "crust", "datetime",
+    "cargo-outdated", "cargo-readme ", "cobs", "clippy", "compiletest_rs", "conrod", "coreaudio-sys", "cortex-a", "cpython", "cron", "crust", "datetime",
     "decimal", "devicemapper", "elastic-array ", "elastic-array", "euclid", "flame", "flexi_logger", "freetype-rs", "ftp", "gdk", "generator",
     "genmesh", "gleam", "gstreamer", "gtk", "igd", "imageproc", "immeta", "jsonrpc", "kuchiki", "liquid", "llvm-sys", "lodepng", "mp4parse",
     "mysql", "nalgebra", "notify-rust", "obj", "opencv", "pbr", "pcap", "piston2d-gfx_graphics ", "piston2d-opengl_graphics", "piston_window",
@@ -68,6 +68,12 @@ const SOURCEGRAPH_SPAMMED: &[&str] = &[
     "r2d2_mysql", "racer", "regex_macros", "router", "routing", "rss", "rust-htslib", "rustfmt", "rustler", "select", "self_encryption",
     "servo-fontconfig-sys", "servo-glutin", "servo-skia", "signal", "sprs", "stb_truetype", "symbolic-debuginfo", "symbolic_demangle",
     "sysfs_gpio", "sysinfo", "systemd", "systemstat", "timely", "tobj", "tokei", "utime", "va_list", "wavefront_obj", "xcb",
+    "tract-core", "vkrs", "vpncloud", "xmpp-parsers", "way-cooler", "ydcv-rs", "tag_safe", "symbolic-sourcemap", "symbolic-unreal",
+    "symbolic-symcache", "skeletal_animation", "v8-sys", "td_revent", "superlu-sys", "symbolic-proguard", "telegram-bot", "rustorm",
+    "rustfbp", "scaly", "slack", "scribe", "rustwlc", "rsgenetic", "select_color", "rs-graph", "sdl2_ttf", "slabmalloc", "sdl2_image",
+    "rsteam", "rusted_cypher", "speedtest-rs", "sassers", "spaceapi", "rust-mpfr", "sdl2_mixer", "shuttle", "sexp", "serde_xml",
+    "sel4-start", "smtp", "by_address", "sawtooth-xo", "rosc", "ssbh_lib", "ssdp", "sel4-sys", "static-server", "squash-sys",
+    "tokei", "rs-es", "rusp", "snailquote", "sql_lexer", "rusoto", "cobs",
 ];
 
 const NUM_CRATES: usize = 42000;
@@ -206,25 +212,40 @@ async fn main() {
 }
 
 // Cap spammed download data to ~prev week's max during incident period
-// TODO: it'd be nice to interpolate week prior to week after
 #[inline(never)]
 fn filter_download_spam(crates: &CratesMap, versions: &VersionsMap, downloads: &mut VersionDownloads) {
-    let incidents = DOWNLOAD_SPAM_INCIDENTS.map(|(start,end,headroom,names)| {
-        (date_from_str(start).unwrap(), date_from_str(end).unwrap(), headroom, names.iter().copied().collect::<HashSet<_>>())
-    });
+    // the downloads in the datadump aren't complete, so incidents can be fixed only when they're recent
+    let earliest_date_available = downloads.values().flat_map(|v| v).map(|&(d, _, _)| d).min().unwrap();
+    let incidents: Vec<_> = DOWNLOAD_SPAM_INCIDENTS.iter().filter_map(|&Incident {start,end,headroom,lookaround,names}| {
+        let start = date_from_str(start).unwrap();
+        // otherwise it won't have enough before/after data
+        if earliest_date_available > start - chrono::Duration::days(lookaround.into()) {
+            return None;
+        }
+        Some(Incident {
+            start,
+            end: date_from_str(end).unwrap(),
+            headroom, lookaround,
+            names: names.iter().copied().collect::<HashSet<_>>(),
+        })
+    }).collect();
+    if incidents.is_empty() {
+        return;
+    }
     for (crate_id, name) in crates.iter() {
-        for &(start, end, headroom, _) in incidents.iter().filter(|(_, _, _, names)| names.is_empty() || names.contains(name.as_str())) {
-            let versions = versions.get(crate_id).expect(name);
+        let versions = versions.get(crate_id).expect(name);
+        let orig_downloads: u32 = versions.iter().flat_map(|row| downloads.get(&row.id)).flat_map(|d| d).map(|d| d.1).sum();
 
-            let min_date = start - chrono::Duration::days(3);
-            let max_date = end + chrono::Duration::days(3);
+        for &Incident { start, end, headroom, lookaround, .. } in incidents.iter().filter(|i| i.names.is_empty() || i.names.contains(name.as_str())) {
+            let min_date = start - chrono::Duration::days(lookaround.into());
+            let max_date = end + chrono::Duration::days(lookaround.into());
 
             for version_id in versions.iter().map(|row| row.id) {
                 if let Some(mut dl) = downloads.get_mut(&version_id) {
                     let before = dl.iter().filter(|(day, _, _)| (*day >= min_date && *day < start) )
                         .map(|&(_, dl, _)| dl).max().unwrap_or(0);
                     let after = dl.iter().filter(|(day, _, _)| (*day <= max_date && *day > end) )
-                        .map(|&(_, dl, _)| dl).max().unwrap_or(0);
+                        .map(|&(_, dl, _)| dl).max().unwrap_or(before * 5 / 4);
                     let max_dl = headroom + before.max(after);
                     let expected = (before + after)/2;
 
@@ -233,12 +254,17 @@ fn filter_download_spam(crates: &CratesMap, versions: &VersionsMap, downloads: &
                             *dl > max_dl && *day >= start && *day <= end
                         })
                         .for_each(|(day, dl, ovr)| {
-                            eprintln!("cut {day} {dl} to {max_dl} for {name} in {start}-{end} incident");
+                            // eprintln!("cut {day} {dl} > {max_dl} to {expected} for {name} in {start}-{end} incident");
                             *dl = expected;
                             *ovr = true;
                         });
                 }
             }
+        }
+
+        let after_downloads: u32 = versions.iter().flat_map(|row| downloads.get(&row.id)).flat_map(|d| d).map(|d| d.1).sum();
+        if after_downloads != orig_downloads {
+            eprintln!("Changed {name} dl from {orig_downloads} to {after_downloads}");
         }
     }
 }

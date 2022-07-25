@@ -1927,7 +1927,7 @@ impl KitchenSink {
 
         // direct deps are used as extra keywords for similarity matching,
         // but we're taking only niche deps to group similar niche crates together
-        let raw_deps_stats = timeout("raw-r-deps", 14, self.index.deps_stats().map_err(KitchenSinkErr::Deps)).await?;
+        let raw_deps_stats = timeout("raw-r-deps", 25, self.index.deps_stats().map_err(KitchenSinkErr::Deps)).await?;
         let mut weighed_deps = Vec::<(&str, f32)>::new();
         let all_deps = manifest.direct_dependencies();
         let all_deps = [(all_deps.0, 1.0), (all_deps.2, 0.33)];

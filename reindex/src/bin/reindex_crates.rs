@@ -68,12 +68,6 @@ fn main() {
         }
     });
 
-    let _ = rt.spawn({
-        let r = r.clone();
-        async move {
-            r.crates.prewarm().await;
-        }
-    });
     let index_thread = rt.spawn({
         async move {
             let renderer = Arc::new(Renderer::new(None));
@@ -97,6 +91,8 @@ fn main() {
             Ok::<_, anyhow::Error>(())
         }
     });
+
+    rt.block_on(r.crates.prewarm());
 
     let c: Box<dyn Iterator<Item = Origin> + Send> = if everything {
         let mut c: Vec<_> = r.crates.all_crates().collect::<Vec<_>>();

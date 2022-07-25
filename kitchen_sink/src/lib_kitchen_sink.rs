@@ -1094,7 +1094,7 @@ impl KitchenSink {
         if !has_readme {
             let maybe_repo = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
             warnings.insert(Warning::NoReadmeProperty);
-            warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()).await);
+            warnings.extend(Box::pin(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref())).await);
         }
         self.rich_crate_version_data_common(origin.clone(), meta, false, warnings).await
     }
@@ -1174,7 +1174,7 @@ impl KitchenSink {
             watch("readme", self.add_readme_from_crates_io(&mut meta, name, ver)).await;
             let has_readme = meta.readme.is_some();
             if !has_readme {
-                warnings.extend(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref()).await);
+                warnings.extend(Box::pin(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref())).await);
             }
         }
 

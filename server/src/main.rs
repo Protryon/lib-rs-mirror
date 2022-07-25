@@ -650,16 +650,16 @@ async fn handle_install(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     };
 
     let state = state2.clone();
-    let (page, last_modified) = rt_run_timeout(&state2.rt, "instpage", 30, async move {
+    let rendered = rt_run_timeout(&state2.rt, "instpage", 30, async move {
         let crates = state.crates.load();
         let ver = crates.rich_crate_version_async(&origin).await?;
         let mut page: Vec<u8> = Vec::with_capacity(32000);
         front_end::render_install_page(&mut page, &ver, &crates, &state.markup).await?;
         minify_html(&mut page);
         mark_server_still_alive(&state);
-        Ok::<_, anyhow::Error>((page, None))
+        Ok::<_, anyhow::Error>(Rendered {page, cache_time: 24 * 3600, refresh: false, last_modified: None})
     }).await?;
-    Ok(serve_page(Rendered {page, cache_time: 24 * 3600, refresh: false, last_modified}))
+    Ok(serve_page(rendered))
 }
 
 async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {

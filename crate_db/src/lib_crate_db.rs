@@ -214,90 +214,12 @@ impl CrateDb {
     /// Score is a ranking of a crate (0 = bad, 1 = great)
     pub async fn index_latest(&self, c: CrateVersionData<'_>) -> FResult<DbDerived> {
         let origin = c.origin.to_str();
-
-        let manifest = &c.manifest;
-        let package = manifest.package.as_ref().expect("package");
-        let mut insert_keyword = KeywordInsert::new()?;
-        let all_explicit_keywords = package.keywords.iter()
-            .chain(c.source_data.github_keywords.iter().flatten());
-
-        for (i, k) in all_explicit_keywords.enumerate() {
-            let w: f64 = 100. / (6 + i * 2) as f64;
-            insert_keyword.add(k, w, true);
-        }
-
-        for (i, k) in package.name.split(|c: char| !c.is_alphanumeric()).enumerate() {
-            let w: f64 = 100. / (8 + i * 2) as f64;
-            insert_keyword.add(k, w, false);
-        }
-
-        if let Some(l) = manifest.links() {
-            insert_keyword.add(l.trim_start_matches("lib"), 0.54, false);
-        }
-
-        // this will find forks
-        if let Some(lib) = c.source_data.lib_file.as_ref() {
-            insert_keyword.add_raw(hex_hash(lib), 1., false);
-        }
-        if let Some(bin) = c.source_data.bin_file.as_ref() {
-            insert_keyword.add_raw(hex_hash(bin), 1., false);
-        }
-        // this will find crates from the same repo/template
-        if let Some(Readme { markup: Markup::Markdown(txt) | Markup::Html(txt) | Markup::Rst(txt) , ..}) = c.source_data.readme.as_ref() {
-            insert_keyword.add_raw(hex_hash(txt), 1., false);
-        }
-
-        // order is important. SO's synonyms are very keyword-specific and would
-        // add nonsense keywords if applied to freeform text
-        insert_keyword.add_synonyms(&self.tag_synonyms);
-
-        for (i, (w2, k)) in c.extracted_auto_keywords.iter().enumerate() {
-            let w = *w2 as f64 * 150. / (80 + i) as f64;
-            insert_keyword.add(k, w, false);
-        }
-
-        for feat in manifest.features.keys() {
-            if feat != "default" && feat != "std" && feat != "nightly" {
-                insert_keyword.add_raw(format!("feature:{}", feat), 0.55, false);
-            }
-        }
-        if manifest.is_sys(c.source_data.has_buildrs || package.build.is_some()) {
-            insert_keyword.add_raw("has:is_sys".into(), 0.01, false);
-        }
-        if manifest.is_proc_macro() {
-            insert_keyword.add_raw("has:proc_macro".into(), 0.25, false);
-        }
-        if manifest.has_bin() {
-            insert_keyword.add_raw("has:bin".into(), 0.01, false);
-            if manifest.has_cargo_bin() {
-                insert_keyword.add_raw("has:cargo-bin".into(), 0.2, false);
-            }
-        }
-        if c.is_build {
-            insert_keyword.add_raw("has:is_build".into(), 0.01, false);
-        }
-        if c.is_dev {
-            insert_keyword.add_raw("has:is_dev".into(), 0.01, false);
-        }
-
-        for &(dep, weight) in c.deps_stats {
-            insert_keyword.add_raw(format!("dep:{}", dep), weight.into(), false);
-        }
+        let mut insert_keyword = self.gather_crate_keywords(&c)?;
 
         let mut out = String::with_capacity(200);
         write!(&mut out, "https://lib.rs/{} ", if c.origin.is_crates_io() { c.origin.short_crate_name() } else { &origin }).unwrap();
 
         let next_timestamp = (Utc::now().timestamp() + 3600 * 24 * 31) as u32;
-
-        for (i, k) in c.authors.iter().filter_map(|a| a.email.as_ref().or(a.name.as_ref())).enumerate() {
-            let w: f64 = 50. / (100 + i) as f64;
-            insert_keyword.add_raw(k.into(), w, false);
-        }
-
-        if let Some(repo) = c.repository {
-            let url = repo.canonical_git_url();
-            insert_keyword.add_raw(format!("repo:{}", url), 1., false); // crates in monorepo probably belong together
-        }
 
         self.with_write("insert_crate", |tx| {
             let mut insert_crate = tx.prepare_cached("INSERT OR IGNORE INTO crates (origin, recent_downloads, ranking) VALUES (?1, ?2, ?3)")?;
@@ -374,6 +296,7 @@ impl CrateDb {
             // so knock all keywords' importance if it's yanked
             insert_keyword.commit(tx, crate_id, if c.source_data.is_yanked {0.1} else {1.})?;
 
+            let package = c.manifest.package.as_ref().expect("package");
             let mut keywords: Vec<_> = package.keywords.iter().filter(|k| !k.is_empty()).map(|k| normalize_keyword(k)).collect();
             if keywords.is_empty() {
                 keywords = Self::keywords_tx(tx, c.origin)?;
@@ -386,6 +309,75 @@ impl CrateDb {
                 keywords,
             })
         }).await
+    }
+
+    fn gather_crate_keywords(&self, c: &CrateVersionData) -> Result<KeywordInsert, Error> {
+        let manifest = c.manifest;
+        let package = manifest.package.as_ref().expect("package");
+
+        let mut insert_keyword = KeywordInsert::new()?;
+        let all_explicit_keywords = package.keywords.iter()
+            .chain(c.source_data.github_keywords.iter().flatten());
+        for (i, k) in all_explicit_keywords.enumerate() {
+            let w: f64 = 100. / (6 + i * 2) as f64;
+            insert_keyword.add(k, w, true);
+        }
+        for (i, k) in package.name.split(|c: char| !c.is_alphanumeric()).enumerate() {
+            let w: f64 = 100. / (8 + i * 2) as f64;
+            insert_keyword.add(k, w, false);
+        }
+        if let Some(l) = manifest.links() {
+            insert_keyword.add(l.trim_start_matches("lib"), 0.54, false);
+        }
+        if let Some(lib) = c.source_data.lib_file.as_ref() {
+            insert_keyword.add_raw(hex_hash(lib), 1., false);
+        }
+        if let Some(bin) = c.source_data.bin_file.as_ref() {
+            insert_keyword.add_raw(hex_hash(bin), 1., false);
+        }
+        if let Some(Readme { markup: Markup::Markdown(txt) | Markup::Html(txt) | Markup::Rst(txt) , ..}) = c.source_data.readme.as_ref() {
+            insert_keyword.add_raw(hex_hash(txt), 1., false);
+        }
+        insert_keyword.add_synonyms(&self.tag_synonyms);
+        for (i, (w2, k)) in c.extracted_auto_keywords.iter().enumerate() {
+            let w = *w2 as f64 * 150. / (80 + i) as f64;
+            insert_keyword.add(k, w, false);
+        }
+        for feat in manifest.features.keys() {
+            if feat != "default" && feat != "std" && feat != "nightly" {
+                insert_keyword.add_raw(format!("feature:{}", feat), 0.55, false);
+            }
+        }
+        if manifest.is_sys(c.source_data.has_buildrs || package.build.is_some()) {
+            insert_keyword.add_raw("has:is_sys".into(), 0.01, false);
+        }
+        if manifest.is_proc_macro() {
+            insert_keyword.add_raw("has:proc_macro".into(), 0.25, false);
+        }
+        if manifest.has_bin() {
+            insert_keyword.add_raw("has:bin".into(), 0.01, false);
+            if manifest.has_cargo_bin() {
+                insert_keyword.add_raw("has:cargo-bin".into(), 0.2, false);
+            }
+        }
+        if c.is_build {
+            insert_keyword.add_raw("has:is_build".into(), 0.01, false);
+        }
+        if c.is_dev {
+            insert_keyword.add_raw("has:is_dev".into(), 0.01, false);
+        }
+        for &(dep, weight) in c.deps_stats {
+            insert_keyword.add_raw(format!("dep:{}", dep), weight.into(), false);
+        }
+        for (i, k) in c.authors.iter().filter_map(|a| a.email.as_ref().or(a.name.as_ref())).enumerate() {
+            let w: f64 = 50. / (100 + i) as f64;
+            insert_keyword.add_raw(k.into(), w, false);
+        }
+        if let Some(repo) = c.repository {
+            let url = repo.canonical_git_url();
+            insert_keyword.add_raw(format!("repo:{}", url), 1., false); // crates in monorepo probably belong together
+        }
+        Ok(insert_keyword)
     }
 
     /// (rank-relevance, relevance, slug)

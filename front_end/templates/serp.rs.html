@@ -38,7 +38,7 @@
         </div>
         @if let SearchKind::Query(query) = p.query {
             <form role="search" id=search method="get" action="/search">
-                <input placeholder="name, keywords, description" autocapitalize="off" autocorrect="off" autocomplete="off" tabindex="1" type=search value="@query" name=q><button type=submit>Search</button>
+                <input accesskey="s" placeholder="name, keywords, description" autocapitalize="off" autocorrect="off" autocomplete="off" tabindex="1" type=search value="@query" name=q><button type=submit>Search</button>
             </form>
             <nav>
                 <ul>

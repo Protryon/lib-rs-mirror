@@ -92,7 +92,10 @@ impl SearchPage<'_> {
     ///
     /// TODO: Merge with the better version history analysis from the individual crate page.
     pub fn version_class(&self, ver: &str) -> &str {
-        let v = semver::Version::parse(ver).expect("semver");
+        let v = match semver::Version::parse(ver) {
+            Ok(v) => v,
+            _ => return "unstable",
+        };
         match (v.major, v.minor, v.patch, !v.pre.is_empty()) {
             (1..=15, _, _, false) => "stable",
             (0, m, p, false) if m >= 2 && p >= 3 => "stable",

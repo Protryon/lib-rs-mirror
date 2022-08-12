@@ -57,7 +57,7 @@ fn parse_package_id(id: Option<&str>) -> Option<(String, SemVer)> {
     Some((name, ver))
 }
 
-const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 505] = [
+const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 516] = [
 // rg  --no-filename -o '\[stable\(feature.*\]' library/ | fgrep 1. | sort -u | sed -E 's/.*feature ?= ?"(.+)", since ?= ?"1\.(..+)\..".*/(\2, "\1"),/' | sort -V | pbcopy
 
 (17, "addr_from_into_ip"),
@@ -562,9 +562,20 @@ const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 505] = [
 (63, "toowned_clone_into"),
 (63, "try_reserve_2"),
 (63, "vecdeque_read_write"),
+(64, "alloc_c_string"),
+(64, "alloc_ffi"),
+(64, "asfd_ptrs"),
+(64, "btree_unwindsafe"),
+(64, "core_c_str"),
+(64, "core_ffi_c"),
+(64, "future_poll_fn"),
 (64, "into_future"),
 (64, "nonzero_checked_ops"),
+(64, "os_string_fmt_write"),
+(64, "process_set_process_group"),
+(64, "ready_macro"),
 (64, "tcp_listener_incoming_fused_iterator"),
+(64, "windows_file_type_ext"),
 ];
 
 fn parse_analysis(stdout: &str, stderr: &str) -> Result<Findings, String> {
@@ -988,9 +999,11 @@ fn parse_rustc_version_cargo() {
 error: package `fooo v0.1.230` cannot be built because it requires rustc 1.999.2 or newer, while the currently active rustc version is 1.61.0
 "##;
 
-    let f = parse_analysis("CHECKING 1.61.0 watever 1.2.3", stderr).unwrap();
+    let mut f = parse_analysis("CHECKING 1.61.0 watever 1.2.3", stderr).unwrap();
 
-    assert_eq!(f.crates.len(), 1);
+    f.crates.retain(|(_, name, ..)| name == "fooo");
+
+    assert_eq!(f.crates.len(), 1, "{:?}", f.crates);
     let f = f.crates.into_iter().next().unwrap();
     assert_eq!(998, f.0.unwrap());
     assert_eq!("fooo", f.1);

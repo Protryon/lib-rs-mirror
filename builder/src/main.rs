@@ -37,16 +37,16 @@ const RUST_VERSIONS: [RustcMinorVersion; 14] = [
     60,
     59,
     58,
-    57,
-    54,
-    52,
-    49,
-    46,
-    42,
-    41,
-    39,
-    33,
     56,
+    55,
+    53,
+    51,
+    48,
+    47,
+    40,
+    38,
+    32,
+    63,
 ];
 
 use crate_db::builddb::*;
@@ -170,7 +170,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let rustc_ver = available_rust_versions.swap_remove(rustc_idx);
                 let mut required_deps = Vec::new();
                 for (c,(v, newest_bad)) in x.rustc_compat.required_deps() {
-                    if newest_bad >= rustc_ver {
+                    if newest_bad <= rustc_ver { // this check is useless, since newest_bad is for wrong version
                         required_deps.push((c.into(), v.clone()));
                     }
                 }
@@ -183,7 +183,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     is_app: x.is_app,
                 })
             })
-            .take(RUST_VERSIONS.len() *2/3)
+            .take((RUST_VERSIONS.len() *2/3).min(5)) // max concurrency
             .collect();
 
             eprintln!("\nselected: {}/{} ({})", versions.len(), candidates.len(), versions.iter().take(10).map(|c| format!("{} {}", c.crate_name, c.version)).collect::<Vec<_>>().join(", "));

@@ -145,7 +145,7 @@ name = "Programming languages"
 description = """
 Tools for programming languages: compilers, interpreters, transpilers, and virtual machines.\
 """
-short-description = "Programming languages"
+short-description = "Compilers"
 title = "Rust-lang"
 preference = 0.1
 

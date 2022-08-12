@@ -402,7 +402,7 @@ lazy_static! {
             &[("date-and-time", 0.7, 0.), ("parsing", 0.7, 0.), ("rust-patterns", 0.7, 0.), ("embedded", 0.7, 0.), ("algorithms", 0.8, 0.),
             ("data-structures", 0.7, 0.), ("rendering", 0.7, 0.), ("value-formatting", 0.8, 0.0)]),
         (Cond::Any(&["dep:tokio", "dep:futures-core", "dep:actix", "dep:mio", "dep:async-std"]),
-            &[("value-formatting", 0.7, 0.), ("parsing", 0.7, 0.), ("algorithms", 0.8, 0.), ("data-structures", 0.7, 0.), ("no-std", 0.7, 0.)]),
+            &[("value-formatting", 0.7, 0.), ("parsing", 0.7, 0.), ("algorithms", 0.8, 0.), ("data-structures", 0.7, 0.), ("rust-patterns", 0.6, 0.), ("no-std", 0.6, 0.)]),
 
         (Cond::NotAny(&["settings", "configuration", "config", "dotenv", "configurator", "dotfile", "dotfiles", "env", "customization", "environment"]),
             &[("config", 0.75, 0.)]),
@@ -558,7 +558,7 @@ lazy_static! {
             ("multimedia::video", 0.5, 0.), ("multimedia", 0.5, 0.), ("wasm", 0.8, 0.)]),
         (Cond::Any(&["z80", "mos6502", "6502", "intel-8080"]), &[("emulators", 1.3, 0.1), ("hardware-support", 1.3, 0.1), ("embedded", 1.1, 0.), ("wasm", 0.5, 0.), ("multimedia", 0.7, 0.)]),
         (Cond::Any(&["rom", "sega"]), &[("emulators", 1.1, 0.), ("hardware-support", 1.1, 0.)]),
-        (Cond::Any(&["c64", "ms-dos", "chip-8", "spc700", "snes", "gameboy", "game-boy", "gba", "nintendo", "playstation", "commodore", "nes", "atari"]),
+        (Cond::Any(&["c64", "ms-dos", "chip-8", "spc700", "snes", "gameboy", "game-boy", "game-boy-advance", "gba", "nintendo", "playstation", "commodore", "nes", "atari"]),
             &[("emulators", 1.3, 0.1), ("game-development", 1.1, 0.), ("multimedia", 0.9, 0.), ("development-tools::build-utils", 0.7, 0.), ("rendering::graphics-api", 0.7, 0.), ("wasm", 0.5, 0.), ("no-std", 0.8, 0.)]),
         (Cond::All(&["virtual", "machine"]), &[("emulators", 1.4, 0.1), ("simulation", 1.1, 0.), ("development-tools::build-utils", 0.7, 0.)]),
         (Cond::All(&["virtual", "machines"]), &[("emulators", 1.1, 0.), ("simulation", 1.1, 0.), ("parser-implementations", 0.8, 0.)]),

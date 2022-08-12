@@ -253,7 +253,7 @@ impl Index {
                 let bad = a.is_yanked() || ver.is_none() || (stable_only && !ver.as_ref().map_or(false, |v| v.pre.is_empty()));
                 (!bad, ver)
             })
-            .unwrap_or_else(|| krate.latest_version()) // latest_version = most recently published version
+            .unwrap_or_else(|| krate.most_recent_version()) // latest_version = most recently published version
     }
 
     pub(crate) fn deps_of_crate(&self, krate: &impl ICrate, query: DepQuery) -> Result<Dep, DepsErr> {
@@ -370,7 +370,7 @@ impl Index {
                     req.matches(semver)
                 })
                 .unwrap_or_else(|| {
-                    let fallback = krate.latest_version(); // bad version, but it shouldn't happen anyway
+                    let fallback = krate.most_recent_version(); // bad version, but it shouldn't happen anyway
                     let semver = semver_parse(fallback.version());
                     (fallback, semver)
                 });

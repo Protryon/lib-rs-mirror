@@ -919,7 +919,7 @@ impl KitchenSink {
         let krate = tokio::task::block_in_place(|| {
             self.index.crates_io_crate_by_lowercase_name(name)
         })?;
-        let latest_in_index = krate.latest_version().version(); // most recently published version
+        let latest_in_index = krate.most_recent_version().version(); // most recently published version
         let meta = timeout("cacheable meta request", 10, self.crates_io.crate_meta(name, latest_in_index).map(|r| r.map_err(KitchenSinkErr::from))).await?;
         let mut meta = meta.ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?;
         if !meta.versions.iter().any(|v| v.num == latest_in_index) {

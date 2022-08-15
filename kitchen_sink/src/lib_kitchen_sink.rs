@@ -2940,6 +2940,14 @@ impl KitchenSink {
         }
     }
 
+    pub fn crate_tarball_download_url(&self, k: &RichCrateVersion) -> Option<String> {
+        if k.origin().is_crates_io() {
+            Some(self.crates_io.crate_data_url(k.short_name(), k.version()))
+        } else {
+            None
+        }
+    }
+
     pub fn index_stats_histogram(&self, kind: &str, data: StatsHistogram) -> CResult<()> {
         Ok(self.stats_histograms.set(kind, data)?)
     }

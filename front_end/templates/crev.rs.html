@@ -86,6 +86,14 @@
             </article>
         }
         </div>
+
+        @if let Some(tarball_url) = c.crate_tarball_download_url.as_deref() {
+            <hr>
+            <p>Crates in the crates.io registry are tarball snapshots uploaded by crates' publishers. The registry is not using crates' git repositories. There is absolutely no guarantee that the repository URL declared by the crate belongs to the crate, or that the code in the repository is the code inside the published tarball.
+
+            To review the actual code of the crate, it's best to use <code>cargo <a href="@url.crate_by_origin(&c.cargo_crev_origin)">crev</a> open @c.ver.short_name()</code>. Alternatively, you can <a href="@tarball_url" rel="noindex nofollow" download="@(c.ver.short_name())-@(c.ver.version()).crate.tar.gz">download the tarball of @c.ver.short_name() v@c.ver.version()</a>.</p>
+            </p>
+        }
     </div>
   </main>
 

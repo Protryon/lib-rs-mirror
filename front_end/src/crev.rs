@@ -20,10 +20,11 @@ pub struct ReviewsPage<'a> {
     pub(crate) reviews: Vec<(bool, bool, &'a Review)>,
     pub(crate) version: SemVer,
     pub(crate) cargo_crev_origin: Origin,
+    pub(crate) crate_tarball_download_url: Option<String>,
 }
 
 impl<'a> ReviewsPage<'a> {
-    pub(crate) async fn new(reviews: &'a [Review], ver: &'a RichCrateVersion, _k: &'a KitchenSink, markup: &'a Renderer) -> ReviewsPage<'a> {
+    pub(crate) async fn new(reviews: &'a [Review], ver: &'a RichCrateVersion, k: &'a KitchenSink, markup: &'a Renderer) -> ReviewsPage<'a> {
         let version: SemVer = ver.version().parse().expect("semver");
         let cargo_crev_origin = Origin::from_crates_io_name("cargo-crev");
         let mut author_seen = HashSet::new();
@@ -43,6 +44,7 @@ impl<'a> ReviewsPage<'a> {
             ver,
             markup,
             cargo_crev_origin,
+            crate_tarball_download_url: k.crate_tarball_download_url(ver),
         }
     }
 

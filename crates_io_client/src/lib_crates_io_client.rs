@@ -63,6 +63,11 @@ impl CratesIoClient {
         self
     }
 
+    pub fn crate_data_url(&self, crate_name: &str, version: &str) -> String {
+        // it really uses unencoded names, e.g. + is accepted, %2B is not!
+        format!("https://static.crates.io/crates/{crate_name}/{crate_name}-{version}.crate")
+    }
+
     pub async fn crate_data(&self, crate_name: &str, version: &str) -> Result<Vec<u8>, Error> {
         let tarball_path = self.tarballs_path.join(format!("{}/{}.crate", fs_safe(crate_name), fs_safe(version)));
         if let Ok(data) = std::fs::read(&tarball_path) {
@@ -73,8 +78,7 @@ impl CratesIoClient {
             return Err(Error::NotInCache);
         }
 
-        // it really uses unencoded names, e.g. + is accepted, %2B is not!
-        let url = format!("https://static.crates.io/crates/{name}/{name}-{version}.crate", name = crate_name, version = version);
+        let url = self.crate_data_url(crate_name, version);
         let data = self.fetcher.fetch(&url).await?;
         if data.len() < 10 || data[0] != 31 || data[1] != 139 {
             return Err(Error::Other(format!("Not tarball: {}", url)));

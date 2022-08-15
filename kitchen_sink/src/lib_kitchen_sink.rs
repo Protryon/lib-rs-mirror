@@ -3127,6 +3127,10 @@ impl KitchenSink {
         let deadline = Instant::now() + Duration::from_secs(4);
         let with_owners = futures::stream::iter(crates.drain(..))
         .map(|(o, score)| async move {
+            if Instant::now() > deadline {
+                warn!("Everything timed out in ranking");
+                return Some((o, score, vec![], vec![]));
+            }
             let get_crate = tokio::time::timeout_at(deadline, self.rich_crate_version_stale_is_ok(&o));
             let (k, owners) = futures::join!(get_crate, self.crate_owners(&o));
             let keywords = match k {

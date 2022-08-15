@@ -2626,7 +2626,7 @@ impl KitchenSink {
                         }
                         let count = contr.weeks.iter()
                             .map(|w| {
-                                w.commits as f64 +
+                                w.commits.max(0) as f64 +
                                 ((w.added_l.abs() + w.deleted_l.abs()*2) as f64).sqrt()
                             }).sum::<f64>();
                         use std::collections::hash_map::Entry;

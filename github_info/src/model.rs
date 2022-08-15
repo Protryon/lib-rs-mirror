@@ -91,7 +91,7 @@ pub struct ContribWeek {
     #[serde(rename = "d")]
     pub deleted_l: i32,
     #[serde(rename = "c")]
-    pub commits: u32,
+    pub commits: i32, // It's sometimes -1! GitHub's bug?
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

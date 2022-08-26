@@ -57,11 +57,11 @@ fn extract_text_phrases(manifest: &Manifest, github_description: Option<&str>, r
     if let Some(sub) = &readme_text {
         // render readme to DOM, extract nodes
         for par in sub.split('\n') {
-            if len > 200 {
+            if len > 300 {
                 break;
             }
             let par = par.trim_start_matches(|c: char| c.is_whitespace() || c == '#' || c == '=' || c == '*' || c == '-');
-            let par = par.replace("http://", " ").replace("https://", " ");
+            let par = par.replace("http://", " ").replace("https://", " ").replace("the rust programming language", "rust");
             if !par.trim_start().is_empty() {
                 let par = par.to_lowercase();
                 len += par.len();

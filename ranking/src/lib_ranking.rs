@@ -96,33 +96,33 @@ fn cargo_toml_score(cr: &CrateVersionInputs<'_>) -> Score {
     s.n("build.rs", 10, if !cr.has_build_rs && !cr.has_links {10} else if cr.has_links {5} else {0});
 
     // users report examples are super valuable
-    s.has("has_examples", 50, cr.has_examples);
+    s.has("has_examples", 5, cr.has_examples); // FIXME: should check git
     // probably less buggy than if winging it
-    s.has("has_tests", 50, cr.has_tests);
-    s.has("has_code_of_conduct", 15, cr.has_code_of_conduct);
+    s.has("has_tests", 5, cr.has_tests); // FIXME: should check git
+    s.has("has_code_of_conduct", 10, cr.has_code_of_conduct); // FIXME: should check git
     // probably optimized
-    s.has("has_benches", 10, cr.has_benches);
+    s.has("has_benches", 5, cr.has_benches); // FIXME: should check git
 
     // docs are very important (TODO: this may be redundant with docs.rs)
     s.has("has_documentation_link", 30, cr.has_documentation_link);
-    s.has("has_homepage_link", 30, cr.has_homepage_link);
+    s.has("has_homepage_link", 20, cr.has_homepage_link);
 
     // we care about being able to analyze
-    s.has("has_repository_link", 8, cr.has_repository_link);
+    s.has("has_repository_link", 15, cr.has_repository_link);
     s.has("has_verified_repository_link", 10, cr.has_verified_repository_link);
 
     // helps lib.rs show crate in the right place
-    s.has("has_keywords", 10, cr.has_keywords);
-    s.has("has_categories", 5, cr.has_own_categories);
+    s.has("has_keywords", 8, cr.has_keywords);
+    s.has("has_categories", 6, cr.has_own_categories);
 
     // probably non-trivial crate
-    s.has("has_features", 5, cr.has_features);
+    s.has("has_features", 4, cr.has_features);
 
     // it's the best practice, may help building old versions of the project
     // s.has("has_lockfile", 5, cr.has_lockfile);
     // assume it's CI, which helps improve quality
     // TODO: detect travis, etc. without badges, since they're deprecated now
-    s.has("has_badges", 5, cr.has_badges);
+    s.has("has_badges", 1, cr.has_badges);
 
     s.n("maintenance status", 30, match cr.maintenance {
         MaintenanceStatus::ActivelyDeveloped => 30,
@@ -137,7 +137,7 @@ fn cargo_toml_score(cr: &CrateVersionInputs<'_>) -> Score {
     // TODO: being nightly should be a negative score
     s.has("works on stable", 20, !cr.is_nightly);
     // fresh
-    s.has("2018 edition", 5, cr.edition != Edition::E2015);
+    s.n("edition", 5, match cr.edition { Edition::E2015 => 0, Edition::E2018 => 4, Edition::E2021 => 5 });
 
     // license proliferation is bad
     s.has("useful license", 10, if cr.is_app {
@@ -242,7 +242,7 @@ fn versions_score(ver: &[CrateVersion]) -> Score {
     if let (Some(oldest), Some(newest)) = (oldest, newest) {
         s.n("development history", 40, (newest - oldest).num_days() / 11);
 
-        s.has("not ancient", 10, newest.year() > 2016); // such old Rust crates are all suspicious
+        s.has("not ancient", 10, newest.year() > 2017); // such old Rust crates are all suspicious
     }
 
     // don't count 0.0.x
@@ -274,7 +274,7 @@ fn authors_score(authors: &[Author], owners: &[CrateOwner], contributors: Option
 fn code_score(cr: &CrateVersionInputs<'_>) -> Score {
     let mut s = Score::new();
     s.has("Non-trivial", 1, cr.total_code_lines > 700); // usually trivial/toy programs
-    s.has("Non-giant", 1, cr.total_code_lines < 80000); // these should be split into crates
+    s.has("Non-giant", 1, cr.total_code_lines < 80_000); // these should be split into crates
     s.frac("Rust LoC", 2, (cr.rust_code_lines as f64 / 5000.).min(1.)); // prefer substantial projects (and ignore vendored non-Rust code)
     s.frac("Comments", 2, (10. * cr.rust_comment_lines as f64 / (3000. + cr.rust_code_lines as f64)).min(1.)); // it's easier to keep small project commented
     s
@@ -328,17 +328,17 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs<'_>) -> Score {
         .product::<f32>());
 
     // Low numbers are just bots/noise.
-    let downloads = (cr.downloads_per_month as f64 - 100.).max(0.) + 100.;
+    let downloads = (cr.downloads_per_month as f64 - 150.).max(0.) + 150.;
     let downloads_cleaned = (cr.downloads_per_month_minus_most_downloaded_user as f64 / if is_app_only { 1. } else { 2. } - 50.).max(0.) + 50.;
     // distribution of downloads follows power law.
     // apps have much harder to get high download numbers.
-    let pop = (downloads.log2() - 6.6) / (if is_app_only { 5. } else { 6. });
-    let pop_cleaned = downloads_cleaned.log2() - 5.6;
+    let pop = (downloads.log2() - 6.0).max(0.) / (if is_app_only { 5. } else { 6. });
+    let pop_cleaned = (downloads_cleaned.log2() - 5.0).max(0.);
     assert!(pop > 0.);
     assert!(pop_cleaned > 0.);
     // FIXME: max should be based on the most downloaded crate?
     score.score_f("Downloads", 5., pop);
-    score.score_f("Downloads (cleaned)", 18., pop_cleaned);
+    score.score_f("Downloads (cleaned)", 17., pop_cleaned);
 
     // if it's new, it doesn't have to have many downloads.
     // if it's aging, it'd better have more users
@@ -363,6 +363,7 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs<'_>) -> Score {
     score
 }
 
+#[derive(Debug)]
 pub struct OverallScoreInputs {
     // ratio of peak active users to current active users (1.0 = everyone active, 0.0 = all dead)
     pub former_glory: Option<f64>,
@@ -390,7 +391,7 @@ pub fn combined_score(base_score: Score, temp_score: Score, f: &OverallScoreInpu
     }
 
     if f.is_sub_component  {
-        score *= 0.9;
+        score *= 0.8;
     }
 
     if f.is_autopublished {
@@ -402,7 +403,7 @@ pub fn combined_score(base_score: Score, temp_score: Score, f: &OverallScoreInpu
     }
 
     if f.is_unwanted_category {
-        score *= 0.5;
+        score *= 0.4;
     }
 
     if !f.is_crates_io_published {

@@ -97,7 +97,7 @@
         <table class="reverse-deps @if !p.has_download_columns {no-dl-columns}">
           <thead>
               <tr><th colspan="3">Depender
-                @if p.has_download_columns {<small>(with downloads and own rev deps)</small>}
+                @if p.has_download_columns {<small title="the second column is a sum direct dependencies (normal and dev)">(with downloads and own rev deps)</small>}
               </th> <th colspan="2">@p.ver.capitalized_name() version</th></tr>
           </thead>
           @for r in &p.deps {

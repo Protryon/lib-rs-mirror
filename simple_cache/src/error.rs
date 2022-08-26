@@ -27,7 +27,7 @@ quick_error! {
             from()
             source(err)
         }
-        KvPoison {}
+        Timeout {}
         NotInCache {}
         Parse(err: serde_json::Error, data: Vec<u8>) {
             display("{}\n{}", err, String::from_utf8_lossy(data))

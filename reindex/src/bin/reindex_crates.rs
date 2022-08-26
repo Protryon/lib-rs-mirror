@@ -124,7 +124,8 @@ async fn main_indexing_loop(ref r: Arc<Reindexer>, crate_origins: Box<dyn Iterat
             Ok(()) => {},
             err => {
                 print_res(err);
-                return;
+                if reindexing_all_crates { return; }
+                // on hourly updates, try to continue and update score, search, etc.
             },
         }
         if stopped() {return;}

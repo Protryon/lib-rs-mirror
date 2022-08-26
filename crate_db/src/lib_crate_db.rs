@@ -21,7 +21,7 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 use thread_local::ThreadLocal;
-use log::error;
+use log::{debug, error};
 use tokio::sync::{Mutex, RwLock};
 type FResult<T, E = Error> = std::result::Result<T, E>;
 
@@ -408,6 +408,8 @@ impl CrateDb {
                 ((w * cat_w).min(0.99), slug)
             }).collect()
         };
+
+        debug!("categories = {categories:?}");
 
         // slightly nudge towards specific, leaf categories over root generic ones
         for (w, slug) in &mut categories {

@@ -1,4 +1,3 @@
-use kitchen_sink::VersionPopularity;
 use anyhow::anyhow;
 use debcargo_list::DebcargoList;
 use feat_extractor::*;
@@ -7,7 +6,9 @@ use futures::Future;
 use futures::stream::StreamExt;
 use kitchen_sink::ArcRichCrateVersion;
 use kitchen_sink::RichCrate;
+use kitchen_sink::VersionPopularity;
 use kitchen_sink::{self, stop, stopped, KitchenSink, Origin, RichCrateVersion};
+use log::debug;
 use parking_lot::Mutex;
 use rand::{seq::SliceRandom, thread_rng};
 use ranking::CrateTemporalInputs;
@@ -135,16 +136,16 @@ async fn main_indexing_loop(ref r: Arc<Reindexer>, crate_origins: Box<dyn Iterat
                     if let Some(repo) = v.repository() {
                         {
                             let mut s = seen_repos.lock();
-                            let url = repo.canonical_git_url().to_string();
-                            if s.contains(&url) {
+                            let url = repo.canonical_git_url();
+                            if s.contains(&*url) {
                                 return;
                             }
-                            println!("Indexing {}", url);
-                            s.insert(url);
+                            println!("Indexing repo of {}: {}", v.short_name(), url);
+                            s.insert(url.to_string());
                         }
                         let _finished = repo_concurrency.acquire().await;
                         if stopped() {return;}
-                        print_res(run_timeout(600, r.crates.index_repo(repo, v.version())).await);
+                        print_res(run_timeout(500, r.crates.index_repo(repo, v.version())).await);
                     }
                 }
             },
@@ -161,6 +162,7 @@ async fn index_crate(&self, origin: &Origin, renderer: &Renderer, search_sender:
     let (k, v) = futures::try_join!(crates.rich_crate_async(origin), run_timeout(45, crates.rich_crate_version_async(origin)))?;
 
     let (downloads_per_month, score) = self.crate_overall_score(&k, &v, renderer).await;
+    debug!("{origin:?} has score {score} and {downloads_per_month}dl/mo");
     let (_, index_res) = futures::join!(
         async {
             search_sender.send((v.clone(), downloads_per_month, score)).await
@@ -341,8 +343,7 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
     }
 
     let temp_score = ranking::crate_score_temporal(&temp_inp);
-
-    let score = ranking::combined_score(base_score, temp_score, &OverallScoreInputs {
+    let overall = OverallScoreInputs {
         former_glory: crates.former_glory(all.origin()).await.expect("former_glory").map(|(f,_)| f),
         is_proc_macro: k.is_proc_macro(),
         is_sys: k.is_sys(),
@@ -353,7 +354,10 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
         is_yanked: k.is_yanked(),
         is_squatspam: is_squatspam(k) || is_on_shitlist,
         is_unwanted_category: k.category_slugs().iter().any(|c| &**c == "cryptography::cryptocurrencies"),
-    });
+    };
+
+    debug!("score {base_score:?} {temp_score:?} {overall:?}");
+    let score = ranking::combined_score(base_score, temp_score, &overall);
 
     (downloads_per_month as usize, score)
 }

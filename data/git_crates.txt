@@ -245,6 +245,11 @@ github:lunatic-solutions/lunatic/lunatic-runtime
 github:luqmana/rust-opencl/opencl
 github:m4b/dryad/dryad
 github:maikklein/rlsl/rlsl
+github:maikklein/unreal-rust/unreal-api
+github:maikklein/unreal-rust/unreal-api-derive
+github:maikklein/unreal-rust/unreal-ffi
+github:maikklein/unreal-rust/unreal-movement
+github:maikklein/unreal-rust/unreal-reflect
 github:makepad/makepad/makepad
 github:makepad/makepad/makepad_wasm
 github:maps4print/azul/azul-core
@@ -337,7 +342,9 @@ github:oam-dev/rudr/healthscope
 github:oam-dev/rudr/rudr
 github:ogham/dog/dns
 github:ogham/dog/dog
-github:oreboot/oreboot/cpu
+github:oreboot/oreboot/beaglev
+github:oreboot/oreboot/oreboot-cpu
+github:oreboot/oreboot/oreboot-soc
 github:oreboot/oreboot/payloads
 github:oreboot/oreboot/uart
 github:osrg/rustybgp/daemon
@@ -441,7 +448,8 @@ github:scipr-lab/zexe/dpc
 github:scipr-lab/zexe/groth16
 github:sebbbi/rust_test/rust_test
 github:seppo0010/rsedis/rsedis
-github:sequal32/yourcontrols/sharedcockpit
+github:sequal32/yourcontrols/yourcontrols
+github:sequal32/yourcontrols/yourcontrols-net
 github:servo/devices/device
 github:servo/fontsan/fontsan
 github:servo/pathfinder/pathfinder_c
@@ -493,10 +501,11 @@ github:thinkofname/univercity/univercity
 github:thinkofname/univercity/univercity_server
 github:tikv/tikv/tidb_query
 github:tikv/tikv/tikv
-github:timberio/vector/codec
+github:timberio/vector/datadog-grok
 github:timberio/vector/file-source
 github:timberio/vector/tracing-limit
 github:timberio/vector/vector
+github:timberio/vector/vrl
 github:tock/tock/acd52832
 github:tock/tock/arty_e21
 github:tock/tock/cortexm

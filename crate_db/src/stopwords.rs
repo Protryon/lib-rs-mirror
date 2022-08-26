@@ -97,7 +97,7 @@ lazy_static! {
         ("blockchain", Some(&["database", "key-value", "network", "wasm", "nosql", "orm", "driver", "fun", "rpc", "client", "server", "p2p", "networking", "websocket"])),
         ("cryptocurrencies", Some(&["database", "key-value", "network", "wasm", "nosql", "orm", "driver", "fun", "rpc", "client", "server", "p2p", "networking", "websocket"])),
         ("cryptocurrency", Some(&["database", "key-value", "network", "wasm", "nosql", "orm", "driver", "fun", "rpc", "client", "server", "p2p", "networking", "websocket", "twitch"])),
-        ("ethereum", Some(&["http", "day", "nosql", "log", "generic", "network", "wasm", "key-value", "orm", "client", "database", "secp256k1", "websocket"])),
+        ("ethereum", Some(&["http", "day", "nosql", "log", "generic", "network", "wasm", "key-value", "orm", "client", "database", "secp256k1", "websocket", "parity"])),
         ("iter", Some(&["math"])),
         ("macro", Some(&["no-std", "no_std", "feature:no_std"])),
         ("macros", Some(&["no-std", "no_std", "feature:no_std"])),
@@ -162,8 +162,8 @@ lazy_static! {
         ("cargo-subcommand", None),
         ("substrate", None),
         ("twitch", Some(&["kraken"])),
-
-        ("ethereum", None), // there's a ton of auto-generated crates
+        ("chess", Some(&["bot"])),
+        ("lichess", Some(&["bot"])),
 
         ("placeholder", None), // spam
         ("reserved", None), // spam

@@ -161,7 +161,7 @@ async fn index_crate(&self, origin: &Origin, renderer: &Renderer, search_sender:
     let crates = &self.crates;
     let (k, v) = futures::try_join!(crates.rich_crate_async(origin), run_timeout(45, crates.rich_crate_version_async(origin)))?;
 
-    let (downloads_per_month, score) = self.crate_overall_score(&k, &v, renderer).await;
+    let (downloads_per_month, score) = self.crate_overall_score(&k, &v, renderer).await?;
     debug!("{origin:?} has score {score} and {downloads_per_month}dl/mo");
     let (_, index_res) = futures::join!(
         async {
@@ -225,7 +225,7 @@ fn index_search(indexer: &mut Indexer, lines: &TempCache<(String, f64), [u8; 16]
 }
 
 impl Reindexer {
-async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) -> (usize, f64) {
+async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) -> Result<(usize, f64), anyhow::Error> {
     let crates = &self.crates;
 
     let mut is_repo_archived = false;
@@ -282,7 +282,7 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
         is_nightly: k.is_nightly(),
     });
 
-    let downloads_per_month = crates.downloads_per_month_or_equivalent(all.origin()).await.expect("dl numbers").unwrap_or(0) as u32;
+    let downloads_per_month = crates.downloads_per_month_or_equivalent(all.origin()).await?.unwrap_or(0) as u32;
     let (runtime, _, build) = k.direct_dependencies();
     let dependency_freshness = {
         // outdated dev deps don't matter
@@ -324,7 +324,7 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
         is_in_debian,
     };
 
-    if let Some(deps) = crates.crates_io_dependents_stats_of(k.origin()).await.expect("depsstats") {
+    if let Some(deps) = crates.crates_io_dependents_stats_of(k.origin()).await? {
         let direct_rev_deps = deps.direct.all();
         let indirect_reverse_optional_deps = (deps.runtime.def as u32 + deps.runtime.opt as u32)
             .max(deps.dev as u32)
@@ -344,7 +344,7 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
 
     let temp_score = ranking::crate_score_temporal(&temp_inp);
     let overall = OverallScoreInputs {
-        former_glory: crates.former_glory(all.origin()).await.expect("former_glory").map(|(f,_)| f),
+        former_glory: crates.former_glory(all.origin()).await?.map(|(f,_)| f),
         is_proc_macro: k.is_proc_macro(),
         is_sys: k.is_sys(),
         is_sub_component: crates.is_sub_component(k).await,
@@ -359,7 +359,7 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
     debug!("score {base_score:?} {temp_score:?} {overall:?}");
     let score = ranking::combined_score(base_score, temp_score, &overall);
 
-    (downloads_per_month as usize, score)
+    Ok((downloads_per_month as usize, score))
 }
 }
 

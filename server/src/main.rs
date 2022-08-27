@@ -34,14 +34,12 @@ use tokio::runtime::Handle;
 use urlencoding::decode;
 use urlencoding::Encoded;
 use once_cell::sync::Lazy;
-
-#[macro_use]
-extern crate log;
+use log::{debug, info, warn, error};
 
 mod writer;
 
 #[global_allocator]
-static ALLOCATOR: Cap<std::alloc::System> = Cap::new(std::alloc::System, 6 * 1024 * 1024 * 1024);
+static ALLOCATOR: Cap<std::alloc::System> = Cap::new(std::alloc::System, 8 * 1024 * 1024 * 1024);
 
 static HUP_SIGNAL: AtomicU32 = AtomicU32::new(0);
 

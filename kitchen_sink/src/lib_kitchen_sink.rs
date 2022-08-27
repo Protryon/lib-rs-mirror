@@ -2718,8 +2718,8 @@ impl KitchenSink {
                             e.owner = true;
                         }
                         if e.info.is_none() {
-                            e.info = Some(Cow::Owned(Author{
-                                name: Some(owner.name().to_owned()),
+                            e.info = Some(Cow::Owned(Author {
+                                name: Some(owner.name().to_owned()).filter(|n| !n.is_empty()),
                                 email: None,
                                 url: owner.url.clone(),
                             }));
@@ -2728,7 +2728,7 @@ impl KitchenSink {
                             e.github = Some(user);
                         } else if let Some(ref mut gh) = e.github {
                             if gh.name.is_none() {
-                                gh.name = Some(owner.name().to_owned());
+                                gh.name = Some(owner.name().to_owned()).filter(|n| !n.is_empty());
                             }
                         }
                     },
@@ -2736,8 +2736,8 @@ impl KitchenSink {
                         e.insert(CrateAuthor {
                             contribution: 0.,
                             github: Some(user),
-                            info: Some(Cow::Owned(Author{
-                                name: Some(owner.name().to_owned()),
+                            info: Some(Cow::Owned(Author {
+                                name: Some(owner.name().to_owned()).filter(|n| !n.is_empty()),
                                 email: None,
                                 url: owner.url.clone(),
                             })),
@@ -3396,16 +3396,15 @@ impl<'a> CrateAuthor<'a> {
     }
 
     pub fn name(&self) -> &str {
-        if let Some(ref info) = self.info {
-            if let Some(ref name) = &info.name {
+        if let Some(ref name) = self.info.as_ref().and_then(|i| i.name.as_deref()) {
+            if !name.trim_start().is_empty() {
                 return name;
             }
         }
         if let Some(ref gh) = self.github {
-            if let Some(ref name) = gh.name {
-                name
-            } else {
-                &gh.login
+            match &gh.name {
+                Some(name) if !name.trim_start().is_empty() => name,
+                _ => &gh.login,
             }
         } else {
             if let Some(ref info) = self.info {

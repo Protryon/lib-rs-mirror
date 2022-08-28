@@ -612,6 +612,8 @@ fn parse_users(file: impl Read) -> Result<Users, BoxErr> {
 
 #[derive(Deserialize, Debug)]
 struct CrateVersionRow {
+    #[serde(with = "hex")]
+    checksum: [u8; 32],
     crate_id: u32,
     crate_size: Option<u64>,
     created_at: String,
@@ -619,6 +621,7 @@ struct CrateVersionRow {
     features: String, // json
     id: u32,
     license: String,
+    links: Option<String>,
     num: String, // ver
     published_by: Option<u32>,
     updated_at: String,
@@ -656,8 +659,8 @@ fn parse_version_downloads(mut file: impl Read) -> Result<VersionDownloads, BoxE
         let r = r?;
         let mut r = r.iter();
         let date = date_from_str(r.next().ok_or("no date")?)?;
-        let downloads = r.next().and_then(|s| s.parse().ok()).ok_or("bad dl")?;
-        let version_id = r.next().and_then(|s| s.parse().ok()).ok_or("bad dl")?;
+        let downloads = r.next().and_then(|s| s.parse().ok()).ok_or("bad dl1")?;
+        let version_id = r.next().and_then(|s| s.parse().ok()).ok_or("bad dl2")?;
         out.entry(version_id).or_insert_with(|| Vec::with_capacity(365 * 4)).push((date, downloads, false));
     }
     Ok(out)
@@ -678,8 +681,8 @@ fn parse_crates(file: impl Read) -> Result<CratesMap, BoxErr> {
     let mut out = HashMap::with_capacity(NUM_CRATES);
     for r in csv.records() {
         let r = r?;
-        let id: u32 = r.get(5).and_then(|s| s.parse().ok()).ok_or("bad record")?;
-        let name = r.get(7).ok_or("bad record")?;
+        let id: u32 = r.get(5).and_then(|s| s.parse().ok()).ok_or("bad record1")?;
+        let name = r.get(7).ok_or("bad record2")?;
         out.insert(id, name.to_owned());
     }
     Ok(out)
@@ -695,8 +698,9 @@ fn parse_dependencies(file: impl Read) -> Result<CrateDepsMap, BoxErr> {
     let mut out = HashMap::with_capacity(NUM_CRATES);
     for r in csv.records() {
         let r = r?;
-        let crate_id: u32 = r.get(0).and_then(|s| s.parse().ok()).ok_or("bad record")?;
-        let version_id: u32 = r.get(8).and_then(|s| s.parse().ok()).ok_or("bad record")?;
+        // 0crate_id,1default_features,2explicit_name,3features,4id,5kind,6optional,7req,8target,9version_id
+        let crate_id: u32 = r.get(0).and_then(|s| s.parse().ok()).ok_or("bad record3")?;
+        let version_id: u32 = r.get(9).and_then(|s| s.parse().ok()).ok_or("bad record4")?;
         out.entry(version_id).or_insert_with(Vec::new).push(crate_id);
     }
     Ok(out)

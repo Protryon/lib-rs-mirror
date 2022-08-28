@@ -52,15 +52,15 @@ impl MiniVer {
 }
 
 pub trait FeatureGetter {
-    fn get(&self, key: &str) -> Option<&Vec<String>>;
+    fn get_feature_descriptors(&self, key: &str) -> Option<&Vec<String>>;
 }
 impl FeatureGetter for std::collections::HashMap<String, Vec<String>> {
-    fn get(&self, key: &str) -> Option<&Vec<String>> {
+    fn get_feature_descriptors(&self, key: &str) -> Option<&Vec<String>> {
         self.get(key)
     }
 }
 impl FeatureGetter for std::collections::BTreeMap<String, Vec<String>> {
-    fn get(&self, key: &str) -> Option<&Vec<String>> {
+    fn get_feature_descriptors(&self, key: &str) -> Option<&Vec<String>> {
         self.get(key)
     }
 }
@@ -294,14 +294,16 @@ impl Index {
                         .map(|s| s.as_ref())
                         .chain(iter::repeat("default").take(if wants.default {1} else {0}));
         for feat in all_wanted_features {
-            if let Some(enable) = ver_features.get(feat) {
-                for enable in enable {
-                    let mut t = enable.splitn(2, '/');
-                    let dep_name = t.next().unwrap();
+            if let Some(feature_descriptors) = ver_features.get_feature_descriptors(feat) {
+                for feat_des in feature_descriptors {
+                    let mut t = feat_des.splitn(2, '/');
+                    let dep_descriptor = t.next().unwrap();
+                    let subfeatures = t.next();
+                    let dep_name = dep_descriptor.trim_start_matches("dep:").trim_end_matches('?');
                     let enabled = to_enable.entry(dep_name.to_owned())
                         .or_insert_with(FxHashSet::default);
-                    if let Some(enable) = t.next() {
-                        enabled.insert(enable);
+                    if let Some(subfeatures) = subfeatures {
+                        enabled.insert(subfeatures);
                     }
                 }
             } else {

@@ -2462,13 +2462,12 @@ impl KitchenSink {
                     let mut dependency_affects_msrv = false;
 
                     // find known-bad dep to bump msrv
-                    let dep_newest_bad = dep_compat.iter()
+                    let most_compatible_dependency = dep_compat.iter()
                         .filter(|(semver, _)| req.matches(semver))
-                        .filter_map(|(semver, compat)| Some((semver, compat.newest_bad()?)))
-                        .chain(dep_compat.iter()
-                            .filter(|(semver, _)| req.matches(semver))
-                            .filter_map(|(semver, compat)| Some((semver, compat.oldest_ok()?.saturating_sub(1))))
-                        )
+                        .filter_map(|(semver, compat)| {
+                            let n = compat.newest_bad().or_else(|| Some(compat.oldest_ok()?.saturating_sub(1)))?;
+                            Some((semver, n))
+                        })
                         .inspect(|&(_, n)| {
                             if n > parent_newest_bad && n >= parent_oldest_ok_lower_limit {
                                 dependency_affects_msrv = true;
@@ -2476,7 +2475,12 @@ impl KitchenSink {
                         })
                         .min_by_key(|&(v, n)| (n, Reverse(v)));
 
-                    if let Some((dep_found_ver, dep_newest_bad)) = dep_newest_bad {
+                    if let Some((dep_found_ver, best_compat)) = most_compatible_dependency {
+                        let dep_newest_bad = dep_compat.iter()
+                            .filter(|(semver, _)| req.matches(semver))
+                            .filter_map(|(_, compat)| compat.newest_bad())
+                            .min().unwrap_or(0)
+                            .min(best_compat); // sparse data with only few failures may be too pessimistic, because other versions may be compatible
                         if c.newest_bad().unwrap_or(0) < dep_newest_bad {
                             if dep_newest_bad > 19 {
                                 debug!("{} {} MSRV went from {} to {} because of https://lib.rs/compat/{} {} = {}", all.name(), crate_ver, c.newest_bad().unwrap_or(0), dep_newest_bad, dep_origin.short_crate_name(), req, dep_found_ver);
@@ -2488,7 +2492,9 @@ impl KitchenSink {
                                 // may be too pessimistic if the dep lacks positive build data.
                                 let dep_newest_bad_certain = dep_compat.iter()
                                     .filter(|(semver, _)| req.matches(semver))
-                                    .filter_map(|(_, compat)| compat.newest_bad_likely())
+                                    .filter_map(|(_, compat)| {
+                                        compat.newest_bad_likely().or_else(|| Some(compat.oldest_ok()?.saturating_sub(1)))
+                                    })
                                     .min()
                                     .unwrap_or(0);
                                 if c.newest_bad().unwrap_or(0) < dep_newest_bad_certain {
@@ -2497,7 +2503,7 @@ impl KitchenSink {
                             }
                         } else if dependency_affects_msrv {
                             // keep track of this only if it's not reflected in `BrokenDeps` (i.e. happens sometimes, not always)
-                            c.requires_dependency_version(dep_origin.short_crate_name(), dep_found_ver.clone(), dep_newest_bad);
+                            c.requires_dependency_version(dep_origin.short_crate_name(), dep_found_ver.clone(), best_compat);
                         }
                     }
                 }

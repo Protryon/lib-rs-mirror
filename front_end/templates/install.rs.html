@@ -58,31 +58,29 @@
         }
         @if c.ver.has_lib() {
             <h2>Adding <code>@c.ver.lib_name()</code> library as a dependency</h2>
-            @if c.ver.short_name() != "cargo-edit" {
-            <p>If you have <a href='@url.install(&Origin::from_crates_io_name("cargo-edit"))'>cargo-edit installed</a>, run this command in a terminal, in your project's directory:</p>
+            <p>Run this command in a terminal, in your project's directory:</p>
             @if c.is_build {
                 @if let Origin::CratesIo(name) = c.ver.origin() {
-                    <pre class="to-copy cargo-edit"><code><b>cargo add</b> --build @name</code></pre>
+                    <pre class="to-copy"><code><b>cargo add</b> --build @name</code></pre>
                 }
                 @if let Some((repo, package)) = c.ver.origin().clone().into_repo() {
-                    <pre class="to-copy cargo-edit"><code><b>cargo add</b> --build @package --git @repo.canonical_git_url().unwrap()</code></pre>
+                    <pre class="to-copy"><code><b>cargo add</b> --build @package --git @repo.canonical_git_url().unwrap()</code></pre>
                 }
                 <p>to add <code>@c.ver.lib_name()</code> as a build-time dependency. To add it as a run-time dependency, run:</p>
             } else {@if c.is_dev {
                 @if let Origin::CratesIo(name) = c.ver.origin() {
-                    <pre class="to-copy cargo-edit"><code><b>cargo add</b> --dev @name</code></pre>
+                    <pre class="to-copy"><code><b>cargo add</b> --dev @name</code></pre>
                 }
                 @if let Some((repo, package)) = c.ver.origin().clone().into_repo() {
-                    <pre class="to-copy cargo-edit"><code><b>cargo add</b> --dev @package --git @repo.canonical_git_url().unwrap()</code></pre>
+                    <pre class="to-copy"><code><b>cargo add</b> --dev @package --git @repo.canonical_git_url().unwrap()</code></pre>
                 }
                 <p>to add it a dev dependency (if it's used only in tests, not in the final product). To add it as a regular run-time dependency, run:</p>
             }}
             @if let Origin::CratesIo(name) = c.ver.origin() {
-                <pre class="to-copy cargo-edit"><code><b>cargo add</b> @name</code></pre>
+                <pre class="to-copy"><code><b>cargo add</b> @name</code></pre>
             }
             @if let Some((repo, package)) = c.ver.origin().clone().into_repo() {
-                <pre class="to-copy cargo-edit"><code><b>cargo add</b> @package --git @repo.canonical_git_url().unwrap()</code></pre>
-            }
+                <pre class="to-copy"><code><b>cargo add</b> @package --git @repo.canonical_git_url().unwrap()</code></pre>
             }
             <p>To add it manually, edit your project's <code>Cargo.toml</code> file and add to the @if c.is_build {<code>[build-dependencies]</code> or} <code>[dependencies]</code> section:</p>
             @if c.ver.origin().is_crates_io() {
@@ -98,12 +96,12 @@
         }
         @if c.ver.is_proc_macro() && !c.ver.has_lib() {
             <h2>Adding <code>@c.ver.short_name()</code> macro(s) as a dependency</h2>
-            <p>If you have <a href='@url.install(&Origin::from_crates_io_name("cargo-edit"))'>cargo-edit installed</a>, run this command in a terminal, in your project's directory:</p>
+            <p>Run this command in a terminal, in your project's directory:</p>
             @if let Origin::CratesIo(name) = c.ver.origin() {
-                <pre class="to-copy cargo-edit"><code><b>cargo add</b> @name</code></pre>
+                <pre class="to-copy"><code><b>cargo add</b> @name</code></pre>
             }
             @if let Some((repo, package)) = c.ver.origin().clone().into_repo() {
-                <pre class="to-copy cargo-edit"><code><b>cargo add</b> @package --git @repo.canonical_git_url().unwrap()</code></pre>
+                <pre class="to-copy"><code><b>cargo add</b> @package --git @repo.canonical_git_url().unwrap()</code></pre>
             }
             <p>To add it manually, edit your project's <code>Cargo.toml</code> file and add to the <code>[dependencies]</code> section:</p>
             @if c.ver.origin().is_crates_io() {

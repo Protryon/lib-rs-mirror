@@ -193,7 +193,9 @@ display: -webkit-box;
     </section>
     <section id="rustc">
         <h2>Rustc compatibility</h2>
-        <p>Percentage of crates that can be compiled with a given Rust version. The data is approximate, based on sampling of <code>cargo check</code> on Linux/x86-64. Excludes crates that never built (e.g. because they need nightly, or Windows, or unusual C dependencies).</p>
+        <p>Percentage of crates (in their current version) that can be compiled with a given Rust version. The data is based on sampling of <code>cargo check</code> on Linux/x86-64. Excludes crates that never built (e.g. because they need nightly, or Windows, or unusual C dependencies).</p>
+        <p>These stats are best-case scenarios that assume use of a most-compatible <code>Cargo.lock</code> file. Fresh projects without a lockfile will be less compatible due to too-new transitive dependencies.</p>
+        <p>Compatibility weighed by crates' popularity is not a realistic representation of ecosystem-wide compatibility. Actual compatibility is always worse, because <abbr title="minimum supported rust version">MSRV</abbr> of projects is not an average of their dependencies <abbr title="minimum supported rust version">MSRV</abbr>, but entirely dependent on their least-compatible dependency.</p>
         <svg width=1 height=1><defs>
         <linearGradient id="svggrad1" x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" style="stop-color:#8c9f8c;" />
@@ -202,7 +204,7 @@ display: -webkit-box;
       </defs></svg>
       <div class="breakdowns">
         <section>
-            <h3>All crates</h3>
+            <h3>All crates, including unmaintained ones</h3>
             @:global_stats_rustc(&stats.rustc_stats_all)
         </section>
         <section>

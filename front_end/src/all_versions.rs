@@ -5,6 +5,7 @@ use chrono::DateTime;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::KitchenSinkErr;
 use kitchen_sink::Origin;
+use kitchen_sink::Severity;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -26,6 +27,7 @@ pub struct AllVersions {
 #[derive(Debug)]
 pub(crate) struct VerRow {
     pub yanked: bool,
+    pub security_advisory_url: Option<String>,
     pub is_semver_major_change: bool,
     pub version: SemVer,
     pub release_date: String,
@@ -64,6 +66,7 @@ impl AllVersions {
                 }
             }
         );
+        let advisories = kitchen_sink.advisories_for_crate(&origin);
         let mut all_owners = all_owners.unwrap_or_default();
         let only_owner = if all_owners.len() == 1 { all_owners.pop() } else { None };
         let mut release_meta: HashMap<_, _> = release_meta.into_iter()
@@ -132,6 +135,11 @@ impl AllVersions {
         let mut prev_features = None::<HashSet<_>>;
         let mut prev_semver = None::<SemVer>;
         let mut version_history: Vec<_> = combined_meta.into_iter().map(|(version, version_meta, release_date, required_deps, mut audit)| {
+            let advisory = advisories.iter()
+                .filter(|a| a.versions.is_vulnerable(&version) && !a.withdrawn() && a.severity().is_some())
+                .max_by_key(|a| a.severity().unwrap_or(Severity::None));
+            let security_advisory_url = advisory.and_then(|a| a.id().url());
+
             let yanked = version_meta.is_yanked();
             let release_date = release_date.format("%b %e, %Y").to_string();
 
@@ -167,6 +175,7 @@ impl AllVersions {
                 // that only stable compares with stable
                 return VerRow {
                     yanked,
+                    security_advisory_url,
                     version,
                     release_date,
                     is_semver_major_change,
@@ -241,6 +250,7 @@ impl AllVersions {
             };
 
             VerRow {
+                security_advisory_url,
                 yanked,
                 version,
                 release_date,

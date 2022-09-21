@@ -3,24 +3,26 @@ pub use crev_data::proof::Date;
 pub use crev_data::Level;
 pub use crev_data::Rating;
 pub use crev_data::Version;
-use crev_lib::*;
+use crev_lib::{Error, Local};
+
+pub mod security;
 
 pub struct Creviews {
-    local: Local,
+    crev_local: Local,
 }
 
 impl Creviews {
     pub fn new() -> Result<Self, Error> {
-        let local = local::Local::auto_create_or_open()?;
-        Ok(Self { local })
+        let local = Local::auto_create_or_open()?;
+        Ok(Self { crev_local: local })
     }
 
     pub fn update(&self) -> Result<(), Error> {
-        Ok(self.local.fetch_all()?)
+        Ok(self.crev_local.fetch_all()?)
     }
 
     pub fn reviews_for_crate(&self, crate_name: &str) -> Result<Vec<Review>, Error> {
-        let db = self.local.load_db()?;
+        let db = self.crev_local.load_db()?;
 
         let mut reviews: Vec<_> = db.get_pkg_reviews_for_name("https://crates.io", crate_name).filter_map(|r| {
             let (thoroughness, understanding, rating) = r

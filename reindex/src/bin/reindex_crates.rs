@@ -1,3 +1,4 @@
+use kitchen_sink::SemVer;
 use anyhow::anyhow;
 use debcargo_list::DebcargoList;
 use feat_extractor::*;
@@ -228,6 +229,13 @@ impl Reindexer {
 async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) -> Result<(usize, f64), anyhow::Error> {
     let crates = &self.crates;
 
+    let advisories = crates.advisories_for_crate(k.origin());
+    let semver: SemVer = k.version().parse()?;
+    let is_unmaintained = advisories.iter()
+        .filter(|a| !a.withdrawn() && a.versions.is_vulnerable(&semver))
+        .filter_map(|a| a.metadata.informational.as_ref())
+        .any(|info| info.is_unmaintained());
+
     let mut is_repo_archived = false;
     if let Some(repo) = k.repository() {
         if let Some(github_repo) = crates.github_repo(repo).await.map_err(|e| log::error!("gh repo{}", e)).ok().and_then(|x| x) {
@@ -349,7 +357,7 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
         is_sys: k.is_sys(),
         is_sub_component: crates.is_sub_component(k).await,
         is_autopublished: is_autopublished(k),
-        is_deprecated: is_deprecated(k) || is_repo_archived,
+        is_deprecated: is_deprecated(k) || is_repo_archived || is_unmaintained,
         is_crates_io_published: k.origin().is_crates_io(),
         is_yanked: k.is_yanked(),
         is_squatspam: is_squatspam(k) || is_on_shitlist,

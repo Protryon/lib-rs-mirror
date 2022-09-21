@@ -38,6 +38,8 @@ pub use crates_io_client::OwnerKind;
 pub use creviews::Level;
 pub use creviews::Rating;
 pub use creviews::Review;
+pub use creviews::security::Advisory;
+pub use creviews::security::Severity;
 pub use github_info::Org;
 pub use github_info::User;
 pub use github_info::UserOrg;
@@ -225,6 +227,8 @@ pub enum KitchenSinkErr {
     BorkedCache(String),
     #[error("Event log error")]
     Event(#[from] #[source] Arc<event_log::Error>),
+    #[error("RustSec: {}", _0)]
+    RustSec(#[from] #[source] Arc<creviews::security::Error>),
     #[error("Internal error: {}", _0)]
     Internal(std::sync::Arc<dyn std::error::Error + Send + Sync>),
 }
@@ -274,6 +278,7 @@ pub struct KitchenSink {
     throttle: tokio::sync::Semaphore,
     auto_indexing_throttle: tokio::sync::Semaphore,
     crev: Arc<Creviews>,
+    rustsec: Arc<Mutex<creviews::security::RustSec>>,
     crate_rustc_compat_cache: RwLock<HashMap<Origin, CompatByCrateVersion>>,
     crate_rustc_compat_db: OnceCell<BuildDb>,
     data_path: PathBuf,
@@ -315,7 +320,7 @@ impl KitchenSink {
             .filter(Some("tantivy"), log::LevelFilter::Error)
             .try_init();
 
-        let ((crates_io, gh), (index, crev)) = tokio::task::spawn_blocking({
+        let ((crates_io, gh), (index, (crev, rustsec))) = tokio::task::spawn_blocking({
             let data_path = data_path.to_owned();
             let github_token = github_token.to_owned();
             let ghdb = data_path.join("github.db");
@@ -323,14 +328,14 @@ impl KitchenSink {
                 rayon::join(|| rayon::join(
                     || crates_io_client::CratesIoClient::new(&data_path),
                     move || github_info::GitHub::new(&ghdb, &github_token)),
-                || rayon::join(|| Index::new(&data_path),
-                    Creviews::new))
+                || rayon::join(|| Index::new(&data_path), || rayon::join(Creviews::new, || creviews::security::RustSec::new(&data_path))))
             }
         }).await?;
 
         tokio::task::block_in_place(move || Ok(Self {
             main_cache_dir: data_path.to_path_buf(),
             crev: Arc::new(crev?),
+            rustsec: Arc::new(Mutex::new(rustsec.map_err(std::sync::Arc::new)?)),
             crates_io: crates_io?,
             index: Arc::new(index?),
             url_check_cache: TempCache::new(&data_path.join("url_check2.db")).context("urlcheck")?,
@@ -1722,12 +1727,13 @@ impl KitchenSink {
 
     pub async fn update(&self) {
         let crev = self.crev.clone();
+        let rustsec = self.rustsec.clone();
         rayon::spawn(move || {
-            let _ = crev.update().map_err(|e| debug!("crev update: {}", e));
+            let _ = rustsec.lock().unwrap().update().map_err(|e| error!("crev update: {e}"));
+            let _ = crev.update().map_err(|e| error!("crev update: {e}"));
         });
         self.index.update().await;
     }
-
 
     pub async fn crates_io_all_rev_deps_counts(&self) -> Result<StatsHistogram, KitchenSinkErr> {
         let stats = self.index.deps_stats().await.map_err(KitchenSinkErr::Deps)?;
@@ -1759,6 +1765,14 @@ impl KitchenSink {
     pub fn reviews_for_crate(&self, origin: &Origin) -> Vec<creviews::Review> {
         match origin {
             Origin::CratesIo(name) => self.crev.reviews_for_crate(name).unwrap_or_default(),
+            _ => vec![],
+        }
+    }
+
+    /// Rustsec reviews
+    pub fn advisories_for_crate(&self, origin: &Origin) -> Vec<creviews::security::Advisory> {
+        match origin {
+            Origin::CratesIo(name) => self.rustsec.lock().unwrap().advisories_for_crate(name).into_iter().map(|v| v.clone()).collect(),
             _ => vec![],
         }
     }

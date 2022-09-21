@@ -195,6 +195,10 @@
             </section>
 
             <section id="downloads">
+              @if let Some(url) = &c.security_advisory_url {
+                <p><a href="@url">⚠️ Vulnerability reported</a></p>
+              }
+
               @if let Some((top, cat)) = c.top_category() {
                 <p class="top-n">#<b>@top</b> in <a href="@url.category(cat)" title="@cat.description">@cat.name</a></p>
               } else {

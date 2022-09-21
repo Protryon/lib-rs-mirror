@@ -8,3 +8,4 @@ edition = "2018"
 crev-lib = "0.23.1"
 crev-data = "0.23.0"
 crev-wot = "0.23.0"
+rustsec = { git = "https://github.com/rustsec/rustsec" }

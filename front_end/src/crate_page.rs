@@ -14,6 +14,7 @@ use kitchen_sink::CResult;
 use kitchen_sink::CrateAuthor;
 use kitchen_sink::DepInfMap;
 use kitchen_sink::RevDependencies;
+use kitchen_sink::Severity;
 use kitchen_sink::{DepTy, KitchenSink, Origin};
 use locale::Numeric;
 use log::warn;
@@ -75,6 +76,7 @@ pub struct CratePage<'a> {
     pub(crate) top_versions: Vec<VersionGroup<'a>>,
     pub has_reviews: bool,
     pub is_on_shitlist: bool,
+    pub security_advisory_url: Option<String>,
 }
 
 /// Helper used to find most "interesting" versions
@@ -126,6 +128,13 @@ impl<'a> CratePage<'a> {
                 (related_crates, downloads_per_month_or_equivalent)
             },
         );
+        let advisories = kitchen_sink.advisories_for_crate(ver.origin());
+        let semver: SemVer = ver.version().parse()?;
+        let advisory = advisories.iter()
+            .filter(|a| a.versions.is_vulnerable(&semver) && !a.withdrawn() && a.severity().is_some())
+            .max_by_key(|a| a.severity().unwrap_or(Severity::None));
+        let security_advisory_url = advisory.and_then(|a| a.id().url());
+
         let top_category = top_category
             .and_then(|(top, slug)| CATEGORIES.from_slug(slug).0.last().map(|&c| (top, c)));
 
@@ -156,6 +165,7 @@ impl<'a> CratePage<'a> {
         let has_reviews = !kitchen_sink.reviews_for_crate(ver.origin()).is_empty();
         let is_on_shitlist = kitchen_sink.is_crate_on_shitlist(all);
         let mut page = Self {
+            security_advisory_url,
             top_keyword,
             all_contributors,
             all,

@@ -54,6 +54,9 @@
             } else {
               <del>@v.version</del>
             }
+            @if let Some(url) = &v.security_advisory_url {
+              <a href="@url" title="vulnerability">⚠️</a>
+            }
             @if let Some(url) = &v.version_url { [<a class="src" rel="nofollow" href="@url" title="source code">@v.version_url_label</a>] }
           </th>
           <td class="date">

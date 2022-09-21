@@ -29,7 +29,6 @@ assets = [
 
 [dependencies]
 actix-web = "4.0.0-rc.2"
-actix-service = "2.0.2"
 env_logger = "0.9.0"
 log = "0.4.14"
 render_readme = { path = "../render_readme", version = "0.7" }
@@ -46,8 +45,6 @@ locale = "0.2.2"
 cap = "0.1.0"
 futures = "0.3.19"
 actix-files = "0.6.0-beta.16"
-actix-threadpool = "0.3.3"
-either = "1.6.1"
 qstring = "0.7.2"
 chrono = "0.4.19"
 blake3 = { version = "1.3.1", default-features = false }
@@ -57,4 +54,3 @@ anyhow = "1.0.53"
 console-subscriber = "0.1.1"
 tracing-core = "0.1.24"
 once_cell = "1.12.0"
-hex = "0.4.3"

@@ -16,6 +16,8 @@ use std::io::BufReader;
 use std::io::Write;
 use std::sync::Arc;
 
+const CONCURRENCY: usize = 3; // builds in parallel
+
 const DOCKER_NAME: &str = "rustesting2";
 const DOCKERFILE_DEFAULT_RUSTC: RustcMinorVersion = 61;
 const DOCKERFILE_PRELUDE: &str = r##"
@@ -104,7 +106,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             candidates.append(&mut next_batch);
-            for mut tmp in r.try_iter().take(RUST_VERSIONS.len().max(10)) {
+            for mut tmp in r.try_iter().take(100) {
                 candidates.append(&mut tmp);
             }
 
@@ -183,7 +185,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     is_app: x.is_app,
                 })
             })
-            .take((RUST_VERSIONS.len() *2/3).min(5)) // max concurrency
+            .take((RUST_VERSIONS.len() *2/3).min(CONCURRENCY)) // max concurrency
             .collect();
 
             eprintln!("\nselected: {}/{} ({})", versions.len(), candidates.len(), versions.iter().take(10).map(|c| format!("{} {}", c.crate_name, c.version)).collect::<Vec<_>>().join(", "));
@@ -328,13 +330,13 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
     if has_anything_built_ok_yet {
         // biggest gap, then latest ver
         candidates.sort_unstable_by(|a,b| b.score.cmp(&a.score).then(b.version.cmp(&a.version)));
-        candidates.truncate(4);
+        candidates.truncate(6);
     } else {
         candidates.shuffle(&mut rng); // dunno which versions will build
         candidates.truncate(3); // don't waste time on broken crates
     }
 
-    try_join_all(candidates.iter_mut().take(4).map(|c| { async move {
+    try_join_all(candidates.iter_mut().take(3).map(|c| { async move {
         let meta = crates.crate_files_summary_from_crates_io_tarball(&c.crate_name, &c.version.to_string()).await?;
         let msrv = crates.index_msrv_from_manifest(&Origin::from_crates_io_name(&c.crate_name), &meta.manifest)?;
         if msrv > 1 {

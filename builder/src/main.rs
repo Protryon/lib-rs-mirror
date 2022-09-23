@@ -97,6 +97,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::thread::sleep(Duration::from_millis(500)); // wait for more data
         let mut candidates: Vec<ToCheck> = Vec::new();
         let mut rng = rand::thread_rng();
+        let mut one_crate_version = HashSet::new();
 
         while let Ok(mut next_batch) = r.recv() {
             std::thread::sleep(Duration::from_millis(500)); // wait for more data
@@ -116,7 +117,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut available_rust_versions = RUST_VERSIONS.to_vec();
             available_rust_versions.shuffle(&mut rng);
 
-            let mut one_crate_version = HashSet::new();
 
             let max_to_waste_trying = (candidates.len()/2).max(RUST_VERSIONS.len());
             let versions: Vec<_> = std::iter::from_fn(|| candidates.pop())

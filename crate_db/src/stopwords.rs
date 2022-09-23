@@ -164,6 +164,7 @@ lazy_static! {
         ("twitch", Some(&["kraken"])),
         ("chess", Some(&["bot"])),
         ("lichess", Some(&["bot"])),
+        ("nftables", Some(&["nft"])),
 
         ("placeholder", None), // spam
         ("reserved", None), // spam

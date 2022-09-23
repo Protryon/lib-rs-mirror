@@ -176,6 +176,8 @@ pub fn is_deprecated_requirement(name: &str, requirement: &VersionReq) -> bool {
         "winrt" => true,
         // renamed
         "hdrsample" => true,
+        "traitobject" | "unsafe-any" => true, // vulnerable
+        "typemap" => true, // 2015
         // in stdlib
         "insideout" | "file" | "ref_slice" => true,
         _ => false,

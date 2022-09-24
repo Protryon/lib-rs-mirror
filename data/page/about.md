@@ -5,15 +5,16 @@ Lib.rs is a catalog of programs and libraries written in the [Rust programming l
 ## Why use lib.rs?
 
  * lib.rs is _fast_. There's no JavaScript anywhere.
+ * It has an advanced ranking algorithm which promotes stable, regularly updated, popular crates, and hides spam and abandoned crates.
  * It has more complete and accurate crate information than crates.io:
    * Finds missing READMEs and pulls in documentation from `src/lib.rs`
    * Automatically categorizes crates and adds missing keywords, to improve browsing by categories and keywords.
    * Accurately shows which dependencies are out of date or deprecated.
-   * Shows size of each crate and its dependencies.
    * Highlights which crates require nightly compiler or use non-Rust code.
-   * Automatically finds and credits co-authors based on git history.
    * Detailed reverse dependencies page, including version fragmentation.
- * It has an advanced ranking algorithm which promotes stable, regularly updated, popular crates, and hides spam and abandoned crates.
+   * Shows size of each crate with its dependencies.
+   * Integrates with RustSec advisory database and cargo-crev reviews.
+   * Automatically finds and credits co-authors based on git history.
  * It has short URLs to open a crate page `lib.rs/crate-name` and search `lib.rs?keyword`.
  * Shows similar/related crates on each crate page, which helps discovering better alternatives.
  * Has a dark theme (it's automatic — requires Firefox or Safari, and the OS set to dark).

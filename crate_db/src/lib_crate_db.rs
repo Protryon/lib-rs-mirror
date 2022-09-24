@@ -231,7 +231,7 @@ impl CrateDb {
             let mut insert_category = tx.prepare_cached("INSERT OR IGNORE INTO categories (crate_id, slug, rank_weight, relevance_weight) VALUES (?1, ?2, ?3, ?4)")?;
             let mut get_crate_id = tx.prepare_cached("SELECT id, recent_downloads FROM crates WHERE origin = ?1")?;
 
-            let args: &[&dyn ToSql] = &[&origin, &0, &0];
+            let args: &[&dyn ToSql] = &[&origin, &0i32, &0i32];
             insert_crate.execute(args)?;
             let (crate_id, downloads): (u32, u32) = get_crate_id.query_row(&[&origin], |row| Ok((row.get_unwrap(0), row.get_unwrap(1))))
                 .map_err(|e| Error::DbCtx(e, "crate id"))?;
@@ -1133,14 +1133,14 @@ impl KeywordInsert {
         }
 
         for (word, (weight, visible)) in self.keywords {
-            let args: &[&dyn ToSql] = &[&word, if visible { &1 } else { &0 }];
+            let args: &[&dyn ToSql] = &[&word, if visible { &1i32 } else { &0i32 }];
             insert_name.execute(args)?;
             let (keyword_id, old_vis): (u32, u32) = select_id.query_row(&[&word], |r| Ok((r.get_unwrap(0), r.get_unwrap(1))))?;
             if visible && old_vis == 0 {
                 make_visible.execute(&[&keyword_id])?;
             }
             let weight = weight * overall_weight;
-            let args: &[&dyn ToSql] = &[&keyword_id, &crate_id, &weight, if visible { &1 } else { &0 }];
+            let args: &[&dyn ToSql] = &[&keyword_id, &crate_id, &weight, if visible { &1i32 } else { &0i32 }];
             insert_value.execute(args)?;
         }
         Ok(())

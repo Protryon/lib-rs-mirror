@@ -247,6 +247,7 @@ bdk-macros: cryptography::cryptocurrencies
 bdk-testutils: cryptography::cryptocurrencies
 beach: os
 beacon: cryptography::cryptocurrencies
+beaker: cryptography::cryptocurrencies
 beanstalkd-queue: asynchronous
 beautylog: development-tools::debugging
 beaver: rust-patterns
@@ -670,6 +671,7 @@ cosmrs: cryptography::cryptocurrencies
 cosmwasm-crypto: cryptography::cryptocurrencies
 cosmwasm-derive: cryptography::cryptocurrencies
 cosmwasm-math: cryptography::cryptocurrencies
+cosmwasm-schema-derive: cryptography::cryptocurrencies
 cosmwasm-vm: cryptography::cryptocurrencies
 count_constant_sites: science, parser-implementations
 cov-mark: development-tools::testing
@@ -760,6 +762,7 @@ cuticula: science::ml
 cvm: cryptography::cryptocurrencies
 cvssrust: parser-implementations
 cw-mask: cryptography::cryptocurrencies
+cw-optimizoor: cryptography::cryptocurrencies
 cw-storage: cryptography::cryptocurrencies
 cw-voting: cryptography::cryptocurrencies
 cw1-subkeys: cryptography::cryptocurrencies
@@ -1026,6 +1029,7 @@ eng-pwasm-abi: cryptography::cryptocurrencies, wasm
 eng-wasm-derive: cryptography::cryptocurrencies
 eng-wasm: cryptography::cryptocurrencies, wasm
 english-lint: text-processing
+english-numbers: value-formatting
 entab: parser-implementations
 entity_store_code_gen: game-development
 entity_store_helper: game-development
@@ -2017,6 +2021,7 @@ link-cplusplus: development-tools::ffi
 link-ippcore: hardware-support
 link-ippi: hardware-support
 linux-procfs: os::unix-apis
+liquid-chain: cryptography::cryptocurrencies
 liquid-rpc-json: cryptography::cryptocurrencies
 liquidity-pool: cryptography::cryptocurrencies
 lit: development-tools::testing
@@ -2300,6 +2305,7 @@ naslint: development-tools
 nat_traversal: network-programming
 natls: command-line-utilities
 naturalize: value-formatting
+naumachia: cryptography::cryptocurrencies
 nav: game-development, algorithms
 nazar: science, web-programming
 ncurses: command-line-interface, os::unix-apis
@@ -2560,6 +2566,7 @@ ory-oathkeeper-client: authentication
 oslog: os::macos-apis, development-tools::debugging
 osmesa-sys: multimedia, os::unix-apis
 osmgpsmap: science, gui
+osmosis-std-derive: cryptography::cryptocurrencies
 ostree-ext: os
 ostree: os
 ostrich-core: asynchronous
@@ -2720,6 +2727,7 @@ polkadot-cli: cryptography::cryptocurrencies
 polkadot: cryptography::cryptocurrencies
 polonius-parser: parser-implementations
 polonius: development-tools
+poly2geojson: science
 polygraph: database-implementations
 polylog: algorithms
 pomodoro: command-line-utilities
@@ -2768,6 +2776,7 @@ prometheus: development-tools::debugging, development-tools::profiling
 prometheus_wireguard_exporter: network-programming
 proto-vulcan: compilers, science::math
 protospec: encoding
+prov-cosmwasm-vm: cryptography::cryptocurrencies
 ps2: hardware-support
 ps2logo: game-development
 pseudotex: parser-implementations, text-processing
@@ -3771,6 +3780,7 @@ turn: network-programming
 turtle-syntax: parser-implementations
 tusk_parser: parser-implementations, compilers
 tv-renamer: gui, filesystem
+tw-storage-macros: cryptography::cryptocurrencies
 tw_pack_lib: games
 tw_unpack: games
 twapi: web-programming
@@ -3885,6 +3895,7 @@ verba: text-processing, internationalization
 verification: cryptography::cryptocurrencies
 verilated: parser-implementations, hardware-support
 versionisator: development-tools::build-utils
+vertex-lib: cryptography::cryptocurrencies
 vex-sys: development-tools::debugging
 vfio-bindings: os::unix-apis
 vhdl_lang: development-tools
@@ -3954,6 +3965,7 @@ web3_rust_wrapper: cryptography::cryptocurrencies
 web3utilities: cryptography::cryptocurrencies, cryptography
 web: web-programming, development-tools::testing
 webb-bulletproofs: cryptography::cryptocurrencies, cryptography
+webb-proposals: cryptography::cryptocurrencies
 webchain-cli: cryptography::cryptocurrencies
 webchain-rs: cryptography::cryptocurrencies
 webhook_listener: web-programming::http-server

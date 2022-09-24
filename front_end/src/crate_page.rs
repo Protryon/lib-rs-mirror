@@ -77,6 +77,7 @@ pub struct CratePage<'a> {
     pub has_reviews: bool,
     pub is_on_shitlist: bool,
     pub security_advisory_url: Option<String>,
+    has_verified_repository_link: bool,
 }
 
 /// Helper used to find most "interesting" versions
@@ -128,6 +129,7 @@ impl<'a> CratePage<'a> {
                 (related_crates, downloads_per_month_or_equivalent)
             },
         );
+        let has_verified_repository_link = kitchen_sink.has_verified_repository_link(ver).await;
         let advisories = kitchen_sink.advisories_for_crate(ver.origin());
         let semver: SemVer = ver.version().parse()?;
         let advisory = advisories.iter()
@@ -188,6 +190,7 @@ impl<'a> CratePage<'a> {
             has_reviews,
             is_on_shitlist,
             top_versions: Vec::new(),
+            has_verified_repository_link,
         };
         page.top_versions = page.make_top_versions();
         let (sizes, lang_stats, viral_license) = page.crate_size_and_viral_license(deps?).await?;
@@ -668,7 +671,7 @@ impl<'a> CratePage<'a> {
             let label_prefix = repo.site_link_label();
             let label = match repo.host() {
                 RepoHost::GitHub(ref host) | RepoHost::GitLab(ref host) | RepoHost::BitBucket(ref host) => {
-                    if self.ver.has_path_in_repo() {
+                    if self.has_verified_repository_link {
                         format!("{} ({})", label_prefix, host.owner)
                     } else {
                         repo_links.push((urler.docs_rs_source(self.ver.short_name(), self.ver.version()).into(), "Source".into()));

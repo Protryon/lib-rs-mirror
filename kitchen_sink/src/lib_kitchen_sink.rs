@@ -1081,7 +1081,7 @@ impl KitchenSink {
             // Allowing any other URL would allow spoofing
             package.repository = Some(repo.canonical_git_url().into_owned());
 
-            meta.vcs_info_path = Some(found.inner_path);
+            meta.path_in_repo = Some(found.inner_path);
             Ok::<_, CError>(meta)
         }).await?
     }
@@ -1185,9 +1185,9 @@ impl KitchenSink {
 
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
 
-        if meta.vcs_info_path.is_none() {
+        if meta.path_in_repo.is_none() {
             if let Some(r) = maybe_repo.as_ref() {
-                meta.vcs_info_path = self.crate_db.path_in_repo(r, name).await?;
+                meta.path_in_repo = self.crate_db.path_in_repo(r, name).await?;
             }
         }
 
@@ -1306,14 +1306,14 @@ impl KitchenSink {
         let has_buildrs = meta.has("build.rs");
         let has_code_of_conduct = meta.has("CODE_OF_CONDUCT.md") || meta.has("docs/CODE_OF_CONDUCT.md") || meta.has(".github/CODE_OF_CONDUCT.md");
 
-        let path_in_repo = meta.vcs_info_path.as_deref().unwrap_or_default();
+        let path_in_repo = meta.path_in_repo;
         let treeish_revision = meta.vcs_info_git_sha1.as_ref().map(|sha1| hex::encode(sha1));
         let readme = meta.readme.map(|(readme_path, markup)| {
             let (base_url, base_image_url) = match maybe_repo {
                 Some(repo) => {
                     // Not parsing github URL, because "aboslute" path should not be allowed to escape the repo path,
                     // but it needs to normalize ../readme paths
-                    let url = url::Url::parse(&format!("http://localhost/{}", path_in_repo)).and_then(|u| u.join(&readme_path));
+                    let url = url::Url::parse(&format!("http://localhost/{}", path_in_repo.as_deref().unwrap_or_default())).and_then(|u| u.join(&readme_path));
                     let in_repo_url_path = url.as_ref().map_or("", |u| u.path().trim_start_matches('/'));
                     (Some(repo.readme_base_url(in_repo_url_path, treeish_revision.as_deref())), Some(repo.readme_base_image_url(in_repo_url_path, treeish_revision.as_deref())))
                 },
@@ -1341,6 +1341,7 @@ impl KitchenSink {
             bin_file: meta.bin_file,
             github_description,
             github_keywords,
+            path_in_repo,
             is_yanked,
         };
 
@@ -1364,7 +1365,7 @@ impl KitchenSink {
         if let Some(sha) = ver.vcs_info_git_sha1 {
             let package = ver.manifest.package.as_ref().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
             if let Some(Ok(repo)) = package.repository.as_deref().map(Repo::new) {
-                let path_in_repo = match ver.vcs_info_path {
+                let path_in_repo = match ver.path_in_repo {
                     Some(p) => p,
                     None => self.crate_db.path_in_repo(&repo, &package.name).await?.unwrap_or_default(),
                 };
@@ -2008,11 +2009,6 @@ impl KitchenSink {
         });
         let d = timeout("db-index", 16, db_index.map_err(anyhow::Error::from)).await?;
 
-        let path_in_repo = match repository.as_ref() {
-            Some(r) => self.crate_db.path_in_repo(r, &package.name).await?,
-            None => None,
-        };
-
         for w in &warnings {
             debug!("{}: {}", package.name, w);
         }
@@ -2023,7 +2019,7 @@ impl KitchenSink {
             derived: rich_crate::Derived {
                 categories: d.categories,
                 keywords: d.keywords,
-                path_in_repo,
+                path_in_repo: source_data.path_in_repo,
                 language_stats: source_data.language_stats,
                 crate_compressed_size: source_data.crate_compressed_size,
                 crate_decompressed_size: source_data.crate_decompressed_size,
@@ -2678,6 +2674,15 @@ impl KitchenSink {
         }
     }
 
+    pub async fn has_verified_repository_link(&self, k: &RichCrateVersion) -> bool {
+        let repo = match k.repository() {
+            Some(repo) => repo,
+            None => return false,
+        };
+        let repo = self.crate_db.path_in_repo(repo, k.short_name()).await;
+        matches!(repo, Ok(Some(_)))
+    }
+
     /// Merge authors, owners, contributors
     pub async fn all_contributors<'a>(&self, krate: &'a RichCrateVersion) -> CResult<(Vec<CrateAuthor<'a>>, Vec<CrateAuthor<'a>>, bool, usize)> {
         let owners = self.crate_owners(krate.origin()).await?;
@@ -2685,7 +2690,7 @@ impl KitchenSink {
         let (hit_max_contributor_count, mut contributors_by_login) = match krate.repository().as_ref() {
             // Only get contributors from github if the crate has been found in the repo,
             // otherwise someone else's repo URL can be used to get fake contributor numbers
-            Some(crate_repo) => watch("contrib", self.contributors_from_repo(crate_repo, &owners, krate.has_path_in_repo())).await?,
+            Some(crate_repo) => watch("contrib", self.contributors_from_repo(crate_repo, &owners, self.has_verified_repository_link(krate).await)).await?,
             None => (false, HashMap::new()),
         };
 
@@ -3532,7 +3537,7 @@ fn fetch_uppercase_name_and_tarball() {
 
         let testk = k.index.crates_io_crate_by_lowercase_name("dssim-core").unwrap();
         let meta = k.crate_files_summary_from_crates_io_tarball("dssim-core", &testk.versions()[8].version()).await.unwrap();
-        assert_eq!(meta.vcs_info_path.as_deref(), Some("dssim-core"), "{:#?}", meta);
+        assert_eq!(meta.path_in_repo.as_deref(), Some("dssim-core"), "{:#?}", meta);
         assert_eq!(meta.vcs_info_git_sha1.as_ref().unwrap(), b"\xba\x0a\x40\xd1\x3b\x1d\x11\xb0\x19\xf6\xb6\x6a\x77\x2e\xbd\xa7\xd0\xf9\x45\x0c");
     })).unwrap();
 }

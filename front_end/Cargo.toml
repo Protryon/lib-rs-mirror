@@ -8,6 +8,7 @@ autobins = true
 [lib]
 name = "front_end"
 path = "src/front_end.rs"
+doctest = false # ructe templates emit broken doctest
 
 [build-dependencies]
 ructe = "0.13"

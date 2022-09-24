@@ -228,6 +228,7 @@ impl Reindexer {
 async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) -> Result<(usize, f64), anyhow::Error> {
     let crates = &self.crates;
 
+    let has_verified_repository_link = crates.has_verified_repository_link(k).await;
     let advisories = crates.advisories_for_crate(k.origin());
     let semver: SemVer = k.version().parse()?;
     let is_unmaintained = advisories.iter()
@@ -273,7 +274,7 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
         has_documentation_link: k.documentation().is_some(),
         has_homepage_link: k.homepage().is_some(),
         has_repository_link: k.repository().is_some(),
-        has_verified_repository_link: k.has_path_in_repo(),
+        has_verified_repository_link,
         has_keywords: k.has_own_keywords(),
         has_own_categories: k.has_own_categories(),
         has_features: !k.features().is_empty(),

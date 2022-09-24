@@ -92,8 +92,8 @@ pub struct CrateFilesSummary {
     pub decompressed_size: usize,
     pub is_nightly: bool,
 
-    /// From .cargo_vcs_info.json
-    pub vcs_info_path: Option<String>,
+    /// From .cargo_vcs_info.json, or polyfilled from checkout
+    pub path_in_repo: Option<String>,
     pub vcs_info_git_sha1: Option<[u8; 20]>,
 
     /// From all code-like files
@@ -234,7 +234,7 @@ impl Collector {
             bin_file: self.bin_file,
             language_stats: self.stats.finish(),
             is_nightly: self.is_nightly,
-            vcs_info_path: self.vcs_info_path,
+            path_in_repo: self.vcs_info_path,
             vcs_info_git_sha1: self.vcs_info_git_sha1,
         })
     }

@@ -149,6 +149,7 @@ impl RichCrateVersion {
         })
     }
 
+    /// The path may be from vcs_info (not trusted)
     pub fn has_path_in_repo(&self) -> bool {
         self.derived.path_in_repo.is_some()
     }
@@ -514,6 +515,7 @@ pub struct CrateVersionSourceData {
     pub lib_file: Option<String>,
     /// src/main.rs
     pub bin_file: Option<String>,
+    pub path_in_repo: Option<String>,
     pub has_buildrs: bool,
     pub has_code_of_conduct: bool,
     pub is_yanked: bool,

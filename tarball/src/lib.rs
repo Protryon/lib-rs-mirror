@@ -353,7 +353,7 @@ fn unpack_repo() {
     use repo_url::Repo;
     let test_repo_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("test.repo");
     let repo = Repo::new("http://example.invalid/foo.git").unwrap();
-    let checkout = crate_git_checkout::checkout(&repo, &test_repo_path).unwrap();
+    let checkout = crate_git_checkout::checkout(&repo, &test_repo_path, false).unwrap();
     let f = crate_git_checkout::path_in_repo(&checkout, "crates-server").unwrap().unwrap();
     let tree_id = f.tree;
     let manifest = f.manifest;

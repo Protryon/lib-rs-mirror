@@ -837,7 +837,7 @@ impl KitchenSink {
         let origin = origin.clone();
         let repo = repo.clone();
         let package = package.clone();
-        let checkout = self.checkout_repo(repo.clone()).await?;
+        let checkout = self.checkout_repo(repo.clone(), false).await?;
         spawn_blocking(move || {
             let mut pkg_ver = crate_git_checkout::find_versions(&checkout)?;
             if let Some(v) = pkg_ver.remove(&*package) {
@@ -1059,7 +1059,7 @@ impl KitchenSink {
             Origin::GitLab { repo, package } => (RepoHost::GitLab(repo.clone()).try_into().expect("repohost"), package.clone()),
             _ => unreachable!(),
         };
-        let checkout = self.checkout_repo(repo.clone()).await?;
+        let checkout = self.checkout_repo(repo.clone(), true).await?;
         spawn_blocking(move || {
             let found = crate_git_checkout::path_in_repo(&checkout, &package)?
                 .ok_or_else(|| {
@@ -1520,7 +1520,7 @@ impl KitchenSink {
             },
         };
         if let Some(repo) = maybe_repo {
-            let res = self.checkout_repo(repo.clone()).await
+            let res = self.checkout_repo(repo.clone(), true).await
                 .map(|checkout| crate_git_checkout::find_readme(&checkout, package));
             match res {
                 Ok(Ok(Some(mut readme))) => {
@@ -2131,17 +2131,17 @@ impl KitchenSink {
     }
 
     pub async fn inspect_repo_manifests(&self, repo: &Repo) -> CResult<Vec<FoundManifest>> {
-        let checkout = self.checkout_repo(repo.clone()).await?;
+        let checkout = self.checkout_repo(repo.clone(), true).await?;
         let (has, _) = tokio::task::block_in_place(|| crate_git_checkout::find_manifests(&checkout))?;
         Ok(has)
     }
 
-    async fn checkout_repo(&self, repo: Repo) -> Result<crate_git_checkout::Repository, KitchenSinkErr> {
+    async fn checkout_repo(&self, repo: Repo, shallow: bool) -> Result<crate_git_checkout::Repository, KitchenSinkErr> {
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
 
         let git_checkout_path = self.git_checkout_path.clone();
         timeout("checkout", 300, spawn_blocking(move || {
-            crate_git_checkout::checkout(&repo, &git_checkout_path)
+            crate_git_checkout::checkout(&repo, &git_checkout_path, shallow)
                 .map_err(|e| { eprintln!("{}", e); KitchenSinkErr::GitCheckoutFailed })
         }).map_err(|_| KitchenSinkErr::GitCheckoutFailed)).await?
     }
@@ -2149,7 +2149,7 @@ impl KitchenSink {
     pub async fn index_repo(&self, repo: &Repo, as_of_version: &str) -> CResult<()> {
         let _f = self.throttle.acquire().await;
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
-        let checkout = self.checkout_repo(repo.clone()).await?;
+        let checkout = self.checkout_repo(repo.clone(), false).await?;
         let url = repo.canonical_git_url().into_owned();
         let (checkout, manif) = spawn_blocking(move || {
             let (manif, warnings) = crate_git_checkout::find_manifests(&checkout)

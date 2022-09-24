@@ -2,7 +2,7 @@
 name = "crates-server"
 version = "1.19.0"
 authors = ["Kornel <kornel@geekhood.net>"]
-edition = "2018"
+edition = "2021"
 description = "Crates.rs web server"
 readme = "README.md"
 publish = false

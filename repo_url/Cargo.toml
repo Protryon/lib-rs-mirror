@@ -1,5 +1,5 @@
 [package]
-edition = "2018"
+edition = "2021"
 name = "repo_url"
 version = "0.3.3"
 authors = ["Kornel <kornel@geekhood.net>"]

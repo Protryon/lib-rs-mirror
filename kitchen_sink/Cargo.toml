@@ -1,5 +1,5 @@
 [package]
-edition = "2018"
+edition = "2021"
 name = "kitchen_sink"
 version = "0.9.11"
 authors = ["Kornel <kornel@geekhood.net>"]

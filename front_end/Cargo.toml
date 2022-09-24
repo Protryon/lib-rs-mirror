@@ -1,5 +1,5 @@
 [package]
-edition = "2018"
+edition = "2021"
 name = "front_end"
 version = "0.4.6"
 authors = ["Kornel <kornel@geekhood.net>"]

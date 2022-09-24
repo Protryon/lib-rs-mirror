@@ -2,7 +2,7 @@
 name = "ranking"
 version = "0.1.4"
 authors = ["Kornel <kornel@geekhood.net>"]
-edition = "2018"
+edition = "2021"
 publish = false
 
 [lib]

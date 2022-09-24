@@ -1,6 +1,6 @@
 [package]
 version = "0.7.13"
-edition = "2018"
+edition = "2021"
 name = "simple_cache"
 authors = ["Kornel <kornel@geekhood.net>"]
 description = "Minimal wrapper for a HTTP client to cache results on disk, forever"

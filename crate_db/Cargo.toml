@@ -1,5 +1,5 @@
 [package]
-edition = "2018"
+edition = "2021"
 name = "crate_db"
 version = "0.4.15"
 authors = ["Kornel <kornel@geekhood.net>"]

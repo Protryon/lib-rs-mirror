@@ -1,5 +1,5 @@
 [package]
-edition = "2018"
+edition = "2021"
 description = "Analyze git repository containing Cargo crates"
 name = "crate_git_checkout"
 version = "0.4.7"

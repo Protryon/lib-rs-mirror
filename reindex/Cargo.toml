@@ -1,6 +1,6 @@
 [package]
 version = "0.3.11"
-edition = "2018"
+edition = "2021"
 name = "reindex"
 authors = ["Kornel <kornel@geekhood.net>"]
 publish = false

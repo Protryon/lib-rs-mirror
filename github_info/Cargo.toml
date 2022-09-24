@@ -1,5 +1,5 @@
 [package]
-edition = "2018"
+edition = "2021"
 name = "github_info"
 version = "0.9.3"
 authors = ["Kornel <kornel@geekhood.net>"]

@@ -1,6 +1,6 @@
 [package]
 version = "0.3.5"
-edition = "2018"
+edition = "2021"
 name = "search_index"
 authors = ["Kornel <kornel@geekhood.net>"]
 publish = false

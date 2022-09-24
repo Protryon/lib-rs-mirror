@@ -1,8 +1,14 @@
 User-Agent: *
 Disallow: /keywords/
-Disallow: /install
+Disallow: /install/
 Disallow: /search?
 Disallow: /crates/faker
+
+User-Agent: *
+Disallow: /crates/*/source
+Disallow: /crates/*/versions
+Disallow: */source?at*
+Disallow: /~*/dash
 
 # seo scourge
 User-agent: AhrefsBot

@@ -19,11 +19,11 @@ render_readme = { path = "../render_readme", version = "0.7.0" }
 categories = { path = "../categories" }
 udedokei = { path = "../udedokei" }
 search_index = { path = "../search_index" }
-chrono = "0.4.15"
+chrono = { version = "0.4.22", default-features = false }
 semver = "1.0.4"
 lab = "0.11.0"
-urlencoding = "2.1.0"
-regex = "1.3.1"
+urlencoding = "2.1.2"
+regex = "1.6.0"
 locale = "0.2.2"
 url = "2.1.0"
 parking_lot = "0.12.0"
@@ -38,6 +38,6 @@ anyhow = "1.0.41"
 peeking_take_while = "1.0.0"
 rand = "0.8.4"
 treemap = { git = "https://github.com/kornelski/treemap-rs", rev = "4a0beac18a61780b5f9e5910851c7b94c45be8b3" }
-textwrap = "0.15.0"
+textwrap = "0.15.1"
 validator = { version = "0.1.0", path = "../validator" }
-blake3 = "1.3.0"
+blake3 = "1.3.1"

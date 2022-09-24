@@ -80,7 +80,6 @@ fn main() {
         .build()
         .unwrap();
 
-    let _ = std::panic::catch_unwind(|| console_subscriber::init());
 
     let res = sys.block_on(run_server(rt.handle().clone()));
 

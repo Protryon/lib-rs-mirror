@@ -11,16 +11,16 @@ github_info = { path = "../github_info", version = "0.9" }
 kitchen_sink = { path = "../kitchen_sink", version = "0.9" }
 repo_url = { path = "../repo_url" }
 user_db = { path = "../user_db", version = "0.3" }
-rand = "0.8"
+rand = "0.8.5"
 search_index = { path = "../search_index" }
 render_readme = { path = "../render_readme" }
 feat_extractor = { path = "../feat_extractor" }
 ranking = { path = "../ranking" }
 parking_lot = "0.12.0"
 udedokei = { path = "../udedokei" }
-tokio = { version = "1.2.0", features = ["rt-multi-thread", "macros", "sync"] }
-futures = "0.3.4"
-triomphe = "0.1.1"
+tokio = { version = "1.21.1", features = ["rt-multi-thread", "macros", "sync"] }
+futures = "0.3.24"
+triomphe = "0.1.8"
 simple_cache = { path = "../simple_cache", version = "0.7.0" }
 debcargo_list = { path = "../debcargo_list" }
 blake3 = "1.0.0"

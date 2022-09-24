@@ -206,7 +206,6 @@ impl RichCrateVersion {
         self.manifest.badges.appveyor.is_some() ||
             self.manifest.badges.circle_ci.is_some() ||
             self.manifest.badges.gitlab.is_some() ||
-            self.manifest.badges.travis_ci.is_some() ||
             self.manifest.badges.codecov.is_some() ||
             self.manifest.badges.coveralls.is_some()
     }

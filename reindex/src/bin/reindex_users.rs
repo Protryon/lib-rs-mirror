@@ -9,7 +9,6 @@ use std::{
 
 #[tokio::main]
 async fn main() {
-    let _ = std::panic::catch_unwind(|| console_subscriber::init());
 
     let handle = Arc::new(tokio::runtime::Handle::current());
     handle.clone().spawn(async move {

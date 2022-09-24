@@ -10,7 +10,7 @@ publish = false
 path = "src/lib_fetcher.rs"
 
 [dependencies]
-reqwest = "0.11.1"
-tokio = "1.2.0"
-log = "0.4.14"
-quick-error = "2"
+reqwest = "0.11.12"
+tokio = "1.21.1"
+log = "0.4.17"
+quick-error = "2.0.1"

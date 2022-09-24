@@ -5,12 +5,12 @@ authors = ["Kornel <kornel@geekhood.net>"]
 edition = "2018"
 
 [dependencies]
-csv = "1.1.3"
-tar = "0.4.26"
-libflate = "1.0.0"
-serde = "1.0.107"
-serde_derive = "1.0.107"
-chrono = "0.4.11"
+csv = "1.1.6"
+tar = "0.4.38"
+libflate = "1.2.0"
+serde = "1.0.145"
+serde_derive = "1.0.145"
+chrono = { version = "0.4.22", default-features = false }
 kitchen_sink = { path = "../kitchen_sink", version = "0.9" }
 tokio = { version = "1.2.0", features = ["rt-multi-thread", "macros"] }
 reqwest = { version = "0.11.0", features = ["blocking"] }

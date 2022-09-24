@@ -10,15 +10,15 @@ name = "crates_io_client"
 path = "src/lib_crates_io_client.rs"
 
 [dependencies]
-serde = "1.0.104"
-serde_derive = "1.0.104"
+serde = "1.0.145"
+serde_derive = "1.0.145"
 simple_cache = { path = "../simple_cache", version = "0.7.0" }
 parking_lot = "0.12.0"
 urlencoding = "2.0.0"
 tokio = { version = "1.2.0", features = ["macros", "sync"] }
 futures = "0.3.4"
-chrono = "0.4.10"
 rand = "0.8"
 semver = "1.0.4"
+chrono = { version = "0.4.22", default-features = false }
 fetcher = { path = "../fetcher/" }
-log = "0.4.14"
+log = "0.4.17"

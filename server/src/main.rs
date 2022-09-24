@@ -1206,7 +1206,10 @@ async fn handle_search(req: HttpRequest) -> Result<HttpResponse, ServerError> {
             let page = tokio::task::spawn_blocking({
                 let state = state.clone();
                 move || {
-                    let results = state.index.search(&query, 50, true)?;
+                    let mut results = state.index.search(&query, 50, true)?;
+                    let crates = state.crates.load();
+                    results.retain(|res| crates.crate_exists(&res.origin)); // search index can contain stale items
+
                     let mut page = Vec::with_capacity(32000);
                     front_end::render_serp_page(&mut page, &query, &results, &state.markup)?;
                     minify_html(&mut page);

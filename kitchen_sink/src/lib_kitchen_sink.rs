@@ -1933,6 +1933,10 @@ impl KitchenSink {
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
         info!("Indexing {:?}", origin);
 
+        if !self.crate_exists(origin) {
+            let _ = self.crate_db.delete_crate(origin).await;
+        }
+
         timeout("before-index", 5, self.crate_db.before_index_latest(origin).map_err(anyhow::Error::from)).await?;
 
         let (source_data, manifest, mut warnings, cache_key) = self.fetch_rich_crate_version_data(origin).await?;

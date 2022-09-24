@@ -1034,6 +1034,22 @@ impl CrateDb {
         }).await
     }
 
+    pub async fn delete_crate(&self, origin: &Origin) -> FResult<()> {
+        self.with_write("delete", |conn| {
+            let origin_str = origin.to_str();
+            let mut q = conn.prepare("DELETE from categories WHERE crate_id in (SELECT id FROM crates WHERE origin = ?1 LIMIT 1)")?;
+            q.execute([&origin_str])?;
+            let mut q = conn.prepare("DELETE from crate_keywords WHERE crate_id in (SELECT id FROM crates WHERE origin = ?1 LIMIT 1)")?;
+            q.execute([&origin_str])?;
+            let mut q = conn.prepare("DELETE from crate_repos WHERE crate_id in (SELECT id FROM crates WHERE origin = ?1 LIMIT 1)")?;
+            q.execute([&origin_str])?;
+            let mut q = conn.prepare("DELETE from crate_versions WHERE crate_id in (SELECT id FROM crates WHERE origin = ?1 LIMIT 1)")?;
+            q.execute([&origin_str])?;
+            let mut q = conn.prepare("DELETE from crates WHERE origin = ?1")?;
+            q.execute([&origin_str])?;
+            Ok(())
+        }).await
+    }
 }
 
 pub enum RepoChange {

@@ -343,6 +343,11 @@ impl CrateDb {
             let w = *w2 as f64 * 150. / (80 + i) as f64;
             insert_keyword.add(k, w, false);
         }
+        if let Some(url) = &package.homepage {
+            if url.len() > 5 {
+                insert_keyword.add_raw(format!("url:{url}"), 1., false); // crates sharing homepage are likely same project
+            }
+        }
         for feat in manifest.features.keys() {
             if feat != "default" && feat != "std" && feat != "nightly" {
                 insert_keyword.add_raw(format!("feature:{}", feat), 0.55, false);
@@ -375,7 +380,11 @@ impl CrateDb {
         }
         if let Some(repo) = c.repository {
             let url = repo.canonical_git_url();
-            insert_keyword.add_raw(format!("repo:{}", url), 1., false); // crates in monorepo probably belong together
+            insert_keyword.add_raw(format!("repo:{url}", ), 1., false); // crates in monorepo probably belong together
+            if let Some(owner) = repo.host().owner_name() {
+                // TODO: check if that's a GitHub org not user
+                insert_keyword.add_raw(format!("by:{owner}"), if owner.ends_with("-rs") {1.} else {0.6}, false);
+            }
         }
         Ok(insert_keyword)
     }

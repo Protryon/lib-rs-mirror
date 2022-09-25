@@ -98,6 +98,10 @@ impl GitHub {
     }
 
     pub async fn user_by_login(&self, login: &str) -> CResult<Option<User>> {
+        if login.contains(':') {
+            return Err(Error::GitHub(format!("bad login '{login}'")));
+        }
+
         let key = login.to_ascii_lowercase();
         self.get_cached(&self.users, (&key, ""), |client| client.get()
                        .path("users").arg(login)

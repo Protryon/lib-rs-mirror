@@ -2246,6 +2246,10 @@ impl KitchenSink {
     }
 
     pub async fn user_by_github_login(&self, github_login: &str) -> CResult<Option<User>> {
+        if github_login.contains(':') {
+            warn!("bad login {github_login}");
+            anyhow::bail!("bad login {github_login}");
+        }
         tokio::task::yield_now().await;
         let db_fetched = tokio::task::block_in_place(|| self.user_db.user_by_github_login(github_login));
         if let Ok(Some(gh)) = db_fetched.map_err(|e| eprintln!("db user {}: {}", github_login, e)) {

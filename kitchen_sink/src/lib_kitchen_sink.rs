@@ -2753,8 +2753,8 @@ impl KitchenSink {
         let name = k.short_name();
         if let Some(pos) = name.rfind(|c: char| c == '-' || c == '_') {
             match name.get(pos+1..) {
-                Some("core" | "shared" | "private" | "internals" | "internal" | "derive" | "utils" | "common" |
-                "impl" | "fork" | "unofficial") => {
+                Some("core" | "shared" | "runtime" | "codegen" | "private" | "internals" | "internal" |
+                    "derive" | "macros" | "utils" | "util" | "lib" | "types" | "common" | "impl" | "fork" | "unofficial" | "hack") => {
                     if let Some(parent_name) = name.get(..pos-1) {
                         if Origin::try_from_crates_io_name(parent_name).map_or(false, |name| self.crate_exists(&name)) {
                             // TODO: check if owners overlap?

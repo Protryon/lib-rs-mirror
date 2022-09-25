@@ -121,6 +121,7 @@ pub fn is_deprecated(k: &RichCrateVersion) -> bool {
         let desc = orig_desc.to_ascii_lowercase();
         return orig_desc.starts_with("WIP") || orig_desc.ends_with("WIP") ||
             desc.starts_with("unmaintained ") ||
+            desc.starts_with("unmaintained! ") ||
             desc.starts_with("deprecated") ||
             desc.starts_with("this crate was renamed") ||
             desc.starts_with("this crate is deprecated") ||
@@ -167,7 +168,7 @@ pub fn is_deprecated_requirement(name: &str, requirement: &VersionReq) -> bool {
         "glsl-to-spirv" => true,
         // futures 0.1
         "futures-preview" | "futures-core-preview" | "tokio-io" | "tokio-timer" | "tokio-codec" |
-        "tokio-executor" | "tokio-reactor" | "tokio-core" | "futures-cpupool" | "tokio-threadpool" | "tokio-tcp" => true,
+        "tokio-executor" | "tokio-reactor" | "tokio-signal" | "tokio-core" | "futures-cpupool" | "tokio-threadpool" | "tokio-tcp" => true,
         // fundamentally unsound
         "str-concat" => true,
         // uses old winapi
@@ -180,6 +181,8 @@ pub fn is_deprecated_requirement(name: &str, requirement: &VersionReq) -> bool {
         "typemap" => true, // 2015
         // in stdlib
         "insideout" | "file" | "ref_slice" => true,
+
+        "serde_derive_internals" | "serde_codegen_internals" | "serde_macros" | "serde_codegen" => true,
         _ => false,
     }
 }

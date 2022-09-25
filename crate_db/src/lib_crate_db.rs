@@ -13,7 +13,6 @@ use rusqlite::types::ToSql;
 use rusqlite::*;
 use std::borrow::Cow;
 use std::cell::RefCell;
-use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Write;
@@ -221,6 +220,8 @@ impl CrateDb {
 
         let next_timestamp = (Utc::now().timestamp() + 3600 * 24 * 31) as u32;
 
+        c.category_slugs.iter().for_each(|k| debug_assert!(categories::CATEGORIES.from_slug(k).1, "'{}' must exist", k));
+
         self.with_write("insert_crate", |tx| {
             let mut insert_crate = tx.prepare_cached("INSERT OR IGNORE INTO crates (origin, recent_downloads, ranking) VALUES (?1, ?2, ?3)")?;
             let mut mark_updated = tx.prepare_cached("UPDATE crates SET next_update = ?2 WHERE id = ?1")?;
@@ -231,16 +232,14 @@ impl CrateDb {
             let mut insert_category = tx.prepare_cached("INSERT OR IGNORE INTO categories (crate_id, slug, rank_weight, relevance_weight) VALUES (?1, ?2, ?3, ?4)")?;
             let mut get_crate_id = tx.prepare_cached("SELECT id, recent_downloads FROM crates WHERE origin = ?1")?;
 
-            let args: &[&dyn ToSql] = &[&origin, &0i32, &0i32];
-            insert_crate.execute(args)?;
+            insert_crate.execute(&[&origin as &dyn ToSql, &0i32, &0i32])?;
             let (crate_id, downloads): (u32, u32) = get_crate_id.query_row(&[&origin], |row| Ok((row.get_unwrap(0), row.get_unwrap(1))))
                 .map_err(|e| Error::DbCtx(e, "crate id"))?;
             let is_important_ish = downloads > 2000;
 
             if let Some(repo) = c.repository {
                 let url = repo.canonical_git_url();
-                let args: &[&dyn ToSql] = &[&crate_id, &url.as_ref()];
-                insert_repo.execute(args).map_err(|e| Error::DbCtx(e, "insert repo"))?;
+                insert_repo.execute(&[&crate_id as &dyn ToSql, &url.as_ref()]).map_err(|e| Error::DbCtx(e, "insert repo"))?;
             } else {
                 delete_repo.execute(&[&crate_id])?;
             }
@@ -251,8 +250,8 @@ impl CrateDb {
 
             // guessing categories if needed
             let categories = {
-                let keywords = insert_keyword.keywords.iter().map(|(k,_)| k.to_string());
-                self.extract_crate_categories(tx, &c, keywords, is_important_ish)?
+                let keywords = insert_keyword.keywords.keys().map(|k| k.as_str()).collect();
+                self.extract_crate_categories(tx, &c, &keywords, is_important_ish)?
             };
 
             let had_explicit_categories = categories.iter().any(|c| c.explicit);
@@ -321,6 +320,9 @@ impl CrateDb {
         for (i, k) in all_explicit_keywords.enumerate() {
             let w: f64 = 100. / (6 + i * 2) as f64;
             insert_keyword.add(k, w, true);
+        }
+        for k in c.bad_categories {
+            insert_keyword.add(k, 0.5, true);
         }
         for (i, k) in package.name.split(|c: char| !c.is_alphanumeric()).enumerate() {
             let w: f64 = 100. / (8 + i * 2) as f64;
@@ -392,50 +394,42 @@ impl CrateDb {
     /// (rank-relevance, relevance, slug)
     ///
     /// Rank relevance is normalized and biased towards one top category
-    fn extract_crate_categories(&self, conn: &Connection, c: &CrateVersionData<'_>, keywords: impl Iterator<Item=String>, is_important_ish: bool) -> FResult<Vec<CategoryCandidate>> {
-        let keywords = keywords.chain(c.bad_categories.iter().cloned()).collect();
-
-        c.category_slugs.iter().for_each(|k| debug_assert!(categories::CATEGORIES.from_slug(k).1, "'{}' must exist", k));
-
+    fn extract_crate_categories(&self, conn: &Connection, c: &CrateVersionData<'_>, keywords: &HashSet<&str>, is_important_ish: bool) -> FResult<Vec<CategoryCandidate>> {
         let had_explicit_categories = !c.category_slugs.is_empty();
-        let mut categories: Vec<_> = if had_explicit_categories {
+        let candidates = if had_explicit_categories {
             let cat_w = 10.0 / (9.0 + c.category_slugs.len() as f64);
-            let candidates = c.category_slugs
+            c.category_slugs
                 .iter()
                 .enumerate()
                 .map(|(i, slug)| {
-                    let w = 100. / (5 + i.pow(2)) as f64 * cat_w;
+                    let w = 100. / (5 + i) as f64 * cat_w;
                     ((&**slug).into(), w)
                 })
-                .collect();
-
-            categories::adjusted_relevance(candidates, &keywords, 0.01, 15)
+                .collect()
         } else {
             let cat_w = 0.2 + 0.2 * c.manifest.package().keywords.len() as f64;
-            Self::guess_crate_categories_tx(conn, c.origin, &keywords, if is_important_ish {0.1} else {0.25})?.into_iter()
-            .map(|(w, slug)| {
-                ((w * cat_w).min(0.99), slug)
-            }).collect()
+            let mut candidates = Self::candidate_crate_categories_tx(conn, c.origin)?;
+            candidates.values_mut().for_each(|w| {
+                *w = (*w * cat_w).min(0.99);
+            });
+            candidates
         };
+        let threshold = if had_explicit_categories {0.01} else if is_important_ish {0.1} else {0.25};
+        let limit = if had_explicit_categories {2} else {5};
+        let categories = categories::adjusted_relevance(candidates, &keywords, threshold, limit);
 
         debug!("categories = {categories:?}");
 
-        // slightly nudge towards specific, leaf categories over root generic ones
-        for (w, slug) in &mut categories {
-            *w *= categories::CATEGORIES.from_slug(slug).0.last().map(|c| c.preference as f64).unwrap_or(1.);
-        }
-
         let max_weight = categories.iter().map(|&(w, _)| w)
-            .max_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal))
+            .max_by(|a, b| a.total_cmp(b))
             .unwrap_or(0.1)
             .max(0.1); // prevents div/0, ensures odd choices stay low
 
-        let categories = categories
-            .into_iter()
+        let categories = categories.into_iter()
             .map(|(category_relevance, slug)| {
                 let rank_weight = category_relevance / max_weight
-                    * if category_relevance >= max_weight * 0.99 { 1. } else { 0.4 } // a crate is only in 1 category
-                    * if category_relevance > 0.2 { 1. } else { 0.75 }; // keep bad category guesses out of sight
+                    * if category_relevance >= max_weight * 0.98 { 1. } else { 0.4 } // a crate is only in 1 category
+                    * if category_relevance > 0.2 { 1. } else { 0.8 }; // keep bad category guesses out of sight
                 CategoryCandidate {rank_weight, category_relevance, slug, explicit: had_explicit_categories}
             })
             .collect();
@@ -683,7 +677,7 @@ impl CrateDb {
         }).await
     }
 
-    fn guess_crate_categories_tx(conn: &Connection, origin: &Origin, kebab_keywords: &HashSet<String>, threshold: f64) -> FResult<Vec<(f64, Box<str>)>> {
+    fn candidate_crate_categories_tx(conn: &Connection, origin: &Origin) -> FResult<HashMap<Box<str>, f64>> {
         let mut query = conn.prepare_cached(r#"
         select cc.slug, sum(cc.relevance_weight * ck.weight * relk.relevance)/(8+count(*)) as w
         from (
@@ -709,10 +703,9 @@ impl CrateDb {
         limit 10"#)?;
         let candidates = query.query_map(&[&origin.to_str()], |row| Ok((row.get_unwrap(0), row.get_unwrap(1))))?;
         let candidates = candidates.collect::<std::result::Result<HashMap<_,_>, _>>()?;
-
         candidates.keys().for_each(|k| debug_assert!(categories::CATEGORIES.from_slug(k).1, "'{}' must exist", k));
 
-        Ok(categories::adjusted_relevance(candidates, kebab_keywords, threshold, 2))
+        Ok(candidates)
     }
 
     /// Find most relevant keyword for the crate

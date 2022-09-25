@@ -1449,7 +1449,7 @@ lazy_static! {
 /// Based on the set of keywords, adjust relevance of given categories
 ///
 /// Returns (weight, slug)
-pub fn adjusted_relevance(mut candidates: HashMap<Box<str>, f64>, keywords: &HashSet<String>, min_category_match_threshold: f64, max_num_categories: usize) -> Vec<(f64, Box<str>)> {
+pub fn adjusted_relevance(mut candidates: HashMap<Box<str>, f64>, keywords: &HashSet<&str>, min_category_match_threshold: f64, max_num_categories: usize) -> Vec<(f64, Box<str>)> {
     for (cond, actions) in KEYWORD_CATEGORIES.iter() {
         let matched_times = match cond {
             Cond::All(reqs) => {
@@ -1478,11 +1478,6 @@ pub fn adjusted_relevance(mut candidates: HashMap<Box<str>, f64>, keywords: &Has
     if candidates.is_empty() {
         return Vec::new();
     }
-
-    let best_candidate_before_change = candidates.iter()
-        .max_by(|b,a| a.0.partial_cmp(&b.0).expect("nan"))
-        .map(|(v,k)| (*k, v.clone()))
-        .unwrap();
 
     if_this_then_not_that(&mut candidates, "cryptography::cryptocurrencies", "command-line-utilities");
     if_this_then_not_that(&mut candidates, "cryptography::cryptocurrencies", "algorithms");
@@ -1613,18 +1608,14 @@ pub fn adjusted_relevance(mut candidates: HashMap<Box<str>, f64>, keywords: &Has
     if_this_then_not_that(&mut candidates, "config", "compilers");
     if_this_then_not_that(&mut candidates, "development-tools::procedural-macro-helpers", "accessibility");
 
-    let best_candidate_after_change = candidates.iter()
-        .max_by(|b,a| a.0.partial_cmp(&b.0).expect("nan"))
-        .map(|(v,k)| (*k, v.clone()))
-        .unwrap();
-
-    if best_candidate_before_change.1 != best_candidate_after_change.1 {
-        eprintln!("CHANGED §§§ {:?} -> {:?}, {:?}", best_candidate_before_change, best_candidate_after_change, candidates);
+    // slightly nudge towards specific, leaf categories over root generic ones
+    for (slug, w) in &mut candidates {
+        *w *= CATEGORIES.from_slug(slug).0.last().map(|c| c.preference as f64).unwrap_or(1.);
     }
 
     let max_score = candidates.iter()
         .map(|(_, v)| *v)
-        .max_by(|a, b| a.partial_cmp(b).expect("nan"))
+        .max_by(|a, b| a.total_cmp(b))
         .unwrap_or(0.);
 
     let min_category_match_threshold = min_category_match_threshold.max(max_score * 0.951);
@@ -1634,7 +1625,7 @@ pub fn adjusted_relevance(mut candidates: HashMap<Box<str>, f64>, keywords: &Has
         .filter(|&(ref k, _)| CATEGORIES.from_slug(k).1)
         .map(|(k, v)| (v, k))
         .collect();
-    res.sort_unstable_by(|a, b| b.0.partial_cmp(&a.0).expect("nan"));
+    res.sort_unstable_by(|a, b| b.0.total_cmp(&a.0));
     res.truncate(max_num_categories);
     res
 }

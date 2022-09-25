@@ -447,7 +447,7 @@ fn render_404_page(state: &AServerState, path: &str, item_name: &str) -> impl Fu
     let state = state.clone();
 
     tokio::task::spawn_blocking(move || {
-        let results = state.index.search(&query, 5, false).unwrap_or_default();
+        let results = state.index.search(&query, 7, false).unwrap_or_default();
         let mut page: Vec<u8> = Vec::with_capacity(32000);
         front_end::render_404_page(&mut page, &query, &item_name, &results, &state.markup)?;
         Ok(page)
@@ -1101,9 +1101,9 @@ async fn handle_keyword(req: HttpRequest) -> Result<HttpResponse, ServerError> {
             return Ok::<_, anyhow::Error>((query, None));
         }
         let keyword_query = format!("keywords:\"{}\"", query);
-        let results = state2.index.search(&keyword_query, 150, false)?;
+        let results = state2.index.search(&keyword_query, 250, false)?;
         if !results.is_empty() {
-            let mut page: Vec<u8> = Vec::with_capacity(32000);
+            let mut page: Vec<u8> = Vec::with_capacity(60_000);
             front_end::render_keyword_page(&mut page, &query, &results, &state2.markup)?;
             minify_html(&mut page);
             Ok((query, Some(page)))

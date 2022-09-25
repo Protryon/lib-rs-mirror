@@ -2,10 +2,12 @@ use crate::templates;
 use crate::url_domain;
 use crate::Page;
 use chrono::prelude::*;
+use futures::future::join_all;
 use futures::stream::StreamExt;
 use kitchen_sink::ArcRichCrateVersion;
 use kitchen_sink::CResult;
 use kitchen_sink::CrateOwnerRow;
+use kitchen_sink::CrateOwners;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::Org;
 use kitchen_sink::OwnerKind;
@@ -103,14 +105,14 @@ impl<'a> AuthorPage<'a> {
         }
         let num_keywords = (1 + founder_total / 2 + member_total / 3).max(2).min(7);
         let mut keywords: Vec<_> = keywords.into_iter().collect();
-        keywords.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
+        keywords.sort_by(|a, b| b.1.total_cmp(&a.1));
         let keywords: Vec<_> = keywords.into_iter().take(num_keywords).map(|(k, _)| k.to_owned()).collect();
 
         let mut collab: Vec<_> = collab.into_iter().map(|(_, v)| v).collect();
-        collab.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(Ordering::Equal));
-        let collab: Vec<_> = futures::stream::iter(collab.into_iter().take(100)).filter_map(|(_, login)| async move {
+        collab.sort_by(|a, b| b.0.total_cmp(&a.0));
+        let collab: Vec<_> = join_all(collab.into_iter().take(100).map(|(_, login)| async move {
             kitchen_sink.user_by_github_login(login).await.map_err(|e| eprintln!("{}: {}", login, e)).ok().and_then(|x| x)
-        }).collect().await;
+        })).await.into_iter().filter_map(|x| x).collect();
 
         let shitlist_reason = kitchen_sink.author_shitlist.get(&aut.github.login.to_ascii_lowercase()).map(|s| s.as_str());
 
@@ -134,7 +136,7 @@ impl<'a> AuthorPage<'a> {
             .map(|row| async move {
                 let c = kitchen_sink.rich_crate_version_async(&row.origin).await.map_err(|e| eprintln!("{}", e)).ok()?;
                 let dl = kitchen_sink.downloads_per_month(&row.origin).await.map_err(|e| eprintln!("{}", e)).ok()?.unwrap_or(0) as u32;
-                let owners = kitchen_sink.crate_owners(&row.origin).await.map_err(|e| eprintln!("o: {}", e)).ok()?.into_iter().filter_map(|o| {
+                let owners = kitchen_sink.crate_owners(&row.origin, CrateOwners::All).await.map_err(|e| eprintln!("o: {}", e)).ok()?.into_iter().filter_map(|o| {
                     Some(OtherOwner {
                         invited_at: o.invited_at()?,
                         github_id: o.github_id?,

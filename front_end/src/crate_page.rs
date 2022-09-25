@@ -119,7 +119,7 @@ pub(crate) struct Contributors<'a> {
 
 impl<'a> CratePage<'a> {
     pub async fn new(all: &'a RichCrate, ver: &'a RichCrateVersion, kitchen_sink: &'a KitchenSink, markup: &'a Renderer) -> CResult<CratePage<'a>> {
-        let (top_category, parent_crate, keywords_populated, (related_crates, downloads_per_month_or_equivalent)) = futures::join!(
+        let (top_category, parent_crate, keywords_populated, (related_crates, downloads_per_month_or_equivalent), has_verified_repository_link) = futures::join!(
             kitchen_sink.top_category(ver),
             kitchen_sink.parent_crate(ver),
             kitchen_sink.keywords_populated(ver),
@@ -128,8 +128,8 @@ impl<'a> CratePage<'a> {
                 let related_crates = Self::make_related_crates(kitchen_sink, ver, downloads_per_month_or_equivalent).await;
                 (related_crates, downloads_per_month_or_equivalent)
             },
+            kitchen_sink.has_verified_repository_link(ver),
         );
-        let has_verified_repository_link = kitchen_sink.has_verified_repository_link(ver).await;
         let advisories = kitchen_sink.advisories_for_crate(ver.origin());
         let semver: SemVer = ver.version().parse()?;
         let advisory = advisories.iter()
@@ -140,15 +140,8 @@ impl<'a> CratePage<'a> {
         let top_category = top_category
             .and_then(|(top, slug)| CATEGORIES.from_slug(slug).0.last().map(|&c| (top, c)));
 
-        let (is_build_or_dev, parent_crate, dependents_stats, former_glory, top_keyword, all_contributors) = futures::try_join!(
+        let (is_build_or_dev, dependents_stats, former_glory, top_keyword, all_contributors) = futures::try_join!(
             async { Ok(kitchen_sink.is_build_or_dev(ver.origin()).await?) },
-            async {
-                Ok(if let Some(origin) = parent_crate {
-                    kitchen_sink.rich_crate_version_async(&origin).await.ok()
-                } else {
-                    None
-                })
-            },
             async {
                 Ok(kitchen_sink.crates_io_dependents_stats_of(all.origin()).await?)
             },
@@ -159,13 +152,13 @@ impl<'a> CratePage<'a> {
 
         let deps = kitchen_sink.all_dependencies_flattened(ver);
         let has_docs_rs = kitchen_sink.has_docs_rs(ver.origin(), ver.short_name(), ver.version()).await;
+        let is_on_shitlist = kitchen_sink.is_crate_on_shitlist(all).await;
         let api_reference_url = if has_docs_rs {
             Some(format!("https://docs.rs/{}", ver.short_name()))
         } else {
             None
         };
         let has_reviews = !kitchen_sink.reviews_for_crate(ver.origin()).is_empty();
-        let is_on_shitlist = kitchen_sink.is_crate_on_shitlist(all);
         let mut page = Self {
             security_advisory_url,
             top_keyword,

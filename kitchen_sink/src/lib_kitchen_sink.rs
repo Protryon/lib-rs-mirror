@@ -443,8 +443,15 @@ impl KitchenSink {
         self.author_shitlist.get(&login.to_ascii_lowercase()).is_some()
     }
 
-    pub fn is_crate_on_shitlist(&self, k: &RichCrate) -> bool {
-        k.owners().iter()
+    pub async fn is_crate_on_shitlist(&self, k: &RichCrate) -> bool {
+        let owners = match self.crate_owners(k.origin(), CrateOwners::All).await {
+            Ok(o) => o,
+            Err(e) => {
+                warn!("can't check owners of {:?}: {e}", k.origin());
+                return false
+            },
+        };
+        owners.iter()
             // some crates are co-owned by both legit and banned owners,
             // so banning by "any" would interfere with legit users' usage :(
             .all(|owner| {
@@ -742,15 +749,13 @@ impl KitchenSink {
         match origin {
             Origin::CratesIo(name) => {
                 let meta = self.crates_io_meta(name).await?;
-                // don't parallelize with meta, it also reads meta
-                let owners = self.crate_owners(origin).await?;
                 let versions = meta.versions().map(|c| CrateVersion {
                     num: c.num,
                     updated_at: c.updated_at,
                     created_at: c.created_at,
                     yanked: c.yanked,
                 }).collect();
-                Ok(RichCrate::new(origin.clone(), owners, meta.krate.name, versions))
+                Ok(RichCrate::new(origin.clone(), meta.krate.name, versions))
             },
             Origin::GitHub { repo, package } => {
                 watch("repocrate", self.rich_crate_gh(origin, repo, package)).await
@@ -764,34 +769,15 @@ impl KitchenSink {
     async fn rich_crate_gh(&self, origin: &Origin, repo: &SimpleRepo, package: &str) -> CResult<RichCrate> {
         let host = RepoHost::GitHub(repo.clone()).try_into().map_err(|_| KitchenSinkErr::CrateNotFound(origin.clone())).context("ghrepo host bad")?;
         let cachebust = self.cachebust_string_for_repo(&host).await.context("ghrepo")?;
-        let gh = self.gh.repo(repo, &cachebust).await?
-            .ok_or_else(|| KitchenSinkErr::CrateNotFound(origin.clone()))
-            .context(format!("ghrepo {:?} not found", repo))?;
         let versions = self.get_repo_versions(origin, &host, &cachebust).await?;
-        Ok(RichCrate::new(origin.clone(), gh.owner.into_iter().map(|o| {
-            CrateOwner {
-                avatar: o.avatar_url,
-                url: Some(o.html_url),
-                login: o.login,
-                kind: OwnerKind::User, // FIXME: crates-io uses teams, and we'd need to find the right team? is "owners" a guaranteed thing?
-                name: o.name,
-                github_id: o.id,
-
-                invited_at: None,
-                invited_by_github_id: None,
-                last_seen_at: None,
-                contributor_only: false,
-            }
-        }).collect(),
-        format!("github/{}/{}", repo.owner, package),
-        versions))
+        Ok(RichCrate::new(origin.clone(), format!("github/{}/{package}", repo.owner), versions))
     }
 
     async fn rich_crate_gitlab(&self, origin: &Origin, repo: &SimpleRepo, package: &str) -> CResult<RichCrate> {
         let host = RepoHost::GitLab(repo.clone()).try_into().map_err(|_| KitchenSinkErr::CrateNotFound(origin.clone())).context("ghrepo host bad")?;
         let cachebust = self.cachebust_string_for_repo(&host).await.context("ghrepo")?;
         let versions = self.get_repo_versions(origin, &host, &cachebust).await?;
-        Ok(RichCrate::new(origin.clone(), vec![], format!("gitlab/{}/{}", repo.owner, package), versions))
+        Ok(RichCrate::new(origin.clone(), format!("gitlab/{}/{package}", repo.owner), versions))
     }
 
     async fn get_repo_versions(&self, origin: &Origin, repo: &Repo, cachebust: &str) -> CResult<Vec<CrateVersion>> {
@@ -2552,7 +2538,7 @@ impl KitchenSink {
     /// If given crate is a sub-crate, return crate that owns it.
     /// The relationship is based on directory layout of monorepos.
     #[inline]
-    pub async fn parent_crate(&self, child: &RichCrateVersion) -> Option<Origin> {
+    pub async fn parent_crate_same_repo_unverified(&self, child: &RichCrateVersion) -> Option<Origin> {
         if !child.has_path_in_repo() {
             return None;
         }
@@ -2563,6 +2549,86 @@ impl KitchenSink {
             return None;
         }
         res
+    }
+
+    pub async fn parent_crate(&self, child: &RichCrateVersion) -> Option<Arc<RichCrateVersion>> {
+        //
+        let parent_origin = self.parent_crate_same_repo_unverified(child).await.or_else(|| {
+            // See if there's a crate that is a prefix for this name (even if it doesn't share a repo)
+            let mut rest = child.short_name();
+            while let Some((name, _)) = rest.rsplit_once(|c:char| c == '_' || c == '-') {
+                let origin = Origin::try_from_crates_io_name(name)?;
+                if self.crate_exists(&origin) {
+                    return Some(origin);
+                }
+                rest = name;
+            }
+            None
+        })?;
+        let parent = self.rich_crate_version_async(&parent_origin).await.ok()?;
+
+        // if the crate has the parent as a dependency, that's a good-enough endorsement they're related
+        if let Origin::CratesIo(parent_name) = &parent_origin {
+            let (d1,d2,d3) = child.direct_dependencies();
+            if d1.iter().chain(&d2).chain(&d3).any(|dep| dep.package.eq_ignore_ascii_case(parent_name)) {
+                return Some(parent);
+            }
+        }
+
+        if self.are_namespace_related(&parent, child).await.ok()? {
+            Some(parent)
+        } else {
+            None
+        }
+    }
+
+    /// Do these crate belong to the same project? (what would have been a namespace)
+    pub async fn are_namespace_related(&self, a: &RichCrateVersion, b: &RichCrateVersion) -> CResult<bool> {
+        let have_same_repo_owner = {
+            let a_repo_owner = a.repository().and_then(|r| r.host().owner_name());
+            let b_repo_owner = b.repository().and_then(|r| r.host().owner_name());
+            match (a_repo_owner, b_repo_owner) {
+                (Some(a), Some(b)) if a.eq_ignore_ascii_case(b) => true,
+                _ => false
+            }
+        };
+        let have_same_homepage = || match (a.homepage(), b.homepage()) {
+            (Some(a), Some(b)) if a.trim_end_matches('/') == b.trim_end_matches('/') => true,
+            _ => false,
+        };
+        let have_same_name_prefix = || {
+            let a_first_word = a.short_name().split(|c: char| c == '_' || c == '-').next().unwrap();
+            let b_first_word = b.short_name().split(|c: char| c == '_' || c == '-').next().unwrap();
+            a_first_word == b_first_word ||
+            // foo & libfoo-sys && cargo-foo
+            a_first_word.trim_start_matches("cargo-").trim_start_matches("lib") == b_first_word.trim_start_matches("cargo-").trim_start_matches("lib")
+        };
+
+        // They need to look at least a bit related (these factors can be faked/squatted, so alone aren't enough)
+        if !have_same_repo_owner && !have_same_homepage() && !have_same_name_prefix() {
+            return Ok(false);
+        }
+
+        // this is strong
+        if self.have_common_real_owners(a.origin(), b.origin()).await? {
+            return Ok(true);
+        }
+        // they're related if have same repo owner, but make sure the repo url isn't fake
+        if have_same_repo_owner {
+            let a_verified = self.has_verified_repository_link(a).await;
+            if !a_verified { return Ok(false); }
+            let b_verified = self.has_verified_repository_link(a).await;
+            return Ok(b_verified);
+        }
+        Ok(false)
+    }
+
+    async fn have_common_real_owners(&self, a: &Origin, b: &Origin) -> CResult<bool> {
+        let (a_owners, b_owners) = futures::try_join!(self.crate_owners(a, CrateOwners::Strict), self.crate_owners(b, CrateOwners::Strict))?;
+        let a_owners: HashSet<_> = a_owners.into_iter().filter_map(|o| o.github_id).collect();
+        let b_owners: HashSet<_> = b_owners.into_iter().filter_map(|o| o.github_id).collect();
+        let has_common_owners = a_owners.intersection(&b_owners).next().is_some();
+        Ok(has_common_owners)
     }
 
     /// Crates are spilt into foo and foo-core. The core is usually uninteresting/duplicate.
@@ -2578,7 +2644,7 @@ impl KitchenSink {
                             return true;
                         }
                     }
-                    if self.parent_crate(k).await.is_some() {
+                    if self.parent_crate_same_repo_unverified(k).await.is_some() {
                         return true;
                     }
                 },
@@ -2685,7 +2751,7 @@ impl KitchenSink {
 
     /// Merge authors, owners, contributors
     pub async fn all_contributors<'a>(&self, krate: &'a RichCrateVersion) -> CResult<(Vec<CrateAuthor<'a>>, Vec<CrateAuthor<'a>>, bool, usize)> {
-        let owners = self.crate_owners(krate.origin()).await?;
+        let owners = self.crate_owners(krate.origin(), CrateOwners::All).await?;
 
         let (hit_max_contributor_count, mut contributors_by_login) = match krate.repository().as_ref() {
             // Only get contributors from github if the crate has been found in the repo,
@@ -2905,9 +2971,45 @@ impl KitchenSink {
         Ok(self.crate_db.crates_of_author(aut.github.id).await?)
     }
 
+    fn owners_from_audit(current_owners: Vec<CrateOwner>, meta: CrateMetaFile) -> Vec<CrateOwner> {
+        let mut current_owners_by_login: HashMap<_, _> = current_owners.into_iter().map(|o| (o.login.to_ascii_lowercase(), o)).collect();
+
+        // latest first
+        let mut actions: Vec<_> = meta.versions.into_iter().flat_map(|v| v.audit_actions).collect();
+        actions.sort_by(|a,b| b.time.cmp(&a.time));
+
+        // audit actions contain logins which are not present in owners, probably because they're GitHub team members
+        for (idx, a) in actions.into_iter().enumerate() {
+            if let Some(o) = current_owners_by_login.get_mut(&a.user.login.to_ascii_lowercase()) {
+                if o.invited_at.as_ref().map_or(true, |l| l < &a.time) {
+                    o.invited_at = Some(a.time.clone());
+                }
+                if o.last_seen_at.as_ref().map_or(true, |l| l < &a.time) {
+                    o.last_seen_at = Some(a.time);
+                }
+            } else {
+                current_owners_by_login.insert(a.user.login.to_ascii_lowercase(), CrateOwner {
+                    kind: OwnerKind::User,
+                    url: Some(format!("https://github.com/{}", a.user.login)),
+                    login: a.user.login,
+                    name: a.user.name,
+                    github_id: None,
+                    avatar: a.user.avatar,
+                    last_seen_at: Some(a.time.clone()),
+                    invited_at: Some(a.time),
+                    invited_by_github_id: None,
+                    // most recent action is assumed to be done by an owner,
+                    // but we can't be sure about past ones
+                    contributor_only: idx > 0,
+                });
+            }
+        }
+        current_owners_by_login.into_iter().map(|(_, v)| v).collect()
+    }
+
     /// true if it's verified current owner, false if may be a past owner (contributor now)
-    pub async fn crate_owners(&self, origin: &Origin) -> CResult<Vec<CrateOwner>> {
-        match origin {
+    pub async fn crate_owners(&self, origin: &Origin, set: CrateOwners) -> CResult<Vec<CrateOwner>> {
+        let mut owners: Vec<_> = match origin {
             Origin::CratesIo(crate_name) => {
                 let current_owners = async {
                     Ok(match self.crates_io_owners_cache.get(crate_name)? {
@@ -2915,45 +3017,18 @@ impl KitchenSink {
                         None => timeout("owners-fallback", 3, self.crates_io.crate_owners(crate_name, "fallback").map(|r| r.map_err(KitchenSinkErr::from))).await?.unwrap_or_default(),
                     })
                 };
-                let (mut current_owners, meta) = futures::try_join!(current_owners, self.crates_io_meta(crate_name))?;
-
-                let mut current_owners_by_login: HashMap<_, _> = current_owners.into_iter().map(|o| (o.login.to_ascii_lowercase(), o)).collect();
-
-                // latest first
-                let mut actions: Vec<_> = meta.versions.into_iter().flat_map(|v| v.audit_actions).collect();
-                actions.sort_by(|a,b| b.time.cmp(&a.time));
-
-                // audit actions contain logins which are not present in owners, probably because they're GitHub team members
-                for (idx, a) in actions.into_iter().enumerate() {
-                    if let Some(o) = current_owners_by_login.get_mut(&a.user.login.to_ascii_lowercase()) {
-                        if o.invited_at.as_ref().map_or(true, |l| l < &a.time) {
-                            o.invited_at = Some(a.time.clone());
-                        }
-                        if o.last_seen_at.as_ref().map_or(true, |l| l < &a.time) {
-                            o.last_seen_at = Some(a.time);
-                        }
-                    } else {
-                        current_owners_by_login.insert(a.user.login.to_ascii_lowercase(), CrateOwner {
-                            kind: OwnerKind::User,
-                            url: Some(format!("https://github.com/{}", a.user.login)),
-                            login: a.user.login,
-                            name: a.user.name,
-                            github_id: None,
-                            avatar: a.user.avatar,
-                            last_seen_at: Some(a.time.clone()),
-                            invited_at: Some(a.time),
-                            invited_by_github_id: None,
-                            // most recent action is assumed to be done by an owner,
-                            // but we can't be sure about past ones
-                            contributor_only: idx > 0,
-                        });
-                    }
+                if set == CrateOwners::Strict {
+                    let mut owners = current_owners.await?;
+                    // anyone can join rust-bus, so it's meaningless as a common owner between crates
+                    owners.retain(|o| !is_shared_collective_login(&o.login));
+                    owners
+                } else {
+                    let (current_owners, meta) = futures::try_join!(current_owners, self.crates_io_meta(crate_name))?;
+                    Self::owners_from_audit(current_owners, meta)
                 }
-                current_owners = current_owners_by_login.into_iter().map(|(_, v)| v).collect();
-                Ok(current_owners)
             },
-            Origin::GitLab {..} => Ok(vec![]),
-            Origin::GitHub {repo, ..} => Ok(vec![
+            Origin::GitLab {..} => vec![],
+            Origin::GitHub {repo, ..} => vec![
                 CrateOwner {
                     avatar: None,
                     // FIXME: read from GH
@@ -2969,8 +3044,20 @@ impl KitchenSink {
                     last_seen_at: None,
                     contributor_only: false,
                 }
-            ]),
-        }
+            ],
+        };
+        let _ = join_all(owners.iter_mut().map(|owner: &mut CrateOwner| async move {
+            if owner.github_id.is_none() {
+                match self.user_by_github_login(&owner.login).await {
+                    Ok(Some(user)) => {
+                        owner.github_id = Some(user.id);
+                    },
+                    Ok(None) => warn!("owner {} of {origin:?} not found", owner.login),
+                    Err(e) => warn!("can't get owner {} of {origin:?}: {e}", owner.login),
+                }
+            }
+        })).await;
+        Ok(owners)
     }
 
     pub fn crate_tarball_download_url(&self, k: &RichCrateVersion) -> Option<String> {
@@ -3173,7 +3260,7 @@ impl KitchenSink {
                 return Some((o, score, vec![], vec![]));
             }
             let get_crate = tokio::time::timeout_at(deadline, self.rich_crate_version_stale_is_ok(&o));
-            let (k, owners) = futures::join!(get_crate, self.crate_owners(&o));
+            let (k, owners) = futures::join!(get_crate, self.crate_owners(&o, CrateOwners::All));
             let keywords = match k {
                 Ok(Ok(c)) => {
                     if c.is_yanked() {
@@ -3351,6 +3438,11 @@ impl KitchenSink {
         let github = self.user_by_github_login(login).await?.ok_or_else(|| KitchenSinkErr::AuthorNotFound(login.to_owned()))?;
         Ok(RichAuthor { github })
     }
+}
+
+/// Any crate can get such owner
+fn is_shared_collective_login(login: &str) -> bool {
+    login == "rust-bus-owner" || login == "rust-bus" || login.starts_with("rust-bus:")
 }
 
 impl Drop for KitchenSink {
@@ -3585,6 +3677,14 @@ fn timeout<'a, T, E: From<KitchenSinkErr>>(label: &'static str, time: u16, f: im
         info!("Timed out: {} {}", label, time);
         E::from(KitchenSinkErr::TimedOut(label, time))
     }).and_then(|x| x)))
+}
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum CrateOwners {
+    /// Includes guesswork from audit log and rust-bus
+    All,
+    /// Only actual owners, no guesses, no rust-bus
+    Strict,
 }
 
 #[test]

@@ -9,7 +9,6 @@ pub use crates_io_client::CrateOwner;
 pub struct RichCrate {
     origin: Origin,
     name: String,
-    owners: Vec<CrateOwner>,
     versions: Vec<CrateVersion>,
 }
 
@@ -25,8 +24,8 @@ pub struct CrateVersion {
 }
 
 impl RichCrate {
-    pub fn new(origin: Origin, owners: Vec<CrateOwner>, name: String, versions: Vec<CrateVersion>) -> Self {
-        Self { origin, versions, name, owners }
+    pub fn new(origin: Origin, name: String, versions: Vec<CrateVersion>) -> Self {
+        Self { origin, versions, name }
     }
 
     pub fn name(&self) -> &str {
@@ -35,10 +34,6 @@ impl RichCrate {
 
     pub fn origin(&self) -> &Origin {
         &self.origin
-    }
-
-    pub fn owners(&self) -> &[CrateOwner] {
-        &self.owners
     }
 
     pub fn versions(&self) -> &[CrateVersion] {

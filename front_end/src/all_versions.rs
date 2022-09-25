@@ -2,6 +2,7 @@ use crate::Urler;
 use crate::reverse_dependencies::DownloadsBar;
 use crate::Page;
 use chrono::DateTime;
+use kitchen_sink::CrateOwners;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::KitchenSinkErr;
 use kitchen_sink::Origin;
@@ -53,7 +54,7 @@ impl AllVersions {
         let (changelog_url, downloads, all_owners, release_meta) = futures::join!(
             kitchen_sink.changelog_url(krate),
             kitchen_sink.recent_downloads_by_version(&origin),
-            kitchen_sink.crate_owners(&origin),
+            kitchen_sink.crate_owners(&origin, CrateOwners::All),
             async {
                 match &origin {
                     Origin::CratesIo(name) => {

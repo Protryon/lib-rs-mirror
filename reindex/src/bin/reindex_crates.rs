@@ -1,3 +1,4 @@
+use kitchen_sink::CrateOwners;
 use kitchen_sink::SemVer;
 use anyhow::anyhow;
 use debcargo_list::DebcargoList;
@@ -243,14 +244,15 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
         }
     }
 
+    let is_on_shitlist = crates.is_crate_on_shitlist(all).await;
     let contrib_info = crates.all_contributors(k).await.map_err(|e| log::error!("contrib {}", e)).ok();
+    let owners = crates.crate_owners(k.origin(), CrateOwners::All).await?;
     let contributors_count = if let Some((authors, _owner_only, _, extra_contributors)) = &contrib_info {
         (authors.len() + extra_contributors) as u32
     } else {
-        all.owners().len() as u32
+        1
     };
 
-    let is_on_shitlist = crates.is_crate_on_shitlist(all);
 
     let langs = k.language_stats();
     let (rust_code_lines, rust_comment_lines) = langs.langs.get(&udedokei::Language::Rust).map(|rs| (rs.code, rs.comments)).unwrap_or_default();
@@ -261,7 +263,7 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
         readme: k.readme().map(|readme| {
             renderer.page_node(&readme.markup, None, Links::Ugc, None)
         }).as_ref(),
-        owners: all.owners(),
+        owners: &owners,
         authors: k.authors(),
         contributors: Some(contributors_count),
         edition: k.edition(),

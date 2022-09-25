@@ -69,7 +69,8 @@ pub struct CratePage<'a> {
     api_reference_url: Option<String>,
     former_glory: Option<(f64, u32)>,
     dependents_stats: Option<&'a RevDependencies>,
-    related_crates: Option<Vec<Origin>>,
+    related_crates: Vec<Origin>,
+    ns_crates: Vec<ArcRichCrateVersion>,
     keywords_populated: Vec<(String, bool)>,
     parent_crate: Option<ArcRichCrateVersion>,
     downloads_per_month_or_equivalent: Option<usize>,
@@ -119,14 +120,14 @@ pub(crate) struct Contributors<'a> {
 
 impl<'a> CratePage<'a> {
     pub async fn new(all: &'a RichCrate, ver: &'a RichCrateVersion, kitchen_sink: &'a KitchenSink, markup: &'a Renderer) -> CResult<CratePage<'a>> {
-        let (top_category, parent_crate, keywords_populated, (related_crates, downloads_per_month_or_equivalent), has_verified_repository_link) = futures::join!(
+        let (top_category, parent_crate, keywords_populated, (related_crates, ns_crates, downloads_per_month_or_equivalent), has_verified_repository_link) = futures::join!(
             kitchen_sink.top_category(ver),
             kitchen_sink.parent_crate(ver),
             kitchen_sink.keywords_populated(ver),
             async {
                 let downloads_per_month_or_equivalent = kitchen_sink.downloads_per_month_or_equivalent(ver.origin()).await.ok().and_then(|x| x);
-                let related_crates = Self::make_related_crates(kitchen_sink, ver, downloads_per_month_or_equivalent).await;
-                (related_crates, downloads_per_month_or_equivalent)
+                let (related_crates, ns_crates) = Self::make_related_crates(kitchen_sink, ver, downloads_per_month_or_equivalent).await;
+                (related_crates, ns_crates, downloads_per_month_or_equivalent)
             },
             kitchen_sink.has_verified_repository_link(ver),
         );
@@ -177,6 +178,7 @@ impl<'a> CratePage<'a> {
             former_glory,
             dependents_stats,
             related_crates,
+            ns_crates,
             keywords_populated,
             parent_crate,
             downloads_per_month_or_equivalent,
@@ -749,17 +751,21 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn related_crates(&self) -> Option<&[Origin]> {
-        self.related_crates.as_deref()
+        if self.related_crates.is_empty() { None } else { Some(&self.related_crates) }
     }
 
-    async fn make_related_crates(kitchen_sink: &KitchenSink, ver: &RichCrateVersion, downloads_per_month_or_equivalent: Option<usize>) -> Option<Vec<Origin>> {
+    pub fn same_namespace_crates(&self) -> Option<&[ArcRichCrateVersion]> {
+        if self.ns_crates.is_empty() { None } else { Some(&self.ns_crates) }
+    }
+
+    async fn make_related_crates(kitchen_sink: &KitchenSink, ver: &RichCrateVersion, downloads_per_month_or_equivalent: Option<usize>) -> (Vec<Origin>, Vec<ArcRichCrateVersion>) {
         // require some level of downloads to avoid recommending spam
         // but limit should be relative to the current crate, so that minor crates
         // get related suggestions too
 
         let dl = downloads_per_month_or_equivalent.unwrap_or(100);
         let min_recent_downloads = (dl as u32 / 2).min(200);
-        kitchen_sink.related_crates(ver, min_recent_downloads).await.map_err(|e| warn!("related crates fail: {}", e)).ok()
+        kitchen_sink.related_crates(ver, min_recent_downloads).await.map_err(|e| warn!("related crates fail: {}", e)).ok().unwrap_or_default()
     }
 
     /// data for piechart

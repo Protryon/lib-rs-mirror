@@ -72,7 +72,6 @@ use futures::Future;
 use github_info::GitCommitAuthor;
 use github_info::GitHubRepo;
 use github_info::MinimalUser;
-use itertools::Itertools;
 use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 use rayon::prelude::*;
@@ -1735,7 +1734,7 @@ impl KitchenSink {
         }
 
         Ok(tmp.into_iter().map(|(k, (cnt, mut examples))| {
-            examples.sort_by_key(|(dcnt,_)| !dcnt);
+            examples.sort_unstable_by_key(|(dcnt,_)| !dcnt);
             (k, (cnt, examples.into_iter().take(8).map(|(_, n)| n).collect()))
         }).collect())
     }
@@ -1797,19 +1796,98 @@ impl KitchenSink {
         Ok(self.crate_db.related_categories(slug).await?)
     }
 
-    /// Recommendations
-    pub async fn related_crates(&self, krate: &RichCrateVersion, min_recent_downloads: u32) -> CResult<Vec<Origin>> {
-        let (replacements, related) = futures::try_join!(
-            self.crate_db.replacement_crates(krate.short_name()),
-            self.crate_db.related_crates(krate.origin(), min_recent_downloads),
+    /// Recommendations for similar and related crates
+    pub async fn related_crates(&self, krate: &RichCrateVersion, min_recent_downloads: u32) -> CResult<(Vec<Origin>, Vec<ArcRichCrateVersion>)> {
+        let (mut same_namespace, mut replacements, mut related) = futures::try_join!(
+            self.related_namespace_crates(krate),
+            self.crate_db.replacement_crates(krate.short_name()).map_err(From::from),
+            self.crate_db.related_crates(krate.origin(), min_recent_downloads).map_err(From::from),
         )?;
 
-        Ok(replacements.into_iter()
-            .chain(related)
-            .unique()
-            .take(10)
-            .collect())
+        // Dedupe all
+        let mut dupe_origins: HashSet<_> = same_namespace.iter().map(|k| k.origin()).collect();
+        replacements.retain(|r| dupe_origins.get(r).is_none());
+        dupe_origins.extend(replacements.iter());
+        related.retain(|r| dupe_origins.get(r).is_none());
 
+        let mut see_also: Vec<_> = replacements.into_iter().chain(related)
+            .take(15).collect();
+
+        // there may still be related among similar, and may not even share name prefix (e.g. rand + getrandom)
+        let see_also_related = self.filter_namespace_related_origins(krate, see_also.clone()).await;
+        for r in see_also_related {
+            if let Some(pos) = see_also.iter().position(|o| o == r.origin()) {
+                see_also.remove(pos);
+                same_namespace.insert(0, r);
+            }
+        }
+
+        see_also.truncate(10);
+
+        Ok((see_also, same_namespace))
+    }
+
+    async fn related_namespace_crates(&self, krate: &RichCrateVersion) -> CResult<Vec<ArcRichCrateVersion>> {
+        let repo_crates = if let Some(repo) = krate.repository() {
+            self.crate_db.crates_in_repo(repo).await?
+        } else {
+            vec![]
+        };
+
+        let dedup: HashSet<_> = repo_crates.iter().chain(Some(krate.origin())).collect();
+        let valid_ns_prefixes: HashSet<_> = dedup.iter()
+            .map(|o| crate_name_namespace_prefix(o.short_crate_name()))
+            .collect();
+
+        let mut candidates = Vec::with_capacity(32);
+        let mut dedup2 = HashSet::new();
+
+        let owners = self.crate_owners(krate.origin(), CrateOwners::Strict).await?;
+        for github_id in owners.iter().filter_map(|o| o.github_id).take(20) {
+            let crates = self.crate_db.crates_of_author(github_id).await?;
+            candidates.extend(crates.into_iter().take(1000)
+                .filter(|c| !dedup.contains(&c.origin))
+                .filter(|c| {
+                    valid_ns_prefixes.get(crate_name_namespace_prefix(c.origin.short_crate_name())).is_some()
+                })
+                .filter(|c| dedup2.insert(c.origin.clone()))
+                .map(|c| {
+                    // move shorter (root) crate names to the beginning
+                    let hyphens = c.origin.short_crate_name().bytes().filter(|&b| b == b'_' || b == b'-').count() as f32;
+                    (c.origin, c.crate_ranking / hyphens)
+                })
+                .take(30));
+        }
+        candidates.sort_by(|a, b| b.1.total_cmp(&a.1)); // needs stable sort to preserve original ranking
+        candidates.truncate(20);
+
+        let origins: Vec<_> = repo_crates.into_iter().chain(candidates.into_iter().map(|c| c.0)).collect();
+        Ok(self.filter_namespace_related_origins(krate, origins).await)
+    }
+
+    async fn filter_namespace_related_origins<'a>(&self, krate: &RichCrateVersion, origins: Vec<Origin>) -> Vec<ArcRichCrateVersion> {
+        let deadline_at = Instant::now() + Duration::from_secs(3);
+        let iter = origins.into_iter()
+        .filter(|o| o != krate.origin())
+        .map(|origin| async move {
+            let other = deadline("rel-ns", deadline_at, self.rich_crate_version_stale_is_ok(&origin)).await.ok()?;
+            if other.is_yanked() {
+                return None;
+            }
+            if let Some(related) = self.are_namespace_related(krate, &other).await.ok()? {
+                Some((other, related))
+            } else {
+                None
+            }
+        });
+        let mut tmp = futures::stream::iter(iter)
+            .buffered(5)
+            .filter_map(|res| async move { res })
+            .take(15)
+            .collect::<Vec<_>>()
+            .await;
+        tmp.sort_unstable_by(|a,b| b.1.total_cmp(&a.1));
+        tmp.into_iter().map(|(k,_)| k).collect()
     }
 
     /// Returns (nth, slug)
@@ -2551,8 +2629,7 @@ impl KitchenSink {
         res
     }
 
-    pub async fn parent_crate(&self, child: &RichCrateVersion) -> Option<Arc<RichCrateVersion>> {
-        //
+    pub async fn parent_crate(&self, child: &RichCrateVersion) -> Option<ArcRichCrateVersion> {
         let parent_origin = self.parent_crate_same_repo_unverified(child).await.or_else(|| {
             // See if there's a crate that is a prefix for this name (even if it doesn't share a repo)
             let mut rest = child.short_name();
@@ -2565,17 +2642,14 @@ impl KitchenSink {
             }
             None
         })?;
-        let parent = self.rich_crate_version_async(&parent_origin).await.ok()?;
+        // dependencies are not enough to establish relationship, because they're uni-directional,
+        // and neither parent nor child may want false association
 
-        // if the crate has the parent as a dependency, that's a good-enough endorsement they're related
-        if let Origin::CratesIo(parent_name) = &parent_origin {
-            let (d1,d2,d3) = child.direct_dependencies();
-            if d1.iter().chain(&d2).chain(&d3).any(|dep| dep.package.eq_ignore_ascii_case(parent_name)) {
-                return Some(parent);
-            }
+        let parent = self.rich_crate_version_stale_is_ok(&parent_origin).await.ok()?;
+        if parent.is_yanked() {
+            return None;
         }
-
-        if self.are_namespace_related(&parent, child).await.ok()? {
+        if self.are_namespace_related(&parent, child).await.ok()?.is_some() {
             Some(parent)
         } else {
             None
@@ -2583,52 +2657,73 @@ impl KitchenSink {
     }
 
     /// Do these crate belong to the same project? (what would have been a namespace)
-    pub async fn are_namespace_related(&self, a: &RichCrateVersion, b: &RichCrateVersion) -> CResult<bool> {
+    /// None if unrelated, float 0..1 how related they are
+    pub async fn are_namespace_related(&self, a: &RichCrateVersion, b: &RichCrateVersion) -> CResult<Option<f32>> {
+        // Don't recommend cryptocrap to normal people
+        let a_is_dodgy = a.category_slugs().iter().any(|s| &**s == "cryptography::cryptocurrencies");
+        let b_is_dodgy = b.category_slugs().iter().any(|s| &**s == "cryptography::cryptocurrencies");
+        if a_is_dodgy != b_is_dodgy {
+            return Ok(None);
+        }
+
+        let mut commonalities = 0;
+
+        let a_repo_owner = a.repository().and_then(|r| r.host().owner_name());
         let have_same_repo_owner = {
-            let a_repo_owner = a.repository().and_then(|r| r.host().owner_name());
             let b_repo_owner = b.repository().and_then(|r| r.host().owner_name());
             match (a_repo_owner, b_repo_owner) {
                 (Some(a), Some(b)) if a.eq_ignore_ascii_case(b) => true,
                 _ => false
             }
         };
-        let have_same_homepage = || match (a.homepage(), b.homepage()) {
+        if have_same_repo_owner {
+            commonalities += 1;
+        }
+        let have_same_homepage = match (a.homepage(), b.homepage()) {
             (Some(a), Some(b)) if a.trim_end_matches('/') == b.trim_end_matches('/') => true,
-            _ => false,
+            _ => true,
         };
-        let have_same_name_prefix = || {
-            let a_first_word = a.short_name().split(|c: char| c == '_' || c == '-').next().unwrap();
-            let b_first_word = b.short_name().split(|c: char| c == '_' || c == '-').next().unwrap();
-            a_first_word == b_first_word ||
-            // foo & libfoo-sys && cargo-foo
-            a_first_word.trim_start_matches("cargo-").trim_start_matches("lib") == b_first_word.trim_start_matches("cargo-").trim_start_matches("lib")
+        if have_same_homepage {
+            commonalities += 1;
+        }
+        let have_same_name_prefix = {
+            let a_first_word = crate_name_namespace_prefix(a.short_name());
+            let b_first_word = crate_name_namespace_prefix(b.short_name());
+            a_first_word == b_first_word
         };
+        if have_same_name_prefix {
+            commonalities += 1;
+        }
 
         // They need to look at least a bit related (these factors can be faked/squatted, so alone aren't enough)
-        if !have_same_repo_owner && !have_same_homepage() && !have_same_name_prefix() {
-            return Ok(false);
+        if 0 == commonalities {
+            return Ok(None);
         }
+
+        let commonalities_frac = commonalities as f32 / 3.;
 
         // this is strong
-        if self.have_common_real_owners(a.origin(), b.origin()).await? {
-            return Ok(true);
+        let (common, max_owners) = self.common_real_owners(a.origin(), b.origin()).await?;
+        if common > 0 {
+            debug!("{} and {} are related {common}/{max_owners} owners", a.short_name(), b.short_name());
+            return Ok(Some(common as f32 / max_owners as f32 * commonalities_frac));
         }
         // they're related if have same repo owner, but make sure the repo url isn't fake
-        if have_same_repo_owner {
-            let a_verified = self.has_verified_repository_link(a).await;
-            if !a_verified { return Ok(false); }
-            let b_verified = self.has_verified_repository_link(a).await;
-            return Ok(b_verified);
+        if have_same_repo_owner && self.has_verified_repository_link(a).await && self.has_verified_repository_link(b).await {
+            debug!("{} and {} are related not by owners, but by repo {} + {commonalities}", a.short_name(), b.short_name(), a_repo_owner.unwrap());
+            return Ok(Some(0.1 * commonalities_frac));
         }
-        Ok(false)
+        Ok(None)
     }
 
-    async fn have_common_real_owners(&self, a: &Origin, b: &Origin) -> CResult<bool> {
+    /// (common, out of how many)
+    async fn common_real_owners(&self, a: &Origin, b: &Origin) -> CResult<(usize, usize)> {
         let (a_owners, b_owners) = futures::try_join!(self.crate_owners(a, CrateOwners::Strict), self.crate_owners(b, CrateOwners::Strict))?;
-        let a_owners: HashSet<_> = a_owners.into_iter().filter_map(|o| o.github_id).collect();
-        let b_owners: HashSet<_> = b_owners.into_iter().filter_map(|o| o.github_id).collect();
-        let has_common_owners = a_owners.intersection(&b_owners).next().is_some();
-        Ok(has_common_owners)
+        let a_owners: HashSet<_> = a_owners.into_iter().filter(|o| !self.is_github_login_on_shitlist(&o.login)).filter_map(|o| o.github_id).collect();
+        let b_owners: HashSet<_> = b_owners.into_iter().filter(|o| !self.is_github_login_on_shitlist(&o.login)).filter_map(|o| o.github_id).collect();
+        let max = a_owners.len().max(b_owners.len());
+        let common_owners = a_owners.intersection(&b_owners).count();
+        Ok((common_owners, max))
     }
 
     /// Crates are spilt into foo and foo-core. The core is usually uninteresting/duplicate.
@@ -2976,7 +3071,7 @@ impl KitchenSink {
 
         // latest first
         let mut actions: Vec<_> = meta.versions.into_iter().flat_map(|v| v.audit_actions).collect();
-        actions.sort_by(|a,b| b.time.cmp(&a.time));
+        actions.sort_unstable_by(|a,b| b.time.cmp(&a.time));
 
         // audit actions contain logins which are not present in owners, probably because they're GitHub team members
         for (idx, a) in actions.into_iter().enumerate() {
@@ -3020,7 +3115,7 @@ impl KitchenSink {
                 if set == CrateOwners::Strict {
                     let mut owners = current_owners.await?;
                     // anyone can join rust-bus, so it's meaningless as a common owner between crates
-                    owners.retain(|o| !is_shared_collective_login(&o.login));
+                    owners.retain(|o| !is_shared_collective_login(&o.login) && o.github_id != Some(38887296));
                     owners
                 } else {
                     let (current_owners, meta) = futures::try_join!(current_owners, self.crates_io_meta(crate_name))?;
@@ -3357,7 +3452,7 @@ impl KitchenSink {
             let populated = self.crate_db.crates_with_keyword(&k.to_lowercase()).await.unwrap() >= 3;
             (k.to_owned(), populated)
         })).await;
-        keywords.sort_by_key(|&(_, v)| !v); // populated first; relies on stable sort
+        keywords.sort_unstable_by_key(|&(_, v)| !v); // populated first; relies on stable sort
         keywords
     }
 
@@ -3442,7 +3537,19 @@ impl KitchenSink {
 
 /// Any crate can get such owner
 fn is_shared_collective_login(login: &str) -> bool {
-    login == "rust-bus-owner" || login == "rust-bus" || login.starts_with("rust-bus:")
+    login.eq_ignore_ascii_case("rust-bus-owner") || login.eq_ignore_ascii_case("rust-bus") || login.starts_with("github:rust-bus:")
+}
+
+/// foo & libfoo-sys && cargo-foo && rust-foo
+fn crate_name_namespace_prefix(crate_name: &str) -> &str {
+    crate_name
+        .trim_start_matches("rust-")
+        .trim_start_matches("cargo-")
+        .trim_start_matches("lib")
+        .split(|c: char| c == '_' || c == '-')
+        .filter(|&n| n.len() > 1) // libc
+        .next()
+        .unwrap_or(crate_name)
 }
 
 impl Drop for KitchenSink {
@@ -3676,6 +3783,16 @@ fn timeout<'a, T, E: From<KitchenSinkErr>>(label: &'static str, time: u16, f: im
     watch(label, f.map(move |r| r.map_err(|_| {
         info!("Timed out: {} {}", label, time);
         E::from(KitchenSinkErr::TimedOut(label, time))
+    }).and_then(|x| x)))
+}
+
+#[inline(always)]
+fn deadline<'a, T, E: From<KitchenSinkErr>>(label: &'static str, deadline: Instant, f: impl Future<Output = Result<T, E>> + Send + 'a) -> Pin<Box<dyn Future<Output = Result<T, E>> + Send + 'a>> {
+    let time_left = deadline.saturating_duration_since(Instant::now()).as_secs() as u16;
+    let f = tokio::time::timeout_at(deadline, f);
+    watch(label, f.map(move |r| r.map_err(|_| {
+        info!("Timed out: {} {}s", label, time_left);
+        E::from(KitchenSinkErr::TimedOut(label, time_left))
     }).and_then(|x| x)))
 }
 

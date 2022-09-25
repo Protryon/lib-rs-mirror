@@ -799,7 +799,7 @@ impl CrateDb {
                 GROUP by k2.crate_id
                 HAVING w > 200
                 ORDER by 1 desc
-                LIMIT 6
+                LIMIT 15
             "#)?;
             let args: &[&dyn ToSql] = &[&origin, &min_recent_downloads];
             let res = query.query_map(args, |row| {

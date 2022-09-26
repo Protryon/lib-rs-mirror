@@ -567,7 +567,7 @@ async fn owner_stats(kitchen_sink: &KitchenSink, start: Date<Utc>) -> Result<(Ve
         }
         for id in id_examples {
             if let Ok(login) = kitchen_sink.login_by_github_id(id) {
-                if !kitchen_sink.is_github_login_on_shitlist(&login) {
+                if !kitchen_sink.is_crates_io_login_on_shitlist(&login) { // github logins currently equal crates_io_logins
                     examples.push(login);
                     if examples.len() >= 10 {
                         break;

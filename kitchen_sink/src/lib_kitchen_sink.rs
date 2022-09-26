@@ -438,7 +438,7 @@ impl KitchenSink {
         Ok(out)
     }
 
-    pub fn is_github_login_on_shitlist(&self, login: &str) -> bool {
+    pub fn is_crates_io_login_on_shitlist(&self, login: &str) -> bool {
         self.author_shitlist.get(&login.to_ascii_lowercase()).is_some()
     }
 
@@ -454,7 +454,7 @@ impl KitchenSink {
             // some crates are co-owned by both legit and banned owners,
             // so banning by "any" would interfere with legit users' usage :(
             .all(|owner| {
-                self.is_github_login_on_shitlist(&owner.login)
+                self.is_crates_io_login_on_shitlist(&owner.crates_io_login)
             })
     }
 
@@ -2668,9 +2668,9 @@ impl KitchenSink {
 
         let mut commonalities = 0;
 
-        let a_repo_owner = a.repository().and_then(|r| r.host().owner_name());
+        let a_repo_owner = a.repository().and_then(|r| r.github_host()).and_then(|gh| gh.owner_name());
         let have_same_repo_owner = {
-            let b_repo_owner = b.repository().and_then(|r| r.host().owner_name());
+            let b_repo_owner = b.repository().and_then(|r| r.github_host()).and_then(|gh| gh.owner_name());
             match (a_repo_owner, b_repo_owner) {
                 (Some(a), Some(b)) if a.eq_ignore_ascii_case(b) => true,
                 _ => false
@@ -2719,8 +2719,8 @@ impl KitchenSink {
     /// (common, out of how many)
     async fn common_real_owners(&self, a: &Origin, b: &Origin) -> CResult<(usize, usize)> {
         let (a_owners, b_owners) = futures::try_join!(self.crate_owners(a, CrateOwners::Strict), self.crate_owners(b, CrateOwners::Strict))?;
-        let a_owners: HashSet<_> = a_owners.into_iter().filter(|o| !self.is_github_login_on_shitlist(&o.login)).filter_map(|o| o.github_id).collect();
-        let b_owners: HashSet<_> = b_owners.into_iter().filter(|o| !self.is_github_login_on_shitlist(&o.login)).filter_map(|o| o.github_id).collect();
+        let a_owners: HashSet<_> = a_owners.into_iter().filter(|o| !self.is_crates_io_login_on_shitlist(&o.crates_io_login)).filter_map(|o| o.github_id).collect();
+        let b_owners: HashSet<_> = b_owners.into_iter().filter(|o| !self.is_crates_io_login_on_shitlist(&o.crates_io_login)).filter_map(|o| o.github_id).collect();
         let max = a_owners.len().max(b_owners.len());
         let common_owners = a_owners.intersection(&b_owners).count();
         Ok((common_owners, max))
@@ -2788,7 +2788,9 @@ impl KitchenSink {
             // TODO: warn on errors?
             RepoHost::GitHub(ref repo) => {
                 // don't use repo URL if it's not verified to belong to the crate
-                if !found_crate_in_repo && !owners.iter().filter(|o| !o.contributor_only).any(|owner| owner.login.eq_ignore_ascii_case(&repo.owner)) {
+                if !found_crate_in_repo && !owners.iter().filter(|o| !o.contributor_only)
+                        .filter_map(|o| o.github_login())
+                        .any(|owner| owner.eq_ignore_ascii_case(&repo.owner)) {
                     return Ok((false, HashMap::new()));
                 }
 
@@ -3067,7 +3069,7 @@ impl KitchenSink {
     }
 
     fn owners_from_audit(current_owners: Vec<CrateOwner>, meta: CrateMetaFile) -> Vec<CrateOwner> {
-        let mut current_owners_by_login: HashMap<_, _> = current_owners.into_iter().map(|o| (o.login.to_ascii_lowercase(), o)).collect();
+        let mut current_owners_by_login: HashMap<_, _> = current_owners.into_iter().map(|o| (o.crates_io_login.to_ascii_lowercase(), o)).collect();
 
         // latest first
         let mut actions: Vec<_> = meta.versions.into_iter().flat_map(|v| v.audit_actions).collect();
@@ -3086,7 +3088,7 @@ impl KitchenSink {
                 current_owners_by_login.insert(a.user.login.to_ascii_lowercase(), CrateOwner {
                     kind: OwnerKind::User,
                     url: Some(format!("https://github.com/{}", a.user.login)),
-                    login: a.user.login,
+                    crates_io_login: a.user.login,
                     name: a.user.name,
                     github_id: None,
                     avatar: a.user.avatar,
@@ -3115,7 +3117,7 @@ impl KitchenSink {
                 if set == CrateOwners::Strict {
                     let mut owners = current_owners.await?;
                     // anyone can join rust-bus, so it's meaningless as a common owner between crates
-                    owners.retain(|o| !is_shared_collective_login(&o.login) && o.github_id != Some(38887296));
+                    owners.retain(|o| !is_shared_collective_login(&o.crates_io_login) && o.github_id != Some(38887296));
                     owners
                 } else {
                     let (current_owners, meta) = futures::try_join!(current_owners, self.crates_io_meta(crate_name))?;
@@ -3129,7 +3131,7 @@ impl KitchenSink {
                     // FIXME: read from GH
                     url: Some(format!("https://github.com/{}", repo.owner)),
                     // FIXME: read from GH
-                    login: repo.owner.to_string(),
+                    crates_io_login: repo.owner.to_string(),
                     kind: OwnerKind::User, // FIXME: crates-io uses teams, and we'd need to find the right team? is "owners" a guaranteed thing?
                     name: None,
 
@@ -3142,13 +3144,13 @@ impl KitchenSink {
             ],
         };
         let _ = join_all(owners.iter_mut().map(|owner: &mut CrateOwner| async move {
-            if owner.github_id.is_none() {
-                match self.user_by_github_login(&owner.login).await {
+            if owner.github_id.is_none() && owner.github_login().is_some() {
+                match self.user_by_github_login(owner.github_login().unwrap()).await {
                     Ok(Some(user)) => {
                         owner.github_id = Some(user.id);
                     },
-                    Ok(None) => warn!("owner {} of {origin:?} not found", owner.login),
-                    Err(e) => warn!("can't get owner {} of {origin:?}: {e}", owner.login),
+                    Ok(None) => warn!("owner {} of {origin:?} not found", owner.crates_io_login),
+                    Err(e) => warn!("can't get owner {} of {origin:?}: {e}", owner.crates_io_login),
                 }
             }
         })).await;
@@ -3278,10 +3280,10 @@ impl KitchenSink {
         self.crate_db.index_crate_all_owners(&all_owners).await?;
 
         let users = all_owners.iter().flat_map(|(_, owners)| owners.iter().filter_map(|o| {
-            let login = if o.login.starts_with("github:") {
-                o.login.split(':').nth(1).unwrap().to_owned()
+            let login = if o.crates_io_login.starts_with("github:") {
+                o.github_login().unwrap().to_owned()
             } else {
-                o.login.clone()
+                o.crates_io_login.clone()
             };
             Some(User {
                 id: o.github_id?,
@@ -3400,12 +3402,12 @@ impl KitchenSink {
             let mut weight_sum = 0;
             let mut score_sum = 0.0;
             for owner in owners.iter().take(5) {
-                let n = seen_owners.entry(&owner.login).or_insert(0u32);
+                let n = seen_owners.entry(&owner.crates_io_login).or_insert(0u32);
                 score_sum += (*n).saturating_sub(3) as f64; // authors can have a few crates with no penalty
                 weight_sum += 2;
                 *n += 2;
             }
-            let primary_owner_id = owners.get(0).map(|o| o.login.as_str()).unwrap_or("");
+            let primary_owner_id = owners.get(0).map(|o| o.crates_io_login.as_str()).unwrap_or("");
             for keyword in keywords.iter().take(5) {
                 // obvious keywords are too repetitive and affect innocent crates
                 if !top_keywords.contains(keyword.as_str()) {
@@ -3535,7 +3537,7 @@ impl KitchenSink {
     }
 }
 
-/// Any crate can get such owner
+/// Any crate can get such owner. Takes crates_io_login with host prefix
 fn is_shared_collective_login(login: &str) -> bool {
     login.eq_ignore_ascii_case("rust-bus-owner") || login.eq_ignore_ascii_case("rust-bus") || login.starts_with("github:rust-bus:")
 }

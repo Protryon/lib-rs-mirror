@@ -22,7 +22,8 @@ pub enum OwnerKind {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateOwner {
-    pub login: String,          // "github:rust-bus:maintainers",
+    #[serde(rename = "login")]
+    pub crates_io_login: String,          // "github:rust-bus:maintainers",
     pub kind: OwnerKind,        // "team" || "user"
     pub url: Option<String>,    // "https://github.com/rust-bus",
     pub name: Option<String>,   // "maintainers",
@@ -50,16 +51,11 @@ impl CrateOwner {
         match self.kind {
             OwnerKind::User => match &self.name.as_ref() {
                 Some(name) if !name.trim_start().is_empty() => name,
-                _ => &self.login,
+                _ => &self.crates_io_login,
             },
             // teams get crappy names
             OwnerKind::Team => {
-                match &self.url {
-                    Some(url) if url.starts_with("https://github.com/") => {
-                        &url["https://github.com/".len()..]
-                    },
-                    _ => self.login.trim_start_matches("github:")
-                }
+                self.crates_io_login.trim_start_matches("github:")
             },
         }
     }
@@ -71,9 +67,9 @@ impl CrateOwner {
     /// Be careful about case-insensitivity
     pub fn github_login(&self) -> Option<&str> {
         match self.kind {
-            OwnerKind::User => Some(&self.login),
+            OwnerKind::User => Some(&self.crates_io_login),
             OwnerKind::Team => {
-                let mut w = self.login.split(':');
+                let mut w = self.crates_io_login.split(':');
                 match w.next().expect("team parse") {
                     "github" => w.next(),
                     _ => None,

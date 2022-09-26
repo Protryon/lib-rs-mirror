@@ -22,7 +22,7 @@ use std::collections::HashMap;
 
 pub struct OtherOwner {
     github_id: u32,
-    login: String,
+    crates_io_login: String,
     invited_by_github_id: Option<u32>,
     invited_at: DateTime<Utc>,
     kind: OwnerKind,
@@ -99,7 +99,7 @@ impl<'a> AuthorPage<'a> {
                     let overlap = now.signed_duration_since(o.invited_at).num_days().min(own_days) as f32 / max_days;
                     let relationship = if own.invited_by_github_id == Some(o.github_id) {4.}
                         else if o.invited_by_github_id == Some(own.github_id) {2.} else {1.};
-                    collab.entry(o.github_id).or_insert((0., &o.login)).0 += (row.crate_ranking + 0.5) * overlap * relationship;
+                    collab.entry(o.github_id).or_insert((0., &o.crates_io_login)).0 += (row.crate_ranking + 0.5) * overlap * relationship;
                 }
             }
         }
@@ -141,7 +141,7 @@ impl<'a> AuthorPage<'a> {
                         invited_at: o.invited_at()?,
                         github_id: o.github_id?,
                         invited_by_github_id: o.invited_by_github_id,
-                        login: o.login,
+                        crates_io_login: o.crates_io_login,
                         kind: o.kind,
                     })
                 }).collect();

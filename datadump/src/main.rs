@@ -485,7 +485,7 @@ fn process_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users:
                             return None;
                         }
                         CrateOwner {
-                            login: u.login.to_owned(),
+                            crates_io_login: u.login.to_owned(),
                             invited_at: Some(invited_at),
                             invited_by_github_id,
                             github_id: u.github_id.try_into().ok(),
@@ -506,7 +506,7 @@ fn process_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users:
                             },
                         };
                         CrateOwner {
-                            login: u.login.to_owned(),
+                            crates_io_login: u.login.to_owned(),
                             invited_at: Some(invited_at),
                             github_id: Some(u.github_id),
                             invited_by_github_id,

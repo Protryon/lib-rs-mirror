@@ -101,6 +101,14 @@ impl Repo {
         &self.host
     }
 
+    /// Enum with details of git hosting service
+    pub fn github_host(&self) -> Option<&RepoHost> {
+        match &self.host {
+            ok @ RepoHost::GitHub(_) => Some(ok),
+            _ => None,
+        }
+    }
+
     /// URL to view who contributed to the repository
     pub fn contributors_http_url(&self) -> Cow<'_, str> {
         match self.host {

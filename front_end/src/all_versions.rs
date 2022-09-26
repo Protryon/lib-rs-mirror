@@ -288,7 +288,7 @@ impl AllVersions {
         let has_authors = only_owner.map_or(true, |only_owner| {
             version_history.iter()
             .flat_map(|v| v.published_by.iter().map(|(l, _)| l).chain(v.yanked_by.iter().map(|(l, _)| l)))
-            .any(|login| login != &only_owner.login)
+            .any(|login| login != &only_owner.crates_io_login)
         });
 
         Ok(Self {

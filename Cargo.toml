@@ -39,12 +39,12 @@ debug = false
 
 [profile.release]
 opt-level = 2
-debug = false
+debug = 1
 lto = false
 
 [profile.release.package."*"]
 opt-level = 2
-debug = false
+debug = 1
 
 [patch.crates-io]
 cargo_toml = { path = "cargo_toml" }

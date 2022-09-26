@@ -135,7 +135,6 @@ impl CrateSearchIndex {
             doc.score = if sort_by_query_relevance {
                 // bonus for exact match
                 doc.crate_base_score * if doc.crate_name == query_text {
-                    eprintln!("got exact match with relevance {}. max is {}. crate is {}", doc.relevance_score, max_relevance, doc.crate_base_score);
                     max_relevance * 1.10
                 } else {
                     doc.relevance_score

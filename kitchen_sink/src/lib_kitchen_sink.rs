@@ -2842,8 +2842,15 @@ impl KitchenSink {
             Some(repo) => repo,
             None => return false,
         };
-        let repo = self.crate_db.path_in_repo(repo, k.short_name()).await;
-        matches!(repo, Ok(Some(_)))
+        if let Ok(Some(_)) = self.crate_db.path_in_repo(repo, k.short_name()).await {
+            return true;
+        }
+        if let Some(repo_owner) = repo.github_host().and_then(|gh| gh.owner_name()) {
+            if let Ok(owners) = self.crate_owners(k.origin(), CrateOwners::Strict).await {
+                return owners.iter().filter_map(|o| o.github_login()).any(|gh| gh == repo_owner);
+            }
+        }
+        false
     }
 
     /// Merge authors, owners, contributors

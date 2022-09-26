@@ -34,7 +34,10 @@ impl RichCrateVersion {
         let s = Self {
             origin,
             repo: package.repository.as_ref().and_then(|r| Repo::new(r).ok()),
-            authors: package.authors.iter().map(|a| Author::new(a)).collect(),
+            authors: match package.authors.as_slice() {
+                [one] => one.split(',').map(|a| Author::new(a)).collect(), // common mistake to use comma-separated string
+                rest => rest.iter().map(|a| Author::new(a)).collect(),
+            },
             derived,
             manifest,
         };

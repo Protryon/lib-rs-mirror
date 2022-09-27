@@ -351,10 +351,23 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs<'_>) -> Score {
     }
 
     // Don't expect apps to have rev deps (omitting these entirely proprtionally increases importance of other factors)
+    let rev_deps_sqrt = (cr.number_of_direct_reverse_deps as f64).sqrt();
     if !is_app_only {
-        score.score_f("Direct rev deps", 10., (cr.number_of_direct_reverse_deps as f64).sqrt());
+        score.score_f("Direct rev deps", 10., rev_deps_sqrt);
         let indirect = 1. + cr.number_of_indirect_reverse_optional_deps as f64 / 4.;
         score.score_f("Indirect rev deps", 6., indirect.log2());
+
+    }
+
+    // If it's super popular, nothing else matters. Millions of crustaceans can't be wrong.
+    let bonus = ((downloads_cleaned - 1_000_000.) / ( 5_000_000. / 10. )).min(10.);
+    if bonus > 0. {
+        // this way less popular crates aren't penalized, it only marginalizes other scores
+        score.score_f("Downloads bonus", bonus, bonus);
+    }
+    let bonus = ((rev_deps_sqrt - 20.) / 2.).min(20.);
+    if bonus > 0. {
+        score.score_f("Extra popularity bonus", bonus, bonus);
     }
 
     if !is_app_only || cr.has_docs_rs {

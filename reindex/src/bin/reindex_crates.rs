@@ -346,7 +346,7 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
         temp_inp.number_of_direct_reverse_deps = direct_rev_deps;
         temp_inp.number_of_indirect_reverse_deps = deps.runtime.def.max(deps.build.def).into();
         temp_inp.number_of_indirect_reverse_optional_deps = indirect_reverse_optional_deps;
-        let tmp = futures::future::join_all(deps.rev_dep_names.iter()
+        let tmp = futures::future::join_all(deps.rev_dep_names_default.iter()
             .filter_map(|name| Origin::try_from_crates_io_name(name))
             .map(|o| async move {
                 crates.downloads_per_month(&o).await

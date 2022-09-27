@@ -43,6 +43,19 @@ pub struct RevDepInf<'a> {
     pub rev_dep_count: u32,
 }
 
+impl<'a> RevDepInf<'a> {
+    fn sort_value(&self) -> u64 {
+        let mut d = (1 + self.downloads) as u64 + 256 * (1 + self.rev_dep_count) as u64;
+        if self.is_optional {
+            d /= 2;
+        }
+        if self.kind == DependencyKind::Dev {
+            d /= 4;
+        }
+        d
+    }
+}
+
 pub(crate) struct DlRow {
     pub ver: SemVer,
     pub num: u16,
@@ -80,35 +93,38 @@ impl<'a> CratePageRevDeps<'a> {
 
         let deadline = Instant::now() + Duration::from_secs(8);
         let mut deps: Vec<_> = match stats {
-            Some(s) => futures::future::join_all(s.rev_dep_names.iter().map(|rev_dep| async move {
-                let origin = Origin::from_crates_io_name(rev_dep);
-                let downloads = timeout_at(deadline, kitchen_sink.downloads_per_month(&origin)).await;
-                let downloads = downloads.ok().and_then(|x| x.ok()).and_then(|x| x).unwrap_or(0) as u32;
-                let depender = kitchen_sink.index.crate_highest_version(&rev_dep.to_ascii_lowercase(), true).expect("rev dep integrity");
-                let (is_optional, req, kind) = depender.dependencies().iter().find(|d| {
-                    own_name.eq_ignore_ascii_case(d.crate_name())
-                })
-                .map(|d| {
-                    (d.is_optional(), d.requirement(), d.kind())
-                })
-                .unwrap_or_default();
+            Some(s) => {
+                let deps = s.rev_dep_names_default.iter().chain(s.rev_dep_names_optional.iter()).chain(s.rev_dep_names_dev.iter());
+                futures::future::join_all(deps.map(|rev_dep| async move {
+                    let origin = Origin::from_crates_io_name(rev_dep);
+                    let downloads = timeout_at(deadline, kitchen_sink.downloads_per_month(&origin)).await;
+                    let downloads = downloads.ok().and_then(|x| x.ok()).and_then(|x| x).unwrap_or(0) as u32;
+                    let depender = kitchen_sink.index.crate_highest_version(&rev_dep.to_ascii_lowercase(), true).expect("rev dep integrity");
+                    let (is_optional, req, kind) = depender.dependencies().iter().find(|d| {
+                        own_name.eq_ignore_ascii_case(d.crate_name())
+                    })
+                    .map(|d| {
+                        (d.is_optional(), d.requirement(), d.kind())
+                    })
+                    .unwrap_or_default();
 
-                let req = req.parse().unwrap_or_else(|_| VersionReq::STAR);
-                let matches_latest = req.matches(latest_stable_semver) || req.matches(latest_unstable_semver);
+                    let req = req.parse().unwrap_or_else(|_| VersionReq::STAR);
+                    let matches_latest = req.matches(latest_stable_semver) || req.matches(latest_unstable_semver);
 
-                RevDepInf {
-                    origin,
-                    depender, downloads, is_optional, req, kind,
-                    matches_latest,
-                    rev_dep_count: 0,
-                }
-            })).await,
+                    RevDepInf {
+                        origin,
+                        depender, downloads, is_optional, req, kind,
+                        matches_latest,
+                        rev_dep_count: 0,
+                    }
+                })).await
+            },
             None => Vec::new(),
         };
 
         // sort by downloads if > 100, then by name
-        deps.sort_by(|a, b| {
-            b.downloads.max(100).cmp(&a.downloads.max(100))
+        deps.sort_unstable_by(|a, b| {
+            b.sort_value().max(100).cmp(&a.sort_value().max(100))
             .then_with(|| {
                 a.depender.name().cmp(b.depender.name())
             })

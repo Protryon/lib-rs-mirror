@@ -257,7 +257,7 @@ impl<'a> CratePage<'a> {
         let d = DepsStatsResult {
             deps: d.runtime.def as u32 + d.runtime.opt as u32 + d.build.def as u32 + d.build.opt as u32 + d.dev as u32,
             direct: d.direct.all() as u32,
-            name: d.rev_dep_names.iter().next(),
+            name: d.rev_dep_names_default.iter().chain(d.rev_dep_names_optional.iter()).chain(d.rev_dep_names_dev.iter()).next(),
             former_glory: self.former_glory.map(|(f, _)| f).unwrap_or(1.),
         };
         if d.deps == 0 {

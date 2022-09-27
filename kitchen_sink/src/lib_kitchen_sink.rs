@@ -510,7 +510,7 @@ impl KitchenSink {
                 if let Origin::CratesIo(name) = o {
                     if let Some(s) = stats.counts.get(&**name) {
                         // if it's a dependency of another top crate, its not trending, it's riding that crate
-                        if s.rev_dep_names.iter().any(|parent| crates_present.contains(parent)) {
+                        if s.rev_dep_names_default.iter().any(|parent| crates_present.contains(parent)) {
                             *score = 0.;
                         } else {
                             // it should be trending users, not just download hits

@@ -1,5 +1,6 @@
 @use crate::templates::base;
 @use crate::reverse_dependencies::CratePageRevDeps;
+@use crate::templates::rev_dep_row;
 @use crate::Urler;
 @use kitchen_sink::DependencyKind;
 
@@ -100,18 +101,11 @@
                 @if p.has_download_columns {<small title="the second column is a sum direct dependencies (normal and dev)">(with downloads and own rev deps)</small>}
               </th> <th colspan="2">@p.ver.capitalized_name() version</th></tr>
           </thead>
-          @for r in &p.deps {
-            <tr>
-              <td>@if r.downloads > 100 {
-                <span class=downloads>@if let Some((num,unit)) = Some(p.downloads(r.downloads)) {@num<b>@unit</b>}</span>
-              }</td>
-              <td>@if r.rev_dep_count > 0 {
-                @if let Some(link) = url.reverse_deps(&r.origin) {<a href="@link">@r.rev_dep_count</a>}}</td>
-              <td><a href="@url.crate_by_origin(&r.origin)">@r.depender.name()</a></td>
-              <td>@if r.is_optional {<span class=feature>optional</span>}
-             @if r.kind != DependencyKind::Normal {<span class="label label-@p.kind(r.kind)">@p.kind(r.kind)</span>}</td>
-              <td @if !r.matches_latest {class="outdated"}>@r.req</td>
-            </tr>
+          @for r in p.deps.iter().filter(|r| r.kind != DependencyKind::Dev) {
+            @:rev_dep_row(url, p, r)
+          }
+          @for r in p.deps.iter().filter(|r| r.kind == DependencyKind::Dev) {
+            @:rev_dep_row(url, p, r)
           }
         </table>
       } else {

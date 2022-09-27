@@ -49,7 +49,9 @@ pub struct RevDependencies {
     pub dev: u16,
     pub direct: DirectDepCount,
     pub versions: FxHashMap<MiniVer, u16>,
-    pub rev_dep_names: CompactStringSet,
+    pub rev_dep_names_default: CompactStringSet,
+    pub rev_dep_names_optional: CompactStringSet,
+    pub rev_dep_names_dev: CompactStringSet,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -179,13 +181,11 @@ impl Index {
                 let n = counts.entry(name).or_insert_with(RevDependencies::default);
                 let t = n.versions.entry(semver).or_insert(0);
                 *t = t.checked_add(1).expect("overflow");
-                if depinf.direct {
-                    assert!(Origin::is_valid_crate_name(&parent_name));
-                    n.rev_dep_names.push(&parent_name);
-                }
+                debug_assert!(Origin::is_valid_crate_name(&parent_name));
                 match depinf.ty {
                     DepTy::Runtime => {
                         if depinf.direct {
+                            if depinf.default { &mut n.rev_dep_names_default } else { &mut n.rev_dep_names_optional }.push(&parent_name);
                             n.direct.runtime = n.direct.runtime.checked_add(1).expect("overflow");
                         }
                         if depinf.default {
@@ -196,6 +196,7 @@ impl Index {
                     },
                     DepTy::Build => {
                         if depinf.direct {
+                            if depinf.default { &mut n.rev_dep_names_default } else { &mut n.rev_dep_names_optional }.push(&parent_name);
                             n.direct.build = n.direct.build.checked_add(1).expect("overflow");
                         }
                         if depinf.default {
@@ -206,6 +207,7 @@ impl Index {
                     },
                     DepTy::Dev => {
                         if depinf.direct {
+                            n.rev_dep_names_dev.push(&parent_name);
                             n.direct.dev = n.direct.dev.checked_add(1).expect("overflow");
                         }
                         n.dev = n.dev.checked_add(1).expect("overflow");

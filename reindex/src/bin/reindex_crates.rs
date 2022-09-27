@@ -34,14 +34,15 @@ struct Reindexer {
 
 fn main() {
     let everything = std::env::args().nth(1).map_or(false, |a| a == "--all");
-    let specific: Vec<_> = if !everything {
+    let search_only = std::env::args().nth(1).map_or(false, |a| a == "--search");
+    let specific: Vec<_> = if !everything && !search_only {
         std::env::args().skip(1).map(|name| {
             Origin::try_from_crates_io_name(&name).unwrap_or_else(|| Origin::from_str(name))
         }).collect()
     } else {
         Vec::new()
     };
-    let repos = !everything;
+    let repos = !everything && !search_only;
 
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -96,7 +97,7 @@ fn main() {
 
     rt.block_on(r.crates.prewarm());
 
-    let c: Box<dyn Iterator<Item = Origin> + Send> = if everything {
+    let c: Box<dyn Iterator<Item = Origin> + Send> = if everything || search_only {
         let mut c: Vec<_> = r.crates.all_crates().collect::<Vec<_>>();
         c.shuffle(&mut thread_rng());
         Box::new(c.into_iter())
@@ -107,13 +108,13 @@ fn main() {
     };
 
     rt.block_on(rt.spawn(async move {
-        main_indexing_loop(r, c, tx, repos, everything).await;
+        main_indexing_loop(r, c, tx, repos, search_only, everything).await;
         if stopped() {return;}
         index_thread.await.unwrap().unwrap();
     })).unwrap();
 }
 
-async fn main_indexing_loop(ref r: Arc<Reindexer>, crate_origins: Box<dyn Iterator<Item=Origin> + Send>, tx: mpsc::Sender<(Arc<RichCrateVersion>, usize, f64)>, repos: bool, reindexing_all_crates: bool) {
+async fn main_indexing_loop(ref r: Arc<Reindexer>, crate_origins: Box<dyn Iterator<Item=Origin> + Send>, tx: mpsc::Sender<(Arc<RichCrateVersion>, usize, f64)>, repos: bool, search_only: bool, reindexing_all_crates: bool) {
     let ref renderer = Renderer::new(None);
     let ref seen_repos = Mutex::new(HashSet::new());
     let ref repo_concurrency = tokio::sync::Semaphore::new(4);
@@ -122,13 +123,15 @@ async fn main_indexing_loop(ref r: Arc<Reindexer>, crate_origins: Box<dyn Iterat
         async move {
         if stopped() {return;}
         println!("{}…", i);
-        match run_timeout(62, r.crates.index_crate_highest_version(&origin, reindexing_all_crates)).await {
-            Ok(()) => {},
-            err => {
-                print_res(err);
-                if reindexing_all_crates { return; }
-                // on hourly updates, try to continue and update score, search, etc.
-            },
+        if !search_only {
+            match run_timeout(62, r.crates.index_crate_highest_version(&origin, reindexing_all_crates)).await {
+                Ok(()) => {},
+                err => {
+                    print_res(err);
+                    if reindexing_all_crates { return; }
+                    // on hourly updates, try to continue and update score, search, etc.
+                },
+            }
         }
         if stopped() {return;}
         match run_timeout(70, r.index_crate(&origin, &renderer, &mut tx)).await {

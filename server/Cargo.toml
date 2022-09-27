@@ -1,6 +1,6 @@
 [package]
 name = "crates-server"
-version = "1.20.2"
+version = "1.21.0"
 authors = ["Kornel <kornel@geekhood.net>"]
 edition = "2021"
 description = "Crates.rs web server"

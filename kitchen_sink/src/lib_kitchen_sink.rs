@@ -260,7 +260,7 @@ pub struct KitchenSink {
     url_check_cache: TempCache<(bool, u8)>,
     readme_check_cache: TempCache<()>,
     canonical_http_of_crate_at_version_cache: TempCache<String>,
-    crate_db: CrateDb,
+    pub crate_db: CrateDb,
     derived_storage: SimpleCache,
     user_db: user_db::UserDb,
     gh: github_info::GitHub,
@@ -376,7 +376,7 @@ impl KitchenSink {
         &self.event_log
     }
 
-    pub(crate) fn data_path() -> Result<PathBuf, KitchenSinkErr> {
+    pub fn data_path() -> Result<PathBuf, KitchenSinkErr> {
         match env::var("CRATES_DATA_DIR") {
             Ok(d) => {
                 if !Path::new(&d).join("crate_data.db").exists() {

@@ -94,9 +94,9 @@ impl CrateDb {
             .filter(|l| !l.starts_with('#'))
             .map(|l| {
                 let mut cols = l.splitn(3, ',');
-                let score: u8 = cols.next().unwrap().parse().unwrap();
-                let find = cols.next().unwrap();
-                let replace = cols.next().unwrap();
+                let find = cols.next().expect(l);
+                let replace = cols.next().expect(l);
+                let score: u8 = cols.next().unwrap().parse().expect(l);
                 (find.into(), (replace.into(), score))
             })
             .collect();
@@ -745,6 +745,19 @@ impl CrateDb {
         }).await
     }
 
+    /// Sorted by most popular first
+    pub async fn all_explicit_keywords(&self) -> FResult<Vec<String>> {
+        self.with_read("allkw", |conn| {
+            let mut query = conn.prepare_cached("SELECT k.keyword
+                FROM keywords k JOIN crate_keywords ck ON (ck.keyword_id = k.id)
+                WHERE k.visible
+                GROUP BY k.id ORDER BY sum(ck.weight)*count(*) DESC
+            ")?;
+            let res = query.query_map([], |row| (row.get(0)))?;
+            Ok(res.collect::<std::result::Result<_,_>>()?)
+        }).await
+    }
+
     /// Categories similar to the given category
     pub async fn related_categories(&self, slug: &str) -> FResult<Vec<String>> {
         self.with_read("related_categories", |conn| {
@@ -1102,20 +1115,27 @@ impl KeywordInsert {
     }
 
     pub fn add_synonyms(&mut self, tag_synonyms: &HashMap<Box<str>, (Box<str>, u8)>) {
-        let to_add: Vec<_> = self.keywords.iter().filter_map(|(k, &(v, _))| {
-            tag_synonyms.get(k.as_str()).and_then(|&(ref synonym, votes)| {
-                let synonym: &str = synonym;
-                if self.keywords.get(synonym).is_some() {
-                    None
-                } else {
-                    let relevance = (votes as f64 / 5. + 0.1).min(0.8);
-                    Some((synonym.to_string(), v * relevance))
+        let mut to_add = Vec::new();
+        for (k, &(v, _)) in self.keywords.iter() {
+            if let Some((k, v)) = self.get_synonym(tag_synonyms, k, v) {
+                if let Some((k2, v2)) = self.get_synonym(tag_synonyms, &k, v) {
+                    to_add.push((k2, v2));
                 }
-            })
-        }).collect();
+                to_add.push((k, v));
+            }
+        }
         for (s, v) in to_add {
             self.keywords.entry(s).or_insert((v, false));
         }
+    }
+
+    fn get_synonym(&self, tag_synonyms: &HashMap<Box<str>, (Box<str>, u8)>, k: &str, v: f64) -> Option<(String, f64)> {
+        let (synonym, votes) = tag_synonyms.get(k)?;
+        if self.keywords.get(&**synonym).is_some() {
+            return None;
+        }
+        let relevance = (*votes as f64 / 5. + 0.1).min(0.8);
+        Some((normalize_keyword(synonym), v * relevance))
     }
 
     /// Clears old keywords from the db
@@ -1167,9 +1187,17 @@ impl KeywordInsert {
 }
 
 fn normalize_keyword(k: &str) -> String {
-    // heck messes up CJK, i-os looks bad
-    if !k.is_ascii() || k == "eBPF" || k == "iOS" {
+    // heck messes up CJK
+    if !k.is_ascii() {
         return k.to_lowercase();
+    }
+
+    // i-os looks bad
+    let mut k = k;
+    let tmp;
+    if k.starts_with("eBPF") || k.starts_with("iOS") || k.starts_with("iP") || k.starts_with("iM") {
+        tmp = k.to_lowercase();
+        k = &tmp;
     }
     k.to_kebab_case()
 }

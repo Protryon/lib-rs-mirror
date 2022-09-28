@@ -1,6 +1,6 @@
 [package]
 name = "crates-server"
-version = "1.21.0"
+version = "1.21.1"
 authors = ["Kornel <kornel@geekhood.net>"]
 edition = "2021"
 description = "Crates.rs web server"
@@ -14,10 +14,10 @@ assets = [
     ["target/release/reindex_users", "usr/bin/", "755"],
     ["target/release/datadump", "usr/bin/", "755"],
     ["target/release/builder", "usr/bin/", "755"],
-    ["target/release/compat_export", "usr/bin/", "755"],
     ["../data/page/*", "/var/lib/crates-server/page/", "644"],
     ["../data/git_crates.txt", "/var/lib/crates-server/", "644"],
     ["../data/category_overrides.txt", "/var/lib/crates-server/", "644"],
+    ["../data/tag-synonyms.csv", "/var/lib/crates-server/", "644"],
     ["../data/author_shitlist.txt", "/var/lib/crates-server/", "644"],
     ["../style/public/index.css", "/var/www/lib.rs/public/", "644"],
     ["../style/public/fira/*", "/var/www/lib.rs/public/fira/", "644"],

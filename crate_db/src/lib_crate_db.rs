@@ -784,11 +784,12 @@ impl CrateDb {
         }).await
     }
 
-    pub async fn related_crates(&self, origin: &Origin, min_recent_downloads: u32) -> FResult<Vec<Origin>> {
+    /// f32 is ranking
+    pub async fn related_crates(&self, origin: &Origin, min_recent_downloads: u32) -> FResult<Vec<(Origin, f32)>> {
         let origin = origin.to_str();
         self.with_read_spawn("related_crates", move |conn| {
             let mut query = conn.prepare_cached(r#"
-                SELECT sum(k2.weight * k1.weight) as w, c2.origin
+                SELECT sum(k2.weight * k1.weight) as w, c2.origin, c2.ranking
                 FROM crates c1
                 JOIN crate_keywords k1 on k1.crate_id = c1.id
                 JOIN crate_keywords k2 on k1.keyword_id = k2.keyword_id
@@ -803,7 +804,7 @@ impl CrateDb {
             "#)?;
             let args: &[&dyn ToSql] = &[&origin, &min_recent_downloads];
             let res = query.query_map(args, |row| {
-                Ok(Origin::from_str(row.get_ref_unwrap(1).as_str()?))
+                Ok((Origin::from_str(row.get_ref_unwrap(1).as_str()?), row.get_unwrap(2)))
             })?;
             Ok(res.collect::<std::result::Result<_,_>>()?)
         }).await

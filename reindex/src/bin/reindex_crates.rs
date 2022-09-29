@@ -337,8 +337,12 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
         is_in_debian,
     };
 
+    let mut has_many_direct_rev_deps = false;
     if let Some(deps) = crates.crates_io_dependents_stats_of(k.origin()).await? {
         let direct_rev_deps = deps.direct.all();
+        if direct_rev_deps > 50 {
+            has_many_direct_rev_deps = true;
+        }
         let indirect_reverse_optional_deps = (deps.runtime.def as u32 + deps.runtime.opt as u32)
             .max(deps.dev as u32)
             .max(deps.build.def as u32 + deps.build.opt as u32);
@@ -364,6 +368,7 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
         is_proc_macro: k.is_proc_macro(),
         is_sys: k.is_sys(),
         is_sub_component: crates.is_sub_component(k).await,
+        is_internal: crates.is_internal_crate(k) && !has_many_direct_rev_deps,
         is_autopublished: is_autopublished(k),
         is_deprecated: is_deprecated(k) || is_repo_archived || is_unmaintained,
         is_crates_io_published: k.origin().is_crates_io(),

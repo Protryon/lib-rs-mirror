@@ -1798,7 +1798,7 @@ impl KitchenSink {
 
     /// Recommendations for similar and related crates
     pub async fn related_crates(&self, krate: &RichCrateVersion, min_recent_downloads: u32) -> CResult<(Vec<Origin>, Vec<ArcRichCrateVersion>)> {
-        let (mut same_namespace, mut replacements, mut related) = futures::try_join!(
+        let (mut same_namespace, mut replacements, mut see_also) = futures::try_join!(
             self.related_namespace_crates(krate),
             self.crate_db.replacement_crates(krate.short_name()).map_err(From::from),
             self.crate_db.related_crates(krate.origin(), min_recent_downloads).map_err(From::from),
@@ -1808,21 +1808,31 @@ impl KitchenSink {
         let mut dupe_origins: HashSet<_> = same_namespace.iter().map(|k| k.origin()).collect();
         replacements.retain(|r| dupe_origins.get(r).is_none());
         dupe_origins.extend(replacements.iter());
-        related.retain(|r| dupe_origins.get(r).is_none());
+        see_also.retain(|r| dupe_origins.get(&r.0).is_none());
 
-        let mut see_also: Vec<_> = replacements.into_iter().chain(related)
-            .take(15).collect();
+        let replacements = join_all(replacements.into_iter().map(|origin| async move {
+            let rank = self.crate_db.crate_rank(&origin).await.unwrap_or(0.);
+            (origin, rank as f32)
+        })).await;
+
+        see_also.extend(replacements);
+        see_also.sort_unstable_by(|a,b| b.1.total_cmp(&a.1));
+        see_also.truncate(15);
+
+        let best_ranking = see_also.iter().map(|&(_,ranking)| ranking).max_by(|a,b| a.total_cmp(b)).unwrap_or(0.);
+        let cut_off = (0.3f32).min(best_ranking / 2.);
+        see_also.retain(|&(_, ranking)| ranking >= cut_off);
 
         // there may still be related among similar, and may not even share name prefix (e.g. rand + getrandom)
         let see_also_related = self.filter_namespace_related_origins(krate, see_also.clone()).await;
         for r in see_also_related {
-            if let Some(pos) = see_also.iter().position(|o| o == r.origin()) {
+            if let Some(pos) = see_also.iter().position(|(o, _)| o == r.origin()) {
                 see_also.remove(pos);
                 same_namespace.insert(0, r);
             }
         }
 
-        see_also.truncate(10);
+        let see_also = see_also.into_iter().map(|(o, _)| o).take(10).collect();
 
         Ok((see_also, same_namespace))
     }
@@ -1848,34 +1858,44 @@ impl KitchenSink {
             candidates.extend(crates.into_iter().take(1000)
                 .filter(|c| !dedup.contains(&c.origin))
                 .filter(|c| {
-                    valid_ns_prefixes.get(crate_name_namespace_prefix(c.origin.short_crate_name())).is_some()
+                    let name = c.origin.short_crate_name();
+                    let suffix = name.rsplit(|c:char| c == '_' || c == '-').next().unwrap();
+
+                    suffix != "internal" && suffix != "internals" &&
+                        valid_ns_prefixes.get(crate_name_namespace_prefix(name)).is_some()
                 })
                 .filter(|c| dedup2.insert(c.origin.clone()))
                 .map(|c| {
                     // move shorter (root) crate names to the beginning
-                    let hyphens = c.origin.short_crate_name().bytes().filter(|&b| b == b'_' || b == b'-').count() as f32;
-                    (c.origin, c.crate_ranking / hyphens)
+                    let hyphens = (1 + c.origin.short_crate_name().bytes().filter(|&b| b == b'_' || b == b'-').count()) as f32;
+                    (c.origin, c.crate_ranking / hyphens, c.crate_ranking)
                 })
                 .take(30));
         }
+        // Kill crates like serde_macros that is dead
+        let best_ranking = candidates.iter().map(|&(_,_,ranking)| ranking).max_by(|a,b| a.total_cmp(b)).unwrap_or(0.);
+        let cut_off = (0.2f32).min(best_ranking / 3.);
+        candidates.retain(|&(_, _, ranking)| ranking >= cut_off);
+
         candidates.sort_by(|a, b| b.1.total_cmp(&a.1)); // needs stable sort to preserve original ranking
         candidates.truncate(20);
 
-        let origins: Vec<_> = repo_crates.into_iter().chain(candidates.into_iter().map(|c| c.0)).collect();
+        let origins: Vec<_> = repo_crates.into_iter().map(|o| (o,1.))
+            .chain(candidates.into_iter().map(|(a,_,c)| (a,c))).collect();
         Ok(self.filter_namespace_related_origins(krate, origins).await)
     }
 
-    async fn filter_namespace_related_origins<'a>(&self, krate: &RichCrateVersion, origins: Vec<Origin>) -> Vec<ArcRichCrateVersion> {
+    async fn filter_namespace_related_origins<'a>(&self, krate: &RichCrateVersion, origins: Vec<(Origin, f32)>) -> Vec<ArcRichCrateVersion> {
         let deadline_at = Instant::now() + Duration::from_secs(3);
         let iter = origins.into_iter()
-        .filter(|o| o != krate.origin())
-        .map(|origin| async move {
+        .filter(|(o, _)| o != krate.origin())
+        .map(|(origin, ranking)| async move {
             let other = deadline("rel-ns", deadline_at, self.rich_crate_version_stale_is_ok(&origin)).await.ok()?;
             if other.is_yanked() {
                 return None;
             }
             if let Some(related) = self.are_namespace_related(krate, &other).await.ok()? {
-                Some((other, related))
+                Some((other, ranking * related))
             } else {
                 None
             }
@@ -2202,7 +2222,7 @@ impl KitchenSink {
         let git_checkout_path = self.git_checkout_path.clone();
         timeout("checkout", 300, spawn_blocking(move || {
             crate_git_checkout::checkout(&repo, &git_checkout_path, shallow)
-                .map_err(|e| { eprintln!("{}", e); KitchenSinkErr::GitCheckoutFailed })
+                .map_err(|e| { error!("{}", e); KitchenSinkErr::GitCheckoutFailed })
         }).map_err(|_| KitchenSinkErr::GitCheckoutFailed)).await?
     }
 
@@ -2312,7 +2332,7 @@ impl KitchenSink {
         }
         tokio::task::yield_now().await;
         let db_fetched = tokio::task::block_in_place(|| self.user_db.user_by_github_login(github_login));
-        if let Ok(Some(gh)) = db_fetched.map_err(|e| eprintln!("db user {}: {}", github_login, e)) {
+        if let Ok(Some(gh)) = db_fetched.map_err(|e| error!("db user {}: {}", github_login, e)) {
             if gh.created_at.is_some() { // unfortunately name is optional and can be None
                 return Ok(Some(gh));
             } else {
@@ -2321,11 +2341,11 @@ impl KitchenSink {
         } else {
             debug!("gh user cache miss {}", github_login);
         }
-        let u = Box::pin(self.gh.user_by_login(github_login)).await.map_err(|e| {eprintln!("gh user {}: {}", github_login, e); e})?; // errs on 404
+        let u = Box::pin(self.gh.user_by_login(github_login)).await.map_err(|e| {error!("gh user {}: {}", github_login, e); e})?; // errs on 404
         if let Some(u) = &u {
             let _ = tokio::task::block_in_place(|| {
                 self.user_db.index_user(&u, None, None)
-                    .map_err(|e| eprintln!("index user {}: {} {:?}", github_login, e, u))
+                    .map_err(|e| error!("index user {}: {} {:?}", github_login, e, u))
             });
         }
         debug!("fetched user {:?}", u);
@@ -2658,6 +2678,8 @@ impl KitchenSink {
 
     /// Do these crate belong to the same project? (what would have been a namespace)
     /// None if unrelated, float 0..1 how related they are
+    ///
+    /// a is more trusted here, b is matched against it.
     pub async fn are_namespace_related(&self, a: &RichCrateVersion, b: &RichCrateVersion) -> CResult<Option<f32>> {
         // Don't recommend cryptocrap to normal people
         let a_is_dodgy = a.category_slugs().iter().any(|s| &**s == "cryptography::cryptocurrencies");
@@ -2706,7 +2728,7 @@ impl KitchenSink {
         let (common, max_owners) = self.common_real_owners(a.origin(), b.origin()).await?;
         if common > 0 {
             debug!("{} and {} are related {common}/{max_owners} owners", a.short_name(), b.short_name());
-            return Ok(Some(common as f32 / max_owners as f32 * commonalities_frac));
+            return Ok(Some((common+1) as f32 / (max_owners+1) as f32 * commonalities_frac));
         }
         // they're related if have same repo owner, but make sure the repo url isn't fake
         if have_same_repo_owner && self.has_verified_repository_link(a).await && self.has_verified_repository_link(b).await {
@@ -2716,12 +2738,12 @@ impl KitchenSink {
         Ok(None)
     }
 
-    /// (common, out of how many)
+    /// (common, out of how many). A is considered more important, b is matched against it.
     async fn common_real_owners(&self, a: &Origin, b: &Origin) -> CResult<(usize, usize)> {
         let (a_owners, b_owners) = futures::try_join!(self.crate_owners(a, CrateOwners::Strict), self.crate_owners(b, CrateOwners::Strict))?;
         let a_owners: HashSet<_> = a_owners.into_iter().filter(|o| !self.is_crates_io_login_on_shitlist(&o.crates_io_login)).filter_map(|o| o.github_id).collect();
         let b_owners: HashSet<_> = b_owners.into_iter().filter(|o| !self.is_crates_io_login_on_shitlist(&o.crates_io_login)).filter_map(|o| o.github_id).collect();
-        let max = a_owners.len().max(b_owners.len());
+        let max = a_owners.len();
         let common_owners = a_owners.intersection(&b_owners).count();
         Ok((common_owners, max))
     }
@@ -2731,8 +2753,8 @@ impl KitchenSink {
         let name = k.short_name();
         if let Some(pos) = name.rfind(|c: char| c == '-' || c == '_') {
             match name.get(pos+1..) {
-                Some("core") | Some("shared") | Some("utils") | Some("common") |
-                Some("impl") | Some("fork") | Some("unofficial") => {
+                Some("core" | "shared" | "private" | "internals" | "internal" | "derive" | "utils" | "common" |
+                "impl" | "fork" | "unofficial") => {
                     if let Some(parent_name) = name.get(..pos-1) {
                         if Origin::try_from_crates_io_name(parent_name).map_or(false, |name| self.crate_exists(&name)) {
                             // TODO: check if owners overlap?
@@ -2741,6 +2763,25 @@ impl KitchenSink {
                     }
                     if self.parent_crate_same_repo_unverified(k).await.is_some() {
                         return true;
+                    }
+                },
+                _ => {},
+            }
+        }
+        false
+    }
+
+    /// Crates are spilt into foo and foo-core. The core is usually uninteresting/duplicate.
+    pub fn is_internal_crate(&self, k: &RichCrateVersion) -> bool {
+        let name = k.short_name();
+        if let Some(pos) = name.rfind(|c: char| c == '-' || c == '_') {
+            match name.get(pos+1..) {
+                Some("private" | "internals" | "internal" | "impl") => {
+                    if let Some(parent_name) = name.get(..pos-1) {
+                        if Origin::try_from_crates_io_name(parent_name).map_or(false, |name| self.crate_exists(&name)) {
+                            // TODO: check if owners overlap?
+                            return true;
+                        }
                     }
                 },
                 _ => {},

@@ -383,6 +383,7 @@ pub struct OverallScoreInputs {
     pub is_proc_macro: bool,
     pub is_sys: bool,
     pub is_sub_component: bool,
+    pub is_internal: bool,
     pub is_autopublished: bool,
     pub is_deprecated: bool,
     pub is_crates_io_published: bool,
@@ -405,6 +406,10 @@ pub fn combined_score(base_score: Score, temp_score: Score, f: &OverallScoreInpu
 
     if f.is_sub_component  {
         score *= 0.8;
+    }
+
+    if f.is_internal  {
+        score *= 0.5;
     }
 
     if f.is_autopublished {

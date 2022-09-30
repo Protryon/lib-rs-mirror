@@ -1,11 +1,16 @@
 use categories::Synonyms;
 use itertools::Itertools;
-use std::collections::HashSet;
-use std::collections::HashMap;
 use rich_crate::Origin;
-use tantivy::TantivyError;
+use std::collections::HashMap;
+use std::collections::HashSet;
 use std::{fs, path::Path};
-use tantivy::{self, collector::TopDocs, query::QueryParser, schema::*, Index, IndexWriter};
+use tantivy::query::Query;
+use tantivy::query::QueryParserError;
+use tantivy::TantivyError;
+use tantivy::{Index, IndexWriter};
+use tantivy::collector::TopDocs;
+use tantivy::schema::*;
+use tantivy::query::QueryParser;
 
 const CRATE_SCORE_MAX: f64 = 1_000_000.;
 
@@ -107,10 +112,7 @@ impl CrateSearchIndex {
         self.synonyms.normalize(kw)
     }
 
-    /// if sort_by_query_relevance is false, sorts by internal crate score (relevance is still used to select the crates)
-    /// Second arg is distinctive keywords
-    pub fn search(&self, query_text: &str, limit: usize, sort_by_query_relevance: bool) -> tantivy::Result<SearchResults> {
-        let query_text = query_text.trim();
+    fn parse_query(&self, query_text: &str) -> Result<Box<dyn Query>, QueryParserError> {
         let mut query_parser = QueryParser::for_index(&self.tantivy_index, vec![
             self.crate_name_field, self.keywords_field, self.description_field, self.readme_field,
         ]);
@@ -118,20 +120,18 @@ impl CrateSearchIndex {
         query_parser.set_field_boost(self.crate_name_field, 2.0);
         query_parser.set_field_boost(self.keywords_field, 1.5);
         query_parser.set_field_boost(self.readme_field, 0.5);
-
-        let query = query_parser.parse_query(query_text)
+        query_parser.parse_query(query_text)
             .or_else(|_| {
                 let mangled_query: String = query_text.chars().map(|ch| {
                     if ch.is_alphanumeric() {ch.to_ascii_lowercase()} else {' '}
                 }).collect();
                 query_parser.parse_query(mangled_query.trim())
-            })?;
+            })
+    }
 
-        let reader = self.tantivy_index.reader()?;
-        let searcher = reader.searcher();
-        let top_docs = searcher.search(&*query, &TopDocs::with_limit((limit + 50 + limit / 2).max(250)))?; // 250 is a hack for https://github.com/tantivy-search/tantivy/issues/700
-
-        let mut docs = top_docs.into_iter().map(|(relevance_score, doc_address)| {
+    fn fetch_docs(&self, searcher: &tantivy::Searcher, query: &dyn Query, limit: usize) -> Result<Vec<CrateFound>, TantivyError> {
+        let top_docs = searcher.search(query, &TopDocs::with_limit(limit))?;
+        top_docs.into_iter().map(|(relevance_score, doc_address)| {
             let retrieved_doc = searcher.doc(doc_address)?;
             let mut doc = self.tantivy_index.schema().to_named_doc(&retrieved_doc).0;
             let crate_base_score = take_int(doc.get("crate_score")) as f64 / CRATE_SCORE_MAX;
@@ -163,9 +163,21 @@ impl CrateSearchIndex {
                 origin,
             })
         })
-        .collect::<tantivy::Result<Vec<_>>>()?;
+        .collect()
+    }
 
-        let max_relevance = docs.iter().map(|v| v.relevance_score).max_by(|a,b| a.partial_cmp(b).unwrap()).unwrap_or(0.);
+    /// if sort_by_query_relevance is false, sorts by internal crate score (relevance is still used to select the crates)
+    /// Second arg is distinctive keywords
+    pub fn search(&self, query_text: &str, limit: usize, sort_by_query_relevance: bool) -> tantivy::Result<SearchResults> {
+        let query_text = query_text.trim();
+        let query = self.parse_query(query_text)?;
+
+        let reader = self.tantivy_index.reader()?;
+        let searcher = reader.searcher();
+        let expanded_limit = (limit + 50 + limit / 2).max(250); // 250 is a hack for https://github.com/tantivy-search/tantivy/issues/700
+        let mut docs = self.fetch_docs(&searcher, &query, expanded_limit)?;
+
+        let max_relevance = docs.iter().map(|v| v.relevance_score).max_by(|a,b| a.total_cmp(b)).unwrap_or(0.);
         for doc in &mut docs {
             doc.score = if sort_by_query_relevance {
                 // bonus for exact match
@@ -179,8 +191,6 @@ impl CrateSearchIndex {
             };
         }
 
-        // workaround for bug or corrupted index that caused dupes
-        docs.dedup_by(|a, b| a.crate_name == b.crate_name);
 
         // re-sort using our base score
         docs.sort_unstable_by(|a, b| b.score.total_cmp(&a.score));
@@ -226,7 +236,6 @@ impl CrateSearchIndex {
         })
     }
 
-
     fn dividing_keywords(results: &[CrateFound], limit: usize, query_keywords: &[&str], skip_entire_results: &[&str]) -> Option<Vec<String>> {
         // divide keyword popularity by its global popularity tf-idf, because everything gets api, linux, cargo, parser
         // bonus if keyword pair exists
@@ -255,8 +264,11 @@ impl CrateSearchIndex {
         let mut dividing_keywords = Vec::with_capacity(10);
         let mut next_keyword = second_most_common;
         for _ in 0..10 {
-            keyword_sets.iter_mut().for_each(|(k_set, w)| if *w > 0 && k_set.contains(&next_keyword) { *w = -*w/2; });
             dividing_keywords.push(next_keyword.to_string());
+            keyword_sets.iter_mut().for_each(|(k_set, w)| if *w > 0 && k_set.contains(&next_keyword) { *w = -*w/2; });
+            if keyword_sets.iter().filter(|&(_, w)| *w > 0).count() < 25 {
+                break;
+            }
             next_keyword = match Self::popular_dividing_keyword(&keyword_sets, &["reserved"]) {
                 None => break,
                 Some(another) => another,

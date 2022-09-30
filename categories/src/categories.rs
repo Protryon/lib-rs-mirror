@@ -10,6 +10,8 @@ use toml::value::{Table, Value};
 
 mod tuning;
 pub use crate::tuning::*;
+mod synonyms;
+pub use crate::synonyms::*;
 
 const CATEGORIES_TOML: &[u8] = include_bytes!("categories.toml");
 

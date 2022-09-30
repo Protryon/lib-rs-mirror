@@ -1,5 +1,7 @@
-use heck::ToKebabCase;
+use categories::normalize_keyword;
+use categories::Synonyms;
 use chrono::prelude::*;
+use log::{debug, error};
 use rich_crate::CrateOwner;
 use rich_crate::CrateVersionSourceData;
 use rich_crate::Manifest;
@@ -9,18 +11,16 @@ use rich_crate::Origin;
 use rich_crate::Readme;
 use rich_crate::Repo;
 use rich_crate::RichCrate;
-use rusqlite::types::ToSql;
 use rusqlite::*;
+use rusqlite::types::ToSql;
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Write;
-use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 use thread_local::ThreadLocal;
-use log::{debug, error};
 use tokio::sync::{Mutex, RwLock};
 type FResult<T, E = Error> = std::result::Result<T, E>;
 
@@ -51,7 +51,7 @@ pub struct CrateDb {
     concurrency_control: RwLock<()>,
     conn: Arc<ThreadLocal<std::result::Result<RefCell<Connection>, rusqlite::Error>>>,
     exclusive_conn: Mutex<Option<Connection>>,
-    tag_synonyms: HashMap<Box<str>, (Box<str>, u8)>,
+    tag_synonyms: Synonyms,
 }
 
 pub struct CrateVersionData<'a> {
@@ -85,21 +85,10 @@ impl CrateDb {
     /// Path to sqlite db file to create/update
     pub fn new(path: impl AsRef<Path>) -> FResult<Self> {
         let path = path.as_ref();
-        Self::new_with_synonyms(path, &path.with_file_name("tag-synonyms.csv"))
+        Self::new_with_synonyms(path, Synonyms::new(path)?)
     }
 
-    pub fn new_with_synonyms(path: &Path, synonyms: &Path) -> FResult<Self> {
-        let tag_synonyms = fs::read_to_string(synonyms)?;
-        let tag_synonyms = tag_synonyms.lines()
-            .filter(|l| !l.starts_with('#'))
-            .map(|l| {
-                let mut cols = l.splitn(3, ',');
-                let find = cols.next().expect(l);
-                let replace = cols.next().expect(l);
-                let score: u8 = cols.next().unwrap().parse().expect(l);
-                (find.into(), (replace.into(), score))
-            })
-            .collect();
+    pub fn new_with_synonyms(path: &Path, tag_synonyms: Synonyms) -> FResult<Self> {
         Ok(Self {
             tag_synonyms,
             url: format!("file:{}?cache=shared", path.display()),
@@ -1114,7 +1103,7 @@ impl KeywordInsert {
         if visible {k.1 = visible}
     }
 
-    pub fn add_synonyms(&mut self, tag_synonyms: &HashMap<Box<str>, (Box<str>, u8)>) {
+    pub fn add_synonyms(&mut self, tag_synonyms: &Synonyms) {
         let mut to_add = Vec::new();
         for (k, &(v, _)) in self.keywords.iter() {
             if let Some((k, v)) = self.get_synonym(tag_synonyms, k, v) {
@@ -1129,13 +1118,12 @@ impl KeywordInsert {
         }
     }
 
-    fn get_synonym(&self, tag_synonyms: &HashMap<Box<str>, (Box<str>, u8)>, k: &str, v: f64) -> Option<(String, f64)> {
-        let (synonym, votes) = tag_synonyms.get(k)?;
-        if self.keywords.get(&**synonym).is_some() {
+    fn get_synonym(&self, tag_synonyms: &Synonyms, k: &str, v: f64) -> Option<(String, f64)> {
+        let (synonym, relevance) = tag_synonyms.get(k)?;
+        if self.keywords.get(synonym).is_some() {
             return None;
         }
-        let relevance = (*votes as f64 / 5. + 0.1).min(0.8);
-        Some((normalize_keyword(synonym), v * relevance))
+        Some((normalize_keyword(synonym), v * relevance.min(0.8) as f64))
     }
 
     /// Clears old keywords from the db
@@ -1186,22 +1174,6 @@ impl KeywordInsert {
     }
 }
 
-fn normalize_keyword(k: &str) -> String {
-    // heck messes up CJK
-    if !k.is_ascii() {
-        return k.to_lowercase();
-    }
-
-    // i-os looks bad
-    let mut k = k;
-    let tmp;
-    if k.starts_with("eBPF") || k.starts_with("iOS") || k.starts_with("iP") || k.starts_with("iM") {
-        tmp = k.to_lowercase();
-        k = &tmp;
-    }
-    k.to_kebab_case()
-}
-
 fn crates_io_name(name: &str) -> std::result::Result<Origin, rusqlite::Error> {
     Origin::try_from_crates_io_name(name)
                     .ok_or_else(|| rusqlite::Error::ToSqlConversionFailure(format!("bad name {}", name).into()))
@@ -1243,7 +1215,8 @@ fn try_indexing() {
     let f = rt.spawn(async move {
     let t = tempfile::NamedTempFile::new().unwrap();
 
-    let db = CrateDb::new_with_synonyms(t.as_ref(), Path::new("../data/tag-synonyms.csv")).unwrap();
+    let sy = categories::Synonyms::new(Path::new("../data/")).unwrap();
+    let db = CrateDb::new_with_synonyms(t.as_ref(), sy).unwrap();
     let origin = Origin::from_crates_io_name("cratedbtest");
     let source_data = CrateVersionSourceData {
         capitalized_name: "captname".into(),

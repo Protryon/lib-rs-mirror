@@ -268,7 +268,6 @@ pub struct KitchenSink {
     category_crate_counts: DoubleCheckedCell<Option<HashMap<String, (u32, f64)>>>,
     top_crates_cached: Mutex<FxHashMap<String, Arc<DoubleCheckedCell<Arc<Vec<Origin>>>>>>,
     git_checkout_path: PathBuf,
-    main_cache_dir: PathBuf,
     yearly: AllDownloads,
     category_overrides: HashMap<Box<str>, Vec<String>>,
     crates_io_owners_cache: TempCache<Vec<CrateOwner>>,
@@ -334,7 +333,6 @@ impl KitchenSink {
         let synonyms = categories::Synonyms::new(data_path)?;
 
         tokio::task::block_in_place(move || Ok(Self {
-            main_cache_dir: data_path.to_path_buf(),
             crev: Arc::new(crev.context("crev")?),
             rustsec: Arc::new(Mutex::new(rustsec.map_err(std::sync::Arc::new)?)),
             crates_io: crates_io.context("crates_io")?,
@@ -399,7 +397,7 @@ impl KitchenSink {
     }
 
     pub fn main_cache_dir(&self) -> &Path {
-        &self.main_cache_dir
+        &self.data_path
     }
 
     fn load_author_shitlist(path: &Path) -> CResult<HashMap<String, String>> {
@@ -2479,7 +2477,7 @@ impl KitchenSink {
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
 
         self.crate_rustc_compat_db
-            .get_or_try_init(|| BuildDb::new(self.main_cache_dir().join("builds.db")))
+            .get_or_try_init(|| BuildDb::new(self.data_path.join("builds.db")))
             .map_err(|_| KitchenSinkErr::BadRustcCompatData)
     }
 
@@ -3771,9 +3769,9 @@ fn is_build_or_dev_test() {
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(rt.spawn(async move {
         let c = KitchenSink::new_default().await.expect("uhg");
-        assert_eq!((false, false), c.is_build_or_dev(&Origin::from_crates_io_name("semver")).await.unwrap());
-        assert_eq!((false, true), c.is_build_or_dev(&Origin::from_crates_io_name("version-sync")).await.unwrap());
-        assert_eq!((true, false), c.is_build_or_dev(&Origin::from_crates_io_name("cc")).await.unwrap());
+        assert_eq!((false, false), c.is_build_or_dev(&Origin::from_crates_io_name("semver")).await.expect("test1"));
+        assert_eq!((false, true), c.is_build_or_dev(&Origin::from_crates_io_name("version-sync")).await.expect("test2"));
+        assert_eq!((true, false), c.is_build_or_dev(&Origin::from_crates_io_name("cc")).await.expect("test3"));
     })).unwrap();
 }
 

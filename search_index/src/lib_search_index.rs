@@ -1,3 +1,4 @@
+use categories::Synonyms;
 use itertools::Itertools;
 use std::collections::HashSet;
 use std::collections::HashMap;
@@ -7,6 +8,13 @@ use std::{fs, path::Path};
 use tantivy::{self, collector::TopDocs, query::QueryParser, schema::*, Index, IndexWriter};
 
 const CRATE_SCORE_MAX: f64 = 1_000_000.;
+
+#[derive(Debug, Clone, Default)]
+pub struct SearchResults {
+    pub crates: Vec<CrateFound>,
+    pub keywords: Vec<String>,
+    pub normalized_query: Option<String>,
+}
 
 pub struct CrateSearchIndex {
     /// Origin.to_str
@@ -25,6 +33,7 @@ pub struct CrateSearchIndex {
     crate_score: Field,
 
     tantivy_index: Index,
+    synonyms: Synonyms,
 }
 
 #[derive(Debug, Clone)]
@@ -46,13 +55,17 @@ pub struct Indexer {
 }
 
 impl CrateSearchIndex {
-    pub fn new(index_dir: impl AsRef<Path>) -> tantivy::Result<Self> {
-        let index_dir = index_dir.as_ref().join("tantivy18");
+    pub fn new(data_dir: impl AsRef<Path>) -> tantivy::Result<Self> {
+        let data_dir = data_dir.as_ref();
+        let synonyms = Synonyms::new(data_dir)?;
+
+        let index_dir = data_dir.join("tantivy18");
         if !index_dir.exists() {
-            return Self::reset_db_to_empty(&index_dir);
+            return Self::reset_db_to_empty(&index_dir, synonyms);
         }
         let tantivy_index = Index::open_in_dir(index_dir)?;
         let schema = tantivy_index.schema();
+
 
         Ok(Self {
             tantivy_index,
@@ -64,10 +77,11 @@ impl CrateSearchIndex {
             monthly_downloads: schema.get_field("monthly_downloads").expect("schema"),
             crate_version: schema.get_field("crate_version").expect("schema"),
             crate_score: schema.get_field("crate_score").expect("schema"),
+            synonyms,
         })
     }
 
-    fn reset_db_to_empty(index_dir: &Path) -> tantivy::Result<Self> {
+    fn reset_db_to_empty(index_dir: &Path, synonyms: Synonyms) -> tantivy::Result<Self> {
         let _ = fs::create_dir_all(index_dir);
 
         let mut schema_builder = SchemaBuilder::default();
@@ -86,12 +100,16 @@ impl CrateSearchIndex {
         let schema = schema_builder.build();
         let tantivy_index = Index::create_in_dir(index_dir, schema)?;
 
-        Ok(Self { tantivy_index, origin_pkey, crate_name_field, keywords_field, description_field, readme_field, monthly_downloads, crate_version, crate_score })
+        Ok(Self { tantivy_index, origin_pkey, crate_name_field, keywords_field, description_field, readme_field, monthly_downloads, crate_version, crate_score, synonyms })
+    }
+
+    pub fn normalize_keyword<'a>(&'a self, kw: &'a str) -> &'a str {
+        self.synonyms.normalize(kw)
     }
 
     /// if sort_by_query_relevance is false, sorts by internal crate score (relevance is still used to select the crates)
     /// Second arg is distinctive keywords
-    pub fn search(&self, query_text: &str, limit: usize, sort_by_query_relevance: bool) -> tantivy::Result<(Vec<CrateFound>, Vec<String>)> {
+    pub fn search(&self, query_text: &str, limit: usize, sort_by_query_relevance: bool) -> tantivy::Result<SearchResults> {
         let query_text = query_text.trim();
         let mut query_parser = QueryParser::for_index(&self.tantivy_index, vec![
             self.crate_name_field, self.keywords_field, self.description_field, self.readme_field,
@@ -119,13 +137,27 @@ impl CrateSearchIndex {
             let crate_base_score = take_int(doc.get("crate_score")) as f64 / CRATE_SCORE_MAX;
             let crate_name = take_string(doc.remove("crate_name"));
             let origin = Origin::from_str(take_string(doc.remove("origin")));
+
+            let mut kw_dedupe = HashSet::with_capacity(20);
+            let keywords = take_string(doc.remove("keywords"));
+            let keywords = keywords.split(", ").filter(|&k| !k.is_empty()).take(30)
+                .filter_map(|k| {
+                    let normalized = self.synonyms.normalize(k);
+                    if kw_dedupe.insert(normalized) {
+                        Some(normalized.to_string())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
             Ok(CrateFound {
                 crate_base_score: crate_base_score as f32,
                 relevance_score: relevance_score as f32,
                 score: 0.,
                 crate_name,
                 description: take_string(doc.remove("description")),
-                keywords: take_string(doc.remove("keywords")).split(", ").filter(|&k| !k.is_empty()).map(|s| s.to_string()).collect(),
+                keywords,
                 version: take_string(doc.remove("crate_version")),
                 monthly_downloads: if origin.is_crates_io() { take_int(doc.get("monthly_downloads")) } else { 0 },
                 origin,
@@ -154,11 +186,12 @@ impl CrateSearchIndex {
         docs.sort_unstable_by(|a, b| b.score.total_cmp(&a.score));
 
         // Pick a few representative keywords that are for different meanings of the query (e.g. oracle db vs padding oracle)
-        let query_text = query_text.to_ascii_lowercase();
-        let query_as_keyword = query_text.replace(|c:char| { c == '_' || c == ' ' }, "-"); // "foo bar" == "foo-bar"
-        let query_as_keyword2 = query_text.split_whitespace().rev().join("-");
+        let query_lower = query_text.to_ascii_lowercase();
+        let query_as_keyword = query_lower.replace(|c:char| { c == '_' || c == ' ' }, "-"); // "foo bar" == "foo-bar"
+        let query_rev = query_as_keyword.split('-').rev().join("-");
         let query_keywords: Vec<_> = query_text.split(|c: char| !c.is_alphanumeric()).filter(|k| !k.is_empty())
-            .chain([query_text.as_str(), query_as_keyword.as_str(), query_as_keyword2.as_str()])
+            .chain([query_text, &query_lower, &query_as_keyword, &query_rev])
+            .map(|k| self.normalize_keyword(k))
             .collect();
         let dividing_keywords = Self::dividing_keywords(&docs, limit/2, &query_keywords,  &["blockchain", "solana", "ethereum", "bitcoin", "cryptocurrency"]).unwrap_or_default();
         docs.truncate(limit); // truncate after getting all interesting keywords
@@ -172,19 +205,25 @@ impl CrateSearchIndex {
         }
         interesting_crate_indices.sort_unstable();
         interesting_crate_indices.dedup();
-        let mut interesting = Vec::with_capacity(interesting_crate_indices.len());
+        let mut top_crates = Vec::with_capacity(docs.len());
         for idx in interesting_crate_indices.into_iter().rev() {
             let tmp = docs.remove(idx);
-            interesting.push(tmp);
+            top_crates.push(tmp);
         }
-        interesting.sort_unstable_by(|a, b| b.score.total_cmp(&a.score));
+        top_crates.sort_unstable_by(|a, b| b.score.total_cmp(&a.score));
 
-        docs.truncate(limit.saturating_sub(interesting.len())); // search picked a few more results to cut out chaff using crate_score
+        docs.truncate(limit.saturating_sub(top_crates.len())); // search picked a few more results to cut out chaff using crate_score
         let min_score = docs.first().map(|f| f.score).unwrap_or_default();
         // keep score monotonic
-        interesting.iter_mut().for_each(|f| if f.score < min_score { f.score = min_score; });
-        interesting.append(&mut docs);
-        Ok((interesting, dividing_keywords))
+        top_crates.iter_mut().for_each(|f| if f.score < min_score { f.score = min_score; });
+        top_crates.append(&mut docs);
+
+        let normalized_query = query_text.split(' ').map(|w| self.normalize_keyword(w)).join(" ");
+        Ok(SearchResults {
+            crates: top_crates,
+            keywords: dividing_keywords,
+            normalized_query: if normalized_query != query_text { Some(normalized_query) } else { None },
+        })
     }
 
 
@@ -239,6 +278,10 @@ impl CrateSearchIndex {
                 n.1 += *w;
             }
         }
+        for stopword in ["api", "cli", "linux", "client", "rust"] {
+            counts.entry(stopword).and_modify(|e| { e.1 = e.1 * 3/4; });
+        }
+
         let good_pop = (keyword_sets.len() / 3) as u32;
         let too_common = (keyword_sets.len() * 3 / 4) as u32;
         counts.into_iter()

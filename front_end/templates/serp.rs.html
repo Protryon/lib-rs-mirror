@@ -42,12 +42,16 @@
                 <input accesskey="s" placeholder="name, keywords, description" autocapitalize="off" autocorrect="off" autocomplete="off" tabindex="1" type=search value="@query" name=q><button type=submit>Search</button>
             </form>
 
-            @if let Some(iter) = p.did_you_mean() {
-                <p>@query
-                    @for (query, label) in iter {
-                        <a href="@url.search_lib_rs(&query)">…@label</a>?
-                    }
-                </p>
+            @if let Some(dym) = p.normalized_query {
+                <p>Did you mean <a href="@url.search_lib_rs(dym)" rel="canonical">@dym</a>?</p>
+            } else {
+                @if let Some(iter) = p.did_you_mean() {
+                    <p>@query
+                        @for (query, label) in iter {
+                            <a href="@url.search_lib_rs(&query)">…@label</a>?
+                        }
+                    </p>
+                }
             }
 
             <nav>

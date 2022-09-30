@@ -2,6 +2,7 @@ use crate::templates;
 use crate::Page;
 use crate::Urler;
 use render_readme::Renderer;
+use search_index::SearchResults;
 use std::collections::HashMap;
 use std::io::Write;
 
@@ -16,29 +17,32 @@ pub struct SearchPage<'a> {
     pub bad_results: &'a [search_index::CrateFound],
     pub query: SearchKind<'a>,
     dividing_keywords: &'a [String],
+    pub normalized_query: Option<&'a str>,
 }
 
 impl SearchPage<'_> {
-    pub fn new<'a>(query: &'a str, (results, dividing_keywords): (&'a [search_index::CrateFound], &'a [String]), markup: &'a Renderer) -> SearchPage<'a> {
-        let half_score = results.get(0).map_or(0., |r| r.score) * 0.33;
-        let num = results.iter().take_while(|r| r.score >= half_score).count();
-        let (good_results, bad_results) = results.split_at(num);
+    pub fn new<'a>(query: &'a str, results: &'a SearchResults, markup: &'a Renderer) -> SearchPage<'a> {
+        let half_score = results.crates.get(0).map_or(0., |r| r.score) * 0.33;
+        let num = results.crates.iter().take_while(|r| r.score >= half_score).count();
+        let (good_results, bad_results) = results.crates.split_at(num);
         SearchPage {
             query: SearchKind::Query(query),
             markup,
             good_results,
             bad_results,
-            dividing_keywords,
+            dividing_keywords: &results.keywords,
+            normalized_query: results.normalized_query.as_deref(),
         }
     }
 
-    pub fn new_keyword<'a>(keyword: &'a str, (results, dividing_keywords): (&'a [search_index::CrateFound], &'a [String]), markup: &'a Renderer) -> SearchPage<'a> {
+    pub fn new_keyword<'a>(keyword: &'a str, results: &'a SearchResults, markup: &'a Renderer) -> SearchPage<'a> {
         SearchPage {
             query: SearchKind::Keyword(keyword),
             markup,
-            good_results: results,
+            good_results: &results.crates,
             bad_results: &[],
-            dividing_keywords,
+            dividing_keywords: &results.keywords,
+            normalized_query: results.normalized_query.as_deref(),
         }
     }
 
@@ -170,14 +174,14 @@ impl SearchPage<'_> {
     }
 }
 
-pub fn render_serp_page(out: &mut dyn Write, query: &str, results: (&[search_index::CrateFound], &[String]), markup: &Renderer) -> Result<(), anyhow::Error> {
+pub fn render_serp_page(out: &mut dyn Write, query: &str, results: &SearchResults, markup: &Renderer) -> Result<(), anyhow::Error> {
     let urler = Urler::new(None);
     let page = SearchPage::new(query, results, markup);
     templates::serp(out, &page, &urler)?;
     Ok(())
 }
 
-pub fn render_keyword_page(out: &mut dyn Write, keyword: &str, results: (&[search_index::CrateFound], &[String]), markup: &Renderer) -> Result<(), anyhow::Error> {
+pub fn render_keyword_page(out: &mut dyn Write, keyword: &str, results: &SearchResults, markup: &Renderer) -> Result<(), anyhow::Error> {
     let urler = Urler::new(None);
     let page = SearchPage::new_keyword(keyword, results, markup);
     templates::serp(out, &page, &urler)?;

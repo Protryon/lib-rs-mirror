@@ -449,7 +449,7 @@ fn render_404_page(state: &AServerState, path: &str, item_name: &str) -> impl Fu
     tokio::task::spawn_blocking(move || {
         let results = state.index.search(&query, 7, false).unwrap_or_default();
         let mut page: Vec<u8> = Vec::with_capacity(32000);
-        front_end::render_404_page(&mut page, &query, &item_name, &results.0, &state.markup)?;
+        front_end::render_404_page(&mut page, &query, &item_name, &results.crates, &state.markup)?;
         Ok(page)
     }).map(|res| {
         res?.map(|page| {
@@ -1088,13 +1088,18 @@ async fn render_crate_reverse_dependencies(state: AServerState, origin: Origin) 
 }
 
 async fn handle_keyword(req: HttpRequest) -> Result<HttpResponse, ServerError> {
-    let q = req.match_info().query("keyword");
-    if q.is_empty() {
-        return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", "/")).finish());
+    let query = match decode(req.match_info().query("keyword")) {
+        Ok(q) if !q.is_empty() => q,
+        _ => return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", "/")).finish()),
+    };
+
+    let state: &AServerState = req.app_data().expect("appdata");
+    let norm = state.index.normalize_keyword(&query);
+    if norm != query {
+        return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", format!("/keywords/{norm}"))).finish());
     }
 
-    let query = q.to_owned();
-    let state: &AServerState = req.app_data().expect("appdata");
+    let query = query.into_owned();
     let state2 = state.clone();
     let (query, page) = tokio::task::spawn_blocking(move || {
         if !is_alnum(&query) {
@@ -1104,11 +1109,11 @@ async fn handle_keyword(req: HttpRequest) -> Result<HttpResponse, ServerError> {
         let mut results = state2.index.search(&keyword_query, 250, false)?;
 
         let crates = state2.crates.load();
-        results.0.retain(|res| crates.crate_exists(&res.origin)); // search index can contain stale items
+        results.crates.retain(|res| crates.crate_exists(&res.origin)); // search index can contain stale items
 
-        if !results.0.is_empty() {
+        if !results.crates.is_empty() {
             let mut page: Vec<u8> = Vec::with_capacity(60_000);
-            front_end::render_keyword_page(&mut page, &query, (&results.0, &results.1), &state2.markup)?;
+            front_end::render_keyword_page(&mut page, &query, &results, &state2.markup)?;
             minify_html(&mut page);
             Ok((query, Some(page)))
         } else {
@@ -1212,10 +1217,10 @@ async fn handle_search(req: HttpRequest) -> Result<HttpResponse, ServerError> {
                 move || {
                     let mut results = state.index.search(&query, 50, true)?;
                     let crates = state.crates.load();
-                    results.0.retain(|res| crates.crate_exists(&res.origin)); // search index can contain stale items
+                    results.crates.retain(|res| crates.crate_exists(&res.origin)); // search index can contain stale items
 
                     let mut page = Vec::with_capacity(32000);
-                    front_end::render_serp_page(&mut page, &query, (&results.0, &results.1), &state.markup)?;
+                    front_end::render_serp_page(&mut page, &query, &results, &state.markup)?;
                     minify_html(&mut page);
                     Ok::<_, anyhow::Error>(Rendered {page, cache_time: 600, refresh: false, last_modified: None})
                 }

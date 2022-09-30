@@ -80,7 +80,7 @@ fn normalize_plural(all_kw: &[String]) {
 
 /// Most common + alterantive unrelated to most common
 fn top_other_keyword(index: &CrateSearchIndex, query:&str, skip_words: &[&str], skip_results: &[&str]) -> Option<(String, Vec<String>)> {
-    let (res, _) = index.search(query, 300, true).ok()?;
+    let res = index.search(query, 300, true).ok()?.crates;
     if res.len() < 25 {
         return None; // noisy data?
     }

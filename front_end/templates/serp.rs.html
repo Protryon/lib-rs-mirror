@@ -1,3 +1,4 @@
+@use crate::iter::IdentifyLast;
 @use crate::templates::base;
 @use crate::Urler;
 @use crate::limit_text_len;
@@ -29,7 +30,7 @@
                       <a href="@url.keyword(key)" class=keyword><span>#</span>@key</a>
                     }
                   </span>
-                  @for key in k.iter().skip(3).take(3) {
+                  @for key in k.iter().skip(3).take(5) {
                     <a href="@url.keyword(key)" class=keyword><span>#</span>@key</a>
                   }
                 </span>
@@ -40,6 +41,15 @@
             <form role="search" id=search method="get" action="/search">
                 <input accesskey="s" placeholder="name, keywords, description" autocapitalize="off" autocorrect="off" autocomplete="off" tabindex="1" type=search value="@query" name=q><button type=submit>Search</button>
             </form>
+
+            @if let Some(iter) = p.did_you_mean() {
+                <p>@query
+                    @for (query, label) in iter {
+                        <a href="@url.search_lib_rs(&query)">…@label</a>?
+                    }
+                </p>
+            }
+
             <nav>
                 <ul>
                     @if !p.good_results.is_empty() {
@@ -56,7 +66,7 @@
                     @if !p.good_results.is_empty() {
                         <li class=active>Keyword</li>
                     }
-                    <li><a href="@url.search_crates_rs(k)">Search</a></li>
+                    <li><a href="@url.search_lib_rs(k)">Search</a></li>
                 </ul>
             </nav>
         }
@@ -97,6 +107,23 @@
                 <p class=tryalso><a href="https://forms.gle/SFntxLhGJB7xzFy19">Feedback on crate ranking</a></p>
             }
             </ol>
+        }
+
+        @if let Some(iter) = p.search_also() {
+            <p class="tryalso">
+                @if let SearchKind::Keyword(_) = p.query {
+                    Search for:
+                }
+                @if let SearchKind::Query(_) = p.query {
+                    Narrow the search:
+                }
+                @for (is_last, (n, (query, label))) in iter.enumerate().identify_last() {
+                    <a href="@url.search_lib_rs(&query)">@if n == 0 {
+                        @if let SearchKind::Keyword(query) = p.query { @query }
+                        @if let SearchKind::Query(query) = p.query { @query }
+                    } else {…}@label</a>@if !is_last {,}
+                }
+            </p>
         }
     </div>
 </main>

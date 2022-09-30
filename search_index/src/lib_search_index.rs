@@ -1,6 +1,8 @@
+use itertools::Itertools;
+use std::collections::HashSet;
+use std::collections::HashMap;
 use rich_crate::Origin;
 use tantivy::TantivyError;
-use std::cmp::Ordering;
 use std::{fs, path::Path};
 use tantivy::{self, collector::TopDocs, query::QueryParser, schema::*, Index, IndexWriter};
 
@@ -88,7 +90,8 @@ impl CrateSearchIndex {
     }
 
     /// if sort_by_query_relevance is false, sorts by internal crate score (relevance is still used to select the crates)
-    pub fn search(&self, query_text: &str, limit: usize, sort_by_query_relevance: bool) -> tantivy::Result<Vec<CrateFound>> {
+    /// Second arg is distinctive keywords
+    pub fn search(&self, query_text: &str, limit: usize, sort_by_query_relevance: bool) -> tantivy::Result<(Vec<CrateFound>, Vec<String>)> {
         let query_text = query_text.trim();
         let mut query_parser = QueryParser::for_index(&self.tantivy_index, vec![
             self.crate_name_field, self.keywords_field, self.description_field, self.readme_field,
@@ -134,7 +137,7 @@ impl CrateSearchIndex {
         for doc in &mut docs {
             doc.score = if sort_by_query_relevance {
                 // bonus for exact match
-                doc.crate_base_score * if doc.crate_name == query_text {
+                doc.crate_base_score * if doc.crate_name.eq_ignore_ascii_case(query_text) {
                     max_relevance * 1.10
                 } else {
                     doc.relevance_score
@@ -148,10 +151,99 @@ impl CrateSearchIndex {
         docs.dedup_by(|a, b| a.crate_name == b.crate_name);
 
         // re-sort using our base score
-        docs.sort_unstable_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(Ordering::Equal));
-        docs.truncate(limit); // search picked a few more results to cut out chaff using crate_score
-        Ok(docs)
+        docs.sort_unstable_by(|a, b| b.score.total_cmp(&a.score));
+
+        // Pick a few representative keywords that are for different meanings of the query (e.g. oracle db vs padding oracle)
+        let query_text = query_text.to_ascii_lowercase();
+        let query_as_keyword = query_text.replace(|c:char| { c == '_' || c == ' ' }, "-"); // "foo bar" == "foo-bar"
+        let query_as_keyword2 = query_text.split_whitespace().rev().join("-");
+        let query_keywords: Vec<_> = query_text.split(|c: char| !c.is_alphanumeric()).filter(|k| !k.is_empty())
+            .chain([query_text.as_str(), query_as_keyword.as_str(), query_as_keyword2.as_str()])
+            .collect();
+        let dividing_keywords = Self::dividing_keywords(&docs, limit/2, &query_keywords,  &["blockchain", "solana", "ethereum", "bitcoin", "cryptocurrency"]).unwrap_or_default();
+        docs.truncate(limit); // truncate after getting all interesting keywords
+
+        // Make sure that there's at least one crate ranked high for each of the interesting keywords
+        let mut interesting_crate_indices = dividing_keywords.iter().take(6).filter_map(|dk| {
+            docs.iter().position(|k| k.keywords.split(", ").any(|k| k == dk))
+        }).collect::<Vec<_>>();
+        interesting_crate_indices.extend([0,1,2]); // but keep top 3 results as they are
+        interesting_crate_indices.sort_unstable();
+        interesting_crate_indices.dedup();
+        let mut interesting = Vec::with_capacity(interesting_crate_indices.len());
+        for idx in interesting_crate_indices.into_iter().rev() {
+            let tmp = docs.remove(idx);
+            interesting.push(tmp);
+        }
+        interesting.sort_unstable_by(|a, b| b.score.total_cmp(&a.score));
+
+        docs.truncate(limit.saturating_sub(interesting.len())); // search picked a few more results to cut out chaff using crate_score
+        let min_score = docs.first().map(|f| f.score).unwrap_or_default();
+        // keep score monotonic
+        interesting.iter_mut().for_each(|f| if f.score < min_score { f.score = min_score; });
+        interesting.append(&mut docs);
+        Ok((interesting, dividing_keywords))
     }
+
+
+
+    fn dividing_keywords(results: &[CrateFound], limit: usize, query_keywords: &[&str], skip_entire_results: &[&str]) -> Option<Vec<String>> {
+        let mut dupes = HashSet::new();
+        let mut keyword_sets = results.iter().enumerate().filter_map(|(i, found)| {
+                if !dupes.insert(&found.keywords) { // some crate families have all the same keywords, which is spammy and biases the results
+                    return None;
+                }
+                let k_set: HashSet<_> = found.keywords.split(", ")
+                    .filter(|k| !query_keywords.contains(k))
+                    .collect();
+                if skip_entire_results.iter().any(|&dealbreaker| k_set.contains(dealbreaker)) {
+                    return None;
+                }
+                Some((k_set, if i < limit { 2048 } else { 1024 } + (128. * found.score) as u32)) // integer for ease of sorting, unique for sort stability
+            }).collect::<Vec<_>>();
+        drop(dupes);
+
+
+        // api/client/cli are boring and generic
+        let most_common = Self::popular_dividing_keyword(&keyword_sets, &["api", "client", "cli"])?;
+        // The most common co-occurrence may be a synonym, so skip it for now
+        let second_most_common = Self::popular_dividing_keyword(&keyword_sets, &[most_common])?;
+
+        let mut dividing_keywords = Vec::with_capacity(10);
+        let mut next_keyword = second_most_common;
+        for _ in 0..10 {
+            keyword_sets.retain(|(k_set, _)| !k_set.contains(&next_keyword));
+            dividing_keywords.push(next_keyword.to_string());
+            next_keyword = match Self::popular_dividing_keyword(&keyword_sets, &["reserved"]) {
+                None => break,
+                Some(another) => another,
+            };
+        }
+        Some(dividing_keywords)
+    }
+
+    /// Find a keyword that splits the set into two distinctive groups
+    fn popular_dividing_keyword<'a>(keyword_sets: &[(HashSet<&'a str>, u32)], ignore_keywords: &[&str]) -> Option<&'a str> {
+        if keyword_sets.len() < 25 {
+            return None; // too few results will give odd niche keywords
+        }
+        let mut counts: HashMap<&str, (u32, u32)> = HashMap::with_capacity(keyword_sets.len());
+        for (k_set, w) in keyword_sets {
+            for k in k_set {
+                let mut n = counts.entry(k).or_default();
+                n.0 += 1;
+                n.1 += *w;
+            }
+        }
+        let good_pop = (keyword_sets.len() / 3) as u32;
+        let too_common = (keyword_sets.len() * 3 / 4) as u32;
+        counts.into_iter()
+            .filter(|&(_, (pop, _))| pop > 2 && pop <= too_common)
+            .filter(|&(k, _)| !ignore_keywords.iter().any(|&ignore| ignore == k))
+            .max_by_key(|&(_, (pop, weight))| if pop >= 10 && pop <= good_pop { weight * 2 } else { weight })
+            .map(|(k, _)| k)
+    }
+
 }
 
 #[track_caller]

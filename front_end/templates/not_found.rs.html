@@ -20,7 +20,7 @@
             <ul>
                 <li class=active>Error</li>
                 @if !p.results.is_empty() {
-                    <li><a href="@url.search_crates_rs(&p.query)">Search</a>
+                    <li><a href="@url.search_lib_rs(&p.query)">Search</a>
                 }
                 <li><a href="@url.search_ddg(&p.query)">I'm feeling ducky</a></li>
             </ul>
@@ -48,7 +48,7 @@
                 </li>
             }
             </ol>
-            <p><a href="@url.search_crates_rs(&p.query)">See more results</a> or <a href="/">browse all categories</a>.</p>
+            <p><a href="@url.search_lib_rs(&p.query)">See more results</a> or <a href="/">browse all categories</a>.</p>
         } else {
             <p>The URL you've followed is invalid, and there is no @p.item_name named “@p.query”.</p>
             <p><a href="/">Browse categories instead</a>.</p>

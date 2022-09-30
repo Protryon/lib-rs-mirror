@@ -206,8 +206,8 @@ impl Urler {
         format!("https://crates.io/search?q={}", Encoded(query))
     }
 
-    pub fn search_crates_rs(&self, query: &str) -> String {
-        format!("https://lib.rs/search?q={}", Encoded(query))
+    pub fn search_lib_rs(&self, query: &str) -> String {
+        format!("/search?q={}", Encoded(query))
     }
 
     pub fn search_ddg(&self, query: &str) -> String {

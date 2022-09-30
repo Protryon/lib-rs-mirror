@@ -449,7 +449,7 @@ fn render_404_page(state: &AServerState, path: &str, item_name: &str) -> impl Fu
     tokio::task::spawn_blocking(move || {
         let results = state.index.search(&query, 7, false).unwrap_or_default();
         let mut page: Vec<u8> = Vec::with_capacity(32000);
-        front_end::render_404_page(&mut page, &query, &item_name, &results, &state.markup)?;
+        front_end::render_404_page(&mut page, &query, &item_name, &results.0, &state.markup)?;
         Ok(page)
     }).map(|res| {
         res?.map(|page| {
@@ -1101,10 +1101,14 @@ async fn handle_keyword(req: HttpRequest) -> Result<HttpResponse, ServerError> {
             return Ok::<_, anyhow::Error>((query, None));
         }
         let keyword_query = format!("keywords:\"{}\"", query);
-        let results = state2.index.search(&keyword_query, 250, false)?;
-        if !results.is_empty() {
+        let mut results = state2.index.search(&keyword_query, 250, false)?;
+
+        let crates = state2.crates.load();
+        results.0.retain(|res| crates.crate_exists(&res.origin)); // search index can contain stale items
+
+        if !results.0.is_empty() {
             let mut page: Vec<u8> = Vec::with_capacity(60_000);
-            front_end::render_keyword_page(&mut page, &query, &results, &state2.markup)?;
+            front_end::render_keyword_page(&mut page, &query, (&results.0, &results.1), &state2.markup)?;
             minify_html(&mut page);
             Ok((query, Some(page)))
         } else {
@@ -1208,10 +1212,10 @@ async fn handle_search(req: HttpRequest) -> Result<HttpResponse, ServerError> {
                 move || {
                     let mut results = state.index.search(&query, 50, true)?;
                     let crates = state.crates.load();
-                    results.retain(|res| crates.crate_exists(&res.origin)); // search index can contain stale items
+                    results.0.retain(|res| crates.crate_exists(&res.origin)); // search index can contain stale items
 
                     let mut page = Vec::with_capacity(32000);
-                    front_end::render_serp_page(&mut page, &query, &results, &state.markup)?;
+                    front_end::render_serp_page(&mut page, &query, (&results.0, &results.1), &state.markup)?;
                     minify_html(&mut page);
                     Ok::<_, anyhow::Error>(Rendered {page, cache_time: 600, refresh: false, last_modified: None})
                 }

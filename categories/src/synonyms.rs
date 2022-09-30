@@ -31,6 +31,24 @@ impl Synonyms {
         let relevance = (*votes as f32 / 5. + 0.1).min(1.);
         Some((tag, relevance))
     }
+
+    fn get_matching(&self, keyword: &str) -> Option<&str> {
+        let (tag, votes) = self.mapping.get(keyword)?;
+        if *votes > 0 {
+            return Some(tag)
+        }
+        None
+    }
+
+    pub fn normalize<'a>(&'a self, keyword: &'a str) -> &'a str {
+        if let Some(alt) = self.get_matching(keyword) {
+            if let Some(alt2) = self.get_matching(alt) {
+                return alt2;
+            }
+            return alt;
+        }
+        keyword
+    }
 }
 
 

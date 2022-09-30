@@ -82,12 +82,6 @@ pub struct CrateOwnerStat {
 }
 
 impl CrateDb {
-    /// Path to sqlite db file to create/update
-    pub fn new(path: impl AsRef<Path>) -> FResult<Self> {
-        let path = path.as_ref();
-        Self::new_with_synonyms(path, Synonyms::new(path)?)
-    }
-
     pub fn new_with_synonyms(path: &Path, tag_synonyms: Synonyms) -> FResult<Self> {
         Ok(Self {
             tag_synonyms,

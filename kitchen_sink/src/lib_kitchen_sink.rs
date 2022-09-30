@@ -307,7 +307,7 @@ impl KitchenSink {
                 "".to_owned()
             },
         };
-        let data_path = Self::data_path()?;
+        let data_path = Self::data_path().context("can't get data path")?;
         Self::new(&data_path, &github_token).await
     }
 
@@ -331,17 +331,19 @@ impl KitchenSink {
             }
         }).await?;
 
+        let synonyms = categories::Synonyms::new(data_path)?;
+
         tokio::task::block_in_place(move || Ok(Self {
             main_cache_dir: data_path.to_path_buf(),
-            crev: Arc::new(crev?),
+            crev: Arc::new(crev.context("crev")?),
             rustsec: Arc::new(Mutex::new(rustsec.map_err(std::sync::Arc::new)?)),
-            crates_io: crates_io?,
+            crates_io: crates_io.context("crates_io")?,
             index: Arc::new(index?),
             url_check_cache: TempCache::new(&data_path.join("url_check2.db")).context("urlcheck")?,
             readme_check_cache: TempCache::new(&data_path.join("readme_check.db")).context("readmecheck")?,
             canonical_http_of_crate_at_version_cache: TempCache::new(&data_path.join("canonical_http_url_at.db")).context("readmecheck")?,
             docs_rs: docs_rs_client::DocsRsClient::new(data_path.join("docsrs.db")).context("docs")?,
-            crate_db: CrateDb::new(Self::assert_exists(data_path.join("crate_data.db"))?).context("db")?,
+            crate_db: CrateDb::new_with_synonyms(&Self::assert_exists(data_path.join("crate_data.db"))?, synonyms).context("db")?,
             derived_storage: SimpleCache::new(data_path.join("derived.db"), true)?,
             user_db: user_db::UserDb::new(Self::assert_exists(data_path.join("users.db"))?).context("udb")?,
             gh: gh.context("gh")?,
@@ -350,16 +352,16 @@ impl KitchenSink {
             category_crate_counts: DoubleCheckedCell::new(),
             top_crates_cached: Mutex::new(FxHashMap::default()),
             yearly: AllDownloads::new(data_path),
-            category_overrides: Self::load_category_overrides(&data_path.join("category_overrides.txt"))?,
+            category_overrides: Self::load_category_overrides(&data_path.join("category_overrides.txt")).context("cat")?,
             author_shitlist: Self::load_author_shitlist(&data_path.join("author_shitlist.txt"))?,
-            crates_io_owners_cache: TempCache::new(&data_path.join("cio-owners.tmp"))?,
-            depender_changes: TempCache::new(&data_path.join("deps-changes2.tmp"))?,
-            stats_histograms: TempCache::new(&data_path.join("stats-histograms.tmp"))?,
+            crates_io_owners_cache: TempCache::new(&data_path.join("cio-owners.tmp")).context("tmp1")?,
+            depender_changes: TempCache::new(&data_path.join("deps-changes2.tmp")).context("tmp2")?,
+            stats_histograms: TempCache::new(&data_path.join("stats-histograms.tmp")).context("tmp3")?,
             throttle: tokio::sync::Semaphore::new(40),
             auto_indexing_throttle: tokio::sync::Semaphore::new(4),
             crate_rustc_compat_cache: RwLock::new(HashMap::new()),
             crate_rustc_compat_db: OnceCell::new(),
-            event_log: EventLog::new(data_path.join("event_log.db"))?,
+            event_log: EventLog::new(data_path.join("event_log.db")).context("events")?,
             data_path: data_path.into(),
         }))
     }

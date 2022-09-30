@@ -32,7 +32,7 @@ pub struct CrateFound {
     pub origin: Origin,
     pub crate_name: String,
     pub description: String,
-    pub keywords: String,
+    pub keywords: Vec<String>,
     pub score: f32,
     pub relevance_score: f32,
     pub crate_base_score: f32,
@@ -125,7 +125,7 @@ impl CrateSearchIndex {
                 score: 0.,
                 crate_name,
                 description: take_string(doc.remove("description")),
-                keywords: take_string(doc.remove("keywords")),
+                keywords: take_string(doc.remove("keywords")).split(", ").filter(|&k| !k.is_empty()).map(|s| s.to_string()).collect(),
                 version: take_string(doc.remove("crate_version")),
                 monthly_downloads: if origin.is_crates_io() { take_int(doc.get("monthly_downloads")) } else { 0 },
                 origin,
@@ -165,9 +165,11 @@ impl CrateSearchIndex {
 
         // Make sure that there's at least one crate ranked high for each of the interesting keywords
         let mut interesting_crate_indices = dividing_keywords.iter().take(6).filter_map(|dk| {
-            docs.iter().position(|k| k.keywords.split(", ").any(|k| k == dk))
+            docs.iter().position(|k| k.keywords.iter().any(|k| k == dk))
         }).collect::<Vec<_>>();
-        interesting_crate_indices.extend([0,1,2]); // but keep top 3 results as they are
+        if docs.len() > 3 {
+            interesting_crate_indices.extend([0,1,2]); // but keep top 3 results as they are
+        }
         interesting_crate_indices.sort_unstable();
         interesting_crate_indices.dedup();
         let mut interesting = Vec::with_capacity(interesting_crate_indices.len());
@@ -186,14 +188,16 @@ impl CrateSearchIndex {
     }
 
 
-
     fn dividing_keywords(results: &[CrateFound], limit: usize, query_keywords: &[&str], skip_entire_results: &[&str]) -> Option<Vec<String>> {
+        // divide keyword popularity by its global popularity tf-idf, because everything gets api, linux, cargo, parser
+        // bonus if keyword pair exists
         let mut dupes = HashSet::new();
         let mut keyword_sets = results.iter().enumerate().filter_map(|(i, found)| {
                 if !dupes.insert(&found.keywords) { // some crate families have all the same keywords, which is spammy and biases the results
                     return None;
                 }
-                let k_set: HashSet<_> = found.keywords.split(", ")
+                let k_set: HashSet<_> = found.keywords.iter()
+                    .map(|k| k.as_str())
                     .filter(|k| !query_keywords.contains(k))
                     .collect();
                 if skip_entire_results.iter().any(|&dealbreaker| k_set.contains(dealbreaker)) {

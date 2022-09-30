@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use ahash::HashMapExt;
 use ahash::HashSet;
 use ahash::HashMap;
@@ -83,10 +85,12 @@ fn top_other_keyword(index: &CrateSearchIndex, query:&str, skip_words: &[&str], 
         return None; // noisy data?
     }
     let mut keyword_sets = res.iter().filter_map(|k| {
-        if k.keywords.split(", ").any(|k| skip_results.contains(&k)) {
+        if k.keywords.iter().any(|k| skip_results.contains(&k.as_str())) {
             return None;
         }
-        let mut k: Vec<_> = k.keywords.split(", ").filter(|k| !skip_words.contains(k)).collect();
+        let mut k: Vec<_> = k.keywords.iter()
+            .map(|k| k.as_str())
+            .filter(|k| !skip_words.contains(k)).collect();
         k.sort_unstable();
         Some(k)
     }).collect::<HashSet<_>>();

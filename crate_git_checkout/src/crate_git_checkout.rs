@@ -276,6 +276,7 @@ fn add_package(package_versions: &mut PackageVersionTimestamps, pkg: Package, co
 
     // Find oldest occurence of each version, assuming it's a release date
     let time_epoch = commit.time().seconds();
+    #[allow(deprecated)]
     let ver_time = package_versions.entry(pkg.name).or_insert_with(HashMap::new)
         .entry(pkg.version).or_insert(time_epoch);
     *ver_time = (*ver_time).min(time_epoch);

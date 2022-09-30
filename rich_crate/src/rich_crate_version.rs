@@ -224,7 +224,7 @@ impl RichCrateVersion {
 
     #[inline]
     pub fn version(&self) -> &str {
-        &self.package().version
+        &self.package().version()
     }
 
     pub fn version_semver(&self) -> Result<semver::Version, semver::Error> {
@@ -318,7 +318,6 @@ pub trait ManifestExt {
     fn is_proc_macro(&self) -> bool;
     fn is_sys(&self, has_buildrs: bool) -> bool;
     fn links(&self) -> Option<&str>;
-    fn package(&self) -> &Package;
 }
 impl ManifestExt for Manifest {
     fn is_proc_macro(&self) -> bool {
@@ -332,10 +331,6 @@ impl ManifestExt for Manifest {
     fn has_cargo_bin(&self) -> bool {
         // we get binaries normalized, so no need to check for package name
         self.bin.iter().any(|b| b.name.as_ref().map_or(false, |n| n.starts_with("cargo-")))
-    }
-
-    fn package(&self) -> &Package {
-        self.package.as_ref().unwrap()
     }
 
     fn links(&self) -> Option<&str> {

@@ -1,6 +1,5 @@
 use rich_crate::MaintenanceStatus;
 use rich_crate::Manifest;
-use rich_crate::ManifestExt;
 use rich_crate::Markup;
 use rich_crate::RichCrateVersion;
 use semver::VersionReq;

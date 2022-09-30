@@ -334,7 +334,7 @@ fn unpack_crate() {
     let k = include_bytes!("../test.crate");
     let d = read_archive(&k[..], "testing", "1.0.0").unwrap();
     assert_eq!(d.manifest.package.as_ref().unwrap().name, "crates-server");
-    assert_eq!(d.manifest.package.as_ref().unwrap().version, "0.5.1");
+    assert_eq!(d.manifest.package.as_ref().unwrap().version(), "0.5.1");
     assert!(d.lib_file.unwrap().contains("fn nothing"));
     assert_eq!(d.files.len(), 5);
     assert!(match d.readme.unwrap().1 {
@@ -362,7 +362,7 @@ fn unpack_repo() {
     assert_eq!(d.manifest.package, manifest.package);
 
     assert_eq!(d.manifest.package.as_ref().unwrap().name, "crates-server");
-    assert_eq!(d.manifest.package.as_ref().unwrap().version, "0.5.1");
+    assert_eq!(d.manifest.package.as_ref().unwrap().version(), "0.5.1");
     assert!(d.lib_file.unwrap().contains("fn nothing"));
     assert_eq!(d.files.len(), 5);
     assert!(match d.readme.unwrap().1 {

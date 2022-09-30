@@ -1018,7 +1018,7 @@ impl KitchenSink {
 
         // allow forced deprecations to take effect without reindexing
         if data.manifest.badges.maintenance.status == MaintenanceStatus::None {
-            if let Ok(req) = package.version.parse() {
+            if let Ok(req) = package.version().parse() {
                 if is_deprecated_requirement(&package.name, &req) {
                     data.manifest.badges.maintenance.status = MaintenanceStatus::Deprecated;
                 }
@@ -1218,7 +1218,7 @@ impl KitchenSink {
         if origin.is_crates_io() {
             // Delete the original docs.rs link, because we have our own
             // TODO: what if the link was to another crate or a subpage?
-            if package.documentation.as_ref().map_or(false, |s| Self::is_docs_rs_link(s)) && self.has_docs_rs(&origin, &package.name, &package.version).await {
+            if package.documentation.as_ref().map_or(false, |s| Self::is_docs_rs_link(s)) && self.has_docs_rs(&origin, &package.name, package.version()).await {
                 package.documentation = None; // docs.rs is not proper docs
             }
         }
@@ -2445,7 +2445,7 @@ impl KitchenSink {
         if msrv > 1 {
             debug!("Detected {:?} as msrv 1.{} ({})", origin, msrv, reason);
             let latest_bad_rustc = msrv - 1;
-            let ver = SemVer::parse(&package.version)?;
+            let ver = SemVer::parse(package.version())?;
             db.set_compat(origin, &ver, latest_bad_rustc, Compat::DefinitelyIncompatible, reason)?;
             if let Some(working_msrv) = working_msrv {
                 db.set_compat(origin, &ver, working_msrv, Compat::ProbablyWorks, "rust-version")?;

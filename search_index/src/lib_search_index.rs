@@ -242,7 +242,7 @@ impl CrateSearchIndex {
                 if skip_entire_results.iter().any(|&dealbreaker| k_set.contains(dealbreaker)) {
                     return None;
                 }
-                Some((k_set, if i < limit { 2048 } else { 1024 } + (128. * found.score) as u32)) // integer for ease of sorting, unique for sort stability
+                Some((k_set, if i < limit { 2048 } else { 1024 } + (128. * found.score) as i32)) // integer for ease of sorting, unique for sort stability
             }).collect::<Vec<_>>();
         drop(dupes);
 
@@ -255,7 +255,7 @@ impl CrateSearchIndex {
         let mut dividing_keywords = Vec::with_capacity(10);
         let mut next_keyword = second_most_common;
         for _ in 0..10 {
-            keyword_sets.retain(|(k_set, _)| !k_set.contains(&next_keyword));
+            keyword_sets.iter_mut().for_each(|(k_set, w)| if *w > 0 && k_set.contains(&next_keyword) { *w = -*w/2; });
             dividing_keywords.push(next_keyword.to_string());
             next_keyword = match Self::popular_dividing_keyword(&keyword_sets, &["reserved"]) {
                 None => break,
@@ -266,11 +266,11 @@ impl CrateSearchIndex {
     }
 
     /// Find a keyword that splits the set into two distinctive groups
-    fn popular_dividing_keyword<'a>(keyword_sets: &[(HashSet<&'a str>, u32)], ignore_keywords: &[&str]) -> Option<&'a str> {
+    fn popular_dividing_keyword<'a>(keyword_sets: &[(HashSet<&'a str>, i32)], ignore_keywords: &[&str]) -> Option<&'a str> {
         if keyword_sets.len() < 25 {
             return None; // too few results will give odd niche keywords
         }
-        let mut counts: HashMap<&str, (u32, u32)> = HashMap::with_capacity(keyword_sets.len());
+        let mut counts: HashMap<&str, (u32, i32)> = HashMap::with_capacity(keyword_sets.len());
         for (k_set, w) in keyword_sets {
             for k in k_set {
                 let mut n = counts.entry(k).or_default();

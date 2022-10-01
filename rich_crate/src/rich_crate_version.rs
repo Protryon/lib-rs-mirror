@@ -148,7 +148,7 @@ impl RichCrateVersion {
     pub fn repository_http_url(&self) -> Option<(&Repo, Cow<'_, str>)> {
         self.repository().map(|repo| {
             let relpath = self.derived.path_in_repo.as_deref().unwrap_or("");
-            (repo, repo.canonical_http_url(relpath))
+            (repo, repo.canonical_http_url(relpath, self.derived.vcs_info_git_sha1.map(|s| hex::encode(s)).as_deref()))
         })
     }
 
@@ -495,8 +495,10 @@ pub struct Derived {
     pub has_buildrs: bool,
     pub has_code_of_conduct: bool,
     pub is_yanked: bool,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if="Option::is_none")]
     pub bin_file: Option<String>,
+    #[serde(default, skip_serializing_if="Option::is_none")]
+    pub vcs_info_git_sha1: Option<[u8; 20]>,
 }
 
 /// Metadata guessed
@@ -514,6 +516,7 @@ pub struct CrateVersionSourceData {
     /// src/main.rs
     pub bin_file: Option<String>,
     pub path_in_repo: Option<String>,
+    pub vcs_info_git_sha1: Option<[u8; 20]>,
     pub has_buildrs: bool,
     pub has_code_of_conduct: bool,
     pub is_yanked: bool,

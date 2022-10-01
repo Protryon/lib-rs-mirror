@@ -1333,6 +1333,7 @@ impl KitchenSink {
             github_keywords,
             path_in_repo,
             is_yanked,
+            vcs_info_git_sha1: meta.vcs_info_git_sha1,
         };
 
         Ok((src, meta.manifest, warnings))
@@ -1359,10 +1360,9 @@ impl KitchenSink {
                     Some(p) => p,
                     None => self.crate_db.path_in_repo(&repo, &package.name).await?.unwrap_or_default(),
                 };
-                if let Some(url) = repo.canonical_http_url_at(&path_in_repo, &hex::encode(sha)) {
-                    self.canonical_http_of_crate_at_version_cache.set(Self::canonical_http_of_crate_at_version_cache_key(origin, crate_version), &url)?;
-                    return Ok(url);
-                }
+                let url = repo.canonical_http_url(&path_in_repo, Some(&hex::encode(sha))).into_owned();
+                self.canonical_http_of_crate_at_version_cache.set(Self::canonical_http_of_crate_at_version_cache_key(origin, crate_version), &url)?;
+                return Ok(url);
             }
         }
         let mut url = format!("https://docs.rs/crate/{crate_name}/{version}/source/", crate_name = urlencoding::Encoded(origin.short_crate_name()), version = urlencoding::Encoded(crate_version));
@@ -1574,7 +1574,7 @@ impl KitchenSink {
 
         if Self::is_same_url(package.documentation.as_deref(), package.homepage.as_deref()) ||
            Self::is_same_url(package.documentation.as_deref(), package.repository.as_deref()) ||
-           maybe_repo.map_or(false, |repo| Self::is_same_url(Some(&*repo.canonical_http_url("")), package.documentation.as_deref())) {
+           maybe_repo.map_or(false, |repo| Self::is_same_url(Some(&*repo.canonical_http_url("", None)), package.documentation.as_deref())) {
             package.documentation = None;
         }
 
@@ -2107,6 +2107,7 @@ impl KitchenSink {
                 categories: d.categories,
                 keywords: d.keywords,
                 path_in_repo: source_data.path_in_repo,
+                vcs_info_git_sha1: source_data.vcs_info_git_sha1,
                 language_stats: source_data.language_stats,
                 crate_compressed_size: source_data.crate_compressed_size,
                 crate_decompressed_size: source_data.crate_decompressed_size,

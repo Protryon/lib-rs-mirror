@@ -117,14 +117,14 @@ impl Repo {
     pub fn contributors_http_url(&self) -> Cow<'_, str> {
         match self.host {
             RepoHost::GitHub(SimpleRepo {ref owner, ref repo}) => {
-                format!("https://github.com/{}/{}/graphs/contributors", owner, repo).into()
+                format!("https://github.com/{owner}/{repo}/graphs/contributors").into()
             },
             RepoHost::GitLab(SimpleRepo {ref owner, ref repo}) => {
-                format!("https://gitlab.com/{}/{}/graphs/master", owner, repo).into()
+                format!("https://gitlab.com/{owner}/{repo}/graphs/master").into()
             },
             RepoHost::BitBucket(SimpleRepo {ref owner, ref repo}) => {
                 // not really…
-                format!("https://bitbucket.org/{}/{}/commits/all", owner, repo).into()
+                format!("https://bitbucket.org/{owner}/{repo}/commits/all").into()
             },
             RepoHost::Other => self.url.as_str().into(),
         }
@@ -183,8 +183,8 @@ impl Repo {
     }
 
     /// URL for browsing the repository via web browser
-    pub fn canonical_http_url(&self, base_dir_in_repo: &str) -> Cow<'_, str> {
-        self.host.canonical_http_url(base_dir_in_repo) // todo: add git sha1
+    pub fn canonical_http_url(&self, base_dir_in_repo: &str, treeish_revision: Option<&str>) -> Cow<'_, str> {
+        self.host.canonical_http_url(base_dir_in_repo, treeish_revision).map(Cow::from)
             .unwrap_or_else(|| self.url.as_str().into())
     }
 
@@ -193,10 +193,6 @@ impl Repo {
             Some(s) => s.into(),
             None => self.url.as_str().into(),
         }
-    }
-
-    pub fn canonical_http_url_at(&self, base_dir_in_repo: &str, treeish_revision: &str) -> Option<String> {
-        self.host.canonical_http_url_at(base_dir_in_repo, treeish_revision)
     }
 
     pub fn owner_name(&self) -> Option<&str> {
@@ -213,48 +209,40 @@ impl RepoHost {
     pub fn canonical_git_url(&self) -> Option<String> {
         match self {
             RepoHost::GitHub(SimpleRepo {ref owner, ref repo}) => {
-                Some(format!("https://github.com/{}/{}.git", owner, repo))
+                Some(format!("https://github.com/{owner}/{repo}.git"))
             },
             RepoHost::GitLab(SimpleRepo {ref owner, ref repo}) => {
-                Some(format!("https://gitlab.com/{}/{}.git", owner, repo))
+                Some(format!("https://gitlab.com/{owner}/{repo}.git"))
             },
             RepoHost::BitBucket(SimpleRepo {ref owner, ref repo}) => {
-                Some(format!("https://bitbucket.org/{}/{}", owner, repo))
+                Some(format!("https://bitbucket.org/{owner}/{repo}"))
             },
             RepoHost::Other => None,
         }
     }
 
     /// URL for browsing the repository via web browser
-    pub fn canonical_http_url(&self, base_dir_in_repo: &str) -> Option<Cow<'_, str>> {
+    pub fn canonical_http_url(&self, base_dir_in_repo: &str, treeish_revision: Option<&str>) -> Option<String> {
         assert!(!base_dir_in_repo.starts_with('/'));
-        let slash = if !base_dir_in_repo.is_empty() { "/tree/HEAD/" } else { "" };
+        let treeish_revision = treeish_revision.unwrap_or("HEAD");
+        let path_part = if !base_dir_in_repo.is_empty() || treeish_revision != "HEAD" {
+            let dir_name = match self {
+                RepoHost::BitBucket(_) => "src",
+                _ => "tree",
+            };
+            format!("/{dir_name}/{treeish_revision}/{base_dir_in_repo}")
+        } else {
+            String::new()
+        };
         match self {
             RepoHost::GitHub(SimpleRepo {ref owner, ref repo}) => {
-                Some(format!("https://github.com/{}/{}{}{}", owner, repo, slash, base_dir_in_repo).into())
+                Some(format!("https://github.com/{owner}/{repo}{path_part}"))
             },
             RepoHost::GitLab(SimpleRepo {ref owner, ref repo}) => {
-                Some(format!("https://gitlab.com/{}/{}{}{}", owner, repo, slash, base_dir_in_repo).into())
+                Some(format!("https://gitlab.com/{owner}/{repo}{path_part}"))
             },
             RepoHost::BitBucket(SimpleRepo {ref owner, ref repo}) => {
-                Some(format!("https://bitbucket.org/{}/{}", owner, repo).into()) // FIXME: needs hash
-            },
-            RepoHost::Other => None,
-        }
-    }
-
-    /// URL for browsing the repository via web browser
-    pub fn canonical_http_url_at(&self, base_dir_in_repo: &str, treeish_revision: &str) -> Option<String> {
-        assert!(!base_dir_in_repo.starts_with('/'));
-        match self {
-            RepoHost::GitHub(SimpleRepo {ref owner, ref repo}) => {
-                Some(format!("https://github.com/{owner}/{repo}/tree/{treeish_revision}/{base_dir_in_repo}"))
-            },
-            RepoHost::GitLab(SimpleRepo {ref owner, ref repo}) => {
-                Some(format!("https://gitlab.com/{owner}/{repo}/tree/{treeish_revision}/{base_dir_in_repo}"))
-            },
-            RepoHost::BitBucket(SimpleRepo {ref owner, ref repo}) => {
-                Some(format!("https://bitbucket.org/{owner}/{repo}/src/{treeish_revision}/{base_dir_in_repo}"))
+                Some(format!("https://bitbucket.org/{owner}/{repo}{path_part}"))
             },
             RepoHost::Other => None,
         }
@@ -298,9 +286,9 @@ impl TryFrom<RepoHost> for Repo {
 fn repo_parse() {
     let repo = Repo::new("HTTPS://GITHUB.COM/FOO/BAR").unwrap();
     assert_eq!("https://github.com/foo/bar.git", repo.canonical_git_url());
-    assert_eq!("https://github.com/foo/bar", repo.canonical_http_url(""));
-    assert_eq!("https://github.com/foo/bar/tree/HEAD/subdir", repo.canonical_http_url("subdir"));
-    assert_eq!("https://github.com/foo/bar/tree/HEAD/sub/dir", repo.canonical_http_url("sub/dir"));
+    assert_eq!("https://github.com/foo/bar", repo.canonical_http_url("", None));
+    assert_eq!("https://github.com/foo/bar/tree/HEAD/subdir", repo.canonical_http_url("subdir", None));
+    assert_eq!("https://github.com/foo/bar/tree/HEAD/sub/dir", repo.canonical_http_url("sub/dir", None));
 
     let repo = Repo::new("HTTPS://GITlaB.COM/FOO/BAR").unwrap();
     assert_eq!("https://gitlab.com/foo/bar.git", repo.canonical_git_url());
@@ -309,11 +297,11 @@ fn repo_parse() {
     assert_eq!("https://gitlab.com/foo/bar/blob/HEAD/foo/bar/", repo.readme_base_url("foo/bar", None));
     assert_eq!("https://gitlab.com/foo/bar/raw/HEAD/baz/", repo.readme_base_image_url("baz/", None));
     assert_eq!("https://gitlab.com/foo/bar/raw/main/baz/", repo.readme_base_image_url("baz/", Some("main")));
-    assert_eq!("https://gitlab.com/foo/bar/tree/HEAD/sub/dir", repo.canonical_http_url("sub/dir"));
+    assert_eq!("https://gitlab.com/foo/bar/tree/HEAD/sub/dir", repo.canonical_http_url("sub/dir", None));
 
     let repo = Repo::new("http://priv@example.com/#111").unwrap();
     assert_eq!("http://priv@example.com/#111", repo.canonical_git_url());
-    assert_eq!("http://priv@example.com/#111", repo.canonical_http_url(""));
+    assert_eq!("http://priv@example.com/#111", repo.canonical_http_url("", None));
 
     let bad = Repo::new("N/A");
     assert!(bad.is_err());

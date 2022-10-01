@@ -27,7 +27,7 @@ impl Urler {
                 return match repo.host() {
                     RepoHost::GitHub(repo) => format!("/gh/{}/{}/{}", Encoded(&*repo.owner), Encoded(&*repo.repo), Encoded(&*dep.package)),
                     RepoHost::GitLab(repo) => format!("/lab/{}/{}/{}", Encoded(&*repo.owner), Encoded(&*repo.repo), Encoded(&*dep.package)),
-                    _ => repo.canonical_http_url("").into_owned(),
+                    _ => repo.canonical_http_url("", dep.dep.git_rev()).into_owned(),
                 };
             }
         } else if dep.dep.detail().map_or(false, |d| d.path.is_some()) {

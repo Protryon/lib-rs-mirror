@@ -572,8 +572,8 @@ async fn handle_repo_crate(req: HttpRequest) -> Result<HttpResponse, ServerError
 
     if !state.crates.load().crate_exists(&origin) {
         let (repo, _) = origin.into_repo().expect("repohost");
-        let url = repo.canonical_http_url("").expect("repohost");
-        return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", url.into_owned())).finish());
+        let url = repo.canonical_http_url("", None).expect("repohost");
+        return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", url)).finish());
     }
 
     Ok(serve_page(with_file_cache(state, &cache_file_name_for_origin(&origin), 86400, {

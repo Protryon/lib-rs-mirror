@@ -1203,6 +1203,9 @@ impl KitchenSink {
                 if t.starts_with("rust-") {
                     *t = t.trim_start_matches("rust-").into();
                 }
+                if t.ends_with("-rs") {
+                    *t = t.trim_end_matches("-rs").into();
+                }
             }
             topics.retain(|t| match t.as_str() {
                 "rust" | "rs" | "rustlang" | "rust-lang" | "crate" | "crates" | "library" => false,

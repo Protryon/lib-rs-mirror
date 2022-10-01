@@ -75,8 +75,9 @@ impl SearchPage<'_> {
             return None;
         }
         let prefix = format!("{query}-");
+        let suffix = format!("-{query}");
         Some(self.dividing_keywords.iter()
-            .filter(move |k| !k.starts_with(&prefix))
+            .filter(move |k| !k.starts_with(&prefix) && !k.ends_with(&suffix))
             .take(3).map(move |k| {
             (format!("{query} {k}"), k.as_str())
         }))

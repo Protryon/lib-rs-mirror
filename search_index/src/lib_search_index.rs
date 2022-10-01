@@ -283,6 +283,7 @@ impl CrateSearchIndex {
             return None; // too few results will give odd niche keywords
         }
         let prefix = format!("{query_keyword}-");
+        let suffix = format!("-{query_keyword}");
         let mut counts: HashMap<&str, (u32, i32)> = HashMap::with_capacity(keyword_sets.len());
         for (k_set, w) in keyword_sets {
             for k in k_set {
@@ -294,7 +295,13 @@ impl CrateSearchIndex {
                     if !k_set.contains(rest) {
                         let mut n = counts.entry(rest).or_default();
                         n.0 += 1;
-                        n.1 += *w;
+                        n.1 += *w * 2; // having prefix/suffix keyword is a good indicator that it's a meaningful distinction rather than a synonym
+                    }
+                } else if let Some(rest) = k.strip_suffix(&suffix) {
+                    if !k_set.contains(rest) {
+                        let mut n = counts.entry(rest).or_default();
+                        n.0 += 1;
+                        n.1 += *w * 2;
                     }
                 }
             }

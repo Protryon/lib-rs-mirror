@@ -187,7 +187,7 @@ pub fn is_deprecated_requirement(name: &str, requirement: &VersionReq) -> bool {
 }
 
 pub fn is_autopublished(k: &RichCrateVersion) -> bool {
-    k.description().map_or(false, |d| d.starts_with("Automatically published "))
+    k.description().map_or(false, |d| d.starts_with("Automatically published ")) || k.short_name().starts_with("rustc-ap-")
 }
 
 pub fn is_squatspam(k: &RichCrateVersion) -> bool {

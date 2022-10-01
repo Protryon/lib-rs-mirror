@@ -111,8 +111,8 @@ pub async fn warnings_for_crate(c: &KitchenSink, k: &RichCrateVersion, all: &Ric
         }
     }
 
-    let verified_msrv = c.rustc_compatibility(&all).await?.values().rev().filter_map(|c| c.newest_bad_certain()).next().unwrap_or(0);
-    let displayed_msrv = c.rustc_compatibility(&all).await?.values().rev().filter_map(|c| c.newest_bad()).next().unwrap_or(0);
+    let verified_msrv = c.rustc_compatibility(all).await?.values().rev().filter_map(|c| c.newest_bad_certain()).next().unwrap_or(0);
+    let displayed_msrv = c.rustc_compatibility(all).await?.values().rev().filter_map(|c| c.newest_bad()).next().unwrap_or(0);
 
     // if it's not compatible with the old compiler, there's no point using an old-compiler edition
     if verified_msrv >= 55 && k.edition() < Edition::E2021 {
@@ -129,7 +129,7 @@ pub async fn warnings_for_crate(c: &KitchenSink, k: &RichCrateVersion, all: &Ric
         .and_then(|v| v.parse().ok())
         .unwrap_or(0);
     if explicit_msrv <= verified_msrv {
-        let msrv_no_deps = c.rustc_compatibility_no_deps(&all)?.values().rev().filter_map(|c| c.newest_bad_certain()).next().unwrap_or(0);
+        let msrv_no_deps = c.rustc_compatibility_no_deps(all)?.values().rev().filter_map(|c| c.newest_bad_certain()).next().unwrap_or(0);
         if msrv_no_deps >= 56 {
             warnings.insert(Warning::BadMSRV(displayed_msrv+1, explicit_msrv)); // for UI consistency display MSRV with deps
         }
@@ -139,19 +139,19 @@ pub async fn warnings_for_crate(c: &KitchenSink, k: &RichCrateVersion, all: &Ric
         warnings.insert(Warning::DocsRs);
     }
     let (runtime, dev, build) = k.direct_dependencies();
-    warn_outdated_deps(&runtime, &mut warnings, &c).await;
-    warn_outdated_deps(&build, &mut warnings, &c).await;
-    warn_bad_requirements(k, &runtime, &mut warnings, &c).await;
-    warn_bad_requirements(k, &build, &mut warnings, &c).await;
+    warn_outdated_deps(&runtime, &mut warnings, c).await;
+    warn_outdated_deps(&build, &mut warnings, c).await;
+    warn_bad_requirements(k, &runtime, &mut warnings, c).await;
+    warn_bad_requirements(k, &build, &mut warnings, c).await;
     // dev deps are very low priority, so don't warn about them unless there's nothing else to do
     if warnings.is_empty() {
-        warn_outdated_deps(&dev, &mut warnings, &c).await;
+        warn_outdated_deps(&dev, &mut warnings, c).await;
     }
     Ok(warnings)
 }
 
 fn find_most_recent_release<'a>(versions: &'a [(SemVer, &CrateVersion)], pre: bool) -> Option<(&'a SemVer, DateTime<FixedOffset>)> {
-    versions.iter().filter(move |(v, _)| pre == !v.pre.is_empty()).max_by(|a,b| a.1.created_at.cmp(&b.1.created_at))
+    versions.iter().filter(move |(v, _)| pre != v.pre.is_empty()).max_by(|a,b| a.1.created_at.cmp(&b.1.created_at))
         .and_then(|(v, c)| Some((v, DateTime::parse_from_rfc3339(&c.created_at).ok()?)))
 }
 

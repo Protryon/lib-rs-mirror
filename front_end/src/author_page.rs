@@ -1,5 +1,4 @@
 use ahash::HashMapExt;
-use ahash::HashSetExt;
 use crate::templates;
 use crate::url_domain;
 use crate::Page;
@@ -114,7 +113,7 @@ impl<'a> AuthorPage<'a> {
         collab.sort_by(|a, b| b.0.total_cmp(&a.0));
         let collab: Vec<_> = join_all(collab.into_iter().take(100).map(|(_, login)| async move {
             kitchen_sink.user_by_github_login(login).await.map_err(|e| eprintln!("{}: {}", login, e)).ok().and_then(|x| x)
-        })).await.into_iter().filter_map(|x| x).collect();
+        })).await.into_iter().flatten().collect();
 
         let shitlist_reason = kitchen_sink.author_shitlist.get(aut.github.login.to_ascii_lowercase().as_str()).map(|s| s.as_str());
 

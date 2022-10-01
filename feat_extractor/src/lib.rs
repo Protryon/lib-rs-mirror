@@ -248,7 +248,7 @@ fn is_reserved_boilerplate_text(desc: &str) -> bool {
         .trim_start_matches("has been ")
         .trim_start_matches("has ")
         .trim_start_matches("a ").trim_start();
-    return desc.contains("this crate is a placeholder") ||
+    desc.contains("this crate is a placeholder") ||
         desc.contains("reserving this crate") ||
         desc.contains("reserving this crate") ||
         desc.contains("only to reserve the name") ||
@@ -284,5 +284,5 @@ fn is_reserved_boilerplate_text(desc: &str) -> bool {
         desc2.starts_with("claiming it before someone") ||
         desc2.starts_with("reserved name") ||
         desc2.starts_with("reserved package") ||
-        desc2.starts_with("reserve the name");
+        desc2.starts_with("reserve the name")
 }

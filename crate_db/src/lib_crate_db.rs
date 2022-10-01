@@ -419,7 +419,7 @@ impl CrateDb {
         };
         let threshold = if had_explicit_categories {0.01} else if is_important_ish {0.1} else {0.25};
         let limit = if had_explicit_categories {2} else {5};
-        let categories = categories::adjusted_relevance(candidates, &keywords, threshold, limit);
+        let categories = categories::adjusted_relevance(candidates, keywords, threshold, limit);
 
         debug!("categories = {categories:?}");
 
@@ -502,7 +502,7 @@ impl CrateDb {
             let mut child_path = child_path.as_str();
 
             loop {
-                child_path = child_path.rsplitn(2, '/').nth(1).unwrap_or("");
+                child_path = child_path.rsplit_once('/').map(|x| x.0).unwrap_or("");
                 if let Some(child) = paths.get(child_path) {
                     return Ok(Origin::try_from_crates_io_name(child));
                 }
@@ -567,7 +567,7 @@ impl CrateDb {
         let repo = repo.canonical_git_url();
         let mut get_path = conn.prepare_cached("SELECT path FROM repo_crates WHERE repo = ?1 AND crate_name = ?2")?;
         let args: &[&dyn ToSql] = &[&repo, &crate_name];
-        Ok(none_rows(get_path.query_row(args, |row| row.get(0))).map_err(|e| Error::DbCtx(e, "path_in_repo"))?)
+        none_rows(get_path.query_row(args, |row| row.get(0))).map_err(|e| Error::DbCtx(e, "path_in_repo"))
     }
 
     /// Update download counts of the crate

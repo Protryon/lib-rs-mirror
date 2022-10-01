@@ -325,9 +325,9 @@ impl BuildDb {
             let compat = Self::compat_row(row)?;
             let origin = Origin::from_str(row.get_ref(4)?.as_str()?);
 
-            let mut by_ver = by_crate.entry(origin).or_insert_with(BTreeMap::default);
+            let by_ver = by_crate.entry(origin).or_insert_with(BTreeMap::default);
 
-            Self::append_compat(&mut by_ver, compat);
+            Self::append_compat(by_ver, compat);
         }
         Ok(by_crate)
     }

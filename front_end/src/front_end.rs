@@ -6,7 +6,6 @@
 //! complex expressions in the templates.
 
 use ahash::HashSetExt;
-use ahash::HashSetExt;
 mod all_versions;
 mod author_page;
 mod cat_page;
@@ -353,7 +352,7 @@ pub fn limit_text_len<'t>(text: &'t str, mut len_min: usize, mut len_max: usize)
     if let Some(pos) = optional.find(&['.', ',', '!', '\n', '?', ')', ']'][..]).or_else(|| optional.find(' ')) {
         cut = cut[..=len_min + pos].trim_end_matches(&['.', ',', '!', '\n', '?', ' '][..]);
     };
-    return format!("{}…", cut).into();
+    format!("{}…", cut).into()
 }
 
 #[test]

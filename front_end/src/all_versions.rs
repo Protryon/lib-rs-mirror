@@ -1,5 +1,4 @@
 use ahash::HashMapExt;
-use ahash::HashSetExt;
 use crate::Urler;
 use crate::reverse_dependencies::DownloadsBar;
 use crate::Page;

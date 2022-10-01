@@ -117,7 +117,7 @@ impl SimpleCache {
         let conn = self.conn.get_or(|| self.connect().map_err(Arc::new));
         match conn {
             Ok(conn) => cb(conn),
-            Err(err) => Err(Error::Db(self.url.clone(), Arc::clone(&err))),
+            Err(err) => Err(Error::Db(self.url.clone(), Arc::clone(err))),
         }
     }
 

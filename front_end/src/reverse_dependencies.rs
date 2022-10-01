@@ -108,7 +108,7 @@ impl<'a> CratePageRevDeps<'a> {
                     })
                     .unwrap_or_default();
 
-                    let req = req.parse().unwrap_or_else(|_| VersionReq::STAR);
+                    let req = req.parse().unwrap_or(VersionReq::STAR);
                     let matches_latest = req.matches(latest_stable_semver) || req.matches(latest_unstable_semver);
 
                     RevDepInf {

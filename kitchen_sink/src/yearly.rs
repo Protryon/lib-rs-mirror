@@ -68,7 +68,7 @@ impl AllDownloads {
     fn get_full_year(&self, year: u16) -> Result<Arc<TempCache<PerVersionDownloads>>, simple_cache::Error> {
         let mut t = self.by_year.lock();
         let cache = self.get_cache(&mut t, year)?;
-        Ok(Arc::clone(&cache))
+        Ok(Arc::clone(cache))
     }
 
     pub fn total_year_downloads(&self, year: u16) -> Result<[u64; 366], simple_cache::Error> {

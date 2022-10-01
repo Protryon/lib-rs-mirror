@@ -75,7 +75,7 @@ fn downloads_over_time(start: Date<Utc>, mut day: Date<Utc>, kitchen_sink: &Kitc
         if n > 0 {
             break;
         }
-        day = day - chrono::Duration::days(1);
+        day -= chrono::Duration::days(1);
     }
     while day > start {
         let mut weekday_sum = 0;
@@ -93,7 +93,7 @@ fn downloads_over_time(start: Date<Utc>, mut day: Date<Utc>, kitchen_sink: &Kitc
                 Weekday::Sat | Weekday::Sun => weekend_sum += n,
                 _ => weekday_sum += n,
             };
-            day = day - chrono::Duration::days(1);
+            day -= chrono::Duration::days(1);
         }
         dl.push((weekday_sum, weekend_sum));
     }
@@ -251,7 +251,7 @@ fn rustc_stats(compat: &HashMap<Origin, CompatByCrateVersion>, max_rust_version:
         }
 
         // stats for latest crate version only
-        let latest_ver = match c.iter().rfind(|(v, _)| v.pre.is_empty()).or_else(|| c.iter().rev().nth(0)) {
+        let latest_ver = match c.iter().rfind(|(v, _)| v.pre.is_empty()).or_else(|| c.iter().rev().next()) {
             Some((_, c)) => c,
             None => continue,
         };
@@ -363,7 +363,7 @@ async fn category_stats(kitchen_sink: &KitchenSink) -> Result<Vec<TreeBox>, anyh
     }
     fn new_cat(sub: Vec<TreeBox>) -> TreeBox {
         TreeBox {
-            cat: CATEGORIES.root.values().nth(0).unwrap(),
+            cat: CATEGORIES.root.values().next().unwrap(),
             title: String::new(),
             label: String::new(),
             font_size: 0.,
@@ -437,7 +437,7 @@ async fn category_stats(kitchen_sink: &KitchenSink) -> Result<Vec<TreeBox>, anyh
 
     // first layout of top-level boxes (won't be used for anything other than second layout)
     for top in roots.iter_mut() {
-        let (count, weight) = if top.label == "" { (0, 0.) } else { kitchen_sink.category_crate_count(&top.cat.slug).await? };
+        let (count, weight) = if top.label.is_empty() { (0, 0.) } else { kitchen_sink.category_crate_count(&top.cat.slug).await? };
         top.count = count;
         top.weight = weight;
 

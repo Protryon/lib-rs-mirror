@@ -217,7 +217,7 @@ async fn main() {
 #[inline(never)]
 fn filter_download_spam(crates: &CratesMap, versions: &VersionsMap, downloads: &mut VersionDownloads) {
     // the downloads in the datadump aren't complete, so incidents can be fixed only when they're recent
-    let earliest_date_available = downloads.values().flat_map(|v| v).map(|&(d, _, _)| d).min().unwrap();
+    let earliest_date_available = downloads.values().flatten().map(|&(d, _, _)| d).min().unwrap();
     let incidents: Vec<_> = DOWNLOAD_SPAM_INCIDENTS.iter().filter_map(|&Incident {start,end,headroom,lookaround,names}| {
         let start = date_from_str(start).unwrap();
         // otherwise it won't have enough before/after data
@@ -236,7 +236,7 @@ fn filter_download_spam(crates: &CratesMap, versions: &VersionsMap, downloads: &
     }
     for (crate_id, name) in crates.iter() {
         let versions = versions.get(crate_id).expect(name);
-        let orig_downloads: u32 = versions.iter().flat_map(|row| downloads.get(&row.id)).flat_map(|d| d).map(|d| d.1).sum();
+        let orig_downloads: u32 = versions.iter().flat_map(|row| downloads.get(&row.id)).flatten().map(|d| d.1).sum();
 
         for &Incident { start, end, headroom, lookaround, .. } in incidents.iter().filter(|i| i.names.is_empty() || i.names.contains(name.as_str())) {
             let min_date = start - chrono::Duration::days(lookaround.into());
@@ -264,7 +264,7 @@ fn filter_download_spam(crates: &CratesMap, versions: &VersionsMap, downloads: &
             }
         }
 
-        let after_downloads: u32 = versions.iter().flat_map(|row| downloads.get(&row.id)).flat_map(|d| d).map(|d| d.1).sum();
+        let after_downloads: u32 = versions.iter().flat_map(|row| downloads.get(&row.id)).flatten().map(|d| d.1).sum();
         if after_downloads != orig_downloads {
             eprintln!("Changed {name} dl from {orig_downloads} to {after_downloads}");
         }
@@ -318,14 +318,14 @@ fn versions_histogram(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDe
                     let latest_date = date_from_str(&latest.created_at);
                     let oldest_date = date_from_str(&oldest.created_at);
                     if let (Ok(latest_date), Ok(oldest_date)) = (latest_date, oldest_date) {
-                        insert_hist_item(&mut age, today.signed_duration_since(oldest_date).num_weeks() as u32, &name);
-                        insert_hist_item(&mut languish, today.signed_duration_since(latest_date).num_weeks() as u32, &name);
+                        insert_hist_item(&mut age, today.signed_duration_since(oldest_date).num_weeks() as u32, name);
+                        insert_hist_item(&mut languish, today.signed_duration_since(latest_date).num_weeks() as u32, name);
                         let maintenance_weeks = if v.len() == 1 {
                             0
                         } else {
                             latest_date.signed_duration_since(oldest_date).num_weeks().max(1) as u32
                         };
-                        insert_hist_item(&mut maintenance, maintenance_weeks, &name);
+                        insert_hist_item(&mut maintenance, maintenance_weeks, name);
                     }
                 }
 
@@ -335,7 +335,7 @@ fn versions_histogram(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDe
                     } else {
                         size / 1000
                     };
-                    insert_hist_item(&mut crate_sizes, size_kib as u32, &name);
+                    insert_hist_item(&mut crate_sizes, size_kib as u32, name);
                 }
                 if let Some(t) = licenses.get_mut(&latest.license) {
                     *t += 1;
@@ -343,9 +343,9 @@ fn versions_histogram(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDe
                     licenses.insert(latest.license.clone(), 1);
                 }
 
-                insert_hist_item(&mut num_deps, deps.get(&latest.id).map(|d| d.as_slice()).unwrap_or_default().len() as u32, &name);
+                insert_hist_item(&mut num_deps, deps.get(&latest.id).map(|d| d.as_slice()).unwrap_or_default().len() as u32, name);
             }
-            insert_hist_item(&mut num_releases, non_yanked_releases, &name);
+            insert_hist_item(&mut num_releases, non_yanked_releases, name);
         }
     }
     ksink.index_stats_histogram("releases", num_releases);
@@ -477,7 +477,7 @@ fn process_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users:
         let mut owners: Vec<_> = owners
             .into_iter()
             .filter_map(|o| {
-                let invited_at = o.created_at.splitn(2, '.').next().unwrap().to_string(); // trim millis part
+                let invited_at = o.created_at.split('.').next().unwrap().to_string(); // trim millis part
                 let invited_by_github_id =
                     o.created_by_id.and_then(|id| users.get(&id).map(|u| u.github_id as u32).or_else(|| teams.get(&id).map(|t| t.github_id)));
                 let mut o = match o.owner_kind {

@@ -1447,7 +1447,7 @@ lazy_static! {
         (Cond::NotAny(&["no-std", "no_std", "nostd", "hardware", "embedded"]), &[("no-std", 0.8, 0.)]),
         (Cond::Any(&["discord", "telegram", "twitch"]), &[("web-programming", 1.1, 0.1), ("no-std", 0.8, 0.), ("compilers", 0.8, 0.), ("accessibility", 0.8, 0.), ("asynchronous", 0.8, 0.), ("web-programming::websocket", 0.7, 0.)]),
 
-    ].iter().copied().collect();
+    ].to_vec();
 }
 
 /// Based on the set of keywords, adjust relevance of given categories
@@ -1646,14 +1646,14 @@ fn relate_subcategory_candidates(candidates: &mut HashMap<Box<str>, f64>, catego
                 if *score > max {
                     max = *score;
                 }
-                *score = *score + score.min(add_to_children); // at most double the existing score to avoid creating false child categories
+                *score += score.min(add_to_children); // at most double the existing score to avoid creating false child categories
                 *score / 2. // propagate half down
             },
             None => 0.,
         };
         let max_of_children = relate_subcategory_candidates(candidates, &cat.sub, propagage);
         if let Some(score) = candidates.get_mut(cat.slug.as_str()) {
-            *score = *score + max_of_children / 6.;
+            *score += max_of_children / 6.;
         }
     }
     max

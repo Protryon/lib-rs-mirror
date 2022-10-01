@@ -267,7 +267,7 @@ async fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult
 
                     let mut upgrade_note = String::new();
                     if let Some(latest) = latest_version_matching_requirement(&req, deadline, kitchen_sink, &origin).await {
-                        upgrade_note = format!("Specify the version as {} = \"{}\". ", name, latest.to_string());
+                        upgrade_note = format!("Specify the version as {} = \"{}\". ", name, latest);
                     }
 
                     (if is_breaking {2} else {1}, format!("Imprecise dependency requirement {} = {}", name, req).into(),
@@ -289,7 +289,7 @@ async fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult
                 },
                 Warning::Reserved => {
                     extended_desc = Some("It's OK if you intend to publish this project in the near future. Keep in mind that even if you have good intentions, things may not go as planned. crates.io won't reclaim abandoned crates, so reserving good names may end up wasting the good names.");
-                    (1, "Crate is 'reserved'".into(), format!("Please be respectful of crates.io and don't squat crate names. You can ensure the crate can be given to someone else by co-owners, e.g. rust-bus org maintainers: cargo owner --add rust-bus-owner").into(),
+                    (1, "Crate is 'reserved'".into(), "Please be respectful of crates.io and don't squat crate names. You can ensure the crate can be given to someone else by co-owners, e.g. rust-bus org maintainers: cargo owner --add rust-bus-owner".to_string().into(),
                     Some(("Rust-bus maintainers".into(), "https://users.rust-lang.org/t/bus-factor-1-for-crates/17046".into())))
                 },
                 Warning::StaleRelease(days, is_stable, severity) => {

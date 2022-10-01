@@ -259,9 +259,9 @@ impl CrateSearchIndex {
 
 
         // api/cli are boring and generic
-        let most_common = Self::popular_dividing_keyword(&keyword_sets, &query_as_keyword, &["api", "cli"])?;
+        let most_common = Self::popular_dividing_keyword(&keyword_sets, query_as_keyword, &["api", "cli"])?;
         // The most common co-occurrence may be a synonym, so skip it for now
-        let second_most_common = Self::popular_dividing_keyword(&keyword_sets, &query_as_keyword, &[most_common])?;
+        let second_most_common = Self::popular_dividing_keyword(&keyword_sets, query_as_keyword, &[most_common])?;
 
         let mut dividing_keywords = Vec::with_capacity(10);
         let mut next_keyword = second_most_common;
@@ -271,7 +271,7 @@ impl CrateSearchIndex {
             if keyword_sets.iter().filter(|&(_, w)| *w > 0).count() < 25 {
                 break;
             }
-            next_keyword = match Self::popular_dividing_keyword(&keyword_sets, &query_as_keyword, &["reserved"]) {
+            next_keyword = match Self::popular_dividing_keyword(&keyword_sets, query_as_keyword, &["reserved"]) {
                 None => break,
                 Some(another) => another,
             };

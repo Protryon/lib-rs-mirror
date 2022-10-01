@@ -666,7 +666,7 @@ impl KitchenSink {
         let missing_data_days = summed_days[0..day_of_year as usize].iter().cloned().rev().take_while(|&s| s == 0).count().min(7);
 
         if missing_data_days > 0 {
-            now = now - chrono::Duration::days(missing_data_days as _);
+            now -= chrono::Duration::days(missing_data_days as _);
         }
 
         for i in (1..=num_weeks).rev() {
@@ -706,7 +706,7 @@ impl KitchenSink {
         });
         let stream = futures::stream::iter(all.iter())
             .map(move |(name, _)| async move {
-                self.rich_crate_async(&Origin::from_crates_io_name(&*name)).await.map_err(|e| error!("to reindex {}: {}", name, e)).ok()
+                self.rich_crate_async(&Origin::from_crates_io_name(name)).await.map_err(|e| error!("to reindex {}: {}", name, e)).ok()
             })
             .buffer_unordered(8)
             .filter_map(|x| async {x});
@@ -860,7 +860,7 @@ impl KitchenSink {
                 let missing_data_days = summed_days[0..day_of_year as usize].iter().cloned().rev().take_while(|&s| s == 0).count().min(7);
 
                 if missing_data_days > 0 {
-                    now = now - chrono::Duration::days(missing_data_days as _);
+                    now -= chrono::Duration::days(missing_data_days as _);
                 }
 
                 // TODO: make it an iterator
@@ -908,7 +908,7 @@ impl KitchenSink {
 
     pub async fn crates_io_meta(&self, name: &str) -> KResult<CrateMetaFile> {
         tokio::task::yield_now().await;
-        if stopped() {return Err(KitchenSinkErr::Stopped.into());}
+        if stopped() {return Err(KitchenSinkErr::Stopped);}
 
         let krate = tokio::task::block_in_place(|| {
             self.index.crates_io_crate_by_lowercase_name(name)
@@ -1236,10 +1236,8 @@ impl KitchenSink {
         let mut github_name = None;
         if let Some(ref crate_repo) = maybe_repo {
             if let Some(ghrepo) = self.github_repo(crate_repo).await? {
-                if ghrepo.archived {
-                    if meta.manifest.badges.maintenance.status == MaintenanceStatus::None {
-                        meta.manifest.badges.maintenance.status = MaintenanceStatus::AsIs; // FIXME: not exactly
-                    }
+                if ghrepo.archived && meta.manifest.badges.maintenance.status == MaintenanceStatus::None {
+                    meta.manifest.badges.maintenance.status = MaintenanceStatus::AsIs; // FIXME: not exactly
                 }
                 if package.homepage.is_none() {
                     if let Some(url) = ghrepo.homepage {
@@ -1299,7 +1297,7 @@ impl KitchenSink {
         let has_code_of_conduct = meta.has("CODE_OF_CONDUCT.md") || meta.has("docs/CODE_OF_CONDUCT.md") || meta.has(".github/CODE_OF_CONDUCT.md");
 
         let path_in_repo = meta.path_in_repo;
-        let treeish_revision = meta.vcs_info_git_sha1.as_ref().map(|sha1| hex::encode(sha1));
+        let treeish_revision = meta.vcs_info_git_sha1.as_ref().map(hex::encode);
         let readme = meta.readme.map(|(readme_path, markup)| {
             let (base_url, base_image_url) = match maybe_repo {
                 Some(repo) => {
@@ -1644,7 +1642,7 @@ impl KitchenSink {
         }
 
         match (a, b) {
-            (Some(ref a), Some(b)) if trim(a.as_ref()).eq_ignore_ascii_case(trim(b)) => true,
+            (Some(a), Some(b)) if trim(a).eq_ignore_ascii_case(trim(b)) => true,
             _ => false,
         }
     }
@@ -1765,7 +1763,7 @@ impl KitchenSink {
     /// Rustsec reviews
     pub fn advisories_for_crate(&self, origin: &Origin) -> Vec<creviews::security::Advisory> {
         match origin {
-            Origin::CratesIo(name) => self.rustsec.lock().unwrap().advisories_for_crate(name).into_iter().map(|v| v.clone()).collect(),
+            Origin::CratesIo(name) => self.rustsec.lock().unwrap().advisories_for_crate(name).into_iter().cloned().collect(),
             _ => vec![],
         }
     }
@@ -1901,11 +1899,7 @@ impl KitchenSink {
             if other.is_yanked() {
                 return None;
             }
-            if let Some(related) = self.are_namespace_related(krate, &other).await.ok()? {
-                Some((other, ranking * related))
-            } else {
-                None
-            }
+            self.are_namespace_related(krate, &other).await.ok()?.map(|related| (other, ranking * related))
         });
         let mut tmp = futures::stream::iter(iter)
             .buffered(5)
@@ -2063,7 +2057,7 @@ impl KitchenSink {
         let mut category_slugs = categories::Categories::fixed_category_slugs(&package.categories, &mut bad_categories);
         for c in &bad_categories {
             // categories invalid for lib.rs may still be valid for crates.io (they've drifted over time)
-            if is_valid_crates_io_category_not_on_lib_rs(&c) {
+            if is_valid_crates_io_category_not_on_lib_rs(c) {
                 continue;
             }
             warnings.insert(Warning::BadCategory(c.as_str().into()));
@@ -2226,7 +2220,7 @@ impl KitchenSink {
     }
 
     async fn checkout_repo(&self, repo: Repo, shallow: bool) -> Result<crate_git_checkout::Repository, KitchenSinkErr> {
-        if stopped() {return Err(KitchenSinkErr::Stopped.into());}
+        if stopped() {return Err(KitchenSinkErr::Stopped);}
 
         let git_checkout_path = self.git_checkout_path.clone();
         timeout("checkout", 300, spawn_blocking(move || {
@@ -2331,7 +2325,7 @@ impl KitchenSink {
 
     #[inline]
     pub fn user_by_email(&self, email: &str) -> CResult<Option<User>> {
-        Ok(self.user_db.user_by_email(email).context("user_by_email")?)
+        self.user_db.user_by_email(email).context("user_by_email")
     }
 
     pub async fn user_by_github_login(&self, github_login: &str) -> CResult<Option<User>> {
@@ -2353,7 +2347,7 @@ impl KitchenSink {
         let u = Box::pin(self.gh.user_by_login(github_login)).await.map_err(|e| {error!("gh user {}: {}", github_login, e); e})?; // errs on 404
         if let Some(u) = &u {
             let _ = tokio::task::block_in_place(|| {
-                self.user_db.index_user(&u, None, None)
+                self.user_db.index_user(u, None, None)
                     .map_err(|e| error!("index user {}: {} {:?}", github_login, e, u))
             });
         }
@@ -2483,7 +2477,7 @@ impl KitchenSink {
     }
 
     fn build_db(&self) -> Result<&BuildDb, KitchenSinkErr> {
-        if stopped() {return Err(KitchenSinkErr::Stopped.into());}
+        if stopped() {return Err(KitchenSinkErr::Stopped);}
 
         self.crate_rustc_compat_db
             .get_or_try_init(|| BuildDb::new(self.data_path.join("builds.db")))
@@ -2499,7 +2493,7 @@ impl KitchenSink {
         }
 
         let db = self.build_db()?;
-        let mut c = self.rustc_compatibility_inner_non_recursive(&all, db, bump_min_expected_rust)?;
+        let mut c = self.rustc_compatibility_inner_non_recursive(all, db, bump_min_expected_rust)?;
 
         // crates most often fail to compile because their dependencies fail
         if let Ok(vers) = self.all_crates_io_versions(all.origin()) {
@@ -2934,7 +2928,7 @@ impl KitchenSink {
                 if let Some(ref url) = author.url {
                     let gh_url = "https://github.com/";
                     if url.to_ascii_lowercase().starts_with(gh_url) {
-                        let login = url[gh_url.len()..].splitn(2, '/').next().expect("can't happen");
+                        let login = url[gh_url.len()..].split('/').next().expect("can't happen");
                         if let Ok(Some(gh)) = self.user_by_github_login(login).await {
                             let id = gh.id;
                             ca.github = Some(gh);
@@ -3396,7 +3390,7 @@ impl KitchenSink {
                 } else {
                     self.crate_db.top_crates_in_category_partially_ranked(slug, wanted_num + 50).await?
                 };
-                let _ = watch("dupes", self.knock_duplicates(&mut crates)).await;
+                watch("dupes", self.knock_duplicates(&mut crates)).await;
                 let crates: Vec<_> = crates.into_iter().map(|(o, _)| o).take(wanted_num as usize).collect();
                 Ok::<_, anyhow::Error>(Arc::new(crates))
             }).await
@@ -3605,9 +3599,7 @@ fn crate_name_namespace_prefix(crate_name: &str) -> &str {
         .trim_start_matches("rust-")
         .trim_start_matches("cargo-")
         .trim_start_matches("lib")
-        .split(|c: char| c == '_' || c == '-')
-        .filter(|&n| n.len() > 1) // libc
-        .next()
+        .split(|c: char| c == '_' || c == '-').find(|&n| n.len() > 1)
         .unwrap_or(crate_name)
 }
 
@@ -3687,7 +3679,7 @@ impl<'a> CrateAuthor<'a> {
     }
 
     pub fn name(&self) -> &str {
-        if let Some(ref name) = self.info.as_ref().and_then(|i| i.name.as_deref()) {
+        if let Some(name) = self.info.as_ref().and_then(|i| i.name.as_deref()) {
             if !name.trim_start().is_empty() {
                 return name;
             }
@@ -3794,7 +3786,7 @@ fn fetch_uppercase_name_and_tarball() {
 
 
         let testk = k.index.crates_io_crate_by_lowercase_name("dssim-core").unwrap();
-        let meta = k.crate_files_summary_from_crates_io_tarball("dssim-core", &testk.versions()[8].version()).await.unwrap();
+        let meta = k.crate_files_summary_from_crates_io_tarball("dssim-core", testk.versions()[8].version()).await.unwrap();
         assert_eq!(meta.path_in_repo.as_deref(), Some("dssim-core"), "{:#?}", meta);
         assert_eq!(meta.vcs_info_git_sha1.as_ref().unwrap(), b"\xba\x0a\x40\xd1\x3b\x1d\x11\xb0\x19\xf6\xb6\x6a\x77\x2e\xbd\xa7\xd0\xf9\x45\x0c");
     })).unwrap();

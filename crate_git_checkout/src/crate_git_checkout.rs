@@ -127,7 +127,7 @@ fn get_repo(repo: &Repo, base_path: &Path, shallow: bool) -> Result<Repository, 
                     .arg("--depth=64")
                     .arg("--config").arg("core.askPass=true")
                     .arg("--")
-                    .arg(&*url)
+                    .arg(url)
                     .arg(&repo_path)
                     .output()
                     .map(|output| output.status.success())

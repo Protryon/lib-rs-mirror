@@ -35,7 +35,7 @@ impl RichCrateVersion {
             origin,
             repo: package.repository.as_ref().and_then(|r| Repo::new(r).ok()),
             authors: match package.authors.as_slice() {
-                [one] => one.split(',').map(|a| Author::new(a)).collect(), // common mistake to use comma-separated string
+                [one] => one.split(',').map(Author::new).collect(), // common mistake to use comma-separated string
                 rest => rest.iter().map(|a| Author::new(a)).collect(),
             },
             derived,
@@ -224,7 +224,7 @@ impl RichCrateVersion {
 
     #[inline]
     pub fn version(&self) -> &str {
-        &self.package().version()
+        self.package().version()
     }
 
     pub fn version_semver(&self) -> Result<semver::Version, semver::Error> {

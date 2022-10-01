@@ -26,7 +26,7 @@ impl UserDb {
     pub fn email_has_github(&self, email: &str) -> Result<bool> {
         let conn = self.conn.lock();
         let mut get_email = conn.prepare_cached("SELECT 1 FROM github_emails WHERE email = ?1 LIMIT 1")?;
-        Ok(get_email.exists(&[&email.to_ascii_lowercase()])?)
+        get_email.exists(&[&email.to_ascii_lowercase()])
     }
 
     pub fn user_by_github_login(&self, login: &str) -> Result<Option<User>> {
@@ -75,7 +75,7 @@ impl UserDb {
     pub fn login_by_github_id(&self, id: u64) -> Result<String> {
         let conn = self.conn.lock();
         let mut get_user = conn.prepare_cached(r"SELECT login FROM github_users WHERE id = ?1 LIMIT 1")?;
-        Ok(get_user.query_row(&[&id], |row| row.get(0))?)
+        get_user.query_row(&[&id], |row| row.get(0))
     }
 
     pub fn user_by_email(&self, email: &str) -> Result<Option<User>> {

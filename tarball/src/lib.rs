@@ -57,7 +57,7 @@ pub fn read_repo(repo: &crate_git_checkout::Repository, path_in_tree: crate_git_
         collect.add(Path::new(path).join(name), blob_content.len() as u64, &mut blob_content)?;
         Ok(())
     })?;
-    Ok(collect.finish()?)
+    collect.finish()
 }
 
 pub fn read_archive(archive: &[u8], name: &str, ver: &str) -> Result<CrateFilesSummary, UnarchiverError> {

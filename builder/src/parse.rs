@@ -1,4 +1,3 @@
-use ahash::HashMapExt;
 use kitchen_sink::SemVer;
 use ahash::HashMap;
 use crate_db::builddb::{Compat, RustcMinorVersion};
@@ -640,11 +639,11 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Result<Findings, String> {
                     }
 
                     if desc.starts_with("`#![feature]` may not be used on the stable release channel") {
-                        return Err(format!("Nightly crate (or unstable features enabled), can't check"));
+                        return Err("Nightly crate (or unstable features enabled), can't check".to_string());
                     }
 
                     if let Some(feat) = desc.strip_prefix("use of unstable library feature '") {
-                        let feat = feat.splitn(2, '\'').next().unwrap();
+                        let feat = feat.split('\'').next().unwrap();
                         if let Some(rustc_min) = feature_flags.get(feat) {
                             info!("found feature {} >= {} ({} {})", feat, rustc_min, name, ver);
                             // if testing the crate by itself, then there are no other uses (like non-default feature flags) that could break it.
@@ -956,7 +955,7 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Result<Findings, String> {
             };
             Some(format!("{}@{}: {}", name, ver, reason))
         }).collect::<Vec<_>>().join("\n");
-        findings.crates.insert((None, top_level_crate_name.to_owned(), top_level_crate_ver.to_owned(), Compat::BrokenDeps, reason));
+        findings.crates.insert((None, top_level_crate_name.to_owned(), top_level_crate_ver, Compat::BrokenDeps, reason));
     }
     Ok(findings)
 }

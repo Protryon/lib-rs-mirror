@@ -80,7 +80,7 @@ impl DepVisitor {
     }
 
     pub(crate) fn visit(&mut self, depset: &ArcDepSet, depinf: DepInf, mut cb: impl FnMut(&mut Self, &DepName, &Dep)) {
-        let target_addr: &Mutex<FxHashMap<DepName, Dep>> = &*depset;
+        let target_addr: &Mutex<FxHashMap<DepName, Dep>> = depset;
         if self.node_visited.insert((depinf, target_addr as *const _)) {
             if let Some(depset) = depset.try_lock() {
                 for (name, dep) in depset.iter() {

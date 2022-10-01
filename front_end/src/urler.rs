@@ -53,11 +53,11 @@ impl Urler {
     pub fn install(&self, origin: &Origin) -> String {
         match origin {
             Origin::CratesIo(lowercase_name) => {
-                format!("/install/{}", Encoded::str(&lowercase_name))
+                format!("/install/{}", Encoded::str(lowercase_name))
             }
             Origin::GitHub { repo, package } | Origin::GitLab { repo, package } => {
                 let host = if let Origin::GitHub { .. } = origin { "gh" } else { "lab" };
-                format!("/install/{}/{}/{}/{}", host, Encoded(&*repo.owner), Encoded(&*repo.repo), Encoded::str(&package))
+                format!("/install/{}/{}/{}/{}", host, Encoded(&*repo.owner), Encoded(&*repo.repo), Encoded::str(package))
             }
         }
     }
@@ -65,7 +65,7 @@ impl Urler {
     pub fn all_versions(&self, origin: &Origin) -> Option<String> {
         match origin {
             Origin::CratesIo(lowercase_name) => {
-                Some(format!("/crates/{}/versions", Encoded::str(&lowercase_name)))
+                Some(format!("/crates/{}/versions", Encoded::str(lowercase_name)))
             }
             Origin::GitHub { repo: _, package: _ } | Origin::GitLab { repo: _, package: _ } => {
                 // let host = if let Origin::GitHub { .. } = origin { "gh" } else { "lab" };
@@ -78,7 +78,7 @@ impl Urler {
     pub fn reviews(&self, origin: &Origin) -> String {
         match origin {
             Origin::CratesIo(lowercase_name) => {
-                format!("/crates/{}/crev", Encoded::str(&lowercase_name))
+                format!("/crates/{}/crev", Encoded::str(lowercase_name))
             },
             _ => unreachable!(),
         }
@@ -86,7 +86,7 @@ impl Urler {
 
     pub fn reverse_deps(&self, origin: &Origin) -> Option<String> {
         match origin {
-            Origin::CratesIo(lowercase_name) => Some(format!("/crates/{}/rev", Encoded::str(&lowercase_name))),
+            Origin::CratesIo(lowercase_name) => Some(format!("/crates/{}/rev", Encoded::str(lowercase_name))),
             Origin::GitHub { .. } | Origin::GitLab { .. } => None,
         }
     }
@@ -100,7 +100,7 @@ impl Urler {
 
     pub fn crates_io_crate_at_version(&self, origin: &Origin, version: &str) -> Option<String> {
         match origin {
-            Origin::CratesIo(lowercase_name) => Some(format!("https://crates.io/crates/{}/{}", Encoded::str(&lowercase_name), Encoded(version))),
+            Origin::CratesIo(lowercase_name) => Some(format!("https://crates.io/crates/{}/{}", Encoded::str(lowercase_name), Encoded(version))),
             _ => None,
         }
     }
@@ -136,13 +136,13 @@ impl Urler {
     pub fn crate_abs_path_by_origin(&self, o: &Origin) -> String {
         match o {
             Origin::CratesIo(lowercase_name) => {
-                format!("/crates/{}", Encoded::str(&lowercase_name))
+                format!("/crates/{}", Encoded::str(lowercase_name))
             }
             Origin::GitHub { repo, package } => {
-                format!("/gh/{}/{}/{}", Encoded(&*repo.owner), Encoded(&*repo.repo), Encoded::str(&package))
+                format!("/gh/{}/{}/{}", Encoded(&*repo.owner), Encoded(&*repo.repo), Encoded::str(package))
             }
             Origin::GitLab { repo, package } => {
-                format!("/lab/{}/{}/{}", Encoded(&*repo.owner), Encoded(&*repo.repo), Encoded::str(&package))
+                format!("/lab/{}/{}/{}", Encoded(&*repo.owner), Encoded(&*repo.repo), Encoded::str(package))
             }
         }
     }

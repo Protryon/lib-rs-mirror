@@ -4,13 +4,13 @@ use std::path::Path;
 
 pub use tokei::LanguageType as Language;
 
-#[derive(Debug, PartialEq, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Default, Serialize, Deserialize)]
 pub struct Stats {
     pub langs: HashMap<Language, Lines>,
     pub has_old_try: bool,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy, Default, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct Lines {
     pub comments: u32,
     pub code: u32,

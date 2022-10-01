@@ -116,9 +116,9 @@ fn main() {
 }
 
 async fn main_indexing_loop(ref r: Arc<Reindexer>, crate_origins: Box<dyn Iterator<Item=Origin> + Send>, tx: mpsc::Sender<(Arc<RichCrateVersion>, usize, f64)>, repos: bool, search_only: bool, reindexing_all_crates: bool) {
-    let ref renderer = Renderer::new(None);
-    let ref seen_repos = Mutex::new(HashSet::new());
-    let ref repo_concurrency = tokio::sync::Semaphore::new(4);
+    let renderer = &Renderer::new(None);
+    let seen_repos = &Mutex::new(HashSet::new());
+    let repo_concurrency = &tokio::sync::Semaphore::new(4);
     futures::stream::iter(crate_origins.enumerate()).map(move |(i, origin)| {
         let mut tx = tx.clone();
         async move {
@@ -135,7 +135,7 @@ async fn main_indexing_loop(ref r: Arc<Reindexer>, crate_origins: Box<dyn Iterat
             }
         }
         if stopped() {return;}
-        match run_timeout(70, r.index_crate(&origin, &renderer, &mut tx)).await {
+        match run_timeout(70, r.index_crate(&origin, renderer, &mut tx)).await {
             Ok(v) => {
                 if repos {
                     if let Some(repo) = v.repository() {
@@ -404,10 +404,8 @@ fn print_res<T>(res: Result<T, anyhow::Error>) {
     }
 }
 
-fn run_timeout<'a, T, E>(secs: u64, fut: impl Future<Output = Result<T, E>> + 'a) -> impl Future<Output = Result<T, anyhow::Error>> + 'a
+async fn run_timeout<'a, T, E>(secs: u64, fut: impl Future<Output = Result<T, E>> + 'a) -> Result<T, anyhow::Error>
 where anyhow::Error: From<E> {
-    async move {
-        let res = tokio::time::timeout(Duration::from_secs(secs), fut).await.map_err(|_| anyhow!("timed out {}", secs))?;
-        res.map_err(From::from)
-    }
+    let res = tokio::time::timeout(Duration::from_secs(secs), fut).await.map_err(|_| anyhow!("timed out {}", secs))?;
+    res.map_err(From::from)
 }

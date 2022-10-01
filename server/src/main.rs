@@ -528,7 +528,7 @@ async fn handle_git_clone(req: HttpRequest) -> HttpResponse {
             let r = k.repository().unwrap();
 
             let mut url = r.canonical_git_url().into_owned();
-            if url.ends_with("/") {
+            if url.ends_with('/') {
                 url.truncate(url.len() - 1);
             }
             if !url.ends_with(".git") {
@@ -622,7 +622,7 @@ async fn handle_compat(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     // if !cfg!(debug_assertions) {
     //     Err(failure::err_msg("off"))?
     // }
-    let origin = get_origin_from_subpath(req.match_info()).ok_or(anyhow!("boo"))?;
+    let origin = get_origin_from_subpath(req.match_info()).ok_or_else(|| anyhow!("boo"))?;
     let state: &AServerState = req.app_data().expect("appdata");
     let crates = state.crates.load();
     crates.reload_indexed_crate(&origin);
@@ -826,7 +826,7 @@ async fn handle_crate_source_redirect(req: HttpRequest) -> Result<HttpResponse, 
     };
 
     let at_ver = at_ver.to_owned();
-    let state = Arc::clone(&state);
+    let state = Arc::clone(state);
     let git_url = rt_run_timeout(&state.clone().rt, "git revision lookup", 15, async move {
         let crates = state.crates.load();
         crates.canonical_http_of_crate_at_version(&origin, &at_ver).await

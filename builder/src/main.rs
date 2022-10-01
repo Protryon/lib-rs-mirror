@@ -398,7 +398,7 @@ fn run_and_analyze_versions(db: &BuildDb, docker_root: &Path, versions: Vec<Crat
 
                 to_set.entry((rustc_version, origin, crate_version, reason))
                     .and_modify(|existing_compat: &mut Compat| {
-                        if new_compat.is_better(&existing_compat) {
+                        if new_compat.is_better(existing_compat) {
                             *existing_compat = new_compat;
                         }
                     })
@@ -408,7 +408,7 @@ fn run_and_analyze_versions(db: &BuildDb, docker_root: &Path, versions: Vec<Crat
     }
 
     let tmp = to_set.iter().map(|((rv, o, cv, reason), c)| {
-        SetCompatMulti { origin: o, ver: cv, rustc_version: *rv, compat: *c, reason: &reason }
+        SetCompatMulti { origin: o, ver: cv, rustc_version: *rv, compat: *c, reason }
     }).collect::<Vec<_>>();
     if db.set_compat_multi(&tmp).is_err() {
         // retry, sqlite is flaky

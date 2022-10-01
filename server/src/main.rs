@@ -1215,7 +1215,7 @@ async fn handle_search(req: HttpRequest) -> Result<HttpResponse, ServerError> {
             let page = tokio::task::spawn_blocking({
                 let state = state.clone();
                 move || {
-                    let mut results = state.index.search(&query, 100, true)?;
+                    let mut results = state.index.search(&query, 150, true)?;
                     let crates = state.crates.load();
                     results.crates.retain(|res| crates.crate_exists(&res.origin)); // search index can contain stale items
 

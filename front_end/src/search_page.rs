@@ -24,7 +24,12 @@ impl SearchPage<'_> {
     pub fn new<'a>(query: &'a str, results: &'a SearchResults, markup: &'a Renderer) -> SearchPage<'a> {
         let half_score = results.crates.get(0).map_or(0., |r| r.score) * 0.33;
         let num = results.crates.iter().take_while(|r| r.score >= half_score).count();
-        let (good_results, bad_results) = results.crates.split_at(num);
+        let (good_results, mut bad_results) = results.crates.split_at(num);
+
+        // don't show a long tail of garbage if the results really are bad
+        let bad_results_cap = 10 + bad_results.len() / 2;
+        bad_results = &bad_results[..bad_results_cap.min(bad_results.len())];
+
         SearchPage {
             query: SearchKind::Query(query),
             markup,
@@ -66,7 +71,7 @@ impl SearchPage<'_> {
         // did you mean is nice for single-word queries,
         // but specific queries give werid niche keywords
         let query_specificity = query.split(' ').count() * 2;
-        if self.dividing_keywords.len() < 5 + query_specificity {
+        if self.dividing_keywords.len() < 3 + query_specificity {
             return None;
         }
         let prefix = format!("{query}-");

@@ -203,7 +203,7 @@ impl CrateSearchIndex {
             .chain([query_text, &query_lower, &query_as_keyword, &query_rev])
             .map(|k| self.normalize_keyword(k))
             .collect();
-        let dividing_keywords = Self::dividing_keywords(&docs, limit/2, &query_keywords,  &["blockchain", "solana", "ethereum", "bitcoin", "cryptocurrency"]).unwrap_or_default();
+        let dividing_keywords = Self::dividing_keywords(&docs, limit/2, &query_keywords, &query_as_keyword, &["blockchain", "solana", "ethereum", "bitcoin", "cryptocurrency"]).unwrap_or_default();
         docs.truncate(limit); // truncate after getting all interesting keywords
 
         // Make sure that there's at least one crate ranked high for each of the interesting keywords
@@ -236,7 +236,7 @@ impl CrateSearchIndex {
         })
     }
 
-    fn dividing_keywords(results: &[CrateFound], limit: usize, query_keywords: &[&str], skip_entire_results: &[&str]) -> Option<Vec<String>> {
+    fn dividing_keywords(results: &[CrateFound], limit: usize, query_keywords: &[&str], query_as_keyword: &str, skip_entire_results: &[&str]) -> Option<Vec<String>> {
         // divide keyword popularity by its global popularity tf-idf, because everything gets api, linux, cargo, parser
         // bonus if keyword pair exists
         let mut dupes = HashSet::new();
@@ -256,20 +256,20 @@ impl CrateSearchIndex {
         drop(dupes);
 
 
-        // api/client/cli are boring and generic
-        let most_common = Self::popular_dividing_keyword(&keyword_sets, &["api", "client", "cli"])?;
+        // api/cli are boring and generic
+        let most_common = Self::popular_dividing_keyword(&keyword_sets, &query_as_keyword, &["api", "cli"])?;
         // The most common co-occurrence may be a synonym, so skip it for now
-        let second_most_common = Self::popular_dividing_keyword(&keyword_sets, &[most_common])?;
+        let second_most_common = Self::popular_dividing_keyword(&keyword_sets, &query_as_keyword, &[most_common])?;
 
         let mut dividing_keywords = Vec::with_capacity(10);
         let mut next_keyword = second_most_common;
         for _ in 0..10 {
             dividing_keywords.push(next_keyword.to_string());
-            keyword_sets.iter_mut().for_each(|(k_set, w)| if *w > 0 && k_set.contains(&next_keyword) { *w = -*w/2; });
+            keyword_sets.iter_mut().for_each(|(k_set, w)| if *w > 0 && k_set.contains(&next_keyword) { *w = -*w/4; });
             if keyword_sets.iter().filter(|&(_, w)| *w > 0).count() < 25 {
                 break;
             }
-            next_keyword = match Self::popular_dividing_keyword(&keyword_sets, &["reserved"]) {
+            next_keyword = match Self::popular_dividing_keyword(&keyword_sets, &query_as_keyword, &["reserved"]) {
                 None => break,
                 Some(another) => another,
             };
@@ -278,19 +278,28 @@ impl CrateSearchIndex {
     }
 
     /// Find a keyword that splits the set into two distinctive groups
-    fn popular_dividing_keyword<'a>(keyword_sets: &[(HashSet<&'a str>, i32)], ignore_keywords: &[&str]) -> Option<&'a str> {
+    fn popular_dividing_keyword<'a>(keyword_sets: &[(HashSet<&'a str>, i32)], query_keyword: &str, ignore_keywords: &[&str]) -> Option<&'a str> {
         if keyword_sets.len() < 25 {
             return None; // too few results will give odd niche keywords
         }
+        let prefix = format!("{query_keyword}-");
         let mut counts: HashMap<&str, (u32, i32)> = HashMap::with_capacity(keyword_sets.len());
         for (k_set, w) in keyword_sets {
             for k in k_set {
                 let mut n = counts.entry(k).or_default();
                 n.0 += 1;
                 n.1 += *w;
+                // for a query like "http" make "http-client" count as "client" too
+                if let Some(rest) = k.strip_prefix(&prefix) {
+                    if !k_set.contains(rest) {
+                        let mut n = counts.entry(rest).or_default();
+                        n.0 += 1;
+                        n.1 += *w;
+                    }
+                }
             }
         }
-        for stopword in ["api", "cli", "linux", "client", "rust"] {
+        for stopword in ["api", "cli", "rust"] {
             counts.entry(stopword).and_modify(|e| { e.1 = e.1 * 3/4; });
         }
 

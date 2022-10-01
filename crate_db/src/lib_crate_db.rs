@@ -13,6 +13,7 @@ use rich_crate::Repo;
 use rich_crate::RichCrate;
 use rusqlite::*;
 use rusqlite::types::ToSql;
+use smartstring::alias::String as SmolStr;
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -22,6 +23,8 @@ use std::path::Path;
 use std::sync::Arc;
 use thread_local::ThreadLocal;
 use tokio::sync::{Mutex, RwLock};
+use once_cell::sync::OnceCell;
+
 type FResult<T, E = Error> = std::result::Result<T, E>;
 
 #[derive(thiserror::Error, Debug)]
@@ -45,6 +48,7 @@ mod schema;
 mod stopwords;
 use crate::stopwords::{COND_STOPWORDS, STOPWORDS};
 
+
 pub struct CrateDb {
     url: String,
     // Sqlite is awful with "database table is locked"
@@ -52,6 +56,7 @@ pub struct CrateDb {
     conn: Arc<ThreadLocal<std::result::Result<RefCell<Connection>, rusqlite::Error>>>,
     exclusive_conn: Mutex<Option<Connection>>,
     tag_synonyms: Synonyms,
+    all_explicit_keywords_cache: OnceCell<HashSet<SmolStr>>,
 }
 
 pub struct CrateVersionData<'a> {
@@ -89,6 +94,7 @@ impl CrateDb {
             conn: Arc::new(ThreadLocal::new()),
             concurrency_control: RwLock::new(()),
             exclusive_conn: Mutex::new(None),
+            all_explicit_keywords_cache: OnceCell::new(),
         })
     }
 
@@ -196,7 +202,7 @@ impl CrateDb {
     /// Score is a ranking of a crate (0 = bad, 1 = great)
     pub async fn index_latest(&self, c: CrateVersionData<'_>) -> FResult<DbDerived> {
         let origin = c.origin.to_str();
-        let mut insert_keyword = self.gather_crate_keywords(&c)?;
+        let mut insert_keyword = self.gather_crate_keywords(&c).await?;
 
         let mut out = String::with_capacity(200);
         write!(&mut out, "https://lib.rs/{} ", if c.origin.is_crates_io() { c.origin.short_crate_name() } else { &origin }).unwrap();
@@ -293,21 +299,35 @@ impl CrateDb {
         }).await
     }
 
-    fn gather_crate_keywords(&self, c: &CrateVersionData) -> Result<KeywordInsert, Error> {
+    async fn gather_crate_keywords(&self, c: &CrateVersionData<'_>) -> Result<KeywordInsert, Error> {
+        let all_keywords = self.all_explicit_keywords().await?;
+
         let manifest = c.manifest;
         let package = manifest.package.as_ref().expect("package");
 
         let mut insert_keyword = KeywordInsert::new()?;
-        let all_explicit_keywords = package.keywords.iter()
-            .chain(c.source_data.github_keywords.iter().flatten());
-        for (i, k) in all_explicit_keywords.enumerate() {
+        let crate_keywords = package.keywords.iter()
+            .chain(c.source_data.github_keywords.iter().flatten())
+            .chain(c.bad_categories);
+
+        let mut prev_keyword = None;
+        for (i, k) in crate_keywords.enumerate() {
             let w: f64 = 100. / (6 + i * 2) as f64;
+            if let Some(prev) = prev_keyword {
+                let compound = format!("{prev}-{k}");
+                if all_keywords.contains(compound.as_str()) {
+                    insert_keyword.add(&compound, w, true);
+                    insert_keyword.add(k, w, false);
+                    prev_keyword = Some(k);
+                    continue;
+                }
+            }
             insert_keyword.add(k, w, true);
+            prev_keyword = Some(k);
         }
-        for k in c.bad_categories {
-            insert_keyword.add(k, 0.5, true);
-        }
-        for (i, k) in package.name.split(|c: char| !c.is_alphanumeric()).enumerate() {
+        let name_trimmed = package.name.trim_end_matches("-core").trim_end_matches("-internal")
+            .trim_end_matches("-shared").trim_end_matches("-rs").trim_start_matches("rust-");
+        for (i, k) in name_trimmed.split(|c: char| !c.is_alphanumeric()).enumerate() {
             let w: f64 = 100. / (8 + i * 2) as f64;
             insert_keyword.add(k, w, false);
         }
@@ -729,16 +749,23 @@ impl CrateDb {
     }
 
     /// Sorted by most popular first
-    pub async fn all_explicit_keywords(&self) -> FResult<Vec<String>> {
-        self.with_read("allkw", |conn| {
+    pub async fn all_explicit_keywords(&self) -> FResult<&HashSet<SmolStr>> {
+        if let Some(res) = self.all_explicit_keywords_cache.get() {
+            return Ok(res)
+        }
+
+        let res = self.with_read("allkw", |conn| {
             let mut query = conn.prepare_cached("SELECT k.keyword
                 FROM keywords k JOIN crate_keywords ck ON (ck.keyword_id = k.id)
                 WHERE k.visible
                 GROUP BY k.id ORDER BY sum(ck.weight)*count(*) DESC
             ")?;
-            let res = query.query_map([], |row| (row.get(0)))?;
+            let res = query.query_map([], |row| {
+                Ok(SmolStr::from(row.get_ref(0)?.as_str()?))
+            })?;
             Ok(res.collect::<std::result::Result<_,_>>()?)
-        }).await
+        }).await?;
+        Ok(self.all_explicit_keywords_cache.get_or_init(move || res))
     }
 
     /// Categories similar to the given category

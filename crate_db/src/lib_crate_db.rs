@@ -308,22 +308,21 @@ impl CrateDb {
         let mut insert_keyword = KeywordInsert::new()?;
         let crate_keywords = package.keywords.iter()
             .chain(c.source_data.github_keywords.iter().flatten())
-            .chain(c.bad_categories);
+            .map(|k| k.as_str())
+            .chain(c.bad_categories.iter().map(|k| self.tag_synonyms.normalize(k)));
 
         let mut prev_keyword = None;
         for (i, k) in crate_keywords.enumerate() {
             let w: f64 = 100. / (6 + i * 2) as f64;
-            if let Some(prev) = prev_keyword {
+            if let Some((prev, prev_w)) = prev_keyword.replace((k, w)) {
                 let compound = format!("{prev}-{k}");
                 if all_keywords.contains(compound.as_str()) {
-                    insert_keyword.add(&compound, w, true);
-                    insert_keyword.add(k, w, false);
-                    prev_keyword = Some(k);
+                    insert_keyword.add(&compound, prev_w, true);
+                    insert_keyword.add(k, w/2., false);
                     continue;
                 }
             }
             insert_keyword.add(k, w, true);
-            prev_keyword = Some(k);
         }
         let name_trimmed = package.name.trim_end_matches("-core").trim_end_matches("-internal")
             .trim_end_matches("-shared").trim_end_matches("-rs").trim_start_matches("rust-");
@@ -343,11 +342,12 @@ impl CrateDb {
         if let Some(Readme { markup: Markup::Markdown(txt) | Markup::Html(txt) | Markup::Rst(txt) , ..}) = c.source_data.readme.as_ref() {
             insert_keyword.add_raw(hex_hash(txt), 1., false);
         }
-        insert_keyword.add_synonyms(&self.tag_synonyms);
         for (i, (w2, k)) in c.extracted_auto_keywords.iter().enumerate() {
             let w = *w2 as f64 * 150. / (80 + i) as f64;
             insert_keyword.add(k, w, false);
         }
+        insert_keyword.add_synonyms(&self.tag_synonyms);
+
         if let Some(url) = &package.homepage {
             if url.len() > 5 {
                 insert_keyword.add_raw(format!("url:{url}"), 1., false); // crates sharing homepage are likely same project

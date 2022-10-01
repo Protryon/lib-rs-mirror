@@ -2,7 +2,7 @@
 # https://creativecommons.org/licenses/by-sa/3.0/
 # StackOverflow data: SELECT SourceTagName,TargetTagName,Score FROM TagSynonyms where Score >= 0
 11ty,eleventy,0
-128bit,128-bit,0
+128bit,128-bit,5
 128bitatomics,128-bit-atomics,4
 12factor,12-factor,4
 16bit,16-bit,0
@@ -12,6 +12,7 @@
 2ddrawing,2d-drawing,4
 2dengine,2d-engine,4
 2dgame,2d-game,4
+systemverilog,system-verilog,4
 2dgameengine,2d-game-engine,4
 2dgameframework,2d-game-framework,4
 2dgraphics,2d-graphics,4
@@ -160,7 +161,7 @@ adobe-flex-2,flex-2,0
 adobe-flex-3,flex3,2
 adobe-flex-4,flex4,0
 adsb,ads-b,4
-advancedalgorithms,advanced-algorithms,4
+advancedalgorithms,algorithms,4
 adventofcode,advent-of-code,4
 advisorylocks,advisory-locks,4
 adwords,google-adwords,0
@@ -487,6 +488,7 @@ assembler,assembly,4
 assembly-language,assembly,4
 assembly-reference,assembly-references,0
 assembly-script,assemblyscript,1
+assembly-x86,x86-assembly,5
 assemblylanguage,assembly-language,4
 assertcmd,assert-cmd,4
 assertion,assertions,5
@@ -1260,7 +1262,7 @@ compositewpf,prism,0
 comprehensions,comprehension,5
 compress,compression,4
 compressed,compression,4
-compressionalgorithm,compression-algorithm,4
+compressionalgorithm,compression,4
 computational-linguistics,nlp,4
 computations,computation,5
 computer-algebra-systems,symbolic-math,4
@@ -2281,14 +2283,14 @@ hard-coding,hardcode,0
 hardcoded,hardcode,0
 harddisk,hard-drive,0
 hardwareid,hardware-id,1
-hash-algorithms,hash-algorithm,5
+hash-algorithms,hash,5
 hash-rings,hash-ring,5
 hash-trees,hash-tree,5
 hashalgorithm,hash,4
 hashes,hash,4
 hashid,hash-id,1
 hashing,hash,0
-hashing-algorithms,hashing-algorithm,5
+hashing-algorithms,hash,5
 hashmaps,hashmap,2
 hashring,hash-ring,4
 hashtable,hashmap,2
@@ -4105,7 +4107,6 @@ speed,performance,4
 speed-up,performance,4
 spel,spring-el,0
 spellcheck,spell-checking,0
-spellchecker,spell-checker,4
 spellchecker,spell-checking,4
 spellchecking,spell-checking,4
 spider,web-crawler,0
@@ -4209,7 +4210,6 @@ static-function,static-functions,0
 static-library,static-libraries,4
 static-member,static-members,0
 static-method,static-methods,2
-static-resource,staticresource,0
 static-vs-non-static,static,4
 staticfbml,fbml,0
 staticsite,static-site,1
@@ -4834,6 +4834,7 @@ weblogic-11,weblogic-11g,0
 webmocks,webmock,5
 webnoir,noir,0
 webpage,html,3
+lc-3,lc3,5
 webpagescraping,web-scraping,0
 webpartzone,web-parts,0
 webproject,web-project,0

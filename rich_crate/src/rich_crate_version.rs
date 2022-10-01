@@ -7,7 +7,7 @@ pub use cargo_toml::{DepsSet, Edition, Resolver, FeatureSet, MaintenanceStatus, 
 use repo_url::Repo;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
-use std::collections::HashSet;
+use ahash::HashSet;
 
 pub use parse_cfg::{Cfg, Target};
 

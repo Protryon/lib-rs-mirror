@@ -3,7 +3,7 @@ use rich_crate::Manifest;
 use rich_crate::Markup;
 use rich_crate::RichCrateVersion;
 use semver::VersionReq;
-use std::collections::HashSet;
+use ahash::HashSet;
 use log::debug;
 
 pub mod wlita;

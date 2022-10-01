@@ -2,11 +2,12 @@
 use git2::Repository;
 use git2::RepositoryInitOptions;
 use quick_error::quick_error;
-use std::collections::HashSet;
+use ahash::HashSet;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::RwLock;
+use smartstring::alias::String as SmolStr;
 
 const DEBCARGO_CONF_REPO_URL: &str = "https://salsa.debian.org/rust-team/debcargo-conf.git";
 
@@ -26,7 +27,7 @@ quick_error! {
 
 pub struct DebcargoList {
     repo: Repository,
-    list: RwLock<HashSet<Box<str>>>,
+    list: RwLock<HashSet<SmolStr>>,
 }
 
 // *Hopefully* `git2::Repository` is safe to use?
@@ -46,7 +47,7 @@ impl DebcargoList {
                 (true, Repository::init_opts(&repo_path, &opts)?)
             }
         };
-        let list = Self { repo, list: RwLock::new(HashSet::new()) };
+        let list = Self { repo, list: RwLock::default() };
         if needs_update {
             list.update()?;
         }
@@ -69,7 +70,7 @@ impl DebcargoList {
         let commit = self.repo.find_commit(head)?;
         let tree = commit.tree()?;
         let src = tree.get_name("src").ok_or("oops, borked repo")?.to_object(&self.repo)?.peel_to_tree()?;
-        let data: HashSet<_, _> = src.iter().filter_map(|e| e.name().map(Box::from)).collect();
+        let data: HashSet<_> = src.iter().filter_map(|e| e.name().map(SmolStr::from)).collect();
         if data.is_empty() {
             return Err("unexpectedly empty".into());
         }

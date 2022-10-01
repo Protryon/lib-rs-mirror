@@ -42,3 +42,4 @@ treemap = { git = "https://github.com/kornelski/treemap-rs", rev = "4a0beac18a61
 textwrap = "0.15.1"
 validator = { version = "0.1.0", path = "../validator" }
 blake3 = "1.3.1"
+ahash = "0.8.0"

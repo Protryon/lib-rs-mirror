@@ -1,10 +1,11 @@
+use ahash::HashMapExt;
 use parking_lot::Mutex;
 use rich_crate::Origin;
 use rusqlite::*;
 use semver::Version as SemVer;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
-use std::collections::HashMap;
+use ahash::HashMap;
 use std::path::Path;
 use log::{info, error};
 

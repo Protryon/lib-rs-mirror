@@ -1,8 +1,10 @@
+use ahash::HashSetExt;
+use ahash::HashMapExt;
 use categories::Synonyms;
 use itertools::Itertools;
 use rich_crate::Origin;
-use std::collections::HashMap;
-use std::collections::HashSet;
+use ahash::HashMap;
+use ahash::HashSet;
 use std::{fs, path::Path};
 use tantivy::query::Query;
 use tantivy::query::QueryParserError;

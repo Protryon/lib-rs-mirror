@@ -1,9 +1,10 @@
+use ahash::HashMapExt;
 use kitchen_sink::SemVer;
-use std::collections::HashMap;
+use ahash::HashMap;
 use crate_db::builddb::{Compat, RustcMinorVersion};
 use regex::Regex;
 use serde_derive::*;
-use std::collections::HashSet;
+use ahash::HashSet;
 use log::{warn, info, error, debug};
 
 pub const DIVIDER: &str = "---XBdt8MziQTMWYwcSsHz1---";
@@ -602,7 +603,7 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Result<Findings, String> {
     let top_level_crate_name = fl.next().ok_or("no top-level crate name")?;
     let top_level_crate_ver = SemVer::parse(fl.next().ok_or("first line 2")?).map_err(|e| e.to_string())?;
 
-    let mut printed = HashSet::new();
+    let mut printed = HashSet::default();
     for line in lines.filter(|l| l.starts_with('{')) {
         let line = line
             .trim_start_matches("unknown line ")

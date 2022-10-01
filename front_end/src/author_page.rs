@@ -1,3 +1,5 @@
+use ahash::HashMapExt;
+use ahash::HashSetExt;
 use crate::templates;
 use crate::url_domain;
 use crate::Page;
@@ -18,7 +20,7 @@ use kitchen_sink::UserType;
 use render_readme::Renderer;
 use std::borrow::Cow;
 use std::cmp::Ordering;
-use std::collections::HashMap;
+use ahash::HashMap;
 
 pub struct OtherOwner {
     github_id: u32,
@@ -114,7 +116,7 @@ impl<'a> AuthorPage<'a> {
             kitchen_sink.user_by_github_login(login).await.map_err(|e| eprintln!("{}: {}", login, e)).ok().and_then(|x| x)
         })).await.into_iter().filter_map(|x| x).collect();
 
-        let shitlist_reason = kitchen_sink.author_shitlist.get(&aut.github.login.to_ascii_lowercase()).map(|s| s.as_str());
+        let shitlist_reason = kitchen_sink.author_shitlist.get(aut.github.login.to_ascii_lowercase().as_str()).map(|s| s.as_str());
 
         Ok(Self {
             founder_crates, member_crates,

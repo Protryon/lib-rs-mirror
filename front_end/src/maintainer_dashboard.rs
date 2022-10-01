@@ -1,3 +1,4 @@
+use ahash::HashSetExt;
 use crate::Page;
 use crate::templates;
 use crate::urler::Urler;
@@ -21,7 +22,7 @@ use render_readme::Renderer;
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::cmp::Reverse;
-use std::collections::HashSet;
+use ahash::HashSet;
 use std::time::Duration;
 use std::time::Instant;
 use tokio::time::timeout_at;

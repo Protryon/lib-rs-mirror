@@ -1,3 +1,5 @@
+use ahash::HashMapExt;
+use ahash::HashSetExt;
 use crate::templates;
 use crate::Page;
 use kitchen_sink::KitchenSink;
@@ -11,7 +13,7 @@ use render_readme::Markup;
 use render_readme::Renderer;
 use rich_crate::RichCrateVersion;
 use std::borrow::Cow;
-use std::collections::HashSet;
+use ahash::HashSet;
 
 pub struct ReviewsPage<'a> {
     pub(crate) ver: &'a RichCrateVersion,

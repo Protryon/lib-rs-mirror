@@ -1,3 +1,4 @@
+use ahash::HashMapExt;
 use crate::writer::*;
 use actix_web::body::BoxBody;
 use actix_web::dev::Url;
@@ -22,7 +23,7 @@ use locale::Numeric;
 use render_readme::{Highlighter, Markup, Renderer};
 use repo_url::SimpleRepo;
 use search_index::CrateSearchIndex;
-use std::collections::HashMap;
+use ahash::HashMap;
 use std::convert::TryInto;
 use std::env;
 use std::path::PathBuf;
@@ -729,7 +730,7 @@ async fn handle_maintainer_dashboard(req: HttpRequest, atom_feed: bool) -> Resul
     }
 
     let crates = state.crates.load();
-    if crates.author_shitlist.get(&aut.github.login.to_ascii_lowercase()).is_some() {
+    if crates.author_shitlist.get(aut.github.login.to_ascii_lowercase().as_str()).is_some() {
         return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", format!("/~{}", Encoded(&aut.github.login)))).body(""));
     }
 

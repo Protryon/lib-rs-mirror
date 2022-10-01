@@ -1,3 +1,5 @@
+use ahash::HashMapExt;
+use ahash::HashSetExt;
 use crate::Urler;
 use crate::reverse_dependencies::DownloadsBar;
 use crate::Page;
@@ -7,8 +9,8 @@ use kitchen_sink::KitchenSink;
 use kitchen_sink::KitchenSinkErr;
 use kitchen_sink::Origin;
 use kitchen_sink::Severity;
-use std::collections::HashMap;
-use std::collections::HashSet;
+use ahash::HashMap;
+use ahash::HashSet;
 
 use rich_crate::{RichCrate, RichCrateVersion};
 use semver::Version as SemVer;

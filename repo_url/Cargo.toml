@@ -12,4 +12,5 @@ name = "repo_url"
 path = "src/repo.rs"
 
 [dependencies]
+smartstring = "1.0.1"
 url = "2.1"

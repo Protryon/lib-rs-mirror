@@ -5,6 +5,8 @@
 //! because the template engine Ructe doesn't support
 //! complex expressions in the templates.
 
+use ahash::HashSetExt;
+use ahash::HashSetExt;
 mod all_versions;
 mod author_page;
 mod cat_page;
@@ -43,7 +45,7 @@ use render_readme::Renderer;
 use rich_crate::RichCrate;
 use rich_crate::RichCrateVersion;
 use std::borrow::Cow;
-use std::collections::HashSet;
+use ahash::HashSet;
 use std::io::Write;
 use url::Url;
 

@@ -1,3 +1,4 @@
+use ahash::HashSetExt;
 use kitchen_sink::CrateOwners;
 use kitchen_sink::SemVer;
 use anyhow::anyhow;
@@ -20,7 +21,7 @@ use render_readme::Links;
 use render_readme::Renderer;
 use search_index::*;
 use simple_cache::TempCache;
-use std::collections::HashSet;
+use ahash::HashSet;
 use std::convert::TryInto;
 use std::time::Duration;
 use tokio::sync::mpsc;

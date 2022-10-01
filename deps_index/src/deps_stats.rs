@@ -3,8 +3,8 @@ use crate::DepsErr;
 use crate::Origin;
 use parking_lot::Mutex;
 use rayon::prelude::*;
-use smol_str::SmolStr;
 use string_interner::symbol::SymbolU32 as Sym;
+use smartstring::alias::String as SmolStr;
 
 type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
 type FxHashSet<V> = std::collections::HashSet<V, ahash::RandomState>;

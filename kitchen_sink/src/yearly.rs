@@ -1,8 +1,9 @@
+use ahash::HashMapExt;
 use crate::MiniVer;
 use parking_lot::Mutex;
 use simple_cache::TempCache;
 use std::collections::hash_map::Entry::*;
-use std::collections::HashMap;
+use ahash::HashMap;
 use serde_big_array::BigArray;
 use std::path::PathBuf;
 use std::sync::Arc;

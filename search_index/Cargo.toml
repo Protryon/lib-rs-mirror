@@ -16,3 +16,4 @@ rayon = "1.5.0"
 rand = "0.8"
 itertools = "0.10.5"
 categories = { path = "../categories" }
+ahash = "0.8.0"

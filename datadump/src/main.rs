@@ -1,5 +1,7 @@
 #![allow(unused)]
 #![allow(dead_code)]
+use ahash::HashSetExt;
+use ahash::HashMapExt;
 use chrono::prelude::*;
 use kitchen_sink::CrateOwner;
 use kitchen_sink::DependerChanges;
@@ -11,8 +13,8 @@ use kitchen_sink::StatsHistogram;
 use libflate::gzip::Decoder;
 use rayon::prelude::*;
 use serde_derive::Deserialize;
-use std::collections::HashMap;
-use std::collections::HashSet;
+use ahash::HashMap;
+use ahash::HashSet;
 use std::convert::TryInto;
 use std::fs::File;
 use std::io::BufReader;

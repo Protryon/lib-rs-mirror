@@ -1,3 +1,5 @@
+use ahash::HashMapExt;
+use ahash::HashSetExt;
 use crate::download_graph::DownloadsGraph;
 use crate::templates;
 use crate::url_domain;
@@ -29,8 +31,8 @@ use semver::Version as SemVer;
 
 use std::borrow::Cow;
 use std::cmp::Ordering;
-use std::collections::HashMap;
-use std::collections::HashSet;
+use ahash::HashMap;
+use ahash::HashSet;
 use std::f64::consts::PI;
 use std::fmt::Display;
 use std::hash::Hash;

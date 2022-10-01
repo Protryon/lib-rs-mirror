@@ -1,3 +1,5 @@
+use ahash::HashMapExt;
+use ahash::HashSetExt;
 use crate::templates;
 use crate::Page;
 use categories::Category;
@@ -8,7 +10,7 @@ use kitchen_sink::ArcRichCrateVersion;
 use kitchen_sink::KitchenSink;
 use render_readme::Renderer;
 use rich_crate::RichCrateVersion;
-use std::collections::HashSet;
+use ahash::HashSet;
 use std::time::Duration;
 use tokio::time::timeout_at;
 use tokio::time::Instant;

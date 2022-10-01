@@ -1,6 +1,6 @@
 use crate::CATEGORIES;
-use std::collections::HashMap;
-use std::collections::HashSet;
+use ahash::HashMap;
+use ahash::HashSet;
 use std::collections::BTreeMap;
 
 lazy_static! {

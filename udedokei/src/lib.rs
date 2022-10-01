@@ -1,5 +1,5 @@
 use serde_derive::*;
-use std::collections::HashMap;
+use ahash::HashMap;
 use std::path::Path;
 
 pub use tokei::LanguageType as Language;

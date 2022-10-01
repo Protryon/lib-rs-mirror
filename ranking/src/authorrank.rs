@@ -1,5 +1,5 @@
 use rich_crate::RichCrate;
-use std::collections::HashMap;
+use ahash::HashMap;
 use kitchen_sink::{KitchenSink, CratesIndexCrate, Origin,, stopped};
 use fxhash::FxHashMap;
 use fxhash::FxHashSet;

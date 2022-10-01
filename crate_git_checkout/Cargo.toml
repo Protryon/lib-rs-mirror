@@ -17,3 +17,4 @@ repo_url = { path = "../repo_url" }
 urlencoding = "2.1.2"
 lazy_static = "1.4.0"
 thiserror = "1.0.35"
+ahash = "0.8.0"

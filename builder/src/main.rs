@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
-use std::collections::HashSet;
+use ahash::HashSet;
+use ahash::HashSetExt;
 use std::path::PathBuf;
 use std::time::Duration;
 use futures::future::try_join_all;

@@ -15,11 +15,11 @@ use kitchen_sink::VersionReq;
 use kitchen_sink::Warning;
 use semver::Op;
 use semver::Version as SemVer;
-use std::collections::HashSet;
+use ahash::HashSet;
 
 pub async fn warnings_for_crate(c: &KitchenSink, k: &RichCrateVersion, all: &RichCrate) -> CResult<HashSet<Warning>> {
     if k.category_slugs().iter().any(|c| &**c == "cryptography::cryptocurrencies") {
-        return Ok(HashSet::from([Warning::CryptocurrencyBS]));
+        return Ok([Warning::CryptocurrencyBS].into_iter().collect());
     }
 
     let mut warnings = c.rich_crate_warnings(k.origin()).await?;

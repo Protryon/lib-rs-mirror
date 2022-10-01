@@ -1,9 +1,10 @@
+use ahash::HashMapExt;
 use crate::templates;
 use crate::Page;
 use crate::Urler;
 use render_readme::Renderer;
 use search_index::SearchResults;
-use std::collections::HashMap;
+use ahash::HashMap;
 use std::io::Write;
 
 pub enum SearchKind<'a> {

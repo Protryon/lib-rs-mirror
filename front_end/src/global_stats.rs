@@ -1,3 +1,4 @@
+use ahash::HashMapExt;
 use categories::CATEGORIES;
 use categories::Category;
 use categories::CategoryMap;
@@ -13,7 +14,7 @@ use locale::Numeric;
 use peeking_take_while::PeekableExt;
 use rand::seq::SliceRandom;
 use render_readme::Renderer;
-use std::collections::HashMap;
+use ahash::HashMap;
 use std::io::Write;
 
 #[derive(Debug)]

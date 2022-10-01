@@ -1,5 +1,5 @@
 use serde_derive::*;
-use std::collections::HashMap;
+use ahash::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateMetaFile {

@@ -1,11 +1,12 @@
-use std::collections::HashMap;
+use ahash::HashMap;
 use std::path::Path;
 use std::io;
 use std::fs;
 use heck::ToKebabCase;
+use smartstring::alias::String as SmolStr;
 
 pub struct Synonyms {
-    mapping: HashMap<Box<str>, (Box<str>, u8)>,
+    mapping: HashMap<SmolStr, (SmolStr, u8)>,
 }
 
 impl Synonyms {
@@ -19,7 +20,7 @@ impl Synonyms {
                     let find = cols.next().expect(l);
                     let replace = cols.next().expect(l);
                     let score: u8 = cols.next().unwrap().parse().expect(l);
-                    (find.into(), (replace.into(), score))
+                    (SmolStr::from(find), (SmolStr::from(replace), score))
                 })
                 .collect()
         })

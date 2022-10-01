@@ -85,13 +85,12 @@ use rich_crate::Readme;
 pub use semver::VersionReq;
 use simple_cache::SimpleCache;
 use simple_cache::TempCache;
-use smol_str::SmolStr;
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::cmp::Reverse;
 use std::collections::hash_map::Entry::*;
-use std::collections::HashMap;
-use std::collections::HashSet;
+use ahash::HashMap;
+use ahash::HashSet;
 use std::convert::TryInto;
 use std::env;
 use std::path::{Path, PathBuf};
@@ -100,6 +99,9 @@ use std::sync::Mutex;
 use std::time::Duration;
 use std::time::SystemTime;
 use triomphe::Arc;
+use smartstring::alias::String as SmolStr;
+use ahash::HashMapExt;
+use ahash::HashSetExt;
 
 pub type ArcRichCrateVersion = Arc<RichCrateVersion>;
 
@@ -269,7 +271,7 @@ pub struct KitchenSink {
     top_crates_cached: Mutex<FxHashMap<String, Arc<DoubleCheckedCell<Arc<Vec<Origin>>>>>>,
     git_checkout_path: PathBuf,
     yearly: AllDownloads,
-    category_overrides: HashMap<Box<str>, Vec<String>>,
+    category_overrides: HashMap<SmolStr, Vec<SmolStr>>,
     crates_io_owners_cache: TempCache<Vec<CrateOwner>>,
     depender_changes: TempCache<Vec<DependerChanges>>,
     stats_histograms: TempCache<StatsHistogram>,
@@ -281,7 +283,7 @@ pub struct KitchenSink {
     crate_rustc_compat_db: OnceCell<BuildDb>,
     data_path: PathBuf,
     /// login -> reason
-    pub author_shitlist: HashMap<String, String>,
+    pub author_shitlist: HashMap<SmolStr, SmolStr>,
     event_log: EventLog<SharedEvent>,
 }
 
@@ -357,7 +359,7 @@ impl KitchenSink {
             stats_histograms: TempCache::new(&data_path.join("stats-histograms.tmp")).context("tmp3")?,
             throttle: tokio::sync::Semaphore::new(40),
             auto_indexing_throttle: tokio::sync::Semaphore::new(4),
-            crate_rustc_compat_cache: RwLock::new(HashMap::new()),
+            crate_rustc_compat_cache: RwLock::default(),
             crate_rustc_compat_db: OnceCell::new(),
             event_log: EventLog::new(data_path.join("event_log.db")).context("events")?,
             data_path: data_path.into(),
@@ -400,7 +402,7 @@ impl KitchenSink {
         &self.data_path
     }
 
-    fn load_author_shitlist(path: &Path) -> CResult<HashMap<String, String>> {
+    fn load_author_shitlist(path: &Path) -> CResult<HashMap<SmolStr, SmolStr>> {
         let p = std::fs::read_to_string(path)?;
         let mut out = HashMap::with_capacity(10);
         for line in p.lines() {
@@ -413,12 +415,14 @@ impl KitchenSink {
                 continue;
             }
             let reason = parts.next().expect("shitlist broken").trim();
-            out.insert(login.to_ascii_lowercase(), reason.to_owned());
+            let mut login = SmolStr::from(login);
+            login.make_ascii_lowercase();
+            out.insert(login, reason.into());
         }
         Ok(out)
     }
 
-    fn load_category_overrides(path: &Path) -> CResult<HashMap<Box<str>, Vec<String>>> {
+    fn load_category_overrides(path: &Path) -> CResult<HashMap<SmolStr, Vec<SmolStr>>> {
         let p = std::fs::read_to_string(path)?;
         let mut out = HashMap::new();
         for line in p.lines() {
@@ -428,7 +432,7 @@ impl KitchenSink {
                 continue;
             }
             let categories: Vec<_> = parts.next().expect("overrides broken").split(',')
-                .map(|s| s.trim().to_owned()).collect();
+                .map(|s| s.trim().into()).collect();
             if categories.is_empty() {
                 continue;
             }
@@ -439,7 +443,7 @@ impl KitchenSink {
     }
 
     pub fn is_crates_io_login_on_shitlist(&self, login: &str) -> bool {
-        self.author_shitlist.get(&login.to_ascii_lowercase()).is_some()
+        self.author_shitlist.get(login.to_ascii_lowercase().as_str()).is_some()
     }
 
     pub async fn is_crate_on_shitlist(&self, k: &RichCrate) -> bool {
@@ -2073,8 +2077,10 @@ impl KitchenSink {
             warnings.insert(Warning::NoKeywords);
         }
 
+        let tmp: Vec<_>;
         if let Some(overrides) = self.category_overrides.get(origin.short_crate_name()) {
-            category_slugs = categories::Categories::fixed_category_slugs(overrides, &mut bad_categories);
+            tmp = overrides.iter().map(|k| k.to_string()).collect();
+            category_slugs = categories::Categories::fixed_category_slugs(&tmp, &mut bad_categories);
         }
 
         category_slugs.iter().for_each(|k| debug_assert!(categories::CATEGORIES.from_slug(k).1, "'{}' must exist", k));
@@ -3435,7 +3441,7 @@ impl KitchenSink {
         .filter_map(|x| async {x})
         .collect::<Vec<_>>().await;
 
-        let mut top_keywords = HashMap::new();
+        let mut top_keywords = HashMap::default();
         for (_, _, _, keywords) in &with_owners {
             for k in keywords {
                 *top_keywords.entry(k).or_insert(0u32) += 1;

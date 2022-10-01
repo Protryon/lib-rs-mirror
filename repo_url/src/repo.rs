@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use std::convert::TryFrom;
-
+use smartstring::alias::String as SmolStr;
 use url::Url;
 
 pub type GResult<T> = Result<T, GitError>;
@@ -22,12 +22,12 @@ pub enum RepoHost {
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct SimpleRepo {
-    pub owner: Box<str>,
-    pub repo: Box<str>,
+    pub owner: SmolStr,
+    pub repo: SmolStr,
 }
 
 impl SimpleRepo {
-    pub fn new(owner: impl Into<Box<str>>, repo: impl Into<Box<str>>) -> Self {
+    pub fn new(owner: impl Into<SmolStr>, repo: impl Into<SmolStr>) -> Self {
         Self {
             owner: owner.into(),
             repo: repo.into(),
@@ -76,9 +76,13 @@ impl Repo {
     }
 
     fn repo_from_path<'a>(mut path: impl Iterator<Item = &'a str>) -> GResult<SimpleRepo> {
+        let mut owner = SmolStr::from(path.next().ok_or(GitError::IncompleteUrl)?);
+        owner.make_ascii_lowercase();
+        let mut repo = SmolStr::from(path.next().ok_or(GitError::IncompleteUrl)?.trim_end_matches(".git"));
+        repo.make_ascii_lowercase();
         Ok(SimpleRepo {
-            owner: path.next().ok_or(GitError::IncompleteUrl)?.to_ascii_lowercase().into_boxed_str(),
-            repo: path.next().ok_or(GitError::IncompleteUrl)?.trim_end_matches(".git").to_ascii_lowercase().into_boxed_str(),
+            owner,
+            repo,
         })
     }
 

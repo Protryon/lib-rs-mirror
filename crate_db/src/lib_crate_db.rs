@@ -16,8 +16,8 @@ use rusqlite::types::ToSql;
 use smartstring::alias::String as SmolStr;
 use std::borrow::Cow;
 use std::cell::RefCell;
-use std::collections::HashMap;
-use std::collections::HashSet;
+use ahash::HashMap;
+use ahash::HashSet;
 use std::fmt::Write;
 use std::path::Path;
 use std::sync::Arc;
@@ -1092,7 +1092,7 @@ pub struct KeywordInsert {
 impl KeywordInsert {
     pub fn new() -> FResult<Self> {
         Ok(Self {
-            keywords: HashMap::new(),
+            keywords: HashMap::default(),
             ready: false,
         })
     }

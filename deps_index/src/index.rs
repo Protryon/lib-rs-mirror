@@ -16,19 +16,16 @@ use rich_crate::RichDep;
 use semver::Version as SemVer;
 use semver::VersionReq;
 use serde_derive::*;
-use smol_str::SmolStr;
+use smartstring::alias::String as SmolStr;
 use std::iter;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use std::time::Instant;
 use string_interner::StringInterner;
 use string_interner::symbol::SymbolU32 as Sym;
-
+use ahash::{HashMap, HashSet};
 use feat_extractor::is_deprecated_requirement;
 use triomphe::Arc;
-
-type FxHashMap<K, V> = std::collections::HashMap<K, V, ahash::RandomState>;
-type FxHashSet<V> = std::collections::HashSet<V, ahash::RandomState>;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct MiniVer {
@@ -132,12 +129,12 @@ impl ICrate for RichCrateVersion {
 }
 
 pub struct Index {
-    indexed_crates: FxHashMap<SmolStr, Crate>,
+    indexed_crates: HashMap<SmolStr, Crate>,
     pub crates_index_path: PathBuf,
     git_index: GitIndex,
 
     pub inter: RwLock<StringInterner<Sym, string_interner::backend::StringBackend<Sym>>>,
-    pub cache: RwLock<FxHashMap<(SmolStr, Features), ArcDepSet>>,
+    pub cache: RwLock<HashMap<(SmolStr, Features), ArcDepSet>>,
     deps_stats: DoubleCheckedCell<DepsStats>,
 }
 
@@ -148,7 +145,7 @@ impl Index {
         let start = Instant::now();
         let crates_io_index = crates_index::Index::with_path(&crates_index_path, "https://github.com/rust-lang/crates.io-index")
         .map_err(|e| DepsErr::Crates(e.to_string()))?;
-        let indexed_crates: FxHashMap<_,_> = crates_io_index.crates_parallel()
+        let indexed_crates: HashMap<_,_> = crates_io_index.crates_parallel()
                 .filter_map(|c| {
                     let c = c.unwrap();
                     let name = c.name().to_ascii_lowercase();
@@ -165,7 +162,7 @@ impl Index {
         }
         Ok(Self {
             git_index: GitIndex::new(data_dir)?,
-            cache: RwLock::new(FxHashMap::with_capacity_and_hasher(5000, Default::default())),
+            cache: RwLock::new(HashMap::with_capacity_and_hasher(5000, Default::default())),
             inter: RwLock::new(StringInterner::new()),
             deps_stats: DoubleCheckedCell::new(),
             indexed_crates,
@@ -188,7 +185,7 @@ impl Index {
     ///
     /// It returns only a thin and mostly useless data from the index itself,
     /// so `rich_crate`/`rich_crate_version` is needed to do more.
-    pub fn crates_io_crates(&self) -> &FxHashMap<SmolStr, Crate> {
+    pub fn crates_io_crates(&self) -> &HashMap<SmolStr, Crate> {
         &self.indexed_crates
     }
 
@@ -289,7 +286,7 @@ impl Index {
         let (key_id_part, wants) = key;
 
         let ver_features = ver.features(); // available features
-        let mut to_enable = FxHashMap::with_capacity_and_hasher(wants.features.len(), Default::default());
+        let mut to_enable = HashMap::with_capacity_and_hasher(wants.features.len(), Default::default());
         let all_wanted_features = wants.features.iter()
                         .map(|s| s.as_ref())
                         .chain(iter::repeat("default").take(if wants.default {1} else {0}));
@@ -301,18 +298,18 @@ impl Index {
                     let subfeatures = t.next();
                     let dep_name = dep_descriptor.trim_start_matches("dep:").trim_end_matches('?');
                     let enabled = to_enable.entry(dep_name.to_owned())
-                        .or_insert_with(FxHashSet::default);
+                        .or_insert_with(HashSet::default);
                     if let Some(subfeatures) = subfeatures {
                         enabled.insert(subfeatures);
                     }
                 }
             } else {
-                to_enable.entry(feat.to_owned()).or_insert_with(FxHashSet::default);
+                to_enable.entry(feat.to_owned()).or_insert_with(HashSet::default);
             }
         }
 
         let deps = ver.dependencies();
-        let mut set: FxHashMap<DepName, (_, _, SemVer, FxHashSet<String>)> = FxHashMap::with_capacity_and_hasher(60, Default::default());
+        let mut set: HashMap<DepName, (_, _, SemVer, HashSet<String>)> = HashMap::with_capacity_and_hasher(60, Default::default());
         let mut iter1;
         let mut iter2;
         let deps: &mut dyn Iterator<Item = _> = match deps {
@@ -384,7 +381,7 @@ impl Index {
             };
 
             let (_, _, _, all_features) = set.entry(key)
-                .or_insert_with(|| (has_default_features, matched.clone(), semver, FxHashSet::default()));
+                .or_insert_with(|| (has_default_features, matched.clone(), semver, HashSet::default()));
             all_features.extend(features.iter().cloned());
             if let Some(s) = enable_dep_features {
                 all_features.extend(s.iter().copied().map(|s| s.to_string()));
@@ -393,7 +390,7 @@ impl Index {
 
         // break infinite recursion. Must be inserted first, since depth-first search
         // may end up requesting it.
-        let result = Arc::new(Mutex::new(FxHashMap::default()));
+        let result = Arc::new(Mutex::new(HashMap::default()));
         let key = (key_id_part, wants.clone());
         self.cache.write().insert(key, result.clone());
 
@@ -538,7 +535,7 @@ pub struct Features {
 }
 
 pub type DepName = (Sym, Sym);
-pub type DepSet = FxHashMap<DepName, Dep>;
+pub type DepSet = HashMap<DepName, Dep>;
 pub type ArcDepSet = Arc<Mutex<DepSet>>;
 
 pub struct Dep {

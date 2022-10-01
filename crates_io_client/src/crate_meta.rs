@@ -1,3 +1,5 @@
+use chrono::DateTime;
+use chrono::FixedOffset;
 use serde_derive::*;
 use ahash::HashMap;
 
@@ -85,7 +87,7 @@ pub struct CrateMetaUser {
 pub struct AuditAction {
     pub action: String,
     pub user: CrateMetaUser,
-    pub time: String,
+    pub time: DateTime<FixedOffset>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

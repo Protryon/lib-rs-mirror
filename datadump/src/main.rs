@@ -1,5 +1,7 @@
 #![allow(unused)]
 #![allow(dead_code)]
+use serde::Deserialize;
+use serde::Deserializer;
 use ahash::HashSetExt;
 use ahash::HashMapExt;
 use chrono::prelude::*;
@@ -12,7 +14,6 @@ use kitchen_sink::OwnerKind;
 use kitchen_sink::StatsHistogram;
 use libflate::gzip::Decoder;
 use rayon::prelude::*;
-use serde_derive::Deserialize;
 use ahash::HashMap;
 use ahash::HashSet;
 use std::convert::TryInto;
@@ -315,18 +316,16 @@ fn versions_histogram(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDe
 
             if let Some(latest) = v.iter().max_by_key(|v| v.id) {
                 if let Some(oldest) = v.iter().min_by_key(|v| v.id) {
-                    let latest_date = date_from_str(&latest.created_at);
-                    let oldest_date = date_from_str(&oldest.created_at);
-                    if let (Ok(latest_date), Ok(oldest_date)) = (latest_date, oldest_date) {
-                        insert_hist_item(&mut age, today.signed_duration_since(oldest_date).num_weeks() as u32, name);
-                        insert_hist_item(&mut languish, today.signed_duration_since(latest_date).num_weeks() as u32, name);
-                        let maintenance_weeks = if v.len() == 1 {
-                            0
-                        } else {
-                            latest_date.signed_duration_since(oldest_date).num_weeks().max(1) as u32
-                        };
-                        insert_hist_item(&mut maintenance, maintenance_weeks, name);
-                    }
+                    let latest_date = latest.created_at.with_timezone(&Utc).date();
+                    let oldest_date = oldest.created_at.with_timezone(&Utc).date();
+                    insert_hist_item(&mut age, today.signed_duration_since(oldest_date).num_weeks() as u32, name);
+                    insert_hist_item(&mut languish, today.signed_duration_since(latest_date).num_weeks() as u32, name);
+                    let maintenance_weeks = if v.len() == 1 {
+                        0
+                    } else {
+                        latest_date.signed_duration_since(oldest_date).num_weeks().max(1) as u32
+                    };
+                    insert_hist_item(&mut maintenance, maintenance_weeks, name);
                 }
 
                 if let Some(size) = latest.crate_size {
@@ -378,10 +377,9 @@ fn index_active_rev_dependencies(crates: &CratesMap, versions: &VersionsMap, dep
     let mut deps_changes = HashMap::with_capacity(crates.len());
 
     for (crate_id, name) in crates {
-
         if let Some(vers) = versions.get(crate_id) {
-            let mut releases_from_oldest: Vec<_> = vers.iter().filter_map(|v| {
-                date_from_str(&v.created_at).ok().map(|date| (v.id, MiniDate::new(date), &v.num))
+            let mut releases_from_oldest: Vec<_> = vers.iter().map(|v| {
+                (v.id, MiniDate::new(v.created_at.with_timezone(&Utc).date()), &v.num)
             }).collect();
             if releases_from_oldest.is_empty() {
                 continue; // shouldn't happen
@@ -477,18 +475,17 @@ fn process_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users:
         let mut owners: Vec<_> = owners
             .into_iter()
             .filter_map(|o| {
-                let invited_at = o.created_at.split('.').next().unwrap().to_string(); // trim millis part
                 let invited_by_github_id =
                     o.created_by_id.and_then(|id| users.get(&id).map(|u| u.github_id as u32).or_else(|| teams.get(&id).map(|t| t.github_id)));
                 let mut o = match o.owner_kind {
-                    0 => {
+                    OwnerKind::User => {
                         let u = users.get(&o.owner_id).expect("owner consistency");
                         if u.github_id <= 0 {
                             return None;
                         }
                         CrateOwner {
                             crates_io_login: u.login.to_owned(),
-                            invited_at: Some(invited_at),
+                            invited_at: Some(o.created_at),
                             invited_by_github_id,
                             github_id: u.github_id.try_into().ok(),
                             name: Some(u.name.to_owned()),
@@ -499,7 +496,7 @@ fn process_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users:
                             contributor_only: false,
                         }
                     },
-                    1 => {
+                    OwnerKind::Team => {
                         let u = match teams.get(&o.owner_id) {
                             Some(t) => t,
                             None => {
@@ -509,7 +506,7 @@ fn process_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users:
                         };
                         CrateOwner {
                             crates_io_login: u.login.to_owned(),
-                            invited_at: Some(invited_at),
+                            invited_at: Some(o.created_at),
                             github_id: Some(u.github_id),
                             invited_by_github_id,
                             name: Some(u.name.to_owned()),
@@ -520,7 +517,6 @@ fn process_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users:
                             contributor_only: false,
                         }
                     },
-                    _ => panic!("bad owner type"),
                 };
                 if o.github_id == o.invited_by_github_id {
                     o.invited_by_github_id = None;
@@ -546,10 +542,23 @@ fn process_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users:
 #[derive(Debug, Deserialize)]
 struct CrateOwnerRow {
     crate_id: u32,
-    created_at: String,
+    #[serde(deserialize_with = "date_fudge")]
+    created_at: DateTime<Utc>,
     created_by_id: Option<u32>,
     owner_id: u32,
-    owner_kind: u8,
+    owner_kind: OwnerKind,
+}
+
+fn date_fudge<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
+    where D: Deserializer<'de>,
+{
+    let date_str = <&str>::deserialize(deserializer)?;
+
+    let date_part = date_str.split('.').next().unwrap(); // trim millis
+    match Utc.datetime_from_str(date_part, "%Y-%m-%d %H:%M:%S") {
+        Ok(date) => Ok(date),
+        Err(e) => panic!("Bad date: {date_str}: {e}"),
+    }
 }
 
 type CrateOwners = HashMap<u32, Vec<CrateOwnerRow>>;
@@ -618,7 +627,8 @@ struct CrateVersionRow {
     checksum: [u8; 32],
     crate_id: u32,
     crate_size: Option<u64>,
-    created_at: String,
+    #[serde(deserialize_with = "date_fudge")]
+    created_at: DateTime<Utc>,
     downloads: u64,
     features: String, // json
     id: u32,

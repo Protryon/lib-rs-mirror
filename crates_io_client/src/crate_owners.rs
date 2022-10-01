@@ -1,4 +1,4 @@
-use chrono::offset::TimeZone;
+use chrono::FixedOffset;
 use chrono::DateTime;
 use chrono::Utc;
 use serde_derive::*;
@@ -33,13 +33,13 @@ pub struct CrateOwner {
     pub github_id: Option<u32>,
 
     #[serde(default)]
-    pub invited_at: Option<String>,
+    pub invited_at: Option<DateTime<FixedOffset>>,
 
     #[serde(default)]
     pub invited_by_github_id: Option<u32>,
 
     #[serde(default)]
-    pub last_seen_at: Option<String>,
+    pub last_seen_at: Option<DateTime<FixedOffset>>,
 
     /// not from the API, added later
     #[serde(default)]
@@ -61,7 +61,7 @@ impl CrateOwner {
     }
 
     pub fn invited_at(&self) -> Option<DateTime<Utc>> {
-        self.invited_at.as_ref().and_then(|d| Utc.datetime_from_str(d, "%Y-%m-%d %H:%M:%S").ok())
+        Some(self.invited_at?.with_timezone(&Utc))
     }
 
     /// Be careful about case-insensitivity

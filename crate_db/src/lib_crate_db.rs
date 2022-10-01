@@ -640,7 +640,7 @@ impl CrateDb {
                             Some(id) if id != github_id => Some(id),
                             _ => None,
                         };
-                        let args: &[&dyn ToSql] = &[&github_id, &crate_id, &invited_by_github_id, &o.invited_at];
+                        let args: &[&dyn ToSql] = &[&github_id, &crate_id, &invited_by_github_id, &o.invited_at.as_ref().map(|d| d.to_rfc3339())];
                         insert.execute(args)?;
                     }
                 }

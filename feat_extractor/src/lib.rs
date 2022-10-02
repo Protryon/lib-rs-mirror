@@ -44,7 +44,7 @@ lazy_static::lazy_static! {
 fn extract_text_phrases(manifest: &Manifest, github_description: Option<&str>, readme_text: Option<&str>) -> Vec<(f64, String)> {
     let mut out = Vec::new();
     let mut len = 0;
-    if let Some(s) = &manifest.package().description {
+    if let Some(s) = &manifest.package().description() {
         let s = s.to_lowercase();
         len += s.len();
         out.push((1., s));

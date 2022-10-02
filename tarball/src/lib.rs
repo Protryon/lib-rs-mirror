@@ -320,7 +320,7 @@ fn is_bin_filename(path: &Path, manifest: Option<&Manifest>) -> bool {
 /// Check if given filename is a README. If `package` is missing, guess.
 fn is_readme_filename(path: &Path, package: Option<&Package>) -> bool {
     path.to_str().map_or(false, |pathstr| {
-        if let Some(&Package { readme: OptionalFile::Path(ref r), .. }) = package {
+        if let Some(OptionalFile::Path(r)) = package.map(|p| p.readme()) {
             // packages put ./README which doesn't match README
             r.trim_start_matches('.').trim_start_matches('/') == pathstr
         } else {

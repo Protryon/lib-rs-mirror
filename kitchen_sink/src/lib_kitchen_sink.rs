@@ -1070,7 +1070,7 @@ impl KitchenSink {
             let package = meta.manifest.package.as_mut().ok_or(KitchenSinkErr::NotAPackage(origin))?;
 
             // Allowing any other URL would allow spoofing
-            package.repository = Some(repo.canonical_git_url().into_owned());
+            package.set_repository(Some(repo.canonical_git_url().into_owned()));
 
             meta.path_in_repo = Some(found.inner_path);
             Ok::<_, CError>(meta)
@@ -1088,7 +1088,7 @@ impl KitchenSink {
         let mut warnings = HashSet::new();
         let has_readme = meta.readme.is_some();
         if !has_readme {
-            let maybe_repo = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
+            let maybe_repo = package.repository().and_then(|r| Repo::new(r).ok());
             warnings.insert(Warning::NoReadmeProperty);
             warnings.extend(Box::pin(self.add_readme_from_repo(&mut meta, maybe_repo.as_ref())).await);
         }
@@ -1134,32 +1134,34 @@ impl KitchenSink {
         let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
 
         // it may contain data from "nowhere"! https://github.com/rust-lang/crates.io/issues/1624
-        if package.homepage.is_none() {
+        if package.homepage().is_none() {
             if let Some(url) = crates_io_krate.homepage {
-                package.homepage = Some(url.into());
+                package.set_homepage(Some(url.into()));
             }
         }
-        if package.documentation.is_none() {
-            if let Some(url) = crates_io_krate.documentation {
-                package.documentation = Some(url.into());
+        if package.documentation().is_none() {
+            if let Some(url) = crates_io_krate.documentation.as_deref() {
+                package.set_documentation(Some(url.into()));
             }
         }
 
         // Guess repo URL if none was specified; must be done before getting stuff from the repo
-        if package.repository.is_none() {
+        if package.repository().is_none() {
             warnings.insert(Warning::NoRepositoryProperty);
             // it may contain data from nowhere! https://github.com/rust-lang/crates.io/issues/1624
             if let Some(repo) = crates_io_krate.repository {
-                package.repository = Some(repo.into());
-            } else if package.homepage.as_ref().map_or(false, |h| Repo::looks_like_repo_url(h)) {
-                package.repository = package.homepage.take();
+                package.set_repository(Some(repo.into()));
+            } else if package.homepage().map_or(false, |h| Repo::looks_like_repo_url(h)) {
+                #[allow(deprecated)]
+                let home = package.homepage.take();
+                package.set_repository(home);
             }
         }
 
-        let maybe_repo = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
+        let maybe_repo = package.repository().and_then(|r| Repo::new(r).ok());
         let has_readme_file = meta.readme.is_some();
         if !has_readme_file {
-            let has_readme_prop = meta.manifest.package.as_ref().map_or(false, |p| p.readme.is_some());
+            let has_readme_prop = meta.manifest.package.as_ref().map_or(false, |p| p.readme().is_some());
             if has_readme_prop {
                 warnings.insert(Warning::NoReadmePackaged);
             } else {
@@ -1194,7 +1196,7 @@ impl KitchenSink {
         let mut github_keywords = None;
 
         let package = meta.manifest.package.as_mut().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
-        let maybe_repo = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
+        let maybe_repo = package.repository().and_then(|r| Repo::new(r).ok());
         // Guess keywords if none were specified
         // TODO: also ignore useless keywords that are unique db-wide
         let gh = match maybe_repo.as_ref() {
@@ -1222,13 +1224,13 @@ impl KitchenSink {
             }
         }
 
-        let explicit_documentation_link_existed = package.documentation.is_some();
+        let explicit_documentation_link_existed = package.documentation().is_some();
 
         if origin.is_crates_io() {
             // Delete the original docs.rs link, because we have our own
             // TODO: what if the link was to another crate or a subpage?
-            if package.documentation.as_ref().map_or(false, |s| Self::is_docs_rs_link(s)) && self.has_docs_rs(&origin, &package.name, package.version()).await {
-                package.documentation = None; // docs.rs is not proper docs
+            if package.documentation().as_ref().map_or(false, |s| Self::is_docs_rs_link(s)) && self.has_docs_rs(&origin, &package.name, package.version()).await {
+                package.set_documentation(None::<String>); // docs.rs is not proper docs
             }
         }
 
@@ -1241,24 +1243,24 @@ impl KitchenSink {
                 if ghrepo.archived && meta.manifest.badges.maintenance.status == MaintenanceStatus::None {
                     meta.manifest.badges.maintenance.status = MaintenanceStatus::AsIs; // FIXME: not exactly
                 }
-                if package.homepage.is_none() {
+                if package.homepage().is_none() {
                     if let Some(url) = ghrepo.homepage {
-                        let also_add_docs = package.documentation.is_none() && ghrepo.github_page_url.as_ref().map_or(false, |p| p != &url);
-                        package.homepage = Some(url);
+                        let also_add_docs = package.documentation().is_none() && ghrepo.github_page_url.as_ref().map_or(false, |p| p != &url);
+                        package.set_homepage(Some(url));
                         // github pages URLs are often bad, so don't even try to use them unless documentation property is missing
                         // (especially don't try to replace docs.rs with this gamble)
                         if also_add_docs && !explicit_documentation_link_existed {
                             if let Some(url) = ghrepo.github_page_url {
-                                package.documentation = Some(url);
+                                package.set_documentation(Some(url));
                             }
                         }
                     } else if let Some(url) = ghrepo.github_page_url {
-                        package.homepage = Some(url);
+                        package.set_homepage(Some(url));
                     }
                     warnings.extend(self.remove_redundant_links(package, maybe_repo.as_ref()).await);
                 }
-                if package.description.is_none() {
-                    package.description = ghrepo.description;
+                if package.description().is_none() {
+                    package.set_description(ghrepo.description);
                 } else {
                     github_description = ghrepo.description;
                 }
@@ -1285,12 +1287,12 @@ impl KitchenSink {
             if let Some(ref lib) = meta.lib_file {
                 words.push(lib);
             }
-            if let Some(ref s) = package.description {words.push(s);}
+            if let Some(ref s) = package.description() {words.push(s);}
             if let Some(ref s) = github_description {words.push(s);}
             if let Some(ref s) = github_name {words.push(s);}
-            if let Some(ref s) = package.homepage {words.push(s);}
-            if let Some(ref s) = package.documentation {words.push(s);}
-            if let Some(ref s) = package.repository {words.push(s);}
+            if let Some(ref s) = package.homepage() {words.push(s);}
+            if let Some(ref s) = package.documentation() {words.push(s);}
+            if let Some(ref s) = package.repository() {words.push(s);}
 
             Self::capitalized_name(&package.name, words.into_iter())
         };
@@ -1357,7 +1359,7 @@ impl KitchenSink {
         let ver = self.crate_files_summary_from_crates_io_tarball(origin.short_crate_name(), crate_version).await?;
         if let Some(sha) = ver.vcs_info_git_sha1 {
             let package = ver.manifest.package.as_ref().ok_or_else(|| KitchenSinkErr::NotAPackage(origin.clone()))?;
-            if let Some(Ok(repo)) = package.repository.as_deref().map(Repo::new) {
+            if let Some(Ok(repo)) = package.repository().map(Repo::new) {
                 let path_in_repo = match ver.path_in_repo {
                     Some(p) => p,
                     None => self.crate_db.path_in_repo(&repo, &package.name).await?.unwrap_or_default(),
@@ -1376,17 +1378,20 @@ impl KitchenSink {
         Ok(url)
     }
 
+    #[allow(deprecated)]
     fn override_bad_categories(manifest: &mut Manifest) {
         let direct_dependencies = &manifest.dependencies;
         let has_cargo_bin = manifest.has_cargo_bin();
         let package = manifest.package.as_mut().expect("pkg");
         let eq = |a: &str, b: &str| -> bool { a.eq_ignore_ascii_case(b) };
 
-        for cat in &mut package.categories {
+        let keywords = &package.keywords;
+
+        for cat in package.categories.iter_mut() {
             if cat.as_bytes().iter().any(|c| c.is_ascii_uppercase()) {
                 *cat = cat.to_lowercase();
             }
-            if has_cargo_bin && (cat == "development-tools" || cat == "command-line-utilities") && package.keywords.iter().any(|k| k.eq_ignore_ascii_case("cargo-subcommand") || k.eq_ignore_ascii_case("subcommand")) {
+            if has_cargo_bin && (cat == "development-tools" || cat == "command-line-utilities") && keywords.iter().any(|k| k.eq_ignore_ascii_case("cargo-subcommand") || k.eq_ignore_ascii_case("subcommand")) {
                 *cat = "development-tools::cargo-plugins".into();
             }
             if cat == "localization" {
@@ -1394,21 +1399,21 @@ impl KitchenSink {
                 *cat = "internationalization".to_string();
             }
             if cat == "parsers" && (direct_dependencies.keys().any(|k| k == "nom" || k == "peresil" || k == "combine") ||
-                    package.keywords.iter().any(|k| match k.to_ascii_lowercase().as_ref() {
+                    keywords.iter().any(|k| match k.to_ascii_lowercase().as_ref() {
                         "asn1" | "tls" | "idl" | "crawler" | "xml" | "nom" | "json" | "logs" | "elf" | "uri" | "html" | "protocol" | "semver" | "ecma" |
                         "chess" | "vcard" | "exe" | "fasta" => true,
                         _ => false,
                     })) {
                 *cat = "parser-implementations".into();
             }
-            if (cat == "cryptography" || cat == "database" || cat == "rust-patterns" || cat == "development-tools") && package.keywords.iter().any(|k| eq(k, "bitcoin") || eq(k, "ethereum") || eq(k, "exonum") || eq(k, "blockchain")) {
+            if (cat == "cryptography" || cat == "database" || cat == "rust-patterns" || cat == "development-tools") && keywords.iter().any(|k| eq(k, "bitcoin") || eq(k, "ethereum") || eq(k, "exonum") || eq(k, "blockchain")) {
                 *cat = "cryptography::cryptocurrencies".into();
             }
             // crates-io added a better category
             if cat == "game-engines" {
                 *cat = "game-development".to_string();
             }
-            if cat == "games" && package.keywords.iter().any(|k| {
+            if cat == "games" && keywords.iter().any(|k| {
                     k == "game-dev" || k == "game-development" || eq(k,"gamedev") || eq(k,"framework") || eq(k,"utilities") || eq(k,"parser") || eq(k,"api")
                 }) {
                 *cat = "game-development".into();
@@ -1458,9 +1463,9 @@ impl KitchenSink {
                 let is_math = |k: &String| {
                     k == "math" || eq(k,"calculus") || eq(k,"algebra") || eq(k,"linear-algebra") || eq(k,"mathematics") || eq(k,"maths") || eq(k,"number-theory")
                 };
-                if package.keywords.iter().any(is_nn) {
+                if keywords.iter().any(is_nn) {
                     *cat = "science::ml".into();
-                } else if package.keywords.iter().any(is_math) {
+                } else if keywords.iter().any(is_math) {
                     *cat = "science::math".into();
                 }
             }
@@ -1559,10 +1564,10 @@ impl KitchenSink {
         let mut warnings = HashSet::new();
 
         // We show github link prominently, so if homepage = github, that's nothing new
-        let homepage_is_repo = Self::is_same_url(package.homepage.as_deref(), package.repository.as_deref());
+        let homepage_is_repo = Self::is_same_url(package.homepage(), package.repository());
         let homepage_is_canonical_repo = maybe_repo
             .and_then(|repo| {
-                package.homepage.as_ref()
+                package.homepage()
                 .and_then(|home| Repo::new(home).ok())
                 .map(|other| {
                     repo.canonical_git_url() == other.canonical_git_url()
@@ -1571,30 +1576,30 @@ impl KitchenSink {
             .unwrap_or(false);
 
         if homepage_is_repo || homepage_is_canonical_repo {
-            package.homepage = None;
+            package.set_homepage(None::<String>);
         }
 
-        if Self::is_same_url(package.documentation.as_deref(), package.homepage.as_deref()) ||
-           Self::is_same_url(package.documentation.as_deref(), package.repository.as_deref()) ||
-           maybe_repo.map_or(false, |repo| Self::is_same_url(Some(&*repo.canonical_http_url("", None)), package.documentation.as_deref())) {
-            package.documentation = None;
+        if Self::is_same_url(package.documentation(), package.homepage()) ||
+           Self::is_same_url(package.documentation(), package.repository()) ||
+           maybe_repo.map_or(false, |repo| Self::is_same_url(Some(&*repo.canonical_http_url("", None)), package.documentation())) {
+            package.set_documentation(None);
         }
 
-        if package.homepage.as_ref().map_or(false, |d| Self::is_docs_rs_link(d) || d.starts_with("https://lib.rs/") || d.starts_with("https://crates.io/")) {
-            package.homepage = None;
+        if package.homepage().map_or(false, |d| Self::is_docs_rs_link(d) || d.starts_with("https://lib.rs/") || d.starts_with("https://crates.io/")) {
+            package.set_homepage(None);
         }
 
-        if let Some(url) = package.homepage.as_deref() {
+        if let Some(url) = package.homepage() {
             if !self.check_url_is_valid(url).await {
                 warnings.insert(Warning::BrokenLink("homepage".into(), url.into()));
-                package.homepage = None;
+                package.set_homepage(None);
             }
         }
 
-        if let Some(url) = package.documentation.as_deref() {
+        if let Some(url) = package.documentation() {
             if !self.check_url_is_valid(url).await {
                 warnings.insert(Warning::BrokenLink("documentation".into(), url.into()));
-                package.documentation = None;
+                package.set_documentation(None);
             }
         }
         warnings
@@ -2052,11 +2057,11 @@ impl KitchenSink {
         let (is_build, is_dev) = self.is_build_or_dev(origin).await?;
         let package = manifest.package();
         let readme_text = source_data.readme.as_ref().map(|r| render_readme::Renderer::new(None).visible_text(&r.markup));
-        let repository = package.repository.as_ref().and_then(|r| Repo::new(r).ok());
-        let authors = package.authors.iter().map(|a| Author::new(a)).collect::<Vec<_>>();
+        let repository = package.repository().and_then(|r| Repo::new(r).ok());
+        let authors = package.authors().iter().map(|a| Author::new(a)).collect::<Vec<_>>();
 
         let mut bad_categories = Vec::new();
-        let mut category_slugs = categories::Categories::fixed_category_slugs(&package.categories, &mut bad_categories);
+        let mut category_slugs = categories::Categories::fixed_category_slugs(package.categories(), &mut bad_categories);
         for c in &bad_categories {
             // categories invalid for lib.rs may still be valid for crates.io (they've drifted over time)
             if is_valid_crates_io_category_not_on_lib_rs(c) {
@@ -2069,7 +2074,7 @@ impl KitchenSink {
             warnings.insert(Warning::NoCategories);
         }
 
-        if package.keywords.is_empty() {
+        if package.keywords().is_empty() {
             warnings.insert(Warning::NoKeywords);
         }
 
@@ -2407,7 +2412,7 @@ impl KitchenSink {
         let package = manifest.package();
         let mut working_msrv = None;
 
-        let (mut msrv, mut reason) = match package.edition {
+        let (mut msrv, mut reason) = match package.edition() {
             Edition::E2015 => (1u16, "???"),
             Edition::E2018 => (31, "edition 2018"),
             Edition::E2021 => (56, "edition 2021"),
@@ -2440,7 +2445,7 @@ impl KitchenSink {
             reason = "dep:feature";
         }
 
-        if let Some(minor) = package.rust_version.as_ref().and_then(|v| v.split('.').nth(1)).and_then(|minor| minor.parse().ok()) {
+        if let Some(minor) = package.rust_version().and_then(|v| v.split('.').nth(1)).and_then(|minor| minor.parse().ok()) {
             if msrv < minor {
                 reason = "rust-version";
                 msrv = minor;
@@ -2904,7 +2909,7 @@ impl KitchenSink {
     pub async fn all_contributors<'a>(&self, krate: &'a RichCrateVersion) -> CResult<(Vec<CrateAuthor<'a>>, Vec<CrateAuthor<'a>>, bool, usize)> {
         let owners = self.crate_owners(krate.origin(), CrateOwners::All).await?;
 
-        let (hit_max_contributor_count, mut contributors_by_login) = match krate.repository().as_ref() {
+        let (hit_max_contributor_count, mut contributors_by_login) = match krate.repository() {
             // Only get contributors from github if the crate has been found in the repo,
             // otherwise someone else's repo URL can be used to get fake contributor numbers
             Some(crate_repo) => watch("contrib", self.contributors_from_repo(crate_repo, &owners, self.has_verified_repository_link(krate).await)).await?,

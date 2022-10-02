@@ -41,20 +41,20 @@ async fn check_repo(line: &str, crates: &KitchenSink) -> Result<(), Box<dyn std:
             let path = f.inner_path;
             if let Some(pkg) = &manif.package {
                 if path.contains("example") {
-                    println!("// skip {} {}", path, pkg.name);
+                    println!("// skip {} {}", path, pkg.name());
                     continue;
                 }
-                if crates.crate_exists(&Origin::from_github(gh.clone(), pkg.name.as_str())) {
+                if crates.crate_exists(&Origin::from_github(gh.clone(), pkg.name())) {
                     print!("// GIT alredy exists! ");
-                } else if crates.crate_exists(&Origin::from_crates_io_name(&pkg.name)) {
-                    print!("// crate alredy exists! https://lib.rs/crates/{} ", pkg.name);
-                    if let Some(d) = &pkg.description {
+                } else if crates.crate_exists(&Origin::from_crates_io_name(pkg.name())) {
+                    print!("// crate alredy exists! https://lib.rs/crates/{} ", pkg.name());
+                    if let Some(d) = pkg.description() {
                         print!("// {} // ", d.trim());
                     }
-                } else if let Some(d) = &pkg.description {
+                } else if let Some(d) = pkg.description() {
                     println!("// {}", d.trim());
                 }
-                println!("github:{}/{}/{}\n,{}", gh.owner, gh.repo, pkg.name, if !path.is_empty() && path != pkg.name {format!(" // in {}", path)} else {String::new()});
+                println!("github:{}/{}/{}\n,{}", gh.owner, gh.repo, pkg.name, if !path.is_empty() && path != pkg.name() {format!(" // in {}", path)} else {String::new()});
             }
         }
     } else {

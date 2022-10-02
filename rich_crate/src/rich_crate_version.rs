@@ -27,14 +27,14 @@ pub struct RichCrateVersion {
 /// Crates.rs uses this only for the latest version of a crate.
 impl RichCrateVersion {
     pub fn new(origin: Origin, manifest: Manifest, derived: Derived) -> Self {
-        let package = manifest.package.as_ref().expect("package");
+        let package = manifest.package();
         if let Origin::GitHub { .. } = &origin {
-            assert!(package.repository.is_some());
+            assert!(package.repository().is_some());
         }
         let s = Self {
             origin,
-            repo: package.repository.as_ref().and_then(|r| Repo::new(r).ok()),
-            authors: match package.authors.as_slice() {
+            repo: package.repository().and_then(|r| Repo::new(r).ok()),
+            authors: match package.authors() {
                 [one] => one.split(',').map(Author::new).collect(), // common mistake to use comma-separated string
                 rest => rest.iter().map(|a| Author::new(a)).collect(),
             },
@@ -48,32 +48,32 @@ impl RichCrateVersion {
     }
 
     fn package(&self) -> &Package {
-        self.manifest.package.as_ref().unwrap()
+        self.manifest.package()
     }
 
     #[inline]
     pub fn homepage(&self) -> Option<&str> {
-        self.package().homepage.as_ref().map(|s| s.as_ref())
+        self.package().homepage()
     }
 
     pub fn documentation(&self) -> Option<&str> {
-        self.package().documentation.as_ref().map(|s| s.as_ref())
+        self.package().documentation()
     }
 
     pub fn edition(&self) -> Edition {
-        self.package().edition
+        self.package().edition()
     }
 
     pub fn has_own_keywords(&self) -> bool {
-        !self.package().keywords.is_empty()
+        !self.package().keywords().is_empty()
     }
 
     pub fn has_own_categories(&self) -> bool {
-        !self.package().categories.is_empty()
+        !self.package().categories().is_empty()
     }
 
     pub fn manifest_raw_categories(&self) -> &[String] {
-        &self.package().categories
+        self.package().categories()
     }
 
     /// Finds preferred capitalization for the name
@@ -86,11 +86,11 @@ impl RichCrateVersion {
     }
 
     pub fn license(&self) -> Option<&str> {
-        self.package().license.as_deref()
+        self.package().license()
     }
 
     pub fn license_name(&self) -> Option<&str> {
-        self.package().license.as_deref().map(|s| match s {
+        self.package().license().map(|s| match s {
             "" => "(unspecified)",
             "MIT OR Apache-2.0" | "MIT/Apache-2.0" | "MIT / Apache-2.0" => "MIT/Apache",
             "Apache-2.0/ISC/MIT" => "MIT/Apache/ISC",
@@ -101,7 +101,7 @@ impl RichCrateVersion {
     }
 
     pub fn license_file(&self) -> Option<&str> {
-        self.package().license_file.as_deref()
+        self.package().license_file()
     }
 
     /// Either original keywords or guessed ones
@@ -127,7 +127,7 @@ impl RichCrateVersion {
 
     /// Without trailing '.' to match website's style
     pub fn description(&self) -> Option<&str> {
-        self.package().description.as_deref().map(|d| {
+        self.package().description().map(|d| {
             let d = d.trim();
             if d.contains(". ") {d} // multiple sentences, leave them alone
             else {d.trim_end_matches('.')}
@@ -162,7 +162,7 @@ impl RichCrateVersion {
     }
 
     pub fn readme_raw_path(&self) -> Option<&str> {
-        self.package().readme.as_ref()
+        self.package().readme().as_ref()
     }
 
     /// Contents of the `src/lib.rs` from the crate, if available
@@ -274,8 +274,8 @@ impl RichCrateVersion {
     }
 
     pub fn is_no_std(&self) -> bool {
-        self.package().categories.iter().any(|c| c == "no-std") ||
-            self.package().keywords.iter().any(|k| k == "no-std" || k == "no_std") ||
+        self.package().categories().iter().any(|c| c == "no-std") ||
+            self.package().keywords().iter().any(|k| k == "no-std" || k == "no_std") ||
             self.features().iter().any(|(k, _)| k == "no-std" || k == "no_std")
     }
 
@@ -301,7 +301,7 @@ impl RichCrateVersion {
     }
 
     pub fn explicit_msrv(&self) -> Option<&str> {
-        self.package().rust_version.as_deref()
+        self.package().rust_version()
     }
 
     /// compressed (whole tarball) and decompressed (extracted files only)
@@ -334,7 +334,7 @@ impl ManifestExt for Manifest {
     }
 
     fn links(&self) -> Option<&str> {
-        self.package().links.as_deref()
+        self.package().links()
     }
 
     fn is_sys(&self, has_buildrs: bool) -> bool {
@@ -346,7 +346,7 @@ impl ManifestExt for Manifest {
                 (
                     name.ends_with("-sys") ||
                         name.ends_with("_sys") ||
-                        self.package().categories.iter().any(|c| c == "external-ffi-bindings")
+                        self.package().categories().iter().any(|c| c == "external-ffi-bindings")
                     // _dll suffix is a false positive
                 ))
     }

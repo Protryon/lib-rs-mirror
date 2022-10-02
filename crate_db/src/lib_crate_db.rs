@@ -285,7 +285,7 @@ impl CrateDb {
             insert_keyword.commit(tx, crate_id, if c.source_data.is_yanked {0.1} else {1.})?;
 
             let package = c.manifest.package.as_ref().expect("package");
-            let mut keywords: Vec<_> = package.keywords.iter().filter(|k| !k.is_empty()).map(|k| normalize_keyword(k)).collect();
+            let mut keywords: Vec<_> = package.keywords().iter().filter(|k| !k.is_empty()).map(|k| normalize_keyword(k)).collect();
             if keywords.is_empty() {
                 keywords = Self::keywords_tx(tx, c.origin)?;
             }
@@ -306,7 +306,7 @@ impl CrateDb {
         let package = manifest.package.as_ref().expect("package");
 
         let mut insert_keyword = KeywordInsert::new()?;
-        let crate_keywords = package.keywords.iter()
+        let crate_keywords = package.keywords().iter()
             .chain(c.source_data.github_keywords.iter().flatten())
             .map(|k| k.as_str())
             .chain(c.bad_categories.iter().map(|k| self.tag_synonyms.normalize(k)));
@@ -348,7 +348,7 @@ impl CrateDb {
         }
         insert_keyword.add_synonyms(&self.tag_synonyms);
 
-        if let Some(url) = &package.homepage {
+        if let Some(url) = package.homepage() {
             if url.len() > 5 {
                 insert_keyword.add_raw(format!("url:{url}"), 1., false); // crates sharing homepage are likely same project
             }
@@ -410,7 +410,7 @@ impl CrateDb {
                 })
                 .collect()
         } else {
-            let cat_w = 0.2 + 0.2 * c.manifest.package().keywords.len() as f64;
+            let cat_w = 0.2 + 0.2 * c.manifest.package().keywords().len() as f64;
             let mut candidates = Self::candidate_crate_categories_tx(conn, c.origin)?;
             candidates.values_mut().for_each(|w| {
                 *w = (*w * cat_w).min(0.99);

@@ -24,9 +24,7 @@
                     <span class="version"><span>@if let Origin::GitHub{..} = k.origin() {GitHub } else {v}</span>@k.version()</span>
                     @:labels(k, (false, false))
                     @if let Some(at) = all.versions().iter().map(|v| &v.created_at).max() {
-                        @if let Ok(d) = chrono::DateTime::parse_from_rfc3339(at) {
-                            <span class=pubdate>@HumanTime::from(d)</span>
-                        }
+                        <span class=pubdate>@HumanTime::from(*at)</span>
                     }
                 } else {
                     @:labels(k, (false, false))

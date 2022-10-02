@@ -1,5 +1,4 @@
 use chrono::DateTime;
-use chrono::FixedOffset;
 use chrono::Utc;
 use feat_extractor::{is_deprecated_requirement, is_squatspam};
 use kitchen_sink::CResult;
@@ -150,9 +149,9 @@ pub async fn warnings_for_crate(c: &KitchenSink, k: &RichCrateVersion, all: &Ric
     Ok(warnings)
 }
 
-fn find_most_recent_release<'a>(versions: &'a [(SemVer, &CrateVersion)], pre: bool) -> Option<(&'a SemVer, DateTime<FixedOffset>)> {
+fn find_most_recent_release<'a>(versions: &'a [(SemVer, &CrateVersion)], pre: bool) -> Option<(&'a SemVer, DateTime<Utc>)> {
     versions.iter().filter(move |(v, _)| pre != v.pre.is_empty()).max_by(|a,b| a.1.created_at.cmp(&b.1.created_at))
-        .and_then(|(v, c)| Some((v, DateTime::parse_from_rfc3339(&c.created_at).ok()?)))
+        .and_then(|(v, c)| Some((v, c.created_at)))
 }
 
 async fn warn_bad_requirements(k: &RichCrateVersion, dependencies: &[RichDep], warnings: &mut HashSet<Warning>, c: &KitchenSink) {

@@ -55,8 +55,8 @@ impl UserDb {
     fn read_user_row(row: &Row) -> Result<User, Error> {
         Ok(User {
             id: row.get_unwrap(0),
-            login: row.get_unwrap(1),
-            name: row.get_unwrap(2),
+            login: row.get_ref_unwrap(1).as_str()?.into(),
+            name: row.get_ref_unwrap(2).as_str_or_null()?.map(From::from),
             avatar_url: row.get_unwrap(3),
             gravatar_id: row.get_unwrap(4),
             html_url: row.get_unwrap(5),
@@ -129,7 +129,7 @@ impl UserDb {
             let args: &[&dyn ToSql] = &[
                 &user.id,
                 &user.login.to_ascii_lowercase(),
-                &user.name,
+                &user.name.as_deref(),
                 &user.avatar_url,
                 &user.gravatar_id,
                 &user.html_url,
@@ -185,7 +185,7 @@ fn userdb() {
     let res = u.user_by_github_login("HellO").unwrap().unwrap();
 
     assert_eq!(1, res.id);
-    assert_eq!("bla", res.html_url);
+    assert_eq!("bla", &*res.html_url);
     assert_eq!(UserType::Org, res.user_type);
     assert_eq!(Some(false), res.two_factor_authentication);
 
@@ -204,7 +204,7 @@ fn userdb() {
     let res = u.user_by_github_login("HellO").unwrap().unwrap();
 
     assert_eq!(1, res.id);
-    assert_eq!("bla2", res.html_url);
+    assert_eq!("bla2", &*res.html_url);
     assert_eq!(UserType::User, res.user_type);
     assert_eq!(Some(false), res.two_factor_authentication);
     assert_eq!("2020-02-20", res.created_at.as_deref().unwrap());

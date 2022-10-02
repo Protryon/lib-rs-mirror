@@ -237,8 +237,8 @@ fn versions_score(ver: &[CrateVersion]) -> Score {
         return s;
     }
 
-    let oldest = ver.iter().map(|v| &v.created_at).min().and_then(|s| s.parse::<DateTime<Utc>>().ok());
-    let newest = ver.iter().map(|v| &v.created_at).max().and_then(|s| s.parse::<DateTime<Utc>>().ok());
+    let oldest = ver.iter().map(|v| &v.created_at).min().copied();
+    let newest = ver.iter().map(|v| &v.created_at).max().copied();
     if let (Some(oldest), Some(newest)) = (oldest, newest) {
         s.n("development history", 40, (newest - oldest).num_days() / 11);
 
@@ -298,8 +298,6 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs<'_>) -> Score {
     let is_app_only = cr.is_app && cr.number_of_direct_reverse_deps == 0;
 
     let newest = cr.versions.iter().max_by_key(|v| &v.created_at).expect("at least 1 ver?");
-    let freshness_score = match newest.created_at.parse::<DateTime<Utc>>() {
-        Ok(latest_date) => {
             // Assume higher versions, and especially patch versions, mean the crate is more mature
             // and needs fewer updates
             let version_stability_interval = match SemVer::parse(&newest.num) {
@@ -311,17 +309,11 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs<'_>) -> Score {
                 _ => 80,
             };
             let expected_update_interval = version_stability_interval.min(cr.versions.len() as i64 * 50) / if cr.is_nightly { 4 } else { 1 };
-            let age = (Utc::now() - latest_date).num_days();
+            let age = (Utc::now() - newest.created_at).num_days();
             let days_past_expiration_date = (age - expected_update_interval).max(0);
             // score decays for a ~year after the crate should have been updated
             let decay_days = expected_update_interval/2 + if cr.is_nightly { 30 } else if is_app_only {300} else {200};
-            (decay_days - days_past_expiration_date).max(0) as f64 / (decay_days as f64)
-        },
-        Err(e) => {
-            eprintln!("Release time parse error: {}", e);
-            0.
-        },
-    };
+            let freshness_score = (decay_days - days_past_expiration_date).max(0) as f64 / (decay_days as f64);
     score.frac("Freshness of latest release", 10, freshness_score);
     score.frac("Freshness of deps", 10, cr.dependency_freshness.iter()
         .map(|d| 0.2 + d * 0.8) // one bad dep shouldn't totally kill the score

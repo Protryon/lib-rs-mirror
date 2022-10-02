@@ -18,7 +18,6 @@ use futures::future::FutureExt;
 use kitchen_sink::filter::ImageOptimAPIFilter;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::Origin;
-use kitchen_sink::RichCrate;
 use locale::Numeric;
 use render_readme::{Highlighter, Markup, Renderer};
 use repo_url::SimpleRepo;
@@ -951,7 +950,7 @@ impl<'k> RenderLock<'k> {
 /// takes path to storage, freshness in seconds, and a function to call on cache miss
 /// returns (page, fresh in seconds)
 async fn with_file_cache<F: Send>(state: &AServerState, cache_file_name: &str, cache_time: u32, generate: F) -> Result<Rendered, anyhow::Error>
-    where F: Future<Output=Result<(Vec<u8>, Option<DateTime<FixedOffset>>), anyhow::Error>> + 'static {
+    where F: Future<Output=Result<(Vec<u8>, Option<DateTime<Utc>>), anyhow::Error>> + 'static {
 
     let l = RenderLock::new(cache_file_name);
     let _g = l.lock().await;
@@ -979,7 +978,7 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file_name: &str, c
             let timestamp = u32::from_le_bytes(page_cached.get(trailer_pos + 4..).unwrap().try_into().unwrap());
             page_cached.truncate(trailer_pos);
 
-            let last_modified = if timestamp > 0 { Some(DateTime::from_utc(NaiveDateTime::from_timestamp(timestamp as _, 0), FixedOffset::east(0))) } else { None };
+            let last_modified = if timestamp > 0 { Some(Utc.timestamp(timestamp as _, 0)) } else { None };
             let cache_time_remaining = cache_time.saturating_sub(age_secs);
 
             debug!("Using cached page {} {}s fresh={:?} acc={:?}", cache_file.display(), cache_time_remaining, is_fresh, is_acceptable);
@@ -1019,7 +1018,7 @@ async fn with_file_cache<F: Send>(state: &AServerState, cache_file_name: &str, c
 }
 
 fn background_refresh<F>(state: AServerState, cache_file: PathBuf, generate: F)
-    where F: Future<Output=Result<(Vec<u8>, Option<DateTime<FixedOffset>>), anyhow::Error>> + 'static + Send {
+    where F: Future<Output=Result<(Vec<u8>, Option<DateTime<Utc>>), anyhow::Error>> + 'static + Send {
 
     let _ = rt_run_timeout(&state.clone().rt, "refreshbg", 300, {
         async move {
@@ -1049,7 +1048,7 @@ fn background_refresh<F>(state: AServerState, cache_file: PathBuf, generate: F)
     });
 }
 
-fn render_crate_page(state: AServerState, origin: Origin) -> impl Future<Output = Result<(Vec<u8>, Option<DateTime<FixedOffset>>), anyhow::Error>> + 'static {
+fn render_crate_page(state: AServerState, origin: Origin) -> impl Future<Output = Result<(Vec<u8>, Option<DateTime<Utc>>), anyhow::Error>> + 'static {
     run_timeout("cratepage", 30, async move {
         let crates = state.crates.load();
         let (all, ver) = futures::try_join!(crates.rich_crate_async(&origin), crates.rich_crate_version_async(&origin))?;
@@ -1066,7 +1065,7 @@ async fn render_crate_all_versions(state: AServerState, origin: Origin) -> Resul
     rt_run_timeout(&s.rt, "allver", 60, async move {
         let crates = state.crates.load();
         let (all, ver) = futures::try_join!(crates.rich_crate_async(&origin), crates.rich_crate_version_async(&origin))?;
-        let last_modified = Some(get_last_modified(&all));
+        let last_modified = Some(all.most_recent_release());
         let mut page: Vec<u8> = Vec::with_capacity(60000);
         front_end::render_all_versions_page(&mut page, all, &ver, &crates).await?;
         minify_html(&mut page);
@@ -1139,7 +1138,7 @@ struct Rendered {
     // s
     cache_time: u32,
     refresh: bool,
-    last_modified: Option<DateTime<FixedOffset>>,
+    last_modified: Option<DateTime<Utc>>,
 }
 
 fn serve_page(Rendered {page, cache_time, refresh, last_modified}: Rendered) -> HttpResponse {
@@ -1359,8 +1358,4 @@ fn minify_html(page: &mut Vec<u8>) {
         page.clear();
         page.extend_from_slice(out);
     }
-}
-
-fn get_last_modified(c: &RichCrate) -> DateTime<FixedOffset> {
-    DateTime::parse_from_rfc3339(c.most_recent_release_date_str()).unwrap()
 }

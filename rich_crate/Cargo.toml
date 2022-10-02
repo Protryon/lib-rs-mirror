@@ -21,3 +21,5 @@ serde = "1.0.145"
 log = "0.4.17"
 ahash = "0.8.0"
 hex = "0.4.3"
+smartstring = "1.0.1"
+chrono = { version = "0.4.22", default-features = false }

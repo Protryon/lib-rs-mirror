@@ -21,6 +21,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::io::Read;
 use tar::Archive;
+use smartstring::alias::String as SmolStr;
 
 struct Incident<Date, Set> {
     start: Date, end: Date,
@@ -237,8 +238,6 @@ fn filter_download_spam(crates: &CratesMap, versions: &VersionsMap, downloads: &
     }
     for (crate_id, name) in crates.iter() {
         let versions = versions.get(crate_id).expect(name);
-        let orig_downloads: u32 = versions.iter().flat_map(|row| downloads.get(&row.id)).flatten().map(|d| d.1).sum();
-
         for &Incident { start, end, headroom, lookaround, .. } in incidents.iter().filter(|i| i.names.is_empty() || i.names.contains(name.as_str())) {
             let min_date = start - chrono::Duration::days(lookaround.into());
             let max_date = end + chrono::Duration::days(lookaround.into());
@@ -263,11 +262,6 @@ fn filter_download_spam(crates: &CratesMap, versions: &VersionsMap, downloads: &
                         });
                 }
             }
-        }
-
-        let after_downloads: u32 = versions.iter().flat_map(|row| downloads.get(&row.id)).flatten().map(|d| d.1).sum();
-        if after_downloads != orig_downloads {
-            eprintln!("Changed {name} dl from {orig_downloads} to {after_downloads}");
         }
     }
 }
@@ -475,20 +469,20 @@ fn process_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users:
         let mut owners: Vec<_> = owners
             .into_iter()
             .filter_map(|o| {
-                let invited_by_github_id =
-                    o.created_by_id.and_then(|id| users.get(&id).map(|u| u.github_id as u32).or_else(|| teams.get(&id).map(|t| t.github_id)));
+                let invited_by_github_id = o.created_by_id.and_then(|id| users.get(&id).and_then(|u| u.github_id.try_into().ok())
+                    .or_else(|| teams.get(&id).map(|t| t.github_id)));
                 let mut o = match o.owner_kind {
-                    OwnerKind::User => {
+                    0 => {
                         let u = users.get(&o.owner_id).expect("owner consistency");
                         if u.github_id <= 0 {
                             return None;
                         }
                         CrateOwner {
-                            crates_io_login: u.login.to_owned(),
+                            crates_io_login: u.login.clone(),
                             invited_at: Some(o.created_at),
                             invited_by_github_id,
                             github_id: u.github_id.try_into().ok(),
-                            name: Some(u.name.to_owned()),
+                            name: Some(u.name.clone()),
                             avatar: None,
                             url: None,
                             kind: OwnerKind::User,
@@ -496,7 +490,7 @@ fn process_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users:
                             contributor_only: false,
                         }
                     },
-                    OwnerKind::Team => {
+                    1 => {
                         let u = match teams.get(&o.owner_id) {
                             Some(t) => t,
                             None => {
@@ -517,6 +511,7 @@ fn process_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users:
                             contributor_only: false,
                         }
                     },
+                    _ => unreachable!("bad owner type"),
                 };
                 if o.github_id == o.invited_by_github_id {
                     o.invited_by_github_id = None;
@@ -541,12 +536,12 @@ fn process_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users:
 
 #[derive(Debug, Deserialize)]
 struct CrateOwnerRow {
-    crate_id: u32,
+    crate_id: CrateId,
     #[serde(deserialize_with = "date_fudge")]
     created_at: DateTime<Utc>,
-    created_by_id: Option<u32>,
-    owner_id: u32,
-    owner_kind: OwnerKind,
+    created_by_id: Option<UserId>,
+    owner_id: UserId,
+    owner_kind: u8,
 }
 
 fn date_fudge<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
@@ -561,7 +556,8 @@ fn date_fudge<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
     }
 }
 
-type CrateOwners = HashMap<u32, Vec<CrateOwnerRow>>;
+type CrateId = u32;
+type CrateOwners = HashMap<CrateId, Vec<CrateOwnerRow>>;
 
 #[inline(never)]
 fn parse_crate_owners(file: impl Read) -> Result<CrateOwners, BoxErr> {
@@ -577,14 +573,15 @@ fn parse_crate_owners(file: impl Read) -> Result<CrateOwners, BoxErr> {
 
 #[derive(Deserialize)]
 struct TeamRow {
-    avatar: String,
+    avatar: Box<str>,
     github_id: u32,
     id: u32,
-    login: String, // in the funny format
-    name: String,  // human str
+    login: SmolStr, // in the funny format
+    name: SmolStr,  // human str
 }
 
-type Teams = HashMap<u32, TeamRow>;
+type UserId = u32;
+type Teams = HashMap<UserId, TeamRow>;
 
 #[inline(never)]
 fn parse_teams(file: impl Read) -> Result<Teams, BoxErr> {
@@ -600,14 +597,14 @@ fn parse_teams(file: impl Read) -> Result<Teams, BoxErr> {
 
 #[derive(Deserialize)]
 struct UserRow {
-    avatar: String,
+    avatar: Box<str>,
     github_id: i32, // there is -1 :(
-    login: String,
-    id: u32,
-    name: String,
+    login: SmolStr,
+    id: UserId,
+    name: SmolStr,
 }
 
-type Users = HashMap<u32, UserRow>;
+type Users = HashMap<UserId, UserRow>;
 
 #[inline(never)]
 fn parse_users(file: impl Read) -> Result<Users, BoxErr> {
@@ -621,17 +618,19 @@ fn parse_users(file: impl Read) -> Result<Users, BoxErr> {
     Ok(out)
 }
 
+type CrateVersionId = u32;
+
 #[derive(Deserialize, Debug)]
 struct CrateVersionRow {
     #[serde(with = "hex")]
     checksum: [u8; 32],
-    crate_id: u32,
+    crate_id: CrateId,
     crate_size: Option<u64>,
     #[serde(deserialize_with = "date_fudge")]
     created_at: DateTime<Utc>,
     downloads: u64,
     features: String, // json
-    id: u32,
+    id: CrateVersionId,
     license: String,
     links: Option<String>,
     num: String, // ver
@@ -640,7 +639,7 @@ struct CrateVersionRow {
     yanked: char,
 }
 
-type VersionsMap = HashMap<u32, Vec<CrateVersionRow>>;
+type VersionsMap = HashMap<CrateId, Vec<CrateVersionRow>>;
 
 #[inline(never)]
 fn parse_versions(mut file: impl Read) -> Result<VersionsMap, BoxErr> {
@@ -654,7 +653,7 @@ fn parse_versions(mut file: impl Read) -> Result<VersionsMap, BoxErr> {
     Ok(out)
 }
 
-type VersionDownloads = HashMap<u32, Vec<(Date<Utc>, u32, bool)>>;
+type VersionDownloads = HashMap<CrateVersionId, Vec<(Date<Utc>, u32, bool)>>;
 
 fn date_from_str(date: &str) -> Result<Date<Utc>, std::num::ParseIntError> {
     let y = date[0..4].parse()?;
@@ -685,7 +684,7 @@ fn parse_metadata(mut file: impl Read) -> Result<u64, BoxErr> {
     Ok(s.split('\n').nth(1).and_then(|s| s.parse().ok()).ok_or("bad num")?)
 }
 
-type CratesMap = HashMap<u32, String>;
+type CratesMap = HashMap<CrateId, SmolStr>;
 
 #[inline(never)]
 fn parse_crates(file: impl Read) -> Result<CratesMap, BoxErr> {
@@ -693,9 +692,9 @@ fn parse_crates(file: impl Read) -> Result<CratesMap, BoxErr> {
     let mut out = HashMap::with_capacity(NUM_CRATES);
     for r in csv.records() {
         let r = r?;
-        let id: u32 = r.get(5).and_then(|s| s.parse().ok()).ok_or("bad record1")?;
+        let id: CrateId = r.get(5).and_then(|s| s.parse().ok()).ok_or("bad record1")?;
         let name = r.get(7).ok_or("bad record2")?;
-        out.insert(id, name.to_owned());
+        out.insert(id, name.into());
     }
     Ok(out)
 }
@@ -711,7 +710,7 @@ fn parse_dependencies(file: impl Read) -> Result<CrateDepsMap, BoxErr> {
     for r in csv.records() {
         let r = r?;
         // 0crate_id,1default_features,2explicit_name,3features,4id,5kind,6optional,7req,8target,9version_id
-        let crate_id: u32 = r.get(0).and_then(|s| s.parse().ok()).ok_or("bad record3")?;
+        let crate_id: CrateId = r.get(0).and_then(|s| s.parse().ok()).ok_or("bad record3")?;
         let version_id: u32 = r.get(9).and_then(|s| s.parse().ok()).ok_or("bad record4")?;
         out.entry(version_id).or_insert_with(Vec::new).push(crate_id);
     }

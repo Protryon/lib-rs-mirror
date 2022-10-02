@@ -1,4 +1,6 @@
 #![allow(unused_imports)]
+use chrono::DateTime;
+use crate::Utc;
 use crate::Page;
 use categories::Category;
 use categories::CategoryMap;
@@ -234,8 +236,8 @@ impl<'a> HomePage<'a> {
         }
     }
 
-    pub fn last_modified<'b>(&self, allver: &'b RichCrate) -> &'b str {
-        &allver.versions().iter().max_by(|a, b| a.created_at.cmp(&b.created_at)).expect("no versions?").created_at
+    pub fn last_modified<'b>(&self, allver: &'b RichCrate) -> DateTime<Utc> {
+        *allver.versions().iter().map(|a| &a.created_at).max().expect("no versions?")
     }
 
     /// for the feed

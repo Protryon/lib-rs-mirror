@@ -1,3 +1,5 @@
+use smartstring::alias::String as SmolStr;
+
 #[derive(Debug, Copy, Eq, PartialEq, Clone)]
 pub enum UserType {
     Org,
@@ -57,29 +59,29 @@ impl Serialize for UserType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub id: u32,
-    pub login: String,
-    pub name: Option<String>,
-    pub avatar_url: Option<String>,  // "https://avatars0.githubusercontent.com/u/1111?v=4",
-    pub gravatar_id: Option<String>, // "",
-    pub html_url: String,            // "https://github.com/zzzz",
-    pub blog: Option<String>,        // "https://example.com
+    pub login: SmolStr,
+    pub name: Option<SmolStr>,
+    pub avatar_url: Option<Box<str>>,  // "https://avatars0.githubusercontent.com/u/1111?v=4",
+    pub gravatar_id: Option<Box<str>>, // "",
+    pub html_url: Box<str>,            // "https://github.com/zzzz",
+    pub blog: Option<Box<str>>,        // "https://example.com
     pub two_factor_authentication: Option<bool>,
     #[serde(rename = "type")]
     pub user_type: UserType,
-    pub created_at: Option<String>,
+    pub created_at: Option<Box<str>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MinimalUser {
     pub id: Option<u32>,
-    pub login: String,
-    pub name: Option<String>,
-    pub avatar_url: Option<String>,  // "https://avatars0.githubusercontent.com/u/1111?v=4",
-    pub gravatar_id: Option<String>, // "",
-    pub html_url: String,            // "https://github.com/zzzz",
+    pub login: SmolStr,
+    pub name: Option<SmolStr>,
+    pub avatar_url: Option<Box<str>>,  // "https://avatars0.githubusercontent.com/u/1111?v=4",
+    pub gravatar_id: Option<Box<str>>, // "",
+    pub html_url: Box<str>,            // "https://github.com/zzzz",
     #[serde(rename = "type")]
     pub user_type: UserType,
-    pub created_at: Option<String>,
+    pub created_at: Option<Box<str>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -169,14 +171,14 @@ pub struct GitHubRelease {
     // zipball_url: Option<String>, // "https://api.github.com/repos/octocat/Hello-World/zipball/v1.0.0",
     // id: Option<String>, // 1,
     // node_id: Option<String>, // "MDc6UmVsZWFzZTE=",
-    pub tag_name: Option<String>, // "v1.0.0",
+    pub tag_name: Option<SmolStr>, // "v1.0.0",
     // target_commitish: Option<String>, // "master",
     // name: Option<String>, // "v1.0.0",
-    pub body: Option<String>,         // "Description of the release",
+    pub body: Option<Box<str>>,         // "Description of the release",
     pub draft: Option<bool>,          // false,
     pub prerelease: Option<bool>,     // false,
-    pub created_at: Option<String>,   // "2013-02-27T19:35:32Z",
-    pub published_at: Option<String>, // "2013-02-27T19:35:32Z",
+    pub created_at: Option<SmolStr>,   // "2013-02-27T19:35:32Z",
+    pub published_at: Option<SmolStr>, // "2013-02-27T19:35:32Z",
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

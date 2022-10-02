@@ -183,7 +183,7 @@ pub enum KitchenSinkErr {
     #[error("crate not found: {:?}", _0)]
     CrateNotFound(Origin),
     #[error("author not found: {}", _0)]
-    AuthorNotFound(String),
+    AuthorNotFound(SmolStr),
     #[error("crate {} not found in repo {}", _0, _1)]
     CrateNotFoundInRepo(String, String),
     #[error("crate is not a package: {:?}", _0)]
@@ -711,11 +711,10 @@ impl KitchenSink {
             .buffer_unordered(8)
             .filter_map(|x| async {x});
         let mut crates = stream.filter(move |k| {
-            let latest = k.versions().iter().map(|v| v.created_at.as_str()).max().unwrap_or("");
-            let res = if let Ok(timestamp) = DateTime::parse_from_rfc3339(latest) {
+            let latest = k.versions().iter().map(|v| &v.created_at).max();
+            let res = if let Some(timestamp) = latest {
                 timestamp.timestamp() >= min_timestamp as i64
             } else {
-                error!("Can't parse {} of {}", latest, k.name());
                 true
             };
             async move { res }
@@ -752,12 +751,12 @@ impl KitchenSink {
         match origin {
             Origin::CratesIo(name) => {
                 let meta = self.crates_io_meta(name).await?;
-                let versions = meta.versions().map(|c| CrateVersion {
+                let versions = meta.versions().map(|c| Ok(CrateVersion {
                     num: c.num,
-                    updated_at: c.updated_at,
-                    created_at: c.created_at,
+                    updated_at: DateTime::parse_from_rfc3339(&c.updated_at)?.with_timezone(&Utc),
+                    created_at: DateTime::parse_from_rfc3339(&c.created_at)?.with_timezone(&Utc),
                     yanked: c.yanked,
-                }).collect();
+                })).collect::<Result<_,chrono::ParseError>>()?;
                 Ok(RichCrate::new(origin.clone(), meta.krate.name, versions))
             },
             Origin::GitHub { repo, package } => {
@@ -773,14 +772,14 @@ impl KitchenSink {
         let host = RepoHost::GitHub(repo.clone()).try_into().map_err(|_| KitchenSinkErr::CrateNotFound(origin.clone())).context("ghrepo host bad")?;
         let cachebust = self.cachebust_string_for_repo(&host).await.context("ghrepo")?;
         let versions = self.get_repo_versions(origin, &host, &cachebust).await?;
-        Ok(RichCrate::new(origin.clone(), format!("github/{}/{package}", repo.owner), versions))
+        Ok(RichCrate::new(origin.clone(), format!("github/{}/{package}", repo.owner).into(), versions))
     }
 
     async fn rich_crate_gitlab(&self, origin: &Origin, repo: &SimpleRepo, package: &str) -> CResult<RichCrate> {
         let host = RepoHost::GitLab(repo.clone()).try_into().map_err(|_| KitchenSinkErr::CrateNotFound(origin.clone())).context("ghrepo host bad")?;
         let cachebust = self.cachebust_string_for_repo(&host).await.context("ghrepo")?;
         let versions = self.get_repo_versions(origin, &host, &cachebust).await?;
-        Ok(RichCrate::new(origin.clone(), format!("gitlab/{}/{package}", repo.owner), versions))
+        Ok(RichCrate::new(origin.clone(), format!("gitlab/{}/{package}", repo.owner).into(), versions))
     }
 
     async fn get_repo_versions(&self, origin: &Origin, repo: &Repo, cachebust: &str) -> CResult<Vec<CrateVersion>> {
@@ -789,15 +788,18 @@ impl KitchenSink {
             Origin::GitHub { repo, package } => {
                 let releases = self.gh.releases(repo, cachebust).await?.ok_or_else(|| KitchenSinkErr::CrateNotFound(origin.clone())).context("releases not found")?;
                 let versions: Vec<_> = releases.into_iter().filter_map(|r| {
-                    let date = r.published_at.or(r.created_at)?;
                     let num_full = r.tag_name?;
                     let num = num_full.trim_start_matches(|c:char| !c.is_numeric());
                     // verify that it semver-parses
                     let _ = SemVer::parse(num).map_err(|e| warn!("{:?}: ignoring {}, {}", origin, num_full, e)).ok()?;
+                    let date = r.published_at.or(r.created_at)?;
+                    let date = DateTime::parse_from_rfc3339(&date)
+                        .map_err(|e| warn!("{:?}: ignoring {}, {}", origin, date, e)).ok()?
+                        .with_timezone(&Utc);
                     Some(CrateVersion {
-                        num: num.to_string(),
+                        num: num.into(),
                         yanked: r.draft.unwrap_or(false),
-                        updated_at: date.clone(),
+                        updated_at: date,
                         created_at: date,
                     })
                 }).collect();
@@ -810,7 +812,7 @@ impl KitchenSink {
         };
 
         let versions: Vec<_> = self.crate_db.crate_versions(origin).await?.into_iter().map(|(num, timestamp)| {
-            let date = Utc.timestamp(timestamp as _, 0).to_rfc3339();
+            let date = Utc.timestamp(timestamp as _, 0);
             CrateVersion {
                 num,
                 yanked: false,
@@ -831,9 +833,9 @@ impl KitchenSink {
             let mut pkg_ver = crate_git_checkout::find_versions(&checkout)?;
             if let Some(v) = pkg_ver.remove(&*package) {
                 let versions: Vec<_> = v.into_iter().map(|(num, timestamp)| {
-                    let date = Utc.timestamp(timestamp, 0).to_rfc3339();
+                    let date = Utc.timestamp(timestamp, 0);
                     CrateVersion {
-                        num,
+                        num: num.into(),
                         yanked: false,
                         updated_at: date.clone(),
                         created_at: date,
@@ -1134,12 +1136,12 @@ impl KitchenSink {
         // it may contain data from "nowhere"! https://github.com/rust-lang/crates.io/issues/1624
         if package.homepage.is_none() {
             if let Some(url) = crates_io_krate.homepage {
-                package.homepage = Some(url);
+                package.homepage = Some(url.into());
             }
         }
         if package.documentation.is_none() {
             if let Some(url) = crates_io_krate.documentation {
-                package.documentation = Some(url);
+                package.documentation = Some(url.into());
             }
         }
 
@@ -1148,7 +1150,7 @@ impl KitchenSink {
             warnings.insert(Warning::NoRepositoryProperty);
             // it may contain data from nowhere! https://github.com/rust-lang/crates.io/issues/1624
             if let Some(repo) = crates_io_krate.repository {
-                package.repository = Some(repo);
+                package.repository = Some(repo.into());
             } else if package.homepage.as_ref().map_or(false, |h| Repo::looks_like_repo_url(h)) {
                 package.repository = package.homepage.take();
             }
@@ -2378,7 +2380,7 @@ impl KitchenSink {
             };
             let c = c.entry(semver).or_insert_with(Default::default);
 
-            let created = DateTime::parse_from_rfc3339(&ver.created_at).map_err(|_| KitchenSinkErr::BadRustcCompatData)?;
+            let created = ver.created_at;
             if let Some(expected_rust) = Self::rustc_release_from_date(&created) {
                 c.add_compat(expected_rust.saturating_sub(bump_min_expected_rust), Compat::ProbablyWorks, Some("Assumed from release date".into()));
             }
@@ -2622,7 +2624,7 @@ impl KitchenSink {
         Ok(Some(c))
     }.boxed()}
 
-    fn rustc_release_from_date(date: &DateTime<FixedOffset>) -> Option<u16> {
+    fn rustc_release_from_date(date: &DateTime<Utc>) -> Option<u16> {
         let zero = Utc.ymd(2015,5,15).and_hms(0,0,0);
         let age = date.signed_duration_since(zero);
         let weeks = age.num_weeks();
@@ -2969,14 +2971,14 @@ impl KitchenSink {
                             e.info = Some(Cow::Owned(Author {
                                 name: Some(owner.name().to_owned()).filter(|n| !n.is_empty()),
                                 email: None,
-                                url: owner.url.clone(),
+                                url: owner.url.as_deref().map(|u| u.into()),
                             }));
                         }
                         if e.github.is_none() {
                             e.github = Some(user);
                         } else if let Some(ref mut gh) = e.github {
-                            if gh.name.is_none() {
-                                gh.name = Some(owner.name().to_owned()).filter(|n| !n.is_empty());
+                            if gh.name.is_none() && !owner.name().is_empty() {
+                                gh.name = Some(owner.name().into());
                             }
                         }
                     },
@@ -2987,7 +2989,7 @@ impl KitchenSink {
                             info: Some(Cow::Owned(Author {
                                 name: Some(owner.name().to_owned()).filter(|n| !n.is_empty()),
                                 email: None,
-                                url: owner.url.clone(),
+                                url: owner.url.map(|u| u.to_string()),
                             })),
                             nth_author: None,
                             owner: !owner.contributor_only,
@@ -3139,7 +3141,7 @@ impl KitchenSink {
             } else {
                 current_owners_by_login.insert(a.user.login.to_ascii_lowercase(), CrateOwner {
                     kind: OwnerKind::User,
-                    url: Some(format!("https://github.com/{}", a.user.login)),
+                    url: Some(format!("https://github.com/{}", a.user.login).into()),
                     crates_io_login: a.user.login,
                     name: a.user.name,
                     github_id: None,
@@ -3181,9 +3183,9 @@ impl KitchenSink {
                 CrateOwner {
                     avatar: None,
                     // FIXME: read from GH
-                    url: Some(format!("https://github.com/{}", repo.owner)),
+                    url: Some(format!("https://github.com/{}", repo.owner).into()),
                     // FIXME: read from GH
-                    crates_io_login: repo.owner.to_string(),
+                    crates_io_login: repo.owner.clone(),
                     kind: OwnerKind::User, // FIXME: crates-io uses teams, and we'd need to find the right team? is "owners" a guaranteed thing?
                     name: None,
 
@@ -3333,7 +3335,7 @@ impl KitchenSink {
 
         let users = all_owners.iter().flat_map(|(_, owners)| owners.iter().filter_map(|o| {
             let login = if o.crates_io_login.starts_with("github:") {
-                o.github_login().unwrap().to_owned()
+                o.github_login().unwrap().into()
             } else {
                 o.crates_io_login.clone()
             };
@@ -3343,7 +3345,7 @@ impl KitchenSink {
                 name: o.name.clone(),
                 avatar_url: o.avatar.clone(),
                 gravatar_id: None,
-                html_url: o.url.as_deref().unwrap_or("").to_owned(),
+                html_url: o.url.as_deref().unwrap_or("").into(),
                 blog: None,
                 user_type: match o.kind {
                     OwnerKind::Team => UserType::Org,
@@ -3584,7 +3586,7 @@ impl KitchenSink {
 
     #[inline]
     pub async fn author_by_login(&self, login: &str) -> CResult<RichAuthor> {
-        let github = self.user_by_github_login(login).await?.ok_or_else(|| KitchenSinkErr::AuthorNotFound(login.to_owned()))?;
+        let github = self.user_by_github_login(login).await?.ok_or_else(|| KitchenSinkErr::AuthorNotFound(login.into()))?;
         Ok(RichAuthor { github })
     }
 }
@@ -3932,7 +3934,7 @@ fn rustc_rel_dates() {
         (2021,03,25, 51), //.0
     ];
     for (y,m,d, ver) in RUST_RELEASE_DATES.iter().copied() {
-        let date = FixedOffset::east(0).ymd(y as _,m as _,d as _).and_hms(0, 0, 0);
+        let date = Utc.ymd(y as _,m as _,d as _).and_hms(0, 0, 0);
         assert_eq!(ver, KitchenSink::rustc_release_from_date(&date).unwrap());
     }
 }

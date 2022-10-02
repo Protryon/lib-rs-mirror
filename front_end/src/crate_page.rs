@@ -95,7 +95,7 @@ pub struct Version<'a> {
     pub num: &'a str,
     pub semver: SemVer,
     pub yanked: bool,
-    pub created_at: DateTime<FixedOffset>,
+    pub created_at: DateTime<Utc>,
 }
 
 ///
@@ -412,11 +412,11 @@ impl<'a> CratePage<'a> {
         }
     }
 
-    pub fn format(date: &DateTime<FixedOffset>) -> String {
+    pub fn format(date: &DateTime<Utc>) -> String {
         date.format("%b %e, %Y").to_string()
     }
 
-    pub fn format_month(date: &DateTime<FixedOffset>) -> String {
+    pub fn format_month(date: &DateTime<Utc>) -> String {
         date.format("%b %Y").to_string()
     }
 
@@ -488,7 +488,7 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn is_version_new(&self, ver: &Version<'_>, nth: usize) -> bool {
-        nth == 0 /*latest*/ && ver.created_at.with_timezone(&Utc) > Utc::now() - Duration::weeks(1)
+        nth == 0 /*latest*/ && ver.created_at > Utc::now() - Duration::weeks(1)
     }
 
     pub fn has_runtime_deps(&self) -> bool {
@@ -713,7 +713,7 @@ impl<'a> CratePage<'a> {
             .collect()
     }
 
-    pub fn date_created(&self) -> Option<DateTime<FixedOffset>> {
+    pub fn date_created(&self) -> Option<DateTime<Utc>> {
         self.most_recent_version().map(|v| v.created_at)
     }
 
@@ -730,13 +730,13 @@ impl<'a> CratePage<'a> {
             yanked: v.yanked,
             num: &v.num,
             semver: SemVer::parse(&v.num).map_err(|e| warn!("semver parse {} {:?}", e, v.num)).ok()?,
-            created_at: DateTime::parse_from_rfc3339(&v.created_at).expect("created_at parse"),
+            created_at: v.created_at,
         }))
     }
 
-    pub fn published_date(&self) -> DateTime<FixedOffset> {
+    pub fn published_date(&self) -> DateTime<Utc> {
         let min_iso_date = self.all.versions().iter().map(|v| &v.created_at).min().expect("any version in the crate");
-        DateTime::parse_from_rfc3339(min_iso_date).expect("created_at parse")
+        *min_iso_date
     }
 
     /// Data for weekly breakdown of recent downloads

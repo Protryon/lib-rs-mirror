@@ -1,5 +1,7 @@
 use crate::Origin;
 pub use crates_io_client::CrateOwner;
+use smartstring::alias::String as SmolStr;
+use chrono::{DateTime, Utc};
 
 /// Struct representing all versions of the crate
 /// (metadata that is version-independent or for all versions).
@@ -8,15 +10,15 @@ pub use crates_io_client::CrateOwner;
 #[derive(Debug)]
 pub struct RichCrate {
     origin: Origin,
-    name: String,
+    name: SmolStr,
     versions: Vec<CrateVersion>,
 }
 
 #[derive(Debug, Clone)]
 pub struct CrateVersion {
-    pub num: String, // "1.4.0",
-    pub updated_at: String, // "2018-01-29T23:10:11.539889+00:00",
-    pub created_at: String, // "2018-01-29T23:10:11.539889+00:00",
+    pub num: SmolStr, // "1.4.0",
+    pub updated_at: DateTime<Utc>, // "2018-01-29T23:10:11.539889+00:00",
+    pub created_at: DateTime<Utc>, // "2018-01-29T23:10:11.539889+00:00",
     // pub downloads: usize,   // 154,
     // pub features: HashMap<String, Vec<String>>,
     pub yanked: bool,
@@ -24,7 +26,7 @@ pub struct CrateVersion {
 }
 
 impl RichCrate {
-    pub fn new(origin: Origin, name: String, versions: Vec<CrateVersion>) -> Self {
+    pub fn new(origin: Origin, name: SmolStr, versions: Vec<CrateVersion>) -> Self {
         Self { origin, versions, name }
     }
 
@@ -40,8 +42,8 @@ impl RichCrate {
         &self.versions
     }
 
-    pub fn most_recent_release_date_str(&self) -> &str {
-        self.versions.iter().map(|v| v.created_at.as_str()).max().unwrap()
+    pub fn most_recent_release(&self) -> DateTime<Utc> {
+        *self.versions.iter().map(|v| &v.created_at).max().unwrap()
     }
 
     pub fn is_yanked(&self) -> bool {

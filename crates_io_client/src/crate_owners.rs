@@ -1,7 +1,7 @@
-use chrono::FixedOffset;
 use chrono::DateTime;
 use chrono::Utc;
 use serde_derive::*;
+use smartstring::alias::String as SmolStr;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateOwnersFile {
@@ -23,23 +23,23 @@ pub enum OwnerKind {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CrateOwner {
     #[serde(rename = "login")]
-    pub crates_io_login: String,          // "github:rust-bus:maintainers",
+    pub crates_io_login: SmolStr,          // "github:rust-bus:maintainers",
     pub kind: OwnerKind,        // "team" || "user"
-    pub url: Option<String>,    // "https://github.com/rust-bus",
-    pub name: Option<String>,   // "maintainers",
-    pub avatar: Option<String>, // "https://avatars1.githubusercontent.com/u/38887296?v=4"
+    pub url: Option<Box<str>>,    // "https://github.com/rust-bus",
+    pub name: Option<SmolStr>,   // "maintainers",
+    pub avatar: Option<Box<str>>, // "https://avatars1.githubusercontent.com/u/38887296?v=4"
 
     #[serde(default)]
     pub github_id: Option<u32>,
 
     #[serde(default)]
-    pub invited_at: Option<DateTime<FixedOffset>>,
+    pub invited_at: Option<DateTime<Utc>>,
 
     #[serde(default)]
     pub invited_by_github_id: Option<u32>,
 
     #[serde(default)]
-    pub last_seen_at: Option<DateTime<FixedOffset>>,
+    pub last_seen_at: Option<DateTime<Utc>>,
 
     /// not from the API, added later
     #[serde(default)]

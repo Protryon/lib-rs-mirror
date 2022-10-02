@@ -2,7 +2,6 @@ use ahash::HashMapExt;
 use crate::Urler;
 use crate::reverse_dependencies::DownloadsBar;
 use crate::Page;
-use chrono::DateTime;
 use kitchen_sink::CrateOwners;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::KitchenSinkErr;
@@ -10,6 +9,7 @@ use kitchen_sink::Origin;
 use kitchen_sink::Severity;
 use ahash::HashMap;
 use ahash::HashSet;
+use smartstring::alias::String as SmolStr;
 
 use rich_crate::{RichCrate, RichCrateVersion};
 use semver::Version as SemVer;
@@ -40,8 +40,8 @@ pub(crate) struct VerRow {
     pub feat_added: Vec<String>,
     pub feat_removed: Vec<String>,
     pub dl: DownloadsBar,
-    pub published_by: Option<(String, Option<String>)>,
-    pub yanked_by: Option<(String, Option<String>)>,
+    pub published_by: Option<(SmolStr, Option<SmolStr>)>,
+    pub yanked_by: Option<(SmolStr, Option<SmolStr>)>,
     pub msrv: Option<(u16, u16, bool)>, // min version, max version, both are rustc minor v; true if certain
     pub version_url: Option<String>,
     pub version_url_label: &'static str,
@@ -90,8 +90,7 @@ impl AllVersions {
             let num = version_meta.version();
             let sem: SemVer = num.parse().ok()?;
             let audit = release_meta.remove(num)?;
-            let release_date = DateTime::parse_from_rfc3339(&ver_dates.get(num)?.created_at)
-                .map_err(|e| log::error!("bad date {}: {}", all.name(), e)).ok()?;
+            let release_date = &ver_dates.get(num)?.created_at;
 
             let mut required_deps = HashMap::with_capacity(version_meta.dependencies().len());
 

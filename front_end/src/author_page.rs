@@ -20,10 +20,11 @@ use render_readme::Renderer;
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use ahash::HashMap;
+use smartstring::alias::String as SmolStr;
 
 pub struct OtherOwner {
     github_id: u32,
-    crates_io_login: String,
+    crates_io_login: SmolStr,
     invited_by_github_id: Option<u32>,
     invited_at: DateTime<Utc>,
     kind: OwnerKind,

@@ -178,13 +178,13 @@ impl CrateDb {
         }).await
     }
 
-    pub async fn crate_versions(&self, origin: &Origin) -> FResult<Vec<(String, u32)>> {
+    pub async fn crate_versions(&self, origin: &Origin) -> FResult<Vec<(SmolStr, u32)>> {
         self.with_read("crate_versions", |conn| {
             let mut q = conn.prepare("SELECT v.version, v.created FROM crates c JOIN crate_versions v ON v.crate_id = c.id WHERE c.origin = ?1")?;
             let res = q.query_map(&[&origin.to_str()], |row| {
-                Ok((row.get(0)?, row.get(1)?))
+                Ok((row.get_ref(0)?.as_str()?.into(), row.get(1)?))
             })?;
-            Ok(res.collect::<Result<Vec<(String, u32)>>>()?)
+            Ok(res.collect::<Result<Vec<(SmolStr, u32)>>>()?)
         }).await
     }
 
@@ -586,10 +586,9 @@ impl CrateDb {
             update_recent.execute(args)?;
 
             for ver in all.versions() {
-                if let Ok(timestamp) = DateTime::parse_from_rfc3339(&ver.created_at) {
-                    let args: &[&dyn ToSql] = &[&crate_id, &ver.num, &timestamp.timestamp()];
-                    insert_version.execute(args)?;
-                }
+                let timestamp = ver.created_at.timestamp();
+                let args: &[&dyn ToSql] = &[&crate_id, &ver.num.as_str(), &timestamp];
+                insert_version.execute(args)?;
             }
             Ok(())
         }).await
@@ -662,9 +661,13 @@ impl CrateDb {
             let q = query.query_map(&[&github_id], |row| {
                 let origin = Origin::from_str(row.get_ref_unwrap(0).as_str()?);
                 let invited_by_github_id: Option<u32> = row.get_unwrap(1);
-                let invited_at = row.get_ref_unwrap(2).as_str().ok().map(|d| match Utc.datetime_from_str(d, "%Y-%m-%d %H:%M:%S") {
-                    Ok(d) => d,
-                    Err(e) => panic!("Can't parse {}, because {}", d, e),
+                let invited_at = row.get_ref_unwrap(2).as_str().ok().map(|d| {
+                    let res = DateTime::parse_from_rfc3339(d).map(|d| d.with_timezone(&Utc))
+                        .or_else(|_| Utc.datetime_from_str(d, "%Y-%m-%d %H:%M:%S"));
+                    match res {
+                        Ok(d) => d,
+                        Err(e) => panic!("Can't parse {}, because {}", d, e),
+                    }
                 });
                 let latest_timestamp: u32 = row.get_unwrap(3);
                 let crate_ranking: f64 = row.get_unwrap(4);
@@ -673,7 +676,7 @@ impl CrateDb {
                     crate_ranking: crate_ranking as f32,
                     invited_by_github_id,
                     invited_at,
-                    latest_release: DateTime::from_utc(NaiveDateTime::from_timestamp(latest_timestamp as _, 0), Utc),
+                    latest_release: Utc.timestamp(latest_timestamp as _, 0),
                 })
             })?;
             Ok(q.filter_map(|x| x.map_err(|e| error!("by owner: {}", e)).ok()).collect())

@@ -174,7 +174,7 @@ pub async fn render_maintainer_dashboard<W: Write>(out: &mut W, atom_feed: bool,
 }
 
 /// See `crate_page.rs.html`
-pub async fn render_crate_page<W: Write>(out: &mut W, all: &RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<Option<DateTime<FixedOffset>>, anyhow::Error> {
+pub async fn render_crate_page<W: Write>(out: &mut W, all: &RichCrate, ver: &RichCrateVersion, kitchen_sink: &KitchenSink, renderer: &Renderer) -> Result<Option<DateTime<Utc>>, anyhow::Error> {
     if stopped() {
         return Err(KitchenSinkErr::Stopped.into());
     }

@@ -263,15 +263,20 @@ impl CrateSearchIndex {
         // The most common co-occurrence may be a synonym, so skip it for now
         let second_most_common = Self::popular_dividing_keyword(&keyword_sets, query_as_keyword, &[most_common])?;
 
-        let mut dividing_keywords = Vec::with_capacity(10);
+        let mut dividing_keywords = Vec::<String>::with_capacity(10);
         let mut next_keyword = second_most_common;
         for _ in 0..10 {
+            if dividing_keywords.iter().any(|k| k == next_keyword) {
+                break; // looped, so nothing interesting left?
+            }
             dividing_keywords.push(next_keyword.to_string());
-            keyword_sets.iter_mut().for_each(|(k_set, w)| if *w > 0 && k_set.contains(&next_keyword) { *w = -*w/4; });
+            keyword_sets.iter_mut().for_each(|(k_set, w)| {
+                if k_set.remove(&next_keyword) && *w > 0 { *w = -*w/2; }
+            });
             if keyword_sets.iter().filter(|&(_, w)| *w > 0).count() < 25 {
                 break;
             }
-            next_keyword = match Self::popular_dividing_keyword(&keyword_sets, query_as_keyword, &["reserved"]) {
+            next_keyword = match Self::popular_dividing_keyword(&keyword_sets, query_as_keyword, &["reserved", next_keyword]) {
                 None => break,
                 Some(another) => another,
             };
@@ -292,18 +297,20 @@ impl CrateSearchIndex {
                 let mut n = counts.entry(k).or_default();
                 n.0 += 1;
                 n.1 += *w;
-                // for a query like "http" make "http-client" count as "client" too
-                if let Some(rest) = k.strip_prefix(&prefix) {
-                    if !k_set.contains(rest) {
-                        let mut n = counts.entry(rest).or_default();
-                        n.0 += 1;
-                        n.1 += *w * 2; // having prefix/suffix keyword is a good indicator that it's a meaningful distinction rather than a synonym
-                    }
-                } else if let Some(rest) = k.strip_suffix(&suffix) {
-                    if !k_set.contains(rest) {
-                        let mut n = counts.entry(rest).or_default();
-                        n.0 += 1;
-                        n.1 += *w * 2;
+                if *w > 0 {
+                    // for a query like "http" make "http-client" count as "client" too
+                    if let Some(rest) = k.strip_prefix(&prefix) {
+                        if !k_set.contains(rest) {
+                            let mut n = counts.entry(rest).or_default();
+                            n.0 += 1;
+                            n.1 += *w * 2; // having prefix/suffix keyword is a good indicator that it's a meaningful distinction rather than a synonym
+                        }
+                    } else if let Some(rest) = k.strip_suffix(&suffix) {
+                        if !k_set.contains(rest) {
+                            let mut n = counts.entry(rest).or_default();
+                            n.0 += 1;
+                            n.1 += *w * 2;
+                        }
                     }
                 }
             }

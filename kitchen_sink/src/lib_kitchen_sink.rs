@@ -3326,7 +3326,10 @@ impl KitchenSink {
 
         let depender_changes = self.depender_changes(origin)?;
         if let Some(current_active) = depender_changes.last() {
-            let peak_active_users = depender_changes.iter().map(|m| m.users_total).max().unwrap_or(0);
+            // smooth spikes out
+            let peak_active_users = depender_changes.windows(2)
+                .map(|m| m[0].users_total + m[1].users_total).max().unwrap_or(0) / 2;
+
             let current_active_users = current_active.users_total;
             let current_active_crates = current_active.running_total();
 
@@ -3354,7 +3357,7 @@ impl KitchenSink {
                 let prev = prev[0].users_total + prev[1].users_total;
                 let curr = curr[0].users_total + curr[1].users_total;
 
-                growth = (curr + 5) as f64 / (prev + 5) as f64;
+                growth = (curr + 15) as f64 / (prev + 15) as f64;
 
                 // if it's clearly declining, accelerate its demise
                 if prev > curr + 2 {

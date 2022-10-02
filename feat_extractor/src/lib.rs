@@ -144,6 +144,7 @@ pub fn is_deprecated(k: &RichCrateVersion) -> bool {
             desc.starts_with("temporary fork") ||
             desc.contains("no longer maintained") ||
             desc.contains("this tool is abandoned") ||
+            desc.ends_with("please dont use") ||
             desc.ends_with("deprecated") || desc.contains("deprecated in favor") || desc.contains("project is deprecated");
     }
     if let Ok(req) = k.version().parse() {

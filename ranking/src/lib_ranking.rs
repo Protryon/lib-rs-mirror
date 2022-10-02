@@ -110,8 +110,8 @@ fn cargo_toml_score(cr: &CrateVersionInputs<'_>) -> Score {
     s.has("has_homepage_link", 20, cr.has_homepage_link);
 
     // we care about being able to analyze
-    s.has("has_repository_link", 15, cr.has_repository_link);
-    s.has("has_verified_repository_link", 10, cr.has_verified_repository_link);
+    s.has("has_repository_link", 10, cr.has_repository_link);
+    s.has("has_verified_repository_link", 15, cr.has_verified_repository_link);
 
     // helps lib.rs show crate in the right place
     s.has("has_keywords", 8, cr.has_keywords);
@@ -264,7 +264,7 @@ fn versions_score(ver: &[CrateVersion]) -> Score {
 
 fn authors_score(authors: &[Author], owners: &[CrateOwner], contributors: Option<u32>) -> Score {
     let mut s = Score::new();
-    s.n("more than one owner", 3, owners.len() > 1);
+    s.has("more than one owner", 3, owners.len() > 1);
     s.n("bus factor", 4, owners.len() as u32);
     s.n("authors", 5, authors.len() as u32);
     if let Some(contributors) = contributors {
@@ -305,31 +305,33 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs<'_>) -> Score {
     }
 
     let newest = cr.versions.iter().max_by_key(|v| &v.created_at).expect("at least 1 ver?");
-            // Assume higher versions, and especially patch versions, mean the crate is more mature
-            // and needs fewer updates
-            let version_stability_interval = match SemVer::parse(&newest.num) {
-                Ok(ref ver) if ver.patch > 3 && ver.major > 0 => 700,
-                Ok(ref ver) if ver.patch > 3 => 450,
-                Ok(ref ver) if ver.patch > 0 => 300,
-                Ok(ref ver) if ver.major > 0 => 200,
-                Ok(ref ver) if ver.minor > 3 => 140,
-                _ => 80,
-            };
-            let expected_update_interval = version_stability_interval.min(cr.versions.len() as u32 * 50) / if cr.is_nightly { 4 } else { 1 };
-            let age = (Utc::now() - newest.created_at).num_days().max(0) as u32;
-            let days_past_expiration_date = age.saturating_sub(expected_update_interval);
-            // score decays for a ~year after the crate should have been updated
-            let decay_days = expected_update_interval/2 + if cr.is_nightly { 30 } else if is_app_only {300} else {200};
-            // multiply by growth - new traction saves old crates, loss of traction quickens demise
-            let freshness_score = (growth * decay_days.saturating_sub(days_past_expiration_date) as f64 / (decay_days as f64)).min(1.);
+    // Assume higher versions, and especially patch versions, mean the crate is more mature
+    // and needs fewer updates
+    let version_stability_interval = match SemVer::parse(&newest.num) {
+        Ok(ref ver) if ver.patch > 3 && ver.major > 0 => 700,
+        Ok(ref ver) if ver.patch > 3 => 450,
+        Ok(ref ver) if ver.patch > 0 => 300,
+        Ok(ref ver) if ver.major > 0 => 200,
+        Ok(ref ver) if ver.minor > 3 => 140,
+        _ => 80,
+    };
+    let expected_update_interval = version_stability_interval.min(cr.versions.len() as u32 * 50) / if cr.is_nightly { 4 } else { 1 };
+    let age = (Utc::now() - newest.created_at).num_days().max(0) as u32;
+    let days_past_expiration_date = age.saturating_sub(expected_update_interval);
+    // score decays for a ~year after the crate should have been updated
+    let decay_days = expected_update_interval/2 + if cr.is_nightly { 30 } else if is_app_only {300} else {200};
+    // multiply by growth - new traction saves old crates, loss of traction quickens demise
+    let freshness_score = (growth * decay_days.saturating_sub(days_past_expiration_date) as f64 / (decay_days as f64)).min(1.);
     score.frac("Freshness of latest release", 14, freshness_score);
     score.frac("Freshness of deps", 10, cr.dependency_freshness.iter()
         .map(|d| 0.2 + d * 0.8) // one bad dep shouldn't totally kill the score
         .product::<f32>());
 
+    let external_usage = cr.traction_stats.map_or(1., |t| t.external_usage);
+
     // Low numbers are just bots/noise.
     let downloads = (cr.downloads_per_month as f64 - 150.).max(0.) + 150.;
-    let downloads_cleaned = (cr.downloads_per_month_minus_most_downloaded_user as f64 / if is_app_only { 1. } else { 2. } - 50.).max(0.) + 50.;
+    let downloads_cleaned = external_usage * (cr.downloads_per_month_minus_most_downloaded_user as f64 / if is_app_only { 1. } else { 2. } - 50.).max(0.) + 50.;
     // distribution of downloads follows power law.
     // apps have much harder to get high download numbers.
     let pop = (downloads.log2() - 6.0).max(0.) / (if is_app_only { 5. } else { 6. });
@@ -356,10 +358,9 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs<'_>) -> Score {
         score.has("Debian endorsement", 4, true);
     }
 
-    let rev_dep_ratio = cr.traction_stats.map_or(1., |t| t.external_usage);
 
     // Don't expect apps to have rev deps (omitting these entirely proprtionally increases importance of other factors)
-    let rev_deps_sqrt = (rev_dep_ratio * cr.number_of_direct_reverse_deps as f64).sqrt();
+    let rev_deps_sqrt = (external_usage * cr.number_of_direct_reverse_deps as f64).sqrt();
     let active_users_sqrt = active_users.sqrt();
     // if has lots of users, override other scores
     if active_users_sqrt > 8. {
@@ -369,7 +370,7 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs<'_>) -> Score {
     if !is_app_only {
         score.score_f("Active users", 8., active_users_sqrt);
         score.score_f("Direct rev deps", 10., rev_deps_sqrt);
-        let indirect = 1. + (rev_dep_ratio * cr.number_of_indirect_reverse_optional_deps as f64) / 4.;
+        let indirect = 1. + (external_usage * cr.number_of_indirect_reverse_optional_deps as f64) / 4.;
         score.score_f("Indirect rev deps", 6., indirect.log2());
 
     }

@@ -62,7 +62,7 @@ pub fn normalize_keyword(k: &str) -> String {
     // i-os looks bad
     let mut k = k;
     let tmp;
-    if k.starts_with("eBPF") || k.starts_with("iOS") || k.starts_with("iP") || k.starts_with("iM") {
+    if k.starts_with("eBPF") || k.starts_with("iOS") || k.starts_with("LaTeX") || k.starts_with("iP") || k.starts_with("iM") {
         tmp = k.to_lowercase();
         k = &tmp;
     }

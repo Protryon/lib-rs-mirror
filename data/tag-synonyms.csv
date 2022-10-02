@@ -12,7 +12,6 @@
 2ddrawing,2d-drawing,4
 2dengine,2d-engine,4
 2dgame,2d-game,4
-systemverilog,system-verilog,4
 2dgameengine,2d-game-engine,4
 2dgameframework,2d-game-framework,4
 2dgraphics,2d-graphics,4
@@ -1065,6 +1064,7 @@ chromedevtoolsprotocol,chrome-devtools-protocol,4
 chromedriver,selenium-chromedriver,0
 chunk,chunks,2
 ci,continuous-integration,2
+cielab,cie-lab,0
 cipher,encryption,4
 ciphers,cipher,5
 circuitbreaker,circuit-breaker,4
@@ -1503,6 +1503,7 @@ deciphering,encryption,4
 decisiontree,decision-tree,1
 decisiontrees,decision-tree,0
 declarations,declaration,4
+decoder-encoder,codec,3
 decompiler,decompiling,1
 decompress,decompression,5
 decorators,decorator,3
@@ -1524,6 +1525,7 @@ delegate,delegates,3
 deletes,delete,3
 delimiter-separated-values,csv,0
 delta2a,delta-2a,1
+deltae,delta-e,4
 deltalake,delta-lake,1
 demos,demo,1
 deno-plug-ins,deno-plugin,5
@@ -1716,6 +1718,7 @@ empty-string,string,1
 emr,amazon-emr,0
 emulate,emulation,1
 emulator,emulation,0
+encoder-decoder,codec,5
 encodings,encoding,4
 encrypt,encryption,3
 encrypted,encryption,3
@@ -1769,7 +1772,9 @@ escaped-characters,escaping,4
 esolangs,esolang,5
 esoteric-languages,esoteric-language,5
 esri-javascript-api,arcgis-js-api,0
+eth-rlp,ethereum,5
 ether-cat,ethercat,1
+ethernet-eth,ethernet,5
 etree,elementtree,0
 eureka,netflix-eureka,0
 evaluation-order,operator-precedence,0
@@ -2317,6 +2322,7 @@ hidden-markov-models,hidden-markov-model,5
 hidden-services,hidden-service,5
 hiddenfield,hidden-field,0
 hide,show-hide,0
+high-perf,high-performance,3
 highlighting,highlight,0
 highmaps,highcharts,4
 highstock,highcharts,4
@@ -2386,7 +2392,7 @@ ibm-i,ibm-midrange,0
 ibm-notes,lotus-notes,3
 ibm-was,websphere,4
 ibm-watson-cognitive,ibm-watson,0
-ical,icalendar,0
+icalendar,ical,4
 icarus,iverilog,0
 icc-profiles,icc-profile,5
 icloudkit,cloudkit,0
@@ -2672,6 +2678,7 @@ labels,label,0
 lambda-expressions,lambda,4
 lambda-expressions,lambda-expression,5
 lambda-functions,lambda,4
+lang,language,3
 language-constructs,language-construct,4
 language-independent,language-agnostic,3
 language-integrated-query,linq,0
@@ -2690,6 +2697,7 @@ layers,layer,0
 layouts,layout,4
 laziness,lazy-evaluation,4
 lazy,lazy-evaluation,4
+lazy-eval,lazy-evaluation,5
 lazy-load,lazy-loading,0
 lazyload,lazy-loading,0
 lc-3,lc3,5
@@ -3405,9 +3413,12 @@ parenthesis,parentheses,0
 parents,parent,0
 parkinglot,parking-lot,1
 parse,parser,0
+parser-combination,parser-combinator,5
+parser-combinators,parser-combinator,5
 parsers,parser,4
 parsexml,xml-parsing,4
 parsing,parser,4
+parsing-combinator,parser-combinator,5
 parti-ql,partiql,1
 partialviews,partial-views,0
 particle,particles,0
@@ -4834,7 +4845,6 @@ weblogic-11,weblogic-11g,0
 webmocks,webmock,5
 webnoir,noir,0
 webpage,html,3
-lc-3,lc3,5
 webpagescraping,web-scraping,0
 webpartzone,web-parts,0
 webproject,web-project,0

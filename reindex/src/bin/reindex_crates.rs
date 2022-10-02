@@ -59,7 +59,7 @@ fn main() {
     }
     let r = Arc::new(Reindexer { crates, deblist });
     let mut indexer = Indexer::new(CrateSearchIndex::new(r.crates.main_cache_dir()).expect("init search")).expect("init search indexer");
-    let lines = TempCache::new(r.crates.main_cache_dir().join("search-uniq-lines.dat")).expect("init lines cache");
+    let lines = TempCache::new(r.crates.main_cache_dir().join("search-uniq-lines.dat"), Duration::ZERO).expect("init lines cache");
     let (tx, mut rx) = mpsc::channel::<(Arc<_>, _, _)>(64);
 
     let r2 = r.clone();

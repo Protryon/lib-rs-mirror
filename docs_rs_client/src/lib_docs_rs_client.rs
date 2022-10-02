@@ -1,3 +1,4 @@
+use std::time::Duration;
 use fetcher::Fetcher;
 use serde_derive::*;
 pub use simple_cache::Error;
@@ -19,7 +20,7 @@ pub struct BuildStatus {
 impl DocsRsClient {
     pub fn new(cache_path: impl AsRef<Path>) -> Result<Self, Error> {
         Ok(Self {
-            cache: TempCacheJson::new(cache_path.as_ref(), Arc::new(Fetcher::new(8)))?,
+            cache: TempCacheJson::new(cache_path.as_ref(), Arc::new(Fetcher::new(8)), Duration::from_secs(3600*24*31*3))?,
         })
     }
 

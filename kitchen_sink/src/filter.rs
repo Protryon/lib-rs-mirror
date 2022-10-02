@@ -29,7 +29,7 @@ impl ImageOptimAPIFilter {
             img_prefix: format!("https://img.gs/{}/full/", api_id),
             img2x_prefix: format!("https://img.gs/{}/full,2x/", api_id),
             meta_prefix: format!("https://img.gs/{}/meta,timeout=3/", api_id),
-            cache: TempCacheJson::new(cache_path, Arc::new(Fetcher::new(8)))?,
+            cache: TempCacheJson::new(cache_path, Arc::new(Fetcher::new(8)), Duration::from_secs(3600*24*15))?,
             handle: tokio::runtime::Handle::current(),
         })
     }

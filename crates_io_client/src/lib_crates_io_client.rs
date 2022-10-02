@@ -1,3 +1,4 @@
+use std::time::Duration;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 pub use simple_cache::Error;
@@ -42,8 +43,8 @@ impl CratesIoClient {
         let fetcher = Arc::new(Fetcher::new(4));
         Ok(Self {
             metacache: SimpleFetchCache::new(&cache_base_path.join("cratesiometadb.bin"), fetcher.clone(), true)?,
-            ownerscache1: TempCacheJson::new(&cache_base_path.join("cratesioowners1.bin"), fetcher.clone())?,
-            ownerscache2: TempCacheJson::new(&cache_base_path.join("cratesioowners2.bin"), fetcher.clone())?,
+            ownerscache1: TempCacheJson::new(&cache_base_path.join("cratesioowners1.bin"), fetcher.clone(), Duration::from_secs(3600*24*14))?,
+            ownerscache2: TempCacheJson::new(&cache_base_path.join("cratesioowners2.bin"), fetcher.clone(), Duration::from_secs(3600*24*15))?,
             readmes: SimpleFetchCache::new(&cache_base_path.join("readmes.db"), fetcher.clone(), false)?,
             tarballs_path: cache_base_path.join("tarballs"),
             fetcher,

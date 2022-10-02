@@ -7,6 +7,7 @@ use ahash::HashMap;
 use serde_big_array::BigArray;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 /// Downloads each day of the year
 #[derive(Serialize, Deserialize, Clone)]
@@ -35,7 +36,7 @@ impl AllDownloads {
     pub fn new(base_path: impl Into<PathBuf>) -> Self {
         let base_path = base_path.into();
         Self {
-            sum_cache: TempCache::new(base_path.join("yearlydownloads")).unwrap(),
+            sum_cache: TempCache::new(base_path.join("yearlydownloads"), Duration::ZERO).unwrap(),
             by_year: Mutex::new(HashMap::new()),
             base_path,
         }
@@ -45,7 +46,7 @@ impl AllDownloads {
         Ok(match t.entry(year) {
             Occupied(e) => e.into_mut(),
             Vacant(e) => {
-                e.insert(Arc::new(TempCache::new(self.base_path.join(format!("{}-big.rmpz", year)))?))
+                e.insert(Arc::new(TempCache::new(self.base_path.join(format!("{}-big.rmpz", year)), Duration::ZERO)?))
             },
         })
     }

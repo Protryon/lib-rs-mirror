@@ -1,3 +1,4 @@
+use std::time::Duration;
 use repo_url::SimpleRepo;
 use simple_cache::TempCache;
 use tokio::task::block_in_place;
@@ -69,14 +70,14 @@ impl GitHub {
     pub fn new(cache_path: impl AsRef<Path>, token: &str) -> CResult<Self> {
         Ok(Self {
             client: github_v3::Client::new(Some(token)),
-            user_orgs: TempCache::new(&cache_path.as_ref().with_file_name("github_user_orgs.bin"))?,
-            orgs: TempCache::new(&cache_path.as_ref().with_file_name("github_orgs2.bin"))?,
-            users: TempCache::new(&cache_path.as_ref().with_file_name("github_users3.bin"))?,
-            commits: TempCache::new(&cache_path.as_ref().with_file_name("github_commits2.bin"))?,
-            releases: TempCache::new(&cache_path.as_ref().with_file_name("github_releases2.bin"))?,
-            contribs: TempCache::new(&cache_path.as_ref().with_file_name("github_contribs.bin"))?,
-            repos: TempCache::new(&cache_path.as_ref().with_file_name("github_repos2.bin"))?,
-            emails: TempCache::new(&cache_path.as_ref().with_file_name("github_emails.bin"))?,
+            user_orgs: TempCache::new(&cache_path.as_ref().with_file_name("github_user_orgs.bin"), Duration::from_secs(3600*24*14))?,
+            orgs: TempCache::new(&cache_path.as_ref().with_file_name("github_orgs2.bin"), Duration::from_secs(3600*24*31))?,
+            users: TempCache::new(&cache_path.as_ref().with_file_name("github_users3.bin"), Duration::from_secs(3600*24*31*2))?,
+            commits: TempCache::new(&cache_path.as_ref().with_file_name("github_commits2.bin"), Duration::from_secs(3600*24*30))?,
+            releases: TempCache::new(&cache_path.as_ref().with_file_name("github_releases2.bin"), Duration::from_secs(3600*24*8))?,
+            contribs: TempCache::new(&cache_path.as_ref().with_file_name("github_contribs.bin"), Duration::from_secs(3600*24*31*2))?,
+            repos: TempCache::new(&cache_path.as_ref().with_file_name("github_repos2.bin"), Duration::from_secs(3600*24*15))?,
+            emails: TempCache::new(&cache_path.as_ref().with_file_name("github_emails.bin"), Duration::from_secs(3600*24*31*3))?,
         })
     }
 

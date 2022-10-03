@@ -1,7 +1,6 @@
 use std::time::Duration;
 use repo_url::SimpleRepo;
 use simple_cache::TempCache;
-use tokio::task::block_in_place;
 use std::future::Future;
 use std::path::Path;
 
@@ -181,7 +180,7 @@ impl GitHub {
         B: for<'de> serde::Deserialize<'de> + serde::Serialize + Clone + Send + 'static,
         R: for<'de> serde::Deserialize<'de> + serde::Serialize + Clone + Send + 'static,
     {
-        if let Some((ver, payload)) = block_in_place(|| cache.get(key.0))? {
+        if let Some((ver, payload)) = cache.get(key.0)? {
             if ver == key.1 {
                 return Ok(payload);
             }
@@ -230,13 +229,13 @@ impl GitHub {
             Ok(val) => {
                 let res = (key.1.to_string(), Some(val));
                 if keep_cached {
-                    block_in_place(|| cache.set(key.0, &res))?;
+                    cache.set(key.0, &res)?;
                 }
                 Ok(res.1)
             },
             Err(_) if non_parsable_body => {
                 if keep_cached {
-                    block_in_place(|| cache.set(key.0, (key.1.to_string(), None)))?;
+                    cache.set(key.0, (key.1.to_string(), None))?;
                 }
                 Ok(None)
             },

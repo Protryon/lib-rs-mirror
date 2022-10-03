@@ -99,27 +99,42 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
 
     #[track_caller]
     fn lock_for_write(&self) -> Result<RwLockWriteGuard<'_, Inner<K>>, Error> {
-        let mut inner = self.inner.try_write_for(Duration::from_secs(4)).ok_or(Error::Timeout)?;
-        if inner.data.is_none() {
-            let (size, data) = self.load_data()?;
-            inner.expected_size = AtomicU64::new(size);
-            inner.data = Some(data);
-            inner.writes = 0;
-            inner.next_autosave = 10;
+        if let Some(inner) = self.inner.try_write() {
+            if inner.data.is_some() {
+                return Ok(inner);
+            }
         }
-        Ok(inner)
+        tokio::task::block_in_place(|| {
+            let mut inner = self.inner.try_write_for(Duration::from_secs(4)).ok_or(Error::Timeout)?;
+            if inner.data.is_none() {
+                let (size, data) = self.load_data()?;
+                inner.expected_size = AtomicU64::new(size);
+                inner.data = Some(data);
+                inner.writes = 0;
+                inner.next_autosave = 10;
+            }
+            Ok(inner)
+        })
     }
 
     #[track_caller]
     fn lock_for_read(&self) -> Result<RwLockReadGuard<'_, Inner<K>>, Error> {
-        loop {
-            let inner = self.inner.try_read_for(Duration::from_secs(6)).ok_or(Error::Timeout)?;
+        if let Some(inner) = self.inner.try_read() {
             if inner.data.is_some() {
                 return Ok(inner);
             }
-            drop(inner);
-            let _ = self.lock_for_write()?;
         }
+        tokio::task::block_in_place(|| {
+            for _ in 0..5 {
+                let inner = self.inner.try_read_for(Duration::from_secs(6)).ok_or(Error::Timeout)?;
+                if inner.data.is_some() {
+                    return Ok(inner);
+                }
+                drop(inner);
+                let _ = self.lock_for_write()?;
+            }
+            Err(Error::Timeout)
+        })
     }
 
     fn load_data(&self) -> Result<(u64, FxHashMap<K, RawEntry>), Error> {
@@ -185,23 +200,28 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
             w.writes = 0;
             w.next_autosave *= 2;
             drop(w); // unlock writes
-            let d = self.lock_for_read()?;
-            if !self.save_unlocked(&d)? {
-                warn!("Data write race; discarding {}", self.path.display());
-                let mut w = self.lock_for_write()?;
-                w.data = None;
-            }
+            tokio::task::block_in_place(|| {
+                let d = self.lock_for_read()?;
+                if !self.save_unlocked(&d)? {
+                    warn!("Data write race; discarding {}", self.path.display());
+                    let mut w = self.lock_for_write()?;
+                    w.data = None;
+                }
+                Ok::<_, Error>(())
+            })?;
         }
         Ok(())
     }
 
     #[track_caller]
     pub fn for_each(&self, mut cb: impl FnMut(&K, T)) -> Result<(), Error> {
-        let kw = self.lock_for_read()?;
-        kw.data.as_ref().unwrap().iter().try_for_each(|(k, v)| {
-            let v = Self::unbr(&v.compressed)?;
-            cb(k, v);
-            Ok(())
+        tokio::task::block_in_place(|| {
+            let kw = self.lock_for_read()?;
+            kw.data.as_ref().unwrap().iter().try_for_each(|(k, v)| {
+                let v = Self::unbr(&v.compressed)?;
+                cb(k, v);
+                Ok(())
+            })
         })
     }
 
@@ -233,13 +253,15 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
     }
 
     pub fn save(&self) -> Result<(), Error> {
-        let mut data = self.inner.write();
-        if data.writes > 0 {
-            self.expire_old(&mut data);
-            self.save_unlocked(&data)?;
-            data.data = None; // Flush mem
-        }
-        Ok(())
+        tokio::task::block_in_place(|| {
+            let mut data = self.inner.write();
+            if data.writes > 0 {
+                self.expire_old(&mut data);
+                self.save_unlocked(&data)?;
+                data.data = None; // Flush mem
+            }
+            Ok(())
+        })
     }
 
     fn expire_old(&self, d: &mut Inner<K>) {

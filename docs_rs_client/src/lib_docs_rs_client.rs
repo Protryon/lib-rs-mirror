@@ -40,7 +40,7 @@ impl DocsRsClient {
     }
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_docsrsclient() {
     let client = DocsRsClient::new("../data/docsrs.db").expect("new");
 

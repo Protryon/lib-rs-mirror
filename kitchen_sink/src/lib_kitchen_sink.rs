@@ -185,6 +185,8 @@ pub enum KitchenSinkErr {
     CrateNotFound(Origin),
     #[error("author not found: {}", _0)]
     AuthorNotFound(SmolStr),
+    #[error("error getting GH data: {}", _0)]
+    GitHub(String),
     #[error("crate {} not found in repo {}", _0, _1)]
     CrateNotFoundInRepo(String, String),
     #[error("crate is not a package: {:?}", _0)]
@@ -203,7 +205,9 @@ pub enum KitchenSinkErr {
     CacheDbMissing(String),
     #[error("Error when parsing verison")]
     SemverParsingError,
-    #[error("Stopped")]
+    #[error("Db error {}", _0)]
+    Db(#[from] #[source] Arc<crate_db::Error>),
+    #[error("Deps stats timeout")]
     Stopped,
     #[error("Deps stats timeout")]
     DepsNotAvailable,
@@ -926,7 +930,7 @@ impl KitchenSink {
             self.index.crates_io_crate_by_lowercase_name(name)
         })?;
         let latest_in_index = krate.most_recent_version().version(); // most recently published version
-        let meta = timeout("cacheable meta request", 10, self.crates_io.crate_meta(name, latest_in_index).map(|r| r.map_err(KitchenSinkErr::from))).await?;
+        let meta = self.crates_io.crate_meta(name, latest_in_index).map_err(KitchenSinkErr::from).await?;
         let mut meta = meta.ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?;
         if !meta.versions.iter().any(|v| v.num == latest_in_index) {
             warn!("Crate data missing latest version {}@{}", name, latest_in_index);
@@ -1482,11 +1486,11 @@ impl KitchenSink {
         }
     }
 
-    pub async fn github_repo(&self, crate_repo: &Repo) -> CResult<Option<GitHubRepo>> {
+    pub async fn github_repo(&self, crate_repo: &Repo) -> Result<Option<GitHubRepo>, KitchenSinkErr> {
         Ok(match crate_repo.host() {
             RepoHost::GitHub(ref repo) => {
-                let cachebust = self.cachebust_string_for_repo(crate_repo).await.context("ghrepo")?;
-                self.gh.repo(repo, &cachebust).await?
+                let cachebust = self.cachebust_string_for_repo(crate_repo).await?;
+                timeout("gh2", 21, self.gh.repo(repo, &cachebust).map_err(|e| KitchenSinkErr::GitHub(format!("{crate_repo:?} {e}")))).await?
             },
             _ => None,
         })
@@ -2662,7 +2666,8 @@ impl KitchenSink {
             return None;
         }
         let repo = child.repository()?;
-        let res = self.crate_db.parent_crate(repo, child.short_name()).await.ok()?;
+        let db_query = self.crate_db.parent_crate(repo, child.short_name()).map_err(|e| KitchenSinkErr::DataNotFound(e.to_string()));
+        let res = timeout("parcrate", 10, db_query).await.ok()?;
         if res.as_ref().map_or(false, |p| p == child.origin()) {
             error!("Buggy parent_crate for: {:?}", child.origin());
             return None;
@@ -2811,11 +2816,10 @@ impl KitchenSink {
         false
     }
 
-    async fn cachebust_string_for_repo(&self, crate_repo: &Repo) -> CResult<String> {
+    async fn cachebust_string_for_repo(&self, crate_repo: &Repo) -> Result<String, KitchenSinkErr> {
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
 
-        Ok(self.crate_db.crates_in_repo(crate_repo).await
-            .context("db crates_in_repo")?
+        Ok(self.crate_db.crates_in_repo(crate_repo).map_err(Arc::from).await?
             .into_iter()
             .filter_map(|origin| {
                 match origin {

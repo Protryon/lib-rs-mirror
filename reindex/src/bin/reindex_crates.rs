@@ -125,7 +125,7 @@ async fn main_indexing_loop(ref r: Arc<Reindexer>, crate_origins: Box<dyn Iterat
         if stopped() {return;}
         println!("{}…", i);
         if !search_only {
-            match run_timeout(62, r.crates.index_crate_highest_version(&origin, reindexing_all_crates)).await {
+            match run_timeout("hv", 62, r.crates.index_crate_highest_version(&origin, reindexing_all_crates)).await {
                 Ok(()) => {},
                 err => {
                     print_res(err);
@@ -135,7 +135,7 @@ async fn main_indexing_loop(ref r: Arc<Reindexer>, crate_origins: Box<dyn Iterat
             }
         }
         if stopped() {return;}
-        match run_timeout(70, r.index_crate(&origin, renderer, &mut tx)).await {
+        match run_timeout("rc", 70, r.index_crate(&origin, renderer, &mut tx)).await {
             Ok(v) => {
                 if repos {
                     if let Some(repo) = v.repository() {
@@ -150,7 +150,7 @@ async fn main_indexing_loop(ref r: Arc<Reindexer>, crate_origins: Box<dyn Iterat
                         }
                         let _finished = repo_concurrency.acquire().await;
                         if stopped() {return;}
-                        print_res(run_timeout(500, r.crates.index_repo(repo, v.version())).await);
+                        print_res(run_timeout("rep", 500, r.crates.index_repo(repo, v.version())).await);
                     }
                 }
             },
@@ -164,16 +164,19 @@ async fn main_indexing_loop(ref r: Arc<Reindexer>, crate_origins: Box<dyn Iterat
 impl Reindexer {
 async fn index_crate(&self, origin: &Origin, renderer: &Renderer, search_sender: &mut mpsc::Sender<(ArcRichCrateVersion, usize, f64)>) -> Result<ArcRichCrateVersion, anyhow::Error> {
     let crates = &self.crates;
-    let (k, v) = futures::try_join!(crates.rich_crate_async(origin), run_timeout(45, crates.rich_crate_version_async(origin)))?;
+    let (k, v) = futures::try_join!(
+        run_timeout("rca", 31, crates.rich_crate_async(origin)),
+        run_timeout("rcv", 45, crates.rich_crate_version_async(origin)),
+    )?;
 
-    let (downloads_per_month, score) = self.crate_overall_score(&k, &v, renderer).await?;
+    let (downloads_per_month, score) = run_timeout("score", 41, self.crate_overall_score(&k, &v, renderer)).await?;
     debug!("{origin:?} has score {score} and {downloads_per_month}dl/mo");
     let (_, index_res) = futures::join!(
-        async {
+        run_timeout("ssend", 10, async {
             search_sender.send((v.clone(), downloads_per_month, score)).await
-                .map_err(|e| {stop();e}).expect("closed channel?");
-        },
-        run_timeout(60, crates.index_crate(&k, score))
+                .map_err(|e| {stop();e})
+        }),
+        run_timeout("ic", 50, crates.index_crate(&k, score))
     );
     index_res?;
     Ok(v)
@@ -233,8 +236,18 @@ impl Reindexer {
 async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) -> Result<(usize, f64), anyhow::Error> {
     let crates = &self.crates;
 
-    let traction_stats = crates.traction_stats(all.origin()).await?;
-    let has_verified_repository_link = crates.has_verified_repository_link(k).await;
+    let (traction_stats, downloads_per_month, has_docs_rs, has_verified_repository_link, is_on_shitlist, deps_stats) = futures::join!(
+        run_timeout("ts", 10, crates.traction_stats(all.origin())),
+        run_timeout("dl", 10, crates.downloads_per_month_or_equivalent(all.origin())),
+        crates.has_docs_rs(k.origin(), k.short_name(), k.version()),
+        crates.has_verified_repository_link(k),
+        crates.is_crate_on_shitlist(all),
+        run_timeout("depstats", 20, crates.crates_io_dependents_stats_of(k.origin())),
+    );
+    let traction_stats = traction_stats?;
+    let deps_stats = deps_stats?;
+    let downloads_per_month = downloads_per_month?.unwrap_or(0) as u32;
+
     let advisories = crates.advisories_for_crate(k.origin());
     let semver: SemVer = k.version().parse()?;
     let is_unmaintained = advisories.iter()
@@ -244,20 +257,18 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
 
     let mut is_repo_archived = false;
     if let Some(repo) = k.repository() {
-        if let Some(github_repo) = crates.github_repo(repo).await.map_err(|e| log::error!("gh repo{}", e)).ok().and_then(|x| x) {
+        if let Some(github_repo) = run_timeout("gh", 22, crates.github_repo(repo)).await.map_err(|e| log::error!("gh repo{}", e)).ok().and_then(|x| x) {
             is_repo_archived = github_repo.archived;
         }
     }
 
-    let is_on_shitlist = crates.is_crate_on_shitlist(all).await;
-    let contrib_info = crates.all_contributors(k).await.map_err(|e| log::error!("contrib {}", e)).ok();
-    let owners = crates.crate_owners(k.origin(), CrateOwners::All).await?;
+    let contrib_info = run_timeout("contr", 20, crates.all_contributors(k)).await.map_err(|e| log::error!("contrib {}", e)).ok();
+    let owners = run_timeout("own", 20, crates.crate_owners(k.origin(), CrateOwners::All)).await?;
     let contributors_count = if let Some((authors, _owner_only, _, extra_contributors)) = &contrib_info {
         (authors.len() + extra_contributors) as u32
     } else {
         1
     };
-
 
     let langs = k.language_stats();
     let (rust_code_lines, rust_comment_lines) = langs.langs.get(&udedokei::Language::Rust).map(|rs| (rs.code, rs.comments)).unwrap_or_default();
@@ -297,7 +308,6 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
         is_nightly: k.is_nightly(),
     });
 
-    let downloads_per_month = crates.downloads_per_month_or_equivalent(all.origin()).await?.unwrap_or(0) as u32;
     let (runtime, _, build) = k.direct_dependencies();
     let dependency_freshness = {
         // outdated dev deps don't matter
@@ -307,8 +317,7 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
             }
             let req = richdep.dep.req().parse().ok()?;
             Some(async move {
-                let pop = crates.version_popularity(&richdep.package, &req)
-                    .await
+                let pop = run_timeout("depf", 15, crates.version_popularity(&richdep.package, &req)).await
                     .map_err(|e| log::error!("ver1pop {}", e)).unwrap_or(None);
                 (richdep.is_optional(), pop.unwrap_or(VersionPopularity { matches_latest: true, pop: 0., lost_popularity: false}))
             })
@@ -329,7 +338,7 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
         traction_stats,
         versions: all.versions(),
         is_app: k.is_app(),
-        has_docs_rs: crates.has_docs_rs(k.origin(), k.short_name(), k.version()).await,
+        has_docs_rs,
         is_nightly: k.is_nightly(),
         downloads_per_month,
         downloads_per_month_minus_most_downloaded_user: downloads_per_month,
@@ -341,7 +350,7 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
     };
 
     let mut has_many_direct_rev_deps = false;
-    if let Some(deps) = crates.crates_io_dependents_stats_of(k.origin()).await? {
+    if let Some(deps) = deps_stats {
         let direct_rev_deps = deps.direct.all();
         if direct_rev_deps > 50 {
             has_many_direct_rev_deps = true;
@@ -358,7 +367,7 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
             deps.rev_dep_names_optional.iter().map(|n| (n, true)))
             .filter_map(|(name, opt)| Some((Origin::try_from_crates_io_name(name)?, opt)))
             .map(|(o, opt)| async move {
-                let dl = crates.downloads_per_month(&o).await.unwrap_or_default().unwrap_or_default();
+                let dl = run_timeout("dlpm", 5, crates.downloads_per_month(&o)).await.unwrap_or_default().unwrap_or_default();
                 if opt { dl / 2 } else { dl } // hyper-tls vs reqwest
             })).await;
         let biggest = tmp.into_iter().max().unwrap_or(0);
@@ -406,8 +415,8 @@ fn print_res<T>(res: Result<T, anyhow::Error>) {
     }
 }
 
-async fn run_timeout<'a, T, E>(secs: u64, fut: impl Future<Output = Result<T, E>> + 'a) -> Result<T, anyhow::Error>
+async fn run_timeout<'a, T, E>(label: &'static str, secs: u64, fut: impl Future<Output = Result<T, E>> + 'a) -> Result<T, anyhow::Error>
 where anyhow::Error: From<E> {
-    let res = tokio::time::timeout(Duration::from_secs(secs), fut).await.map_err(|_| anyhow!("timed out {}", secs))?;
+    let res = tokio::time::timeout(Duration::from_secs(secs), fut).await.map_err(move |_| anyhow!("{label} timed out {secs}"))?;
     res.map_err(From::from)
 }

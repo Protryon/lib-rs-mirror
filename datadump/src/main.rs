@@ -168,10 +168,10 @@ async fn main() {
                         p => eprintln!("Ignored unexpected file {}", p),
                     };
 
-                    if let (Some(crates), Some(versions)) = (&crates, &versions) {
+                    if let (Some(crates), Some(versions), Some(crate_owners)) = (&crates, &versions, &crate_owners) {
                         if let Some(dependencies) = dependencies.take() {
                             eprintln!("Indexing dependencies for {} crates", dependencies.len());
-                            index_active_rev_dependencies(crates, versions, &dependencies, &ksink)?;
+                            index_active_rev_dependencies(crates, versions, &dependencies, crate_owners, &ksink)?;
                             eprintln!("Versions histogram");
                             versions_histogram(crates, versions, &dependencies, &ksink)?;
                         }
@@ -365,85 +365,106 @@ fn insert_hist_item(histogram: &mut StatsHistogram, val: u32, name: &str) {
     }
 }
 
+struct DepUse {
+    start_date: MiniDate,
+    end_date: MiniDate,
+    expired: bool,
+}
+
+#[derive(Default)]
+pub struct DepChangeAggregator {
+    pub added: u16,
+    /// Crate has released a new version without this dependency
+    pub removed: u16,
+    /// Crate has this dependnecy, but is not active any more
+    pub expired: u16,
+}
+
 /// Direct reverse dependencies, but with release dates (when first seen or last used)
 #[inline(never)]
-fn index_active_rev_dependencies(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDepsMap, ksink: &KitchenSink) -> Result<(), BoxErr> {
+fn index_active_rev_dependencies(crates: &CratesMap, versions: &VersionsMap, deps: &CrateDepsMap, owners: &CrateOwners, ksink: &KitchenSink) -> Result<(), BoxErr> {
     let mut deps_changes = HashMap::with_capacity(crates.len());
 
     for (crate_id, name) in crates {
-        if let Some(vers) = versions.get(crate_id) {
-            let mut releases_from_oldest: Vec<_> = vers.iter().map(|v| {
-                (v.id, MiniDate::new(v.created_at.with_timezone(&Utc).date()), &v.num)
-            }).collect();
-            if releases_from_oldest.is_empty() {
-                continue; // shouldn't happen
-            }
-            releases_from_oldest.sort_unstable_by_key(|a| a.0);
+        let has_multiple_owners = owners.get(crate_id).map(|o| o.len() > 1).unwrap_or(false);
+        let vers = match versions.get(crate_id) {
+            Some(v) => v,
+            None => {
+                eprintln!("Bad crate? {crate_id} {name}");
+                continue;
+            },
+        };
+        let mut releases_from_oldest: Vec<_> = vers.iter().map(|v| {
+            (v.id, MiniDate::new(v.created_at.date()), &v.num)
+        }).collect();
+        if releases_from_oldest.is_empty() {
+            continue; // shouldn't happen
+        }
+        releases_from_oldest.sort_unstable_by_key(|a| a.0);
 
-            let mut over_time = HashMap::new();
-            let mut releases = releases_from_oldest.iter().peekable();
-            while let Some(&(ver_id, release_date, version_str)) = releases.next() {
-                let expired;
-                let end_date = if let Some(&&(_, next_release_date, _)) = releases.peek() {
-                    expired = false;
-                    // if the next releases is going to drop it, then attribute drop date
-                    // to some time between the releases
-                    release_date.half_way(next_release_date)
+        let mut over_time = HashMap::new();
+        let mut releases = releases_from_oldest.iter().peekable();
+        while let Some(&(ver_id, release_date, version_str)) = releases.next() {
+            let expired;
+            let end_date = if let Some(&&(_, next_release_date, _)) = releases.peek() {
+                expired = false;
+                // if the next releases is going to drop it, then attribute drop date
+                // to some time between the releases
+                release_date.half_way(next_release_date)
+            } else {
+                expired = true;
+                // it's the final release, so relevance is now until the death of the crate.
+                //
+                // approximate how junky or stable the crate is
+                // assuming that experimental versions get abandoned quickly
+                // and 1.x are relevant for longer
+                //
+                // FIXME: this logic should be unified with ranking
+                let junk = version_str.as_str() == "0.1.0";
+                let unstable = version_str.starts_with("0.");
+                // a little bit of deterministic fuzzyness
+                // to make date cut-offs less sharp
+                let rand = (ver_id % 17) as i32;
+                let days_fresh = if junk {
+                    30 * 2 + rand + if has_multiple_owners { 14 } else { 0 } // assume more owners means it's likely to be a dead hobby project
+                } else if unstable && releases_from_oldest.len() < 3 {
+                    30 * 6 + rand * 2 + if has_multiple_owners { 30 } else { 0 }
+                } else if unstable || releases_from_oldest.len() < 3 {
+                    365 + rand * 3 + if has_multiple_owners { 90 } else { 0 }
                 } else {
-                    expired = true;
-                    // it's the final release, so relevance is now until the death of the crate.
-                    //
-                    // approximate how junky or stable the crate is
-                    // assuming that experimental versions get abandoned quickly
-                    // and 1.x are relevant for longer
-                    //
-                    // FIXME: this logic should be unified with ranking
-                    let junk = version_str.as_str() == "0.1.0";
-                    let unstable = version_str.starts_with("0.");
-                    // a little bit of deterministic fuzzyness
-                    // to make date cut-offs less sharp
-                    let rand = (ver_id % 17) as i32;
-                    let days_fresh = if junk {
-                        30 * 2 + rand
-                    } else if unstable && releases_from_oldest.len() < 3 {
-                        30 * 6 + rand * 2
-                    } else if unstable || releases_from_oldest.len() < 3 {
-                        365 + rand * 3
-                    } else {
-                        365 * 2 + rand * 4
-                    };
-                    release_date.days_later(days_fresh)
+                    365 * 2 + rand * 4 + if has_multiple_owners { 365 } else { 0 }
                 };
+                release_date.days_later(days_fresh)
+            };
 
-                for &dep_id in deps.get(&ver_id).map(Vec::as_slice).unwrap_or_default() {
-                    if dep_id == *crate_id {
-                        // libcpocalypse semver trick - not relevant
-                        continue;
-                    }
-                    let e = over_time.entry(dep_id).or_insert((release_date, end_date, expired));
-                    if e.1 < end_date {
-                        e.1 = end_date;
-                        e.2 = expired;
-                    }
+            for &dep_crate_id in deps.get(&ver_id).map(Vec::as_slice).unwrap_or_default() {
+                if dep_crate_id == *crate_id {
+                    // libcpocalypse semver trick - not relevant
+                    continue;
+                }
+                let e = over_time.entry(dep_crate_id).or_insert(DepUse {start_date: release_date, end_date, expired});
+                if e.end_date < end_date {
+                    e.end_date = end_date;
+                    e.expired = expired;
                 }
             }
+        }
 
-            for (dep_id, first_last) in over_time {
-                deps_changes.entry(dep_id).or_insert_with(Vec::new).push(first_last);
-            }
-        } else {
-            eprintln!("Bad crate? {} {}", crate_id, name);
+        for (dep_crate_id, first_last) in over_time {
+            deps_changes.entry(dep_crate_id).or_insert_with(Vec::new).push(first_last);
         }
     }
 
+    let today = MiniDate::new(Utc::today());
     for (crate_id, uses) in deps_changes {
         let name = crates.get(&crate_id).expect("bork crate");
-        let today = MiniDate::new(Utc::today());
         let mut by_day = HashMap::with_capacity(uses.len() * 2);
-        for (start_date, end_date, expired) in uses {
-            by_day.entry(start_date).or_insert(DependerChanges { at: start_date, added: 0, removed: 0, expired: 0 }).added += 1;
+        let owners = owners.get(&crate_id);
+        for DepUse {start_date, end_date, expired} in uses {
+            let start_use = by_day.entry(start_date).or_insert_with(DepChangeAggregator::default);
+            start_use.added += 1;
             if end_date <= today {
-                let e = by_day.entry(end_date).or_insert(DependerChanges { at: end_date, added: 0, removed: 0, expired: 0 });
+                let e = by_day.entry(end_date).or_insert_with(DepChangeAggregator::default);
                 if expired {
                     e.expired += 1;
                 } else {
@@ -451,7 +472,9 @@ fn index_active_rev_dependencies(crates: &CratesMap, versions: &VersionsMap, dep
                 }
             }
         }
-        let mut by_day: Vec<_> = by_day.values().copied().collect();
+        let mut by_day: Vec<_> = by_day.into_iter().map(|(at, DepChangeAggregator { added, removed, expired, .. })| {
+            DependerChanges { at, added, removed, expired }
+        }).collect();
         by_day.sort_unstable_by_key(|a| a.at);
 
         let origin = Origin::from_crates_io_name(name);
@@ -539,8 +562,8 @@ struct CrateOwnerRow {
     crate_id: CrateId,
     #[serde(deserialize_with = "date_fudge")]
     created_at: DateTime<Utc>,
-    created_by_id: Option<UserId>,
-    owner_id: UserId,
+    created_by_id: Option<OwnerId>,
+    owner_id: OwnerId,
     owner_kind: u8,
 }
 
@@ -580,8 +603,8 @@ struct TeamRow {
     name: SmolStr,  // human str
 }
 
-type UserId = u32;
-type Teams = HashMap<UserId, TeamRow>;
+type OwnerId = u32;
+type Teams = HashMap<OwnerId, TeamRow>;
 
 #[inline(never)]
 fn parse_teams(file: impl Read) -> Result<Teams, BoxErr> {
@@ -600,11 +623,11 @@ struct UserRow {
     avatar: Box<str>,
     github_id: i32, // there is -1 :(
     login: SmolStr,
-    id: UserId,
+    id: OwnerId,
     name: SmolStr,
 }
 
-type Users = HashMap<UserId, UserRow>;
+type Users = HashMap<OwnerId, UserRow>;
 
 #[inline(never)]
 fn parse_users(file: impl Read) -> Result<Users, BoxErr> {

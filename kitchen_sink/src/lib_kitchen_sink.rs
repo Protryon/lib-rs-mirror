@@ -207,9 +207,9 @@ pub enum KitchenSinkErr {
     SemverParsingError,
     #[error("Db error {}", _0)]
     Db(#[from] #[source] Arc<crate_db::Error>),
-    #[error("Deps stats timeout")]
+    #[error("Stopped")]
     Stopped,
-    #[error("Deps stats timeout")]
+    #[error("Deps not available (timeout?)")]
     DepsNotAvailable,
     #[error("Crate data timeout")]
     DataTimedOut,
@@ -2237,7 +2237,7 @@ impl KitchenSink {
 
     pub async fn inspect_repo_manifests(&self, repo: &Repo) -> CResult<Vec<FoundManifest>> {
         let checkout = self.checkout_repo(repo.clone(), true).await?;
-        let (has, _) = tokio::task::block_in_place(|| crate_git_checkout::find_manifests(&checkout))?;
+        let (has, _) = spawn_blocking(move || crate_git_checkout::find_manifests(&checkout)).await??;
         Ok(has)
     }
 
@@ -2287,8 +2287,8 @@ impl KitchenSink {
         tokio::task::yield_now().await;
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
 
-        let mut changes = Vec::new();
-        tokio::task::block_in_place(|| {
+        let changes = spawn_blocking({let repo = repo.clone(); move || {
+            let mut changes = Vec::new();
             let url = repo.canonical_git_url();
             crate_git_checkout::find_dependency_changes(&checkout, |added, removed, age| {
                 if removed.is_empty() {
@@ -2333,8 +2333,8 @@ impl KitchenSink {
                         }
                     }
                 }
-            })
-        })?;
+            }).map(|_| changes)
+        }}).await??;
         self.crate_db.index_repo_changes(repo, &changes).await?;
 
         Ok(())

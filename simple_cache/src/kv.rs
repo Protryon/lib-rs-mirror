@@ -254,7 +254,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
 
     pub fn save(&self) -> Result<(), Error> {
         tokio::task::block_in_place(|| {
-            let mut data = self.inner.write();
+            let mut data = self.inner.try_write_for(Duration::from_secs(6)).ok_or(Error::Timeout)?;
             if data.writes > 0 {
                 self.expire_old(&mut data);
                 self.save_unlocked(&data)?;
@@ -365,11 +365,12 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
 
 impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeOwned + Clone + Send + Eq + Hash> Drop for TempCache<T, K> {
     fn drop(&mut self) {
-        let mut d = self.inner.write();
-        if d.writes > 0 {
-            self.expire_old(&mut d);
-            if let Err(err) = self.save_unlocked(&d) {
-                error!("Temp db save failed: {}", err);
+        if let Some(mut d) = self.inner.try_write_for(Duration::from_secs(6)) {
+            if d.writes > 0 {
+                self.expire_old(&mut d);
+                if let Err(err) = self.save_unlocked(&d) {
+                    error!("Temp db save failed: {}", err);
+                }
             }
         }
     }

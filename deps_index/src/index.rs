@@ -203,14 +203,14 @@ impl Index {
     }
 
     pub async fn deps_stats(&self) -> Result<&DepsStats, DepsErr> {
-        tokio::task::yield_now().await;
         tokio::time::timeout(Duration::from_secs(60), self.deps_stats.get_or_init(async {
+            tokio::task::yield_now().await;
             tokio::task::block_in_place(|| {
                 self.get_deps_stats()
             })
         }))
-            .await
-            .map_err(|_| DepsErr::DepsNotAvailable)
+        .await
+        .map_err(|_| DepsErr::DepsNotAvailable)
     }
 
     #[inline]

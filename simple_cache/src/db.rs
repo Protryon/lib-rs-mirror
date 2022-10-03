@@ -50,24 +50,24 @@ impl SimpleFetchCache {
     }
 
     pub async fn get_cached(&self, key: (&str, &str), url: impl AsRef<str>) -> Result<Option<Vec<u8>>, Error> {
-        Ok(if let Some(data) = tokio::task::block_in_place(|| self.cache.get(key))? {
+        Ok(if let Some(data) = self.cache.get(key)? {
             Some(data)
         } else if self.cache.cache_only {
             None
         } else {
             let data = Box::pin(self.fetcher.fetch(url.as_ref())).await?;
-            tokio::task::block_in_place(|| self.cache.set(key, &data))?;
+            self.cache.set(key, &data)?;
             Some(data)
         })
     }
 
 
     pub fn set_serialize<B: serde::Serialize>(&self, key: (&str, &str), value: &B) -> Result<(), Error> {
-        tokio::task::block_in_place(|| self.cache.set_serialize(key, value))
+        self.cache.set_serialize(key, value)
     }
 
     pub fn get_deserialized<B: serde::de::DeserializeOwned>(&self, key: (&str, &str)) -> Result<Option<B>, Error> {
-        tokio::task::block_in_place(|| self.cache.get_deserialized(key))
+        self.cache.get_deserialized(key)
     }
 
     pub async fn fetch_cached_deserialized<B: serde::de::DeserializeOwned + serde::Serialize>(&self, key: (&str, &str), url: impl AsRef<str>) -> Result<Option<B>, Error> {
@@ -77,11 +77,9 @@ impl SimpleFetchCache {
             Ok(None)
         } else {
             let data = Box::pin(self.fetcher.fetch(url.as_ref())).await?;
-            tokio::task::block_in_place(|| {
-                let res = serde_json::from_slice(&data).map_err(|e| Error::Parse(e, data))?;
-                self.cache.set_serialize(key, &res)?;
-                Ok(Some(res))
-            })
+            let res = serde_json::from_slice(&data).map_err(|e| Error::Parse(e, data))?;
+            self.cache.set_serialize(key, &res)?;
+            Ok(Some(res))
         }
     }
 
@@ -114,11 +112,13 @@ impl SimpleCache {
 
     #[inline]
     fn with_connection<F, T>(&self, cb: F) -> Result<T, Error> where F: FnOnce(&Connection) -> Result<T, Error> {
-        let conn = self.conn.get_or(|| self.connect().map_err(Arc::new));
-        match conn {
-            Ok(conn) => cb(conn),
-            Err(err) => Err(Error::Db(self.url.clone(), Arc::clone(err))),
-        }
+        tokio::task::block_in_place(|| {
+            let conn = self.conn.get_or(|| self.connect().map_err(Arc::new));
+            match conn {
+                Ok(conn) => cb(conn),
+                Err(err) => Err(Error::Db(self.url.clone(), Arc::clone(err))),
+            }
+        })
     }
 
     pub fn get(&self, key: (&str, &str)) -> Result<Option<Vec<u8>>, Error> {

@@ -173,15 +173,16 @@ impl CrateDb {
 
     #[inline]
     pub async fn latest_crate_update_timestamp(&self) -> FResult<Option<u32>> {
-        self.with_read("latest_crate_update_timestamp", |conn| {
+        self.with_read_spawn("latest_crate_update_timestamp", |conn| {
             Ok(none_rows(conn.query_row("SELECT max(created) FROM crate_versions", [], |row| row.get(0)))?)
         }).await
     }
 
     pub async fn crate_versions(&self, origin: &Origin) -> FResult<Vec<(SmolStr, u32)>> {
-        self.with_read("crate_versions", |conn| {
+        let origin = origin.to_str();
+        self.with_read_spawn("crate_versions", move |conn| {
             let mut q = conn.prepare("SELECT v.version, v.created FROM crates c JOIN crate_versions v ON v.crate_id = c.id WHERE c.origin = ?1")?;
-            let res = q.query_map(&[&origin.to_str()], |row| {
+            let res = q.query_map(&[&origin], |row| {
                 Ok((row.get_ref(0)?.as_str()?.into(), row.get(1)?))
             })?;
             Ok(res.collect::<Result<Vec<(SmolStr, u32)>>>()?)
@@ -468,14 +469,15 @@ impl CrateDb {
     }
 
     pub async fn crates_in_repo(&self, repo: &Repo) -> FResult<Vec<Origin>> {
-        self.with_read("crates_in_repo", |conn| {
+        let repo = repo.canonical_git_url().into_owned();
+        self.with_read_spawn("crates_in_repo", move |conn| {
             let mut q = conn.prepare_cached("
                 SELECT crate_name
                 FROM repo_crates
                 WHERE repo = ?1
                 ORDER BY path, crate_name LIMIT 10
             ")?;
-            let q = q.query_map(&[&repo.canonical_git_url()], |r| {
+            let q = q.query_map(&[&repo], |r| {
                 let s = r.get_ref_unwrap(0).as_str()?;
                 crates_io_name(s)
             })?.filter_map(|r| r.map_err(|e| error!("crepo: {}", e)).ok());
@@ -485,54 +487,54 @@ impl CrateDb {
 
     /// Returns crate name (not origin)
     pub async fn parent_crate(&self, repo: &Repo, child_name: &str) -> FResult<Option<Origin>> {
-        self.with_read("parent_crate", |conn| {
-            let mut paths = conn.prepare_cached("SELECT path, crate_name FROM repo_crates WHERE repo = ?1 LIMIT 100")?;
-            let mut paths: HashMap<String, String> = paths
-                .query_map(&[&repo.canonical_git_url()], |r| Ok((r.get_unwrap(0), r.get_unwrap(1))))?
-                .collect::<std::result::Result<_, _>>()?;
+        let repo_url = repo.canonical_git_url().into_owned();
+        let mut paths = self.with_read_spawn("parent_crate", move |conn| {
+            let mut q = conn.prepare_cached("SELECT path, crate_name FROM repo_crates WHERE repo = ?1 LIMIT 100")?;
+            let tmp = q.query_map(&[&repo_url], |r| Ok((r.get_unwrap(0), r.get_unwrap(1))))?;
+            Ok(tmp.collect::<std::result::Result<HashMap<String, String>, _>>()?)
+        }).await?;
 
-            if paths.len() < 2 {
-                return Ok(None);
+        if paths.len() < 2 {
+            return Ok(None);
+        }
+
+        let child_path = if let Some(a) = paths.iter().find(|(_, child)| *child == child_name)
+            .map(|(path, _)| path.to_owned()) {a} else {return Ok(None)};
+
+        paths.remove(&child_path);
+        let mut child_path = child_path.as_str();
+
+        loop {
+            child_path = child_path.rsplit_once('/').map(|x| x.0).unwrap_or("");
+            if let Some(child) = paths.get(child_path) {
+                return Ok(Origin::try_from_crates_io_name(child));
             }
-
-            let child_path = if let Some(a) = paths.iter().find(|(_, child)| *child == child_name)
-                .map(|(path, _)| path.to_owned()) {a} else {return Ok(None)};
-
-            paths.remove(&child_path);
-            let mut child_path = child_path.as_str();
-
-            loop {
-                child_path = child_path.rsplit_once('/').map(|x| x.0).unwrap_or("");
-                if let Some(child) = paths.get(child_path) {
-                    return Ok(Origin::try_from_crates_io_name(child));
-                }
-                if child_path.is_empty() {
-                    // in these paths "" is the root
-                    break;
-                }
+            if child_path.is_empty() {
+                // in these paths "" is the root
+                break;
             }
+        }
 
-            fn unprefix(s: &str) -> &str {
-                if s.starts_with("rust-") || s.starts_with("rust_") {
-                    return &s[5..];
-                }
-                if s.ends_with("-rs") || s.ends_with("_rs") {
-                    return &s[..s.len() - 3];
-                }
-                if let Some(derusted) = s.strip_prefix("rust") {
-                    return derusted;
-                }
-                s
+        fn unprefix(s: &str) -> &str {
+            if s.starts_with("rust-") || s.starts_with("rust_") {
+                return &s[5..];
             }
+            if s.ends_with("-rs") || s.ends_with("_rs") {
+                return &s[..s.len() - 3];
+            }
+            if let Some(derusted) = s.strip_prefix("rust") {
+                return derusted;
+            }
+            s
+        }
 
-            Ok(if let Some(child) = repo.repo_name().and_then(|n| paths.get(n).or_else(|| paths.get(unprefix(n)))).filter(|c| *c != child_name) {
-                Origin::try_from_crates_io_name(child)
-            } else if let Some(child) = repo.owner_name().and_then(|n| paths.get(n).or_else(|| paths.get(unprefix(n)))).filter(|c| *c != child_name) {
-                Origin::try_from_crates_io_name(child)
-            } else {
-                None
-            })
-        }).await
+        Ok(if let Some(child) = repo.repo_name().and_then(|n| paths.get(n).or_else(|| paths.get(unprefix(n)))).filter(|c| *c != child_name) {
+            Origin::try_from_crates_io_name(child)
+        } else if let Some(child) = repo.owner_name().and_then(|n| paths.get(n).or_else(|| paths.get(unprefix(n)))).filter(|c| *c != child_name) {
+            Origin::try_from_crates_io_name(child)
+        } else {
+            None
+        })
     }
 
     /// additions and removals
@@ -585,7 +587,7 @@ impl CrateDb {
             let args: &[&dyn ToSql] = &[&recent_90_days, &score, &crate_id];
             update_recent.execute(args)?;
 
-            if (prev_ranking - score).abs() > 0.0001 {
+            if (prev_ranking - score).abs() > 0.01 {
                 debug!("ranking changed by {:0.4}; {:?} = {:0.5} => {:0.5}", (prev_ranking - score), all.origin(), prev_ranking, score);
             }
 
@@ -761,7 +763,7 @@ impl CrateDb {
             return Ok(res)
         }
 
-        let res = self.with_read("allkw", |conn| {
+        let res = self.with_read_spawn("allkw", |conn| {
             let mut query = conn.prepare_cached("SELECT k.keyword
                 FROM keywords k JOIN crate_keywords ck ON (ck.keyword_id = k.id)
                 WHERE k.visible
@@ -926,7 +928,7 @@ impl CrateDb {
     }
 
     pub async fn top_crates_uncategorized(&self, limit: u32) -> FResult<Vec<(Origin, f64)>> {
-        self.with_read("top_crates_uncategorized", |conn| {
+        self.with_read_spawn("top_crates_uncategorized", move |conn| {
             // sort by relevance to the category, downrank for being crappy (later also downranked for being removed from crates)
             // low number of downloads is mostly by rank, rather than downloads
             let mut query = conn.prepare_cached(
@@ -977,7 +979,7 @@ impl CrateDb {
     ///
     /// Returns `origin` strings
     pub async fn recently_updated_crates(&self, limit: u32) -> FResult<Vec<(Origin, f64)>> {
-        self.with_read("recently_updated_crates", |conn| {
+        self.with_read_spawn("recently_updated_crates", move |conn| {
             let mut query = conn.prepare_cached(r#"
                 select max(created) + 3600*24*7 * k.ranking, -- week*rank ~= best this week
                     k.ranking,
@@ -1002,7 +1004,7 @@ impl CrateDb {
     ///
     /// Returns `origin` strings
     pub async fn most_downloaded_crates(&self, limit: u32) -> FResult<Vec<(Origin, u32)>> {
-        self.with_read("recently_updated_crates", |conn| {
+        self.with_read_spawn("recently_updated_crates", move |conn| {
             let mut query = conn.prepare_cached(r#"
                 select recent_downloads, origin from crates order by 1 desc limit ?1
             "#)?;
@@ -1017,16 +1019,17 @@ impl CrateDb {
 
     #[inline]
     pub async fn crate_rank(&self, origin: &Origin) -> FResult<f64> {
-        self.with_read("crate_rank", |conn| {
+        let origin = origin.to_str();
+        self.with_read_spawn("crate_rank", move |conn| {
             let mut query = conn.prepare_cached("SELECT ranking FROM crates WHERE origin = ?1)")?;
-            Ok(none_rows(query.query_row(&[&origin.to_str()], |row| row.get(0)))?.unwrap_or(0.))
+            Ok(none_rows(query.query_row(&[&origin], |row| row.get(0)))?.unwrap_or(0.))
         }).await
     }
 
     /// List of all notable crates
     /// Returns origin, rank, last updated unix timestamp
     pub async fn sitemap_crates(&self) -> FResult<Vec<(Origin, f64, i64)>> {
-        self.with_read("sitemap_crates", |conn| {
+        self.with_read_spawn("sitemap_crates", |conn| {
             let mut q = conn.prepare(r#"
                 SELECT origin, ranking, max(created) as last_update
                 FROM crates c
@@ -1043,7 +1046,7 @@ impl CrateDb {
 
     /// Number of crates in every category
     pub async fn category_crate_counts(&self) -> FResult<HashMap<String, (u32, f64)>> {
-        self.with_read("category_crate_counts", |conn| {
+        self.with_read_spawn("category_crate_counts", |conn| {
             let mut q = conn.prepare(r#"
                 select c.slug, count(*), sum(rank_weight) from categories c group by c.slug
             "#)?;
@@ -1056,7 +1059,7 @@ impl CrateDb {
 
     /// Crates overdue for an update
     pub async fn crates_to_reindex(&self) -> FResult<Vec<Origin>> {
-        self.with_read("crates_to_reindex", |conn| {
+        self.with_read_spawn("crates_to_reindex", |conn| {
             let mut q = conn.prepare("SELECT origin FROM crates WHERE next_update < ?1 LIMIT 1000")?;
             let timestamp = Utc::now().timestamp() as u32;
             let q = q.query_map(&[&timestamp], |r| {

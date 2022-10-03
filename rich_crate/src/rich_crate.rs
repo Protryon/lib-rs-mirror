@@ -65,6 +65,7 @@ pub struct DependerChangesMonthly {
     pub added_total: u32,
     pub removed_total: u32,
     pub expired_total: u32,
+    pub users_total: u16,
 }
 
 impl DependerChangesMonthly {

@@ -355,7 +355,7 @@ impl KitchenSink {
             category_overrides: Self::load_category_overrides(&data_path.join("category_overrides.txt")).context("cat")?,
             author_shitlist: Self::load_author_shitlist(&data_path.join("author_shitlist.txt"))?,
             crates_io_owners_cache: TempCache::new(&data_path.join("cio-owners.tmp"), Duration::from_secs(3600*24*14)).context("tmp1")?,
-            depender_changes: TempCache::new(&data_path.join("deps-changes2.tmp"), Duration::from_secs(3600*24*31*3)).context("tmp2")?,
+            depender_changes: TempCache::new(&data_path.join("deps-changes3.tmp"), Duration::ZERO).context("tmp2")?,
             stats_histograms: TempCache::new(&data_path.join("stats-histograms.tmp"), Duration::from_secs(3600*24*31*3)).context("tmp3")?,
             throttle: tokio::sync::Semaphore::new(40),
             auto_indexing_throttle: tokio::sync::Semaphore::new(4),
@@ -3255,10 +3255,12 @@ impl KitchenSink {
                 added: 0, added_total: 0,
                 removed: 0, removed_total: 0,
                 expired: 0, expired_total: 0,
+                users_total: 0,
             });
             w.added += d.added as u32;
             w.removed += d.removed as u32;
             w.expired += d.expired as u32;
+            w.users_total = d.users_abs;
         }
 
         let first = &daily_changes[0];
@@ -3274,6 +3276,7 @@ impl KitchenSink {
                 year: curr.0, month0: curr.1,
                 added: 0, removed: 0, expired: 0,
                 added_total: 0, removed_total: 0, expired_total: 0,
+                users_total: 0,
             });
             added_total += e.added;
             expired_total += e.expired;
@@ -3281,6 +3284,7 @@ impl KitchenSink {
             e.added_total = added_total;
             e.expired_total = expired_total;
             e.removed_total = removed_total;
+            e.users_total = e.users_total;
             monthly.push(e);
             curr.1 += 1;
             if curr.1 > 11 {
@@ -3762,6 +3766,9 @@ pub struct DependerChanges {
     pub removed: u16,
     /// Crate has this dependnecy, but is not active any more
     pub expired: u16,
+
+    /// Already aggregated number of users
+    pub users_abs: u16,
 }
 
 #[derive(Clone, Serialize, Deserialize)]

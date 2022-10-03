@@ -573,17 +573,21 @@ impl CrateDb {
     /// Update download counts of the crate
     pub async fn index_versions(&self, all: &RichCrate, score: f64, downloads_per_month: Option<usize>) -> FResult<()> {
         self.with_write("index_versions", |tx| {
-            let mut get_crate_id = tx.prepare_cached("SELECT id FROM crates WHERE origin = ?1")?;
+            let mut get_crate_id = tx.prepare_cached("SELECT id, ranking FROM crates WHERE origin = ?1")?;
             let mut insert_version = tx.prepare_cached("INSERT OR IGNORE INTO crate_versions (crate_id, version, created) VALUES (?1, ?2, ?3)")?;
 
             let origin = all.origin().to_str();
-            let crate_id: u32 = get_crate_id.query_row(&[&origin], |row| row.get(0))
+            let (crate_id, prev_ranking): (u32, f64) = get_crate_id.query_row(&[&origin], |row| Ok((row.get(0)?, row.get(1)?)))
                 .map_err(|e| Error::DbCtx(e, "the crate hasn't been indexed yet"))?;
 
             let recent_90_days = downloads_per_month.unwrap_or(0) as u32 * 3;
             let mut update_recent = tx.prepare_cached("UPDATE crates SET recent_downloads = ?1, ranking = ?2 WHERE id = ?3")?;
             let args: &[&dyn ToSql] = &[&recent_90_days, &score, &crate_id];
             update_recent.execute(args)?;
+
+            if (prev_ranking - score).abs() > 0.0001 {
+                debug!("ranking changed by {:0.4}; {:?} = {:0.5} => {:0.5}", (prev_ranking - score), all.origin(), prev_ranking, score);
+            }
 
             for ver in all.versions() {
                 let timestamp = ver.created_at.timestamp();

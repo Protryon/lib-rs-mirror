@@ -17,7 +17,8 @@ use std::io::BufReader;
 use std::io::Write;
 use std::sync::Arc;
 
-const CONCURRENCY: usize = 3; // builds in parallel
+const CONCURRENCY: usize = 4; // builds in parallel
+const MAX_OLD_VERSIONS: usize = 3;
 
 const DOCKER_NAME: &str = "rustesting2";
 const DOCKERFILE_DEFAULT_RUSTC: RustcMinorVersion = 61;
@@ -230,15 +231,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if !all.name().contains(&filters[0]) {
                 continue;
             }
-        } else if filters.len() > 1 {
-            if !filters.iter().any(|f| f == all.name()) {
-                continue;
-            }
+        } else if filters.len() > 1 && !filters.iter().any(|f| f == all.name()) {
+            continue;
         }
 
-        if all.versions().len() == 1 || all.versions().len() > 500 {
-            continue; // junk?
-        }
 
         match find_versions_to_build(all, &crates).await {
             Ok(vers) => {
@@ -260,15 +256,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) -> Result<Vec<ToCheck>, Box<dyn std::error::Error>> {
     let crate_name: Arc<str> = all.name().into();
     let origin = &Origin::from_crates_io_name(&crate_name);
+    let krate = crates.rich_crate_async(origin).await?;
 
-    let mut compat_info = crates.rustc_compatibility_for_builder(&crates.rich_crate_async(origin).await?).await.map_err(|_| "rustc_compatibility")?;
+    let min_relevant_rustc = RUST_VERSIONS.iter().copied().min().unwrap_or_default()
+        .max(51);
+    let mut compat_info = crates.rustc_compatibility_for_builder(&krate, min_relevant_rustc).await
+        .map_err(|_| "rustc_compatibility")?;
 
     let has_anything_built_ok_yet = compat_info.values().any(|c| c.has_ever_built());
 
     let mut rng = rand::thread_rng();
     let mut candidates: Vec<_> = all.versions().iter().rev() // rev() starts from most recent
         .filter(|v| !v.is_yanked())
-        .take(16)
+        .take(MAX_OLD_VERSIONS)
         .filter_map(|v| SemVer::parse(v.version()).ok())
         .map(|v| {
             let c = compat_info.remove(&v).unwrap_or_default();
@@ -297,10 +297,10 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
                 + if newest_bad > 29 { 1 } else { 0 } // don't want to check old crap
                 + if no_compat_bottom { 2 } else { 0 } // don't want to show 1.0 as compat rust
                 + if oldest_ok  > 35 { 1 } else { 0 }
-                + if oldest_ok  > 40 { 4 } else { 0 }
                 + if oldest_ok  > 47 { 2 } else { 0 }
                 + if oldest_ok  > 50 { 5 } else { 0 }
-                + if oldest_ok  > 53 { 8 } else { 0 }
+                + if oldest_ok  > 55 { 8 } else { 0 }
+                + if newest_bad_certain <= 55 { 5 } else { 0 } // check post latest edition
                 + if version.pre.is_empty() { 15 } else { 0 } // don't waste time testing alphas
                 + if idx == 0 { 10 } else { 0 } // prefer latest
                 + 5u32.saturating_sub(idx as u32); // prefer newer

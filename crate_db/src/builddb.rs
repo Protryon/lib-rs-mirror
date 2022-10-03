@@ -28,16 +28,16 @@ pub struct CompatRanges {
     has_ever_built: bool,
     ok: BTreeMap<RustcMinorVersion, (Compat, Option<String>)>,
     bad: BTreeMap<RustcMinorVersion, (Compat, Option<String>)>,
-    deps: BTreeMap<Box<str>, (SemVer, RustcMinorVersion)>,
+    required_deps: BTreeMap<Box<str>, (SemVer, RustcMinorVersion)>,
 }
 
 impl CompatRanges {
     pub fn requires_dependency_version(&mut self, dep_name: &str, dep_version: SemVer, newest_bad: RustcMinorVersion) {
-        self.deps.insert(dep_name.into(), (dep_version, newest_bad));
+        self.required_deps.insert(dep_name.into(), (dep_version, newest_bad));
     }
 
     pub fn required_deps(&self) -> impl Iterator<Item = (&str, (&SemVer, RustcMinorVersion))> {
-        self.deps.iter().map(|(k,(v, r))| (&**k, (v,*r)))
+        self.required_deps.iter().map(|(k,(v, r))| (&**k, (v,*r)))
     }
 
     pub fn has_ever_built(&self) -> bool {

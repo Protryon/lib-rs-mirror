@@ -2048,12 +2048,12 @@ impl KitchenSink {
     }
 
     pub async fn index_crate_highest_version(&self, origin: &Origin, maintenance_only_reindexing: bool) -> CResult<()> {
-        tokio::task::yield_now().await;
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
         info!("Indexing {:?}", origin);
 
         if !self.crate_exists(origin) {
             let _ = self.crate_db.delete_crate(origin).await;
+            return Err(KitchenSinkErr::CrateNotFound(origin.clone()).into());
         }
 
         timeout("before-index", 5, self.crate_db.before_index_latest(origin).map_err(anyhow::Error::from)).await?;
@@ -2391,10 +2391,10 @@ impl KitchenSink {
 
     pub fn rustc_compatibility_no_deps(&self, all: &RichCrate) -> Result<CompatByCrateVersion, KitchenSinkErr> {
         let db = self.build_db()?;
-        self.rustc_compatibility_inner_non_recursive(all, db, 0)
+        self.rustc_compatibility_inner_non_recursive(all, db)
     }
 
-    fn rustc_compatibility_inner_non_recursive(&self, all: &RichCrate, db: &BuildDb, bump_min_expected_rust: u16) -> Result<CompatByCrateVersion, KitchenSinkErr> {
+    fn rustc_compatibility_inner_non_recursive(&self, all: &RichCrate, db: &BuildDb) -> Result<CompatByCrateVersion, KitchenSinkErr> {
         let mut c = db.get_compat(all.origin())
             .map_err(|e| error!("bad compat: {}", e))
             .unwrap_or_default();
@@ -2413,7 +2413,7 @@ impl KitchenSink {
 
             let created = ver.created_at;
             if let Some(expected_rust) = Self::rustc_release_from_date(&created) {
-                c.add_compat(expected_rust.saturating_sub(bump_min_expected_rust), Compat::ProbablyWorks, Some("Assumed from release date".into()));
+                c.add_compat(expected_rust, Compat::ProbablyWorks, Some("Assumed from release date".into()));
             }
         }
         // this is needed to copy build failures from non-matching versions to matching versions
@@ -2497,9 +2497,9 @@ impl KitchenSink {
     }
 
     /// Relaxes heuristics to run more builds
-    pub async fn rustc_compatibility_for_builder(&self, all: &RichCrate) -> Result<CompatByCrateVersion, KitchenSinkErr> {
+    pub async fn rustc_compatibility_for_builder(&self, all: &RichCrate, min_relevant_rustc: u16) -> Result<CompatByCrateVersion, KitchenSinkErr> {
         let in_progress = Arc::new(Mutex::new(HashSet::new()));
-        Ok(self.rustc_compatibility_inner(all, in_progress, 1).await?.unwrap())
+        Ok(self.rustc_compatibility_inner(all, in_progress, min_relevant_rustc).await?.unwrap())
     }
 
     pub fn all_crate_compat(&self) -> CResult<HashMap<Origin, CompatByCrateVersion>> {
@@ -2518,7 +2518,7 @@ impl KitchenSink {
             .map_err(|_| KitchenSinkErr::BadRustcCompatData)
     }
 
-    fn rustc_compatibility_inner<'a>(&'a self, all: &'a RichCrate, in_progress: Arc<Mutex<HashSet<Origin>>>, bump_min_expected_rust: u16) -> BoxFuture<'a, Result<Option<CompatByCrateVersion>, KitchenSinkErr>> { async move {
+    fn rustc_compatibility_inner<'a>(&'a self, all: &'a RichCrate, in_progress: Arc<Mutex<HashSet<Origin>>>, min_relevant_rustc: u16) -> BoxFuture<'a, Result<Option<CompatByCrateVersion>, KitchenSinkErr>> { async move {
         if let Some(cached) = self.crate_rustc_compat_get_cached(all.origin()) {
             return Ok(Some(cached));
         }
@@ -2527,7 +2527,7 @@ impl KitchenSink {
         }
 
         let db = self.build_db()?;
-        let mut c = self.rustc_compatibility_inner_non_recursive(all, db, bump_min_expected_rust)?;
+        let mut c = self.rustc_compatibility_inner_non_recursive(all, db)?;
 
         // crates most often fail to compile because their dependencies fail
         if let Ok(vers) = self.all_crates_io_versions(all.origin()) {
@@ -2578,7 +2578,7 @@ impl KitchenSink {
                     } else {
                         debug!("recursing to get compat of {}", dep_origin.short_crate_name());
                         let dep_rich_crate = self.rich_crate_async(&dep_origin).await.ok()?;
-                        self.rustc_compatibility_inner(&dep_rich_crate, in_progress, bump_min_expected_rust).await.ok()??
+                        self.rustc_compatibility_inner(&dep_rich_crate, in_progress, min_relevant_rustc).await.ok()??
                     };
                     Some((dep_compat, dep_origin, reqs))
                 }
@@ -2608,7 +2608,7 @@ impl KitchenSink {
                             Some((semver, n))
                         })
                         .inspect(|&(_, n)| {
-                            if n > parent_newest_bad && n >= parent_oldest_ok_lower_limit {
+                            if n > parent_newest_bad && n >= parent_oldest_ok_lower_limit && n >= min_relevant_rustc {
                                 dependency_affects_msrv = true;
                             }
                         })
@@ -2621,7 +2621,7 @@ impl KitchenSink {
                             .min().unwrap_or(0)
                             .min(best_compat); // sparse data with only few failures may be too pessimistic, because other versions may be compatible
                         if c.newest_bad().unwrap_or(0) < dep_newest_bad {
-                            if dep_newest_bad > 19 {
+                            if dep_newest_bad >= 25 {
                                 debug!("{} {} MSRV went from {} to {} because of https://lib.rs/compat/{} {} = {}", all.name(), crate_ver, c.newest_bad().unwrap_or(0), dep_newest_bad, dep_origin.short_crate_name(), req, dep_found_ver);
                                 let reason = format!("{} {}={} has MSRV {}", dep_origin.short_crate_name(), req, dep_found_ver, dep_newest_bad);
                                 c.add_compat(dep_newest_bad, Compat::BrokenDeps, Some(reason.clone()));

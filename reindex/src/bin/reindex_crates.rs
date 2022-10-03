@@ -3,7 +3,7 @@ use kitchen_sink::CrateOwners;
 use kitchen_sink::SemVer;
 use anyhow::anyhow;
 use debcargo_list::DebcargoList;
-use feat_extractor::*;
+use feat_extractor::{is_autopublished, is_deprecated, is_squatspam, wlita};
 use futures::future::join_all;
 use futures::Future;
 use futures::stream::StreamExt;
@@ -19,7 +19,7 @@ use ranking::CrateVersionInputs;
 use ranking::OverallScoreInputs;
 use render_readme::Links;
 use render_readme::Renderer;
-use search_index::*;
+use search_index::{CrateSearchIndex, Indexer};
 use simple_cache::TempCache;
 use ahash::HashSet;
 use std::convert::TryInto;
@@ -36,15 +36,11 @@ struct Reindexer {
 fn main() {
     let everything = std::env::args().nth(1).map_or(false, |a| a == "--all");
     let search_only = std::env::args().nth(1).map_or(false, |a| a == "--search");
-    let specific: Vec<_> = if !everything && !search_only {
-        std::env::args().skip(1).map(|name| {
-            Origin::try_from_crates_io_name(&name).unwrap_or_else(|| Origin::from_str(name))
-        }).collect()
-    } else {
-        Vec::new()
-    };
-    let repos = !everything && !search_only;
+    let specific: Vec<_> = std::env::args().skip(1).filter(|arg| !arg.starts_with('-')).map(|name| {
+        Origin::try_from_crates_io_name(&name).unwrap_or_else(|| Origin::from_str(name))
+    }).collect();
 
+    let repos = !everything && !search_only;
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .thread_name("reindex")
@@ -98,12 +94,12 @@ fn main() {
 
     rt.block_on(r.crates.prewarm());
 
-    let c: Box<dyn Iterator<Item = Origin> + Send> = if everything || search_only {
+    let c: Box<dyn Iterator<Item = Origin> + Send> = if !specific.is_empty() {
+        Box::new(specific.into_iter())
+    } else if everything || search_only {
         let mut c: Vec<_> = r.crates.all_crates().collect::<Vec<_>>();
         c.shuffle(&mut thread_rng());
         Box::new(c.into_iter())
-    } else if !specific.is_empty() {
-        Box::new(specific.into_iter())
     } else {
         Box::new(rt.block_on(r.crates.crates_to_reindex()).unwrap().into_iter().map(|c| c.origin().clone()))
     };
@@ -233,167 +229,159 @@ fn index_search(indexer: &mut Indexer, lines: &TempCache<(String, f64), [u8; 16]
 }
 
 impl Reindexer {
-async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) -> Result<(usize, f64), anyhow::Error> {
-    let crates = &self.crates;
+    async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) -> Result<(usize, f64), anyhow::Error> {
+        let crates = &self.crates;
 
-    let (traction_stats, downloads_per_month, has_docs_rs, has_verified_repository_link, is_on_shitlist, deps_stats) = futures::join!(
-        run_timeout("ts", 10, crates.traction_stats(all.origin())),
-        run_timeout("dl", 10, crates.downloads_per_month_or_equivalent(all.origin())),
-        crates.has_docs_rs(k.origin(), k.short_name(), k.version()),
-        crates.has_verified_repository_link(k),
-        crates.is_crate_on_shitlist(all),
-        run_timeout("depstats", 20, crates.crates_io_dependents_stats_of(k.origin())),
-    );
-    let traction_stats = traction_stats?;
-    let deps_stats = deps_stats?;
-    let downloads_per_month = downloads_per_month?.unwrap_or(0) as u32;
+        let (traction_stats, downloads_per_month, has_docs_rs, has_verified_repository_link, is_on_shitlist, deps_stats) = futures::join!(
+            run_timeout("ts", 10, crates.traction_stats(all.origin())),
+            run_timeout("dl", 10, crates.downloads_per_month_or_equivalent(all.origin())),
+            crates.has_docs_rs(k.origin(), k.short_name(), k.version()),
+            crates.has_verified_repository_link(k),
+            crates.is_crate_on_shitlist(all),
+            run_timeout("depstats", 20, crates.crates_io_dependents_stats_of(k.origin())),
+        );
+        let traction_stats = traction_stats?;
+        let deps_stats = deps_stats?;
+        let downloads_per_month = downloads_per_month?.unwrap_or(0) as u32;
 
-    let advisories = crates.advisories_for_crate(k.origin());
-    let semver: SemVer = k.version().parse()?;
-    let is_unmaintained = advisories.iter()
-        .filter(|a| !a.withdrawn() && a.versions.is_vulnerable(&semver))
-        .filter_map(|a| a.metadata.informational.as_ref())
-        .any(|info| info.is_unmaintained());
+        let advisories = crates.advisories_for_crate(k.origin());
+        let semver: SemVer = k.version().parse()?;
+        let is_unmaintained = advisories.iter()
+            .filter(|a| !a.withdrawn() && a.versions.is_vulnerable(&semver))
+            .filter_map(|a| a.metadata.informational.as_ref())
+            .any(|info| info.is_unmaintained());
 
-    let mut is_repo_archived = false;
-    if let Some(repo) = k.repository() {
-        if let Some(github_repo) = run_timeout("gh", 22, crates.github_repo(repo)).await.map_err(|e| log::error!("gh repo{}", e)).ok().and_then(|x| x) {
-            is_repo_archived = github_repo.archived;
-        }
-    }
-
-    let contrib_info = run_timeout("contr", 20, crates.all_contributors(k)).await.map_err(|e| log::error!("contrib {}", e)).ok();
-    let owners = run_timeout("own", 20, crates.crate_owners(k.origin(), CrateOwners::All)).await?;
-    let contributors_count = if let Some((authors, _owner_only, _, extra_contributors)) = &contrib_info {
-        (authors.len() + extra_contributors) as u32
-    } else {
-        1
-    };
-
-    let langs = k.language_stats();
-    let (rust_code_lines, rust_comment_lines) = langs.langs.get(&udedokei::Language::Rust).map(|rs| (rs.code, rs.comments)).unwrap_or_default();
-    let total_code_lines = langs.langs.iter().filter(|(k, _)| k.is_code()).map(|(_, l)| l.code).sum::<u32>();
-    let base_score = ranking::crate_score_version(&CrateVersionInputs {
-        versions: all.versions(),
-        description: k.description().unwrap_or(""),
-        readme: k.readme().map(|readme| {
-            renderer.page_node(&readme.markup, None, Links::Ugc, None)
-        }).as_ref(),
-        owners: &owners,
-        authors: k.authors(),
-        contributors: Some(contributors_count),
-        edition: k.edition(),
-        total_code_lines,
-        rust_code_lines,
-        rust_comment_lines,
-        is_app: k.is_app(),
-        has_build_rs: k.has_buildrs(),
-        has_links: k.links().is_some(),
-        has_documentation_link: k.documentation().is_some(),
-        has_homepage_link: k.homepage().is_some(),
-        has_repository_link: k.repository().is_some(),
-        has_verified_repository_link,
-        has_keywords: k.has_own_keywords(),
-        has_own_categories: k.has_own_categories(),
-        has_features: !k.features().is_empty(),
-        has_examples: k.has_examples(),
-        has_code_of_conduct: k.has_code_of_conduct(),
-        has_benches: k.has_benches(),
-        has_tests: k.has_tests(),
-        // has_lockfile: k.has_lockfile(),
-        // has_changelog: k.has_changelog(),
-        license: k.license().unwrap_or(""),
-        has_badges: k.has_badges(),
-        maintenance: k.maintenance(),
-        is_nightly: k.is_nightly(),
-    });
-
-    let (runtime, _, build) = k.direct_dependencies();
-    let dependency_freshness = {
-        // outdated dev deps don't matter
-        join_all(runtime.iter().chain(&build).filter_map(|richdep| {
-            if !richdep.dep.is_crates_io() {
-                return None;
+        let mut is_repo_archived = false;
+        if let Some(repo) = k.repository() {
+            if let Some(github_repo) = run_timeout("gh", 22, crates.github_repo(repo)).await.map_err(|e| log::error!("gh repo{}", e)).ok().and_then(|x| x) {
+                is_repo_archived = github_repo.archived;
             }
-            let req = richdep.dep.req().parse().ok()?;
-            Some(async move {
-                let pop = run_timeout("depf", 15, crates.version_popularity(&richdep.package, &req)).await
-                    .map_err(|e| log::error!("ver1pop {}", e)).unwrap_or(None);
-                (richdep.is_optional(), pop.unwrap_or(VersionPopularity { matches_latest: true, pop: 0., lost_popularity: false}))
-            })
-        }))
-        .await
-        .into_iter()
-        .map(|(is_optional, pop)| {
-            if pop.matches_latest {1.0} // don't penalize pioneers
-            else if is_optional {0.8 + pop.pop * 0.2} // not a big deal when it's off
-            else {pop.pop}
-        })
-        .collect()
-    };
-
-    let is_in_debian = self.deblist.has(k.short_name()).map_err(|e| log::error!("debcargo check: {}", e)).unwrap_or(false);
-
-    let mut temp_inp = CrateTemporalInputs {
-        traction_stats,
-        versions: all.versions(),
-        is_app: k.is_app(),
-        has_docs_rs,
-        is_nightly: k.is_nightly(),
-        downloads_per_month,
-        downloads_per_month_minus_most_downloaded_user: downloads_per_month,
-        number_of_direct_reverse_deps: 0,
-        number_of_indirect_reverse_deps: 0,
-        number_of_indirect_reverse_optional_deps: 0,
-        dependency_freshness,
-        is_in_debian,
-    };
-
-    let mut has_many_direct_rev_deps = false;
-    if let Some(deps) = deps_stats {
-        let direct_rev_deps = deps.direct.all();
-        if direct_rev_deps > 50 {
-            has_many_direct_rev_deps = true;
         }
-        let indirect_reverse_optional_deps = (deps.runtime.def as u32 + deps.runtime.opt as u32)
-            .max(deps.dev as u32)
-            .max(deps.build.def as u32 + deps.build.opt as u32);
 
-        temp_inp.number_of_direct_reverse_deps = direct_rev_deps;
-        temp_inp.number_of_indirect_reverse_deps = deps.runtime.def.max(deps.build.def).into();
-        temp_inp.number_of_indirect_reverse_optional_deps = indirect_reverse_optional_deps;
-        let tmp = futures::future::join_all(
-            deps.rev_dep_names_default.iter().map(|n| (n, false)).chain(
-            deps.rev_dep_names_optional.iter().map(|n| (n, true)))
-            .filter_map(|(name, opt)| Some((Origin::try_from_crates_io_name(name)?, opt)))
-            .map(|(o, opt)| async move {
-                let dl = run_timeout("dlpm", 5, crates.downloads_per_month(&o)).await.unwrap_or_default().unwrap_or_default();
-                if opt { dl / 2 } else { dl } // hyper-tls vs reqwest
-            })).await;
-        let biggest = tmp.into_iter().max().unwrap_or(0);
-        temp_inp.downloads_per_month_minus_most_downloaded_user = downloads_per_month.saturating_sub(biggest as u32);
+        let contrib_info = run_timeout("contr", 20, crates.all_contributors(k)).await?;
+        let contributors_count = (contrib_info.0.len() + contrib_info.3) as u32;
+
+        let owners = run_timeout("own", 20, crates.crate_owners(k.origin(), CrateOwners::All)).await?;
+        let langs = k.language_stats();
+        let (rust_code_lines, rust_comment_lines) = langs.langs.get(&udedokei::Language::Rust).map(|rs| (rs.code, rs.comments)).unwrap_or_default();
+        let total_code_lines = langs.langs.iter().filter(|(k, _)| k.is_code()).map(|(_, l)| l.code).sum::<u32>();
+        let base_score = ranking::crate_score_version(&CrateVersionInputs {
+            versions: all.versions(),
+            description: k.description().unwrap_or(""),
+            readme: k.readme().map(|readme| {
+                renderer.page_node(&readme.markup, None, Links::Ugc, None)
+            }).as_ref(),
+            owners: &owners,
+            authors: k.authors(),
+            contributors: Some(contributors_count),
+            edition: k.edition(),
+            total_code_lines,
+            rust_code_lines,
+            rust_comment_lines,
+            is_app: k.is_app(),
+            has_build_rs: k.has_buildrs(),
+            has_links: k.links().is_some(),
+            has_documentation_link: k.documentation().is_some(),
+            has_homepage_link: k.homepage().is_some(),
+            has_repository_link: k.repository().is_some(),
+            has_verified_repository_link,
+            has_keywords: k.has_own_keywords(),
+            has_own_categories: k.has_own_categories(),
+            has_features: !k.features().is_empty(),
+            has_examples: k.has_examples(),
+            has_code_of_conduct: k.has_code_of_conduct(),
+            has_benches: k.has_benches(),
+            has_tests: k.has_tests(),
+            // has_lockfile: k.has_lockfile(),
+            // has_changelog: k.has_changelog(),
+            license: k.license().unwrap_or(""),
+            has_badges: k.has_badges(),
+            maintenance: k.maintenance(),
+            is_nightly: k.is_nightly(),
+        });
+
+        let (runtime, _, build) = k.direct_dependencies();
+        // outdated dev deps don't matter
+        let dependency_freshness = join_all(runtime.iter().chain(&build).filter_map(|richdep| {
+                if !richdep.dep.is_crates_io() {
+                    return None;
+                }
+                let req = richdep.dep.req().parse().ok()?;
+                Some(async move {
+                    let pop = run_timeout("depf", 15, crates.version_popularity(&richdep.package, &req)).await
+                        .map_err(|e| log::error!("ver1pop {}", e)).unwrap_or(None);
+                    (richdep.is_optional(), pop.unwrap_or(VersionPopularity { matches_latest: true, pop: 0., lost_popularity: false}))
+                })
+            })).await
+            .into_iter().map(|(is_optional, pop)| {
+                if pop.matches_latest {1.0} // don't penalize pioneers
+                else if is_optional {0.8 + pop.pop * 0.2} // not a big deal when it's off
+                else {pop.pop}
+            })
+            .collect();
+
+        let is_in_debian = self.deblist.has(k.short_name()).map_err(|e| log::error!("debcargo check: {}", e)).unwrap_or(false);
+
+        let mut temp_inp = CrateTemporalInputs {
+            traction_stats,
+            versions: all.versions(),
+            is_app: k.is_app(),
+            has_docs_rs,
+            is_nightly: k.is_nightly(),
+            downloads_per_month,
+            downloads_per_month_minus_most_downloaded_user: downloads_per_month, // fixed below
+            number_of_direct_reverse_deps: 0,
+            number_of_indirect_reverse_deps: 0,
+            number_of_indirect_reverse_optional_deps: 0,
+            dependency_freshness,
+            is_in_debian,
+        };
+
+        let mut has_many_direct_rev_deps = false;
+        if let Some(deps) = deps_stats {
+            let direct_rev_deps = deps.direct.all();
+            if direct_rev_deps > 50 {
+                has_many_direct_rev_deps = true;
+            }
+            let indirect_reverse_optional_deps = (deps.runtime.def as u32 + deps.runtime.opt as u32)
+                .max(deps.dev as u32)
+                .max(deps.build.def as u32 + deps.build.opt as u32);
+
+            temp_inp.number_of_direct_reverse_deps = direct_rev_deps;
+            temp_inp.number_of_indirect_reverse_deps = deps.runtime.def.max(deps.build.def).into();
+            temp_inp.number_of_indirect_reverse_optional_deps = indirect_reverse_optional_deps;
+            let tmp = futures::future::join_all(
+                deps.rev_dep_names_default.iter().map(|n| (n, false)).chain(
+                deps.rev_dep_names_optional.iter().map(|n| (n, true)))
+                .filter_map(|(name, opt)| Some((Origin::try_from_crates_io_name(name)?, opt)))
+                .map(|(o, opt)| async move {
+                    let dl = run_timeout("dlpm", 5, crates.downloads_per_month(&o)).await.unwrap_or_default().unwrap_or_default();
+                    if opt { dl / 2 } else { dl } // hyper-tls vs reqwest
+                })).await;
+            let biggest = tmp.into_iter().max().unwrap_or(0);
+            temp_inp.downloads_per_month_minus_most_downloaded_user = downloads_per_month.saturating_sub(biggest as u32);
+        }
+
+        let temp_score = ranking::crate_score_temporal(&temp_inp);
+        let overall = OverallScoreInputs {
+            former_glory: traction_stats.map_or(1., |t| t.former_glory),
+            is_proc_macro: k.is_proc_macro(),
+            is_sys: k.is_sys(),
+            is_sub_component: crates.is_sub_component(k).await,
+            is_internal: crates.is_internal_crate(k) && !has_many_direct_rev_deps,
+            is_autopublished: is_autopublished(k),
+            is_deprecated: is_deprecated(k) || is_repo_archived || is_unmaintained,
+            is_crates_io_published: k.origin().is_crates_io(),
+            is_yanked: k.is_yanked(),
+            is_squatspam: is_squatspam(k) || is_on_shitlist,
+            is_unwanted_category: k.category_slugs().iter().any(|c| &**c == "cryptography::cryptocurrencies"),
+        };
+
+        debug!("score {base_score:?} {temp_score:?} {overall:?}");
+        let score = ranking::combined_score(base_score, temp_score, &overall);
+
+        Ok((downloads_per_month as usize, score))
     }
-
-    let temp_score = ranking::crate_score_temporal(&temp_inp);
-    let overall = OverallScoreInputs {
-        former_glory: traction_stats.map_or(1., |t| t.former_glory),
-        is_proc_macro: k.is_proc_macro(),
-        is_sys: k.is_sys(),
-        is_sub_component: crates.is_sub_component(k).await,
-        is_internal: crates.is_internal_crate(k) && !has_many_direct_rev_deps,
-        is_autopublished: is_autopublished(k),
-        is_deprecated: is_deprecated(k) || is_repo_archived || is_unmaintained,
-        is_crates_io_published: k.origin().is_crates_io(),
-        is_yanked: k.is_yanked(),
-        is_squatspam: is_squatspam(k) || is_on_shitlist,
-        is_unwanted_category: k.category_slugs().iter().any(|c| &**c == "cryptography::cryptocurrencies"),
-    };
-
-    debug!("score {base_score:?} {temp_score:?} {overall:?}");
-    let score = ranking::combined_score(base_score, temp_score, &overall);
-
-    Ok((downloads_per_month as usize, score))
-}
 }
 
 fn print_res<T>(res: Result<T, anyhow::Error>) {
@@ -416,7 +404,7 @@ fn print_res<T>(res: Result<T, anyhow::Error>) {
 }
 
 async fn run_timeout<'a, T, E>(label: &'static str, secs: u64, fut: impl Future<Output = Result<T, E>> + 'a) -> Result<T, anyhow::Error>
-where anyhow::Error: From<E> {
+    where anyhow::Error: From<E> {
     let res = tokio::time::timeout(Duration::from_secs(secs), fut).await.map_err(move |_| anyhow!("{label} timed out {secs}"))?;
     res.map_err(From::from)
 }

@@ -33,10 +33,11 @@ async fn main() {
             let concurrency = Arc::clone(&concurrency);
             let seen = Arc::clone(&seen);
             waiting.push(handle.spawn(async move {
+                if stopped() {bail!("stop");}
                 let _f = concurrency.acquire().await?;
-                println!("{}…", o.short_crate_name());
                 let c = crates.rich_crate_version_async(&o).await?;
                 if stopped() {bail!("stop");}
+                println!("{}…", o.short_crate_name());
                 for a in c.authors().iter().filter(|a| a.email.is_some()) {
                     if let Some(email) = a.email.as_ref() {
                         {

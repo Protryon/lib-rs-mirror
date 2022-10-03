@@ -8,6 +8,7 @@ use rich_crate::Author;
 use rich_crate::CrateOwner;
 use rich_crate::CrateVersion;
 use rich_crate::Edition;
+use rich_crate::TractionStats;
 use semver::Version as SemVer;
 
 /// Only changes when a new version is released
@@ -80,6 +81,7 @@ pub struct CrateTemporalInputs<'a> {
     // pub crate_score_context_free: f64,
     // pub owner_pageranks: Vec<f32>,
     // pub reverse_deps_rankings: Vec<f32>,
+    pub traction_stats: Option<TractionStats>,
 }
 
 pub struct Env {
@@ -297,6 +299,11 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs<'_>) -> Score {
     // if it's bin+lib, treat it as a lib.
     let is_app_only = cr.is_app && cr.number_of_direct_reverse_deps == 0;
 
+    let growth = cr.traction_stats.map_or(1., |t| t.growth);
+    if !is_app_only {
+        score.frac("Growth", 2, (growth-1.).clamp(0., 1.));
+    }
+
     let newest = cr.versions.iter().max_by_key(|v| &v.created_at).expect("at least 1 ver?");
             // Assume higher versions, and especially patch versions, mean the crate is more mature
             // and needs fewer updates
@@ -308,13 +315,14 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs<'_>) -> Score {
                 Ok(ref ver) if ver.minor > 3 => 140,
                 _ => 80,
             };
-            let expected_update_interval = version_stability_interval.min(cr.versions.len() as i64 * 50) / if cr.is_nightly { 4 } else { 1 };
-            let age = (Utc::now() - newest.created_at).num_days();
-            let days_past_expiration_date = (age - expected_update_interval).max(0);
+            let expected_update_interval = version_stability_interval.min(cr.versions.len() as u32 * 50) / if cr.is_nightly { 4 } else { 1 };
+            let age = (Utc::now() - newest.created_at).num_days().max(0) as u32;
+            let days_past_expiration_date = age.saturating_sub(expected_update_interval);
             // score decays for a ~year after the crate should have been updated
             let decay_days = expected_update_interval/2 + if cr.is_nightly { 30 } else if is_app_only {300} else {200};
-            let freshness_score = (decay_days - days_past_expiration_date).max(0) as f64 / (decay_days as f64);
-    score.frac("Freshness of latest release", 10, freshness_score);
+            // multiply by growth - new traction saves old crates, loss of traction quickens demise
+            let freshness_score = (growth * decay_days.saturating_sub(days_past_expiration_date) as f64 / (decay_days as f64)).min(1.);
+    score.frac("Freshness of latest release", 14, freshness_score);
     score.frac("Freshness of deps", 10, cr.dependency_freshness.iter()
         .map(|d| 0.2 + d * 0.8) // one bad dep shouldn't totally kill the score
         .product::<f32>());
@@ -332,21 +340,36 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs<'_>) -> Score {
     score.score_f("Downloads", 5., pop);
     score.score_f("Downloads (cleaned)", 17., pop_cleaned);
 
+    // amplify by user growth
+    let active_users = if let Some(t) = cr.traction_stats {
+        t.growth.min(1.2) as f64 * t.active_users as f64
+    } else { 1. };
+
     // if it's new, it doesn't have to have many downloads.
     // if it's aging, it'd better have more users
-    score.has("Any traction", 2, (cr.downloads_per_month as f64 * freshness_score) > 1000.);
+    score.has("Any traction", 2, active_users > 1. || (cr.downloads_per_month as f64 * freshness_score) > 1000.);
+
 
     // Score added in an unusual way, because not being in Debian is not neccessarily a bad thing
     // (e.g. a crate may be for Windows or Mac only)
     if cr.is_in_debian {
-        score.has("Debian endorsement", 2, true);
+        score.has("Debian endorsement", 4, true);
     }
 
+    let rev_dep_ratio = cr.traction_stats.map_or(1., |t| t.external_usage);
+
     // Don't expect apps to have rev deps (omitting these entirely proprtionally increases importance of other factors)
-    let rev_deps_sqrt = (cr.number_of_direct_reverse_deps as f64).sqrt();
+    let rev_deps_sqrt = (rev_dep_ratio * cr.number_of_direct_reverse_deps as f64).sqrt();
+    let active_users_sqrt = active_users.sqrt();
+    // if has lots of users, override other scores
+    if active_users_sqrt > 8. {
+        let bonus = (active_users_sqrt - 8.).min(10.) + (active_users_sqrt.log2() - 3.);
+        score.score_f("Active users (bonus)", bonus, bonus);
+    }
     if !is_app_only {
+        score.score_f("Active users", 8., active_users_sqrt);
         score.score_f("Direct rev deps", 10., rev_deps_sqrt);
-        let indirect = 1. + cr.number_of_indirect_reverse_optional_deps as f64 / 4.;
+        let indirect = 1. + (rev_dep_ratio * cr.number_of_indirect_reverse_optional_deps as f64) / 4.;
         score.score_f("Indirect rev deps", 6., indirect.log2());
 
     }
@@ -371,7 +394,7 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs<'_>) -> Score {
 #[derive(Debug)]
 pub struct OverallScoreInputs {
     // ratio of peak active users to current active users (1.0 = everyone active, 0.0 = all dead)
-    pub former_glory: Option<f64>,
+    pub former_glory: f64,
     pub is_proc_macro: bool,
     pub is_sys: bool,
     pub is_sub_component: bool,
@@ -385,11 +408,12 @@ pub struct OverallScoreInputs {
 }
 
 pub fn combined_score(base_score: Score, temp_score: Score, f: &OverallScoreInputs) -> f64 {
-    let mut score = (base_score.total() + temp_score.total()) * 0.5;
+    let base_score = base_score.total();
+    let temp_score = temp_score.total();
+    let excels = base_score.max(temp_score);
+    let mut score = base_score * 0.4 + temp_score * 0.5 + excels * 0.1;
 
-    if let Some(former_glory) = f.former_glory {
-        score *= former_glory;
-    }
+    score *= f.former_glory;
 
     // there's usually a non-macro/non-sys sibling
     if f.is_proc_macro || f.is_sys {

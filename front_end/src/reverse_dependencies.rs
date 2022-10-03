@@ -68,16 +68,19 @@ pub(crate) struct DlRow {
 
 pub struct ChangesEntry {
     pub running_total: u32,
+    pub users_total: u16,
     pub added: u32,
     pub removed: u32,
 
     pub width: u16,
     pub running_totals_height: u16,
+    pub users_totals_height: u16,
     pub added_height: u16,
     pub removed_height: u16,
     pub year: u16,
 
     pub label_inside: bool,
+    pub users_label_inside: bool,
 }
 
 impl<'a> CratePageRevDeps<'a> {
@@ -246,6 +249,7 @@ impl<'a> CratePageRevDeps<'a> {
     /// entries + year and colspan
     pub fn changes_graph(&self) -> Option<(Vec<ChangesEntry>, Vec<(u16, u16)>)> {
         let total_max = self.changes.iter().map(|c| c.running_total()).max().unwrap_or(0).max(1);
+        let users_total_max = self.changes.iter().map(|c| c.users_total).max().unwrap_or(0).max(1);
 
         let good_data = (self.changes.len() >= 12 && total_max >= 15) || (self.changes.len() >= 6 && total_max >= 100);
         if !good_data {
@@ -261,17 +265,21 @@ impl<'a> CratePageRevDeps<'a> {
         let entries: Vec<_> = self.changes.iter().map(|ch| {
             let removed = ch.removed + ch.expired;
             let running_totals_height = (ch.running_total() * totals_chart_height) as f64 / total_max.max(50) as f64;
+            let users_totals_height = (ch.users_total as u32 * totals_chart_height) as f64 / users_total_max.max(50) as f64;
             ChangesEntry {
                 running_total: ch.running_total(),
+                users_total: ch.users_total,
                 added: ch.added,
                 removed,
                 width,
                 running_totals_height: running_totals_height.round() as _,
+                users_totals_height: users_totals_height.round() as _,
                 added_height: (ch.added * adds_chart_height / added_removed_max) as _,
                 removed_height: (removed * adds_chart_height / added_removed_max) as _,
                 year: ch.year,
 
                 label_inside: ((ch.running_total() as f64).log10().ceil() * 5.8 + 7.) < running_totals_height,
+                users_label_inside: ((ch.users_total as f64).log10().ceil() * 5.8 + 7.) < users_totals_height,
             }
         }).collect();
 

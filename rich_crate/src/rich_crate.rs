@@ -73,3 +73,17 @@ impl DependerChangesMonthly {
         self.added_total - self.removed_total - self.expired_total
     }
 }
+
+
+#[derive(Debug, Copy, Clone)]
+pub struct TractionStats {
+    /// 1.0 = doing fine, 0 = abandoned
+    pub former_glory: f64,
+    /// 1.0 = real traction, 0 = internal crate
+    pub external_usage: f64,
+
+    /// current usage / previous quarter usage
+    pub growth: f64,
+
+    pub active_users: u16,
+}

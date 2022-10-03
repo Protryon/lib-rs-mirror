@@ -233,6 +233,7 @@ impl Reindexer {
 async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) -> Result<(usize, f64), anyhow::Error> {
     let crates = &self.crates;
 
+    let traction_stats = crates.traction_stats(all.origin()).await?;
     let has_verified_repository_link = crates.has_verified_repository_link(k).await;
     let advisories = crates.advisories_for_crate(k.origin());
     let semver: SemVer = k.version().parse()?;
@@ -325,6 +326,7 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
     let is_in_debian = self.deblist.has(k.short_name()).map_err(|e| log::error!("debcargo check: {}", e)).unwrap_or(false);
 
     let mut temp_inp = CrateTemporalInputs {
+        traction_stats,
         versions: all.versions(),
         is_app: k.is_app(),
         has_docs_rs: crates.has_docs_rs(k.origin(), k.short_name(), k.version()).await,
@@ -365,7 +367,7 @@ async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, rende
 
     let temp_score = ranking::crate_score_temporal(&temp_inp);
     let overall = OverallScoreInputs {
-        former_glory: crates.former_glory(all.origin()).await?.map(|(f,_)| f),
+        former_glory: traction_stats.map_or(1., |t| t.former_glory),
         is_proc_macro: k.is_proc_macro(),
         is_sys: k.is_sys(),
         is_sub_component: crates.is_sub_component(k).await,

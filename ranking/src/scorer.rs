@@ -29,6 +29,7 @@ impl Score {
     }
 
     /// Add `max_score` * `n` where n is in 0..1
+    #[track_caller]
     pub fn frac(&mut self, for_what: &'static str, max_score: u32, n: impl Into<f64>) -> ScoreAdj<'_> {
         let n = n.into();
         assert!(n >= 0.);

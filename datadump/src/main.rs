@@ -369,6 +369,7 @@ struct DepUse {
     start_date: MiniDate,
     end_date: MiniDate,
     expired: bool,
+    by_crate_id: CrateId,
 }
 
 #[derive(Default)]
@@ -443,7 +444,7 @@ fn index_active_rev_dependencies(crates: &CratesMap, versions: &VersionsMap, dep
                     // libcpocalypse semver trick - not relevant
                     continue;
                 }
-                let e = over_time.entry(dep_crate_id).or_insert(DepUse {start_date: release_date, end_date, expired});
+                let e = over_time.entry(dep_crate_id).or_insert(DepUse {start_date: release_date, end_date, expired, by_crate_id: *crate_id});
                 if e.end_date < end_date {
                     e.end_date = end_date;
                     e.expired = expired;
@@ -457,21 +458,21 @@ fn index_active_rev_dependencies(crates: &CratesMap, versions: &VersionsMap, dep
     }
 
     let today = MiniDate::new(Utc::today());
-    for (crate_id, uses) in deps_changes {
-        let name = crates.get(&crate_id).expect("bork crate");
+    for (dep_crate_id, uses) in deps_changes {
         let mut by_day = HashMap::with_capacity(uses.len() * 2);
-        let owners = owners.get(&crate_id).map(Vec::as_slice).unwrap_or_default();
-        for DepUse {start_date, end_date, expired} in uses {
+        for DepUse {start_date, end_date, expired, by_crate_id} in uses {
             let start_use = by_day.entry(start_date).or_insert_with(DepChangeAggregator::default);
             start_use.added += 1;
+            // owners are supposed to add up to 1, so that a one crate with lots of owners doesn't create lots of users, only one "user"
+            let owners = owners.get(&by_crate_id).map(Vec::as_slice).unwrap_or_default();
+            let per_owner_weight = 1. / owners.len() as f32;
             for o in owners {
-                // owners are supposed to add up to 1, so that a one crate with lots of owners doesn't create lots of users, only one "user"
-                *start_use.by_owner.entry(o.owner_id).or_default() += 1. / owners.len() as f32;
+                *start_use.by_owner.entry(o.owner_id).or_default() += per_owner_weight;
             }
             if end_date <= today {
                 let e = by_day.entry(end_date).or_insert_with(DepChangeAggregator::default);
                 for o in owners {
-                    *e.by_owner.entry(o.owner_id).or_default() -= 1. / owners.len() as f32;
+                    *e.by_owner.entry(o.owner_id).or_default() -= per_owner_weight;
                 }
                 if expired {
                     e.expired += 1;
@@ -483,16 +484,21 @@ fn index_active_rev_dependencies(crates: &CratesMap, versions: &VersionsMap, dep
         let mut by_day: Vec<_> = by_day.into_iter().collect();
         by_day.sort_unstable_by_key(|a| a.0);
 
-        let mut users_aggregate = HashMap::<u32, f32>::new();
+        let crates_own_owners: HashSet<_> = owners.get(&dep_crate_id).map(Vec::as_slice).unwrap_or_default().iter().map(|o| o.owner_id).collect();
+        let mut users_aggregate = HashMap::<u32, f64>::new();
         let deps_by_day = by_day.into_iter().map(|(at, DepChangeAggregator { added, removed, expired, by_owner })| {
             for (owner_id, net_change) in by_owner {
-                *users_aggregate.entry(owner_id).or_default() += net_change;
+                if crates_own_owners.contains(&owner_id) {
+                    continue;
+                }
+                *users_aggregate.entry(owner_id).or_default() += net_change as f64;
             }
             // one owner can't count as more than 1 user, but fraction of an owner is kept as a fraction (so many partial co-users add up to one real user)
-            let users_abs = users_aggregate.values().map(|&v| v.min(1.) as f64).sum::<f64>() as u16;
+            let users_abs = users_aggregate.values().map(|&v| v.min(1.)).sum::<f64>().ceil() as u16;
             DependerChanges { at, added, removed, expired, users_abs }
         }).collect::<Vec<_>>();
 
+        let name = crates.get(&dep_crate_id).expect("bork crate");
         let origin = Origin::from_crates_io_name(name);
         ksink.index_dependers_liveness_ranges(&origin, deps_by_day);
     }

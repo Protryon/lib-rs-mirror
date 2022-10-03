@@ -69,7 +69,7 @@ pub struct CratePage<'a> {
     is_build_or_dev: (bool, bool),
     handle: Handle,
     api_reference_url: Option<String>,
-    former_glory: Option<(f64, u32)>,
+    former_glory: f64,
     dependents_stats: Option<&'a RevDependencies>,
     related_crates: Vec<Origin>,
     ns_crates: Vec<ArcRichCrateVersion>,
@@ -143,12 +143,12 @@ impl<'a> CratePage<'a> {
         let top_category = top_category
             .and_then(|(top, slug)| CATEGORIES.from_slug(slug).0.last().map(|&c| (top, c)));
 
-        let (is_build_or_dev, dependents_stats, former_glory, top_keyword, all_contributors) = futures::try_join!(
+        let (is_build_or_dev, dependents_stats, traction_stats, top_keyword, all_contributors) = futures::try_join!(
             async { Ok(kitchen_sink.is_build_or_dev(ver.origin()).await?) },
             async {
                 Ok(kitchen_sink.crates_io_dependents_stats_of(all.origin()).await?)
             },
-            kitchen_sink.former_glory(all.origin()),
+            kitchen_sink.traction_stats(all.origin()),
             kitchen_sink.top_keyword(all),
             kitchen_sink.all_contributors(ver),
         )?;
@@ -177,7 +177,7 @@ impl<'a> CratePage<'a> {
             is_build_or_dev,
             handle: Handle::current(),
             api_reference_url,
-            former_glory,
+            former_glory: traction_stats.map(|t| t.former_glory).unwrap_or(1.),
             dependents_stats,
             related_crates,
             ns_crates,
@@ -243,7 +243,7 @@ impl<'a> CratePage<'a> {
         };
         let name_capital = self.ver.capitalized_name();
 
-        if self.ver.is_yanked() || self.former_glory.map_or(false, |(f, _)| f < 0.3) {
+        if self.ver.is_yanked() || self.former_glory < 0.3 {
             format!("{} {} [deprecated]", name_capital, self.ver.version())
         } else {
             format!("{} — {}", name_capital, kind)
@@ -260,7 +260,7 @@ impl<'a> CratePage<'a> {
             deps: d.runtime.def as u32 + d.runtime.opt as u32 + d.build.def as u32 + d.build.opt as u32 + d.dev as u32,
             direct: d.direct.all() as u32,
             name: d.rev_dep_names_default.iter().chain(d.rev_dep_names_optional.iter()).chain(d.rev_dep_names_dev.iter()).next(),
-            former_glory: self.former_glory.map(|(f, _)| f).unwrap_or(1.),
+            former_glory: self.former_glory,
         };
         if d.deps == 0 {
             return None;

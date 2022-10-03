@@ -45,6 +45,7 @@ pub use github_info::User;
 pub use github_info::UserOrg;
 pub use github_info::UserType;
 pub use rich_crate::DependerChangesMonthly;
+pub use rich_crate::TractionStats;
 pub use rich_crate::Edition;
 pub use rich_crate::Derived;
 pub use rich_crate::MaintenanceStatus;
@@ -534,9 +535,18 @@ impl KitchenSink {
 
         // apply some rank weight to downgrade spam, and pull main crates before their -sys or -derive
         for (origin, score) in &mut top {
-            *score *= 0.3 + self.crate_db.crate_rank(origin).await.unwrap_or(0.);
+            let (rank, traction) = futures::join!(
+                self.crate_db.crate_rank(origin),
+                self.traction_stats(origin),
+            );
+            *score *= 0.3 + rank.unwrap_or(0.);
+            if let Ok(Some(t)) = traction {
+                // it's easy to double if you had only 1 user
+                let growth_smoothed = 100. + t.growth.min(2.) * (1 + t.active_users).min(50) as f64;
+                *score *= growth_smoothed * t.growth.min(1.1) * t.external_usage * t.former_glory;
+            }
         }
-        top.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
+        top.sort_unstable_by(|a, b| b.1.total_cmp(&a.1));
 
         watch("knock_duplicates", self.knock_duplicates(&mut top)).await;
         top.truncate(top_n);
@@ -1786,11 +1796,11 @@ impl KitchenSink {
             None => return Ok(None),
         };
 
-        if let Some((former_glory, _)) = self.former_glory(&Origin::from_crates_io_name(crate_name)).await? {
-            if former_glory < 0.5 {
+        if let Some(s) = self.traction_stats(&Origin::from_crates_io_name(crate_name)).await? {
+            if s.former_glory < 0.5 {
                 lost_popularity = true;
             }
-            pop *= former_glory as f32;
+            pop *= s.former_glory as f32;
         }
         Ok(Some(VersionPopularity {
             lost_popularity, pop, matches_latest,
@@ -3245,13 +3255,12 @@ impl KitchenSink {
             return Ok(Vec::new());
         }
 
-        // We're going to use weirdo 30-day months, with excess going into december
-        // which makes data more even and pads the December's holiday drop a bit
         let mut by_month = HashMap::with_capacity(daily_changes.len());
         for d in &daily_changes {
-            let w = by_month.entry((d.at.y, (d.at.o / 30).min(11))).or_insert(DependerChangesMonthly {
-                year: d.at.y,
-                month0: (d.at.o/30).min(11),
+            let key = d.at.fake_month();
+            let w = by_month.entry(key).or_insert(DependerChangesMonthly {
+                year: key.0,
+                month0: key.1,
                 added: 0, added_total: 0,
                 removed: 0, removed_total: 0,
                 expired: 0, expired_total: 0,
@@ -3260,23 +3269,24 @@ impl KitchenSink {
             w.added += d.added as u32;
             w.removed += d.removed as u32;
             w.expired += d.expired as u32;
-            w.users_total = d.users_abs;
+            w.users_total = d.users_abs.into();
         }
 
         let first = &daily_changes[0];
         let last = daily_changes.last().unwrap();
-        let mut curr = (first.at.y, (first.at.o / 30).min(11));
-        let end = (last.at.y, (last.at.o / 30).min(11));
+        let mut curr = first.at.fake_month();
+        let end = last.at.fake_month();
         let mut monthly = Vec::with_capacity(by_month.len());
         let mut added_total = 0;
         let mut removed_total = 0;
         let mut expired_total = 0;
+        let mut last_users_total = 0;
         while curr <= end {
             let mut e = by_month.get(&curr).copied().unwrap_or(DependerChangesMonthly {
                 year: curr.0, month0: curr.1,
                 added: 0, removed: 0, expired: 0,
                 added_total: 0, removed_total: 0, expired_total: 0,
-                users_total: 0,
+                users_total: last_users_total,
             });
             added_total += e.added;
             expired_total += e.expired;
@@ -3284,7 +3294,7 @@ impl KitchenSink {
             e.added_total = added_total;
             e.expired_total = expired_total;
             e.removed_total = removed_total;
-            e.users_total = e.users_total;
+            last_users_total = e.users_total;
             monthly.push(e);
             curr.1 += 1;
             if curr.1 > 11 {
@@ -3300,7 +3310,7 @@ impl KitchenSink {
     /// < 0.3 - dying
     ///
     /// And returns number of active direct deps
-    pub async fn former_glory(&self, origin: &Origin) -> CResult<Option<(f64, u32)>> {
+    pub async fn traction_stats(&self, origin: &Origin) -> CResult<Option<TractionStats>> {
         let mut direct_rev_deps = 0;
         let mut indirect_reverse_optional_deps = 0;
         if let Some(deps) = self.crates_io_dependents_stats_of(origin).await? {
@@ -3312,27 +3322,52 @@ impl KitchenSink {
 
         let depender_changes = self.depender_changes(origin)?;
         if let Some(current_active) = depender_changes.last() {
-            let peak_active = depender_changes.iter().map(|m| m.running_total()).max().unwrap_or(0);
+            let peak_active_users = depender_changes.iter().map(|m| m.users_total).max().unwrap_or(0);
+            let current_active_users = current_active.users_total;
+            let current_active_crates = current_active.running_total();
+
             // laplace smooth unpopular crates
-            let min_relevant_dependers = 15;
-            let former_glory = 1f64.min((current_active.running_total() + min_relevant_dependers + 1) as f64 / (peak_active + min_relevant_dependers) as f64);
+            let min_relevant_users = 10;
+            let mut former_glory = 1f64.min((current_active_users + min_relevant_users + 1) as f64 / (peak_active_users + min_relevant_users) as f64);
 
             // If a crate is used mostly indirectly, it matters less whether it's losing direct users
             let indirect_to_direct_ratio = 1f64.min((direct_rev_deps * 3) as f64 / indirect_reverse_optional_deps.max(1) as f64);
             let indirect_to_direct_ratio = (0.9 + indirect_to_direct_ratio) * 0.5;
-            let former_glory = former_glory * indirect_to_direct_ratio + (1. - indirect_to_direct_ratio);
+            former_glory = former_glory * indirect_to_direct_ratio + (1. - indirect_to_direct_ratio);
 
             // if it's being mostly removed, accelerate its demise. laplace smoothed for small crates
             let removals_fraction = 1. - (current_active.expired_total + 10) as f64 / (current_active.removed_total + current_active.expired_total + 10) as f64;
             let mut powf = 1.0 + removals_fraction * 0.7;
 
-            // if it's clearly declining, accelerate its demise
-            if let Some(last_quarter) = depender_changes.get(depender_changes.len().saturating_sub(3)) {
-                if last_quarter.running_total() > current_active.running_total() {
+            let mut growth = 1.0;
+
+            // compare to last quarter, smoothed
+            let prev_sample = depender_changes.len().saturating_sub(6);
+            let prev_sample = prev_sample..prev_sample+2;
+            let curr_sample = depender_changes.len().saturating_sub(2);
+            let curr_sample = curr_sample..curr_sample+2;
+            if let (Some(prev), Some(curr)) = (depender_changes.get(prev_sample), depender_changes.get(curr_sample)) {
+                let prev = prev[0].users_total + prev[1].users_total;
+                let curr = curr[0].users_total + curr[1].users_total;
+
+                growth = (curr + 5) as f64 / (prev + 5) as f64;
+
+                // if it's clearly declining, accelerate its demise
+                if prev > curr + 2 {
                     powf += 0.5;
                 }
             }
-            Ok(Some((former_glory.powf(powf), current_active.running_total())))
+
+            // if the crate has lots of other crates using them, but they're all the same user, that looks spammy and isn't real traction
+            let external_user_ratio = ((current_active_users.saturating_sub(2) + 5) as f64 * 1.6 / (current_active_crates.saturating_sub(5) + 5) as f64).powf(1.1);
+            // but if a crate is mainstream-popular it can do whatever
+            let external_usage = external_user_ratio.max(current_active_users as f64 /400.).min(1.);
+            Ok(Some(TractionStats {
+                former_glory: former_glory.powf(powf),
+                external_usage,
+                growth,
+                active_users: current_active_users,
+            }))
         } else {
             Ok(None)
         }
@@ -3728,7 +3763,6 @@ impl MiniDate {
         }
     }
 
-
     /// Screw leap years
     pub fn days_later(self, days: i32) -> Self {
         let n = self.y as i32 * 365 + self.o as i32 + days;
@@ -3742,6 +3776,12 @@ impl MiniDate {
     pub fn half_way(self, other: Self) -> Self {
         let diff = (other.y as i32 - self.y as i32) * 365 + (other.o as i32 - self.o as i32);
         self.days_later(diff / 2)
+    }
+
+    // We're going to use weirdo 30-day months, with excess going into december
+    // which makes data more even and pads the December's holiday drop a bit
+    pub fn fake_month(&self) -> (u16, u16) {
+        (self.y, (self.o / 30).min(11))
     }
 }
 

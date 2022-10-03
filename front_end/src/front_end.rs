@@ -274,8 +274,14 @@ pub async fn render_trending_crates(out: &mut impl Write, kitchen_sink: &Kitchen
     Ok(())
 }
 
-pub async fn render_debug_page(out: &mut impl Write, all: RichCrate, kitchen_sink: &KitchenSink) -> Result<(), anyhow::Error> {
+pub async fn render_debug_page(out: &mut impl Write, kitchen_sink: &KitchenSink) -> Result<(), anyhow::Error> {
+
+    Ok(())
+}
+
+pub async fn render_compat_page(out: &mut impl Write, all: RichCrate, kitchen_sink: &KitchenSink) -> Result<(), anyhow::Error> {
     let mut rustc_versions = HashSet::new();
+    rustc_versions.insert(60);
     rustc_versions.insert(55);
     rustc_versions.insert(50);
     rustc_versions.insert(45);
@@ -291,7 +297,7 @@ pub async fn render_debug_page(out: &mut impl Write, all: RichCrate, kitchen_sin
 
     let mut rustc_versions = rustc_versions.into_iter().collect::<Vec<u16>>();
     rustc_versions.sort_unstable();
-    templates::debug(out, (rustc_versions, by_crate_ver))?;
+    templates::compat(out, (rustc_versions, by_crate_ver))?;
     Ok(())
 }
 

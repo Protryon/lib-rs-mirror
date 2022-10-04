@@ -5,6 +5,7 @@
 //! because the template engine Ructe doesn't support
 //! complex expressions in the templates.
 
+use rich_crate::Origin;
 use ahash::HashSetExt;
 mod all_versions;
 mod author_page;
@@ -26,6 +27,7 @@ pub use crate::search_page::*;
 pub use crate::global_stats::*;
 use futures::future::try_join_all;
 use kitchen_sink::CrateOwnerRow;
+use kitchen_sink::CrateOwners;
 use maintainer_dashboard::MaintainerDashboard;
 use crate::author_page::*;
 use crate::crate_page::*;
@@ -274,8 +276,23 @@ pub async fn render_trending_crates(out: &mut impl Write, kitchen_sink: &Kitchen
     Ok(())
 }
 
-pub async fn render_debug_page(out: &mut impl Write, kitchen_sink: &KitchenSink) -> Result<(), anyhow::Error> {
+pub async fn render_debug_page(out: &mut impl Write, kitchen_sink: &KitchenSink, origin: &Origin) -> Result<(), anyhow::Error> {
 
+    let t = kitchen_sink.traction_stats(origin).await?;
+    let r = kitchen_sink.crate_ranking_for_builder(origin).await?;
+    let dl = kitchen_sink.downloads_per_month_or_equivalent(origin).await?.unwrap_or(0);
+    let dep = kitchen_sink.crates_io_dependents_stats_of(origin).await?;
+    let owners = kitchen_sink.crate_owners(origin, CrateOwners::All).await?;
+
+    writeln!(out, "<pre>{t:#?}
+rank: {r}
+dl: {dl}
+{dep:#?}
+").unwrap();
+    for o in owners {
+        writeln!(out, "{o:?}").unwrap();
+    }
+    write!(out, "</pre>").unwrap();
     Ok(())
 }
 

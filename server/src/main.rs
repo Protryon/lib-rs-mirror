@@ -282,6 +282,7 @@ async fn run_server(rt: Handle) -> Result<(), anyhow::Error> {
             .route("/users/{author}", web::get().to(handle_author_redirect))
             .route("/install/{crate:.*}", web::get().to(handle_install))
             .route("/compat/{crate:.*}", web::get().to(handle_compat))
+            .route("/debug/{crate:.*}", web::get().to(handle_debug))
             .route("/{host}/{owner}/{repo}/{crate}", web::get().to(handle_repo_crate))
             .route("/{host}/{owner}/{repo}/{crate}/versions", web::get().to(handle_repo_crate_all_versions))
             .route("/atom.xml", web::get().to(handle_feed))
@@ -626,6 +627,22 @@ async fn handle_compat(req: HttpRequest) -> Result<HttpResponse, ServerError> {
         let all = crates.rich_crate_async(&origin).await?;
         let mut page: Vec<u8> = Vec::with_capacity(32000);
         front_end::render_compat_page(&mut page, all, &crates).await?;
+        Ok(page)
+    }).await?;
+    Ok(HttpResponse::Ok()
+        .content_type("text/html;charset=UTF-8")
+        .insert_header(("Cache-Control", "no-cache"))
+        .no_chunking(page.len() as u64)
+        .body(page))
+}
+
+async fn handle_debug(req: HttpRequest) -> Result<HttpResponse, ServerError> {
+    let origin = get_origin_from_subpath(req.match_info()).ok_or_else(|| anyhow!("boo"))?;
+    let state: &AServerState = req.app_data().expect("appdata");
+    let crates = state.crates.load();
+    let page = rt_run_timeout(&state.rt, "dbgcrate", 60, async move {
+        let mut page: Vec<u8> = Vec::with_capacity(32000);
+        front_end::render_debug_page(&mut page, &crates, &origin).await?;
         Ok(page)
     }).await?;
     Ok(HttpResponse::Ok()

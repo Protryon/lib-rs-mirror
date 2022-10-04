@@ -80,7 +80,7 @@ const SOURCEGRAPH_SPAMMED: &[&str] = &[
     "tokei", "rs-es", "rusp", "snailquote", "sql_lexer", "rusoto", "cobs",
 ];
 
-const NUM_CRATES: usize = 42000;
+const NUM_CRATES: usize = 100_000;
 type BoxErr = Box<dyn std::error::Error + Sync + Send>;
 
 #[tokio::main]
@@ -379,7 +379,7 @@ pub struct DepChangeAggregator {
     pub removed: u16,
     /// Crate has this dependnecy, but is not active any more
     pub expired: u16,
-    pub by_owner: HashMap<OwnerId, f32>,
+    pub by_owner: HashMap<(u32, u8), f32>, // owner id, owner kind
 }
 
 /// Direct reverse dependencies, but with release dates (when first seen or last used)
@@ -467,12 +467,12 @@ fn index_active_rev_dependencies(crates: &CratesMap, versions: &VersionsMap, dep
             let owners = owners.get(&by_crate_id).map(Vec::as_slice).unwrap_or_default();
             let per_owner_weight = 1. / owners.len() as f32;
             for o in owners {
-                *start_use.by_owner.entry(o.owner_id).or_default() += per_owner_weight;
+                *start_use.by_owner.entry((o.owner_id, o.owner_kind)).or_default() += per_owner_weight;
             }
             if end_date <= today {
                 let e = by_day.entry(end_date).or_insert_with(DepChangeAggregator::default);
                 for o in owners {
-                    *e.by_owner.entry(o.owner_id).or_default() -= per_owner_weight;
+                    *e.by_owner.entry(((o.owner_id, o.owner_kind))).or_default() -= per_owner_weight;
                 }
                 if expired {
                     e.expired += 1;
@@ -484,8 +484,11 @@ fn index_active_rev_dependencies(crates: &CratesMap, versions: &VersionsMap, dep
         let mut by_day: Vec<_> = by_day.into_iter().collect();
         by_day.sort_unstable_by_key(|a| a.0);
 
-        let crates_own_owners: HashSet<_> = owners.get(&dep_crate_id).map(Vec::as_slice).unwrap_or_default().iter().map(|o| o.owner_id).collect();
-        let mut users_aggregate = HashMap::<u32, f64>::new();
+        let crates_own_owners: HashSet<_> = owners.get(&dep_crate_id).map(Vec::as_slice).unwrap_or_default()
+            .iter().map(|o| (o.owner_id, o.owner_kind))
+            .chain([(362, 1), (21274, 0)]) // rust-bus doesn't count
+            .collect();
+        let mut users_aggregate = HashMap::<(u32, u8), f64>::new();
         let deps_by_day = by_day.into_iter().map(|(at, DepChangeAggregator { added, removed, expired, by_owner })| {
             for (owner_id, net_change) in by_owner {
                 if crates_own_owners.contains(&owner_id) {
@@ -514,8 +517,8 @@ fn process_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users:
         let mut owners: Vec<_> = owners
             .into_iter()
             .filter_map(|o| {
-                let invited_by_github_id = o.created_by_id.and_then(|id| users.get(&id).and_then(|u| u.github_id.try_into().ok())
-                    .or_else(|| teams.get(&id).map(|t| t.github_id)));
+                // teams can't invite users
+                let invited_by_github_id = o.created_by_id.and_then(|id| users.get(&id).and_then(|u| u.github_id.try_into().ok()));
                 let mut o = match o.owner_kind {
                     0 => {
                         let u = users.get(&o.owner_id).expect("owner consistency");
@@ -584,8 +587,8 @@ struct CrateOwnerRow {
     crate_id: CrateId,
     #[serde(deserialize_with = "date_fudge")]
     created_at: DateTime<Utc>,
-    created_by_id: Option<OwnerId>,
-    owner_id: OwnerId,
+    created_by_id: Option<UserId>,
+    owner_id: u32,
     owner_kind: u8,
 }
 
@@ -625,8 +628,8 @@ struct TeamRow {
     name: SmolStr,  // human str
 }
 
-type OwnerId = u32;
-type Teams = HashMap<OwnerId, TeamRow>;
+type TeamId = u32;
+type Teams = HashMap<TeamId, TeamRow>;
 
 #[inline(never)]
 fn parse_teams(file: impl Read) -> Result<Teams, BoxErr> {
@@ -645,11 +648,12 @@ struct UserRow {
     avatar: Box<str>,
     github_id: i32, // there is -1 :(
     login: SmolStr,
-    id: OwnerId,
+    id: UserId,
     name: SmolStr,
 }
 
-type Users = HashMap<OwnerId, UserRow>;
+type UserId = u32;
+type Users = HashMap<UserId, UserRow>;
 
 #[inline(never)]
 fn parse_users(file: impl Read) -> Result<Users, BoxErr> {

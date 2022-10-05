@@ -863,12 +863,9 @@ impl KitchenSink {
         }).await?
     }
 
-    #[inline]
-    pub async fn downloads_per_month(&self, origin: &Origin) -> KResult<Option<usize>> {
+    fn downloads_per_month_cached(&self, origin: &Origin, mut now: Date<Utc>) -> KResult<Option<usize>> {
         Ok(match origin {
             Origin::CratesIo(name) => {
-                let mut now = Utc::today();
-
                 let mut curr_year = now.year() as u16;
                 let mut summed_days = self.summed_year_downloads(name, curr_year)?;
 
@@ -892,6 +889,21 @@ impl KitchenSink {
                     total += summed_days[day_of_year] as usize;
                 }
                 if total > 0 {
+                    Some(total)
+                } else {
+                    None
+                }
+            },
+            _ => None,
+        })
+    }
+
+    #[inline]
+    pub async fn downloads_per_month(&self, origin: &Origin) -> KResult<Option<usize>> {
+        Ok(match origin {
+            Origin::CratesIo(name) => {
+                let now = Utc::today();
+                if let Some(total) = self.downloads_per_month_cached(origin, now)? {
                     return Ok(Some(total));
                 }
                 // Downloads are scraped daily, so <1 day crates need a fallback
@@ -3323,61 +3335,59 @@ impl KitchenSink {
                 .max(deps.dev as u32)
                 .max(deps.build.def as u32 + deps.build.opt as u32);
         }
+        // If a crate is used mostly indirectly, it matters less whether it's losing direct users
+        let indirect_to_direct_ratio = 1f64.min((direct_rev_deps * 3) as f64 / indirect_reverse_optional_deps.max(1) as f64);
+        let indirect_to_direct_ratio = (0.9 + indirect_to_direct_ratio) * 0.5;
 
         let depender_changes = self.depender_changes(origin)?;
-        if let Some(current_active) = depender_changes.last() {
-            // smooth spikes out
-            let peak_active_users = depender_changes.windows(2)
-                .map(|m| m[0].users_total + m[1].users_total).max().unwrap_or(0) / 2;
+        Ok(Self::traction_stats_for_changes(&depender_changes, indirect_to_direct_ratio))
+    }
 
-            let current_active_users = current_active.users_total;
-            let current_active_crates = current_active.running_total();
 
-            // laplace smooth unpopular crates
-            let min_relevant_users = 10;
-            let mut former_glory = 1f64.min((current_active_users + min_relevant_users + 1) as f64 / (peak_active_users + min_relevant_users) as f64);
+    #[inline]
+    fn traction_stats_for_changes(depender_changes: &[DependerChangesMonthly], indirect_to_direct_ratio: f64) -> Option<TractionStats> {
+        let current_active = depender_changes.last()?;
 
-            // If a crate is used mostly indirectly, it matters less whether it's losing direct users
-            let indirect_to_direct_ratio = 1f64.min((direct_rev_deps * 3) as f64 / indirect_reverse_optional_deps.max(1) as f64);
-            let indirect_to_direct_ratio = (0.9 + indirect_to_direct_ratio) * 0.5;
-            former_glory = former_glory * indirect_to_direct_ratio + (1. - indirect_to_direct_ratio);
+        // smooth spikes out
+        let peak_active_users = depender_changes.windows(2)
+            .map(|m| m[0].users_total + m[1].users_total).max().unwrap_or(0) / 2;
+        let current_active_users = current_active.users_total;
+        let current_active_crates = current_active.running_total();
+        // laplace smooth unpopular crates
+        let min_relevant_users = 10;
+        let mut former_glory = 1f64.min((current_active_users + min_relevant_users + 1) as f64 / (peak_active_users + min_relevant_users) as f64);
 
-            // if it's being mostly removed, accelerate its demise. laplace smoothed for small crates
-            let removals_fraction = 1. - (current_active.expired_total + 10) as f64 / (current_active.removed_total + current_active.expired_total + 10) as f64;
-            let mut powf = 1.0 + removals_fraction * 0.7;
+        former_glory = former_glory * indirect_to_direct_ratio + (1. - indirect_to_direct_ratio);
+        // if it's being mostly removed, accelerate its demise. laplace smoothed for small crates
+        let removals_fraction = 1. - (current_active.expired_total + 10) as f64 / (current_active.removed_total + current_active.expired_total + 10) as f64;
+        let mut powf = 1.0 + removals_fraction * 0.7;
+        let mut growth = 1.0;
+        // compare to last quarter, smoothed
+        let prev_sample = depender_changes.len().saturating_sub(6);
+        let prev_sample = prev_sample..prev_sample+2;
+        let curr_sample = depender_changes.len().saturating_sub(2);
+        let curr_sample = curr_sample..curr_sample+2;
+        if let (Some(prev), Some(curr)) = (depender_changes.get(prev_sample), depender_changes.get(curr_sample)) {
+            let prev = prev[0].users_total + prev[1].users_total;
+            let curr = curr[0].users_total + curr[1].users_total;
 
-            let mut growth = 1.0;
+            growth = (curr + 15) as f64 / (prev + 15) as f64;
 
-            // compare to last quarter, smoothed
-            let prev_sample = depender_changes.len().saturating_sub(6);
-            let prev_sample = prev_sample..prev_sample+2;
-            let curr_sample = depender_changes.len().saturating_sub(2);
-            let curr_sample = curr_sample..curr_sample+2;
-            if let (Some(prev), Some(curr)) = (depender_changes.get(prev_sample), depender_changes.get(curr_sample)) {
-                let prev = prev[0].users_total + prev[1].users_total;
-                let curr = curr[0].users_total + curr[1].users_total;
-
-                growth = (curr + 15) as f64 / (prev + 15) as f64;
-
-                // if it's clearly declining, accelerate its demise
-                if prev > curr + 2 {
-                    powf += 0.5;
-                }
+            // if it's clearly declining, accelerate its demise
+            if prev > curr + 2 {
+                powf += 0.5;
             }
-
-            // if the crate has lots of other crates using them, but they're all the same user, that looks spammy and isn't real traction
-            let external_user_ratio = ((current_active_users.saturating_sub(2) + 5) as f64 * 1.6 / (current_active_crates.saturating_sub(5) + 5) as f64).powf(1.1);
-            // but if a crate is mainstream-popular it can do whatever
-            let external_usage = external_user_ratio.max(current_active_users as f64 /400.).min(1.);
-            Ok(Some(TractionStats {
-                former_glory: former_glory.powf(powf),
-                external_usage,
-                growth,
-                active_users: current_active_users,
-            }))
-        } else {
-            Ok(None)
         }
+        // if the crate has lots of other crates using them, but they're all the same user, that looks spammy and isn't real traction
+        let external_user_ratio = ((current_active_users.saturating_sub(2) + 5) as f64 * 1.6 / (current_active_crates.saturating_sub(5) + 5) as f64).powf(1.1);
+        // but if a crate is mainstream-popular it can do whatever
+        let external_usage = external_user_ratio.max(current_active_users as f64 /400.).min(1.);
+        Some(TractionStats {
+            former_glory: former_glory.powf(powf),
+            external_usage,
+            growth,
+            active_users: current_active_users,
+        })
     }
 
     pub async fn index_crates_io_crate_all_owners(&self, all_owners: Vec<(Origin, Vec<CrateOwner>)>) -> CResult<()> {

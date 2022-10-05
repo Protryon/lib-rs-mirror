@@ -281,8 +281,8 @@ impl<'a> CratePage<'a> {
         self.parent_crate.as_deref()
     }
 
-    pub fn render_markdown_str(&self, s: &str) -> templates::Html<String> {
-        templates::Html(self.markup.markdown_str(s, true, Some(self.ver.short_name())))
+    pub fn render_maybe_markdown_str(&self, s: &str) -> templates::Html<String> {
+        crate::render_maybe_markdown_str(s, &self.markup, true, Some(self.ver.short_name()))
     }
 
     pub fn render_lib_intro(&self) -> Option<templates::Html<String>> {

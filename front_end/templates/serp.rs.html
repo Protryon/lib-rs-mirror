@@ -89,7 +89,7 @@
                 <li>
                     <a href="@url.crate_by_origin(&c.origin)"><div class=h>
                         <h4>@if let Some((repo, _)) = c.origin.repo() {@repo.owner/}@c.crate_name</h4>
-                        <p class=desc>@p.render_markdown_str(&limit_text_len(&c.description, 180, 220))</p>
+                        <p class=desc>@p.render_maybe_markdown_str(&limit_text_len(&c.description, 180, 220))</p>
                     </div>
                     <div class=meta>
                         <span class="version @p.version_class(&c.version)"><span>@if let Origin::GitHub{..} = c.origin {GitHub } else {v}</span>@c.version</span>

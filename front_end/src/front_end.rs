@@ -399,13 +399,21 @@ impl<S: AsRef<str>> MyAsStr for Option<S> {
     }
 }
 
-pub(crate) fn date_now() -> String {
-    Utc::now().format("%Y-%m-%d").to_string()
+pub(crate) fn date_now() -> impl std::fmt::Display {
+    Utc::now().format("%Y-%m-%d")
 }
 
 /// Used to render descriptions
-pub(crate) fn render_markdown_str(s: &str, markup: &Renderer) -> templates::Html<String> {
-    templates::Html(markup.markdown_str(s, false, None))
+pub(crate) fn render_maybe_markdown_str(s: &str, markup: &Renderer, allow_links: bool, own_crate_name: Option<&str>) -> templates::Html<String> {
+    let looks_like_markdown = s.bytes().any(|b| b == b'`');
+    templates::Html(if looks_like_markdown {
+        markup.markdown_str(s, allow_links, own_crate_name)
+    } else {
+        use templates::ToHtml;
+        let mut buf = Vec::with_capacity(s.len() + 16);
+        s.to_html(&mut buf).unwrap();
+        String::from_utf8(buf).unwrap()
+    })
 }
 
 /// Nicely rounded number of downloads

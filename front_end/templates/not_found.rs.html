@@ -37,7 +37,7 @@
                 <li>
                     <a href="@url.crate_by_origin(&c.origin)"><div class=h>
                         <h4>@c.crate_name</h4>
-                        <p class=desc>@p.render_markdown_str(&c.description)</p>
+                        <p class=desc>@p.render_maybe_markdown_str(&c.description)</p>
                     </div>
                     <div class=meta>
                         <span class="version @p.version_class(&c.version)"><span>v</span>@c.version</span>

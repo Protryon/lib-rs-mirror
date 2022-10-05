@@ -242,7 +242,7 @@ impl<'a> AuthorPage<'a> {
         }
     }
 
-    pub fn render_markdown_str(&self, s: &str) -> templates::Html<String> {
+    pub fn render_maybe_markdown_str(&self, s: &str) -> templates::Html<String> {
         templates::Html(self.markup.markdown_str(s, true, None))
     }
 }

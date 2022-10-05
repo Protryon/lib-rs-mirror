@@ -1,7 +1,7 @@
 @use kitchen_sink::ArcRichCrateVersion;
 @use chrono_humanize::HumanTime;
 @use crate::limit_text_len;
-@use crate::render_markdown_str;
+@use crate::render_maybe_markdown_str;
 @use crate::templates::labels;
 @use crate::Urler;
 @use kitchen_sink::Origin;
@@ -16,7 +16,7 @@
             <div class=h>
                 <h4>@if let Some((repo, _)) = k.origin().repo() {@repo.owner/}@k.short_name()</h4>
                 @if let Some(desc) = k.description() {
-                  <p class=desc>@render_markdown_str(&limit_text_len(desc, 100, 120), markup)</p>
+                  <p class=desc>@render_maybe_markdown_str(&limit_text_len(desc, 100, 120), markup, false, None)</p>
                 }
             </div>
             <div class=meta>

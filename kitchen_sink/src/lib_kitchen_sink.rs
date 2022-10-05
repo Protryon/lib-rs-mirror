@@ -3264,6 +3264,47 @@ impl KitchenSink {
         Ok(())
     }
 
+    pub fn most_popular_crates(&self, limit: usize) -> CResult<Vec<(Origin, f64)>> {
+        let mut out = Vec::with_capacity(limit * 2);
+        let mut min_users = 30;
+        let mut min_users_adjusted = 20.;
+        self.depender_changes.for_each(|k, v| {
+            if let Some(last) = v.iter().max_by_key(|v| v.at) {
+                let users = last.users_abs;
+                if users > min_users {
+                    // a quick way to find dying crates
+                    let peak = v.iter().map(|m| m.users_abs).max().unwrap_or(0) + 1;
+                    let ratio = users as f64 / peak as f64;
+                    if ratio < 0.5 {
+                        return;
+                    }
+                    let adjusted = users as f64 * ratio;
+
+                    if adjusted > min_users_adjusted {
+                        out.push((Origin::from_str(k), users, adjusted));
+                        if out.len() == out.capacity() {
+                            out.sort_unstable_by(|a,b| b.2.total_cmp(&a.2));
+                            out.truncate(limit);
+                            let last = out.last().unwrap();
+                            min_users = last.1;
+                            min_users_adjusted = last.2;
+                        }
+                    }
+
+                }
+            }
+        })?;
+
+        // people expect sorting by downloads, even though it's meh, so compromise on half-users half-downloads
+        let now = Utc::today();
+        out.iter_mut().for_each(move |(origin, _, popularity)| {
+            *popularity *= self.downloads_per_month_cached(&origin, now).unwrap_or_default().unwrap_or(0) as f64;
+        });
+        out.sort_unstable_by(|a,b| b.2.total_cmp(&a.2));
+        out.truncate(limit);
+        Ok(out.into_iter().map(|(o, _, p)| (o,p)).collect())
+    }
+
     /// Direct reverse dependencies, but with release dates (when first seen or last used)
     pub fn depender_changes(&self, origin: &Origin) -> CResult<Vec<DependerChangesMonthly>> {
         let daily_changes = self.depender_changes.get(origin.to_str().as_str())?.unwrap_or_default();
@@ -3447,10 +3488,12 @@ impl KitchenSink {
         let res = cell.get_or_try_init(async {
             watch("topcc", async {
                 let (total_count, _) = self.category_crate_count(slug).await?;
-                let wanted_num = ((total_count / 2 + 25) / 50 * 50).max(100);
+                let wanted_num = ((total_count / 2 + 25) / 50 * 50).max(100).min(3000);
 
                 let mut crates = if slug == "uncategorized" {
                     self.crate_db.top_crates_uncategorized(wanted_num + 50).await?
+                } else if slug == "std" {
+                    self.most_popular_crates(250)?
                 } else {
                     self.crate_db.top_crates_in_category_partially_ranked(slug, wanted_num + 50).await?
                 };
@@ -3607,6 +3650,9 @@ impl KitchenSink {
     pub async fn category_crate_count(&self, slug: &str) -> Result<(u32, f64), KitchenSinkErr> {
         if slug == "uncategorized" {
             return Ok((300, 0.));
+        }
+        if slug == "std" {
+            return Ok((self.all_crates_io_crates().len() as u32, 0.));
         }
         self.category_crate_counts
             .get_or_init(async {match self.crate_db.category_crate_counts().await {

@@ -936,5 +936,16 @@ Crates that don't have enough metadata to be assigned to any category. Please fi
 """
 short-description = """
 Everything else goes here."""
-preference = 0.01
+preference = 0.0001
+obvious-keywords = []
+
+[std]
+name = "Most popular Rust libraries"
+title = "Top crates"
+description = """
+If Rust had a huge standard library, it would be like this.
+"""
+short-description = """
+Popularity contest."""
+preference = 0.0001
 obvious-keywords = []

@@ -3265,6 +3265,19 @@ impl KitchenSink {
     }
 
     pub fn most_popular_crates(&self, limit: usize) -> CResult<Vec<(Origin, f64)>> {
+        const EXCLUDED_FROM_STD_CATEGORY: &[&str] = &[
+            "crates.io:structopt", // in clap
+            "crates.io:serde_cbor", // dead
+            "crates.io:tempdir", // deprecated
+            "crates.io:serde_derive", // serde --features=derive
+            "crates.io:ansi_term", // unmaintained
+            "crates.io:openssl", // use ring or native-tls!
+            "crates.io:fxhash", // rustc-hash
+            "crates.io:getopts", // getting old now
+            "crates.io:sha-1", // dupe
+            "crates.io:md-5", // dupe
+        ];
+
         let mut out = Vec::with_capacity(limit * 2);
         let mut min_users = 30;
         let mut min_users_adjusted = 20.;
@@ -3281,6 +3294,10 @@ impl KitchenSink {
                     let adjusted = users as f64 * ratio;
 
                     if adjusted > min_users_adjusted {
+                        if EXCLUDED_FROM_STD_CATEGORY.contains(&&**k) {
+                            return;
+                        }
+
                         out.push((Origin::from_str(k), users, adjusted));
                         if out.len() == out.capacity() {
                             out.sort_unstable_by(|a,b| b.2.total_cmp(&a.2));
@@ -3362,26 +3379,52 @@ impl KitchenSink {
         Ok(monthly)
     }
 
-    /// 1.0 - still at its peak
-    /// < 1 - heading into obsolescence
-    /// < 0.3 - dying
-    ///
-    /// And returns number of active direct deps
     pub async fn traction_stats(&self, origin: &Origin) -> CResult<Option<TractionStats>> {
-        let mut direct_rev_deps = 0;
-        let mut indirect_reverse_optional_deps = 0;
-        if let Some(deps) = self.crates_io_dependents_stats_of(origin).await? {
-            direct_rev_deps = deps.direct.all();
-            indirect_reverse_optional_deps = (deps.runtime.def as u32 + deps.runtime.opt as u32)
-                .max(deps.dev as u32)
-                .max(deps.build.def as u32 + deps.build.opt as u32);
+        let (direct_rev_deps, mut res) = self.traction_stats_inner(origin).await?;
+
+        if let Some(res) = &mut res {
+            // intrenal crates used only/mainly by their parent never seem abandoned,
+            // because they never had many users to lose in the first place.
+            if direct_rev_deps > 0 && res.active_users < 5 {
+                if let Some(parent) = self.parent_crate(&*self.rich_crate_version_stale_is_ok(origin).await?).await {
+                    if let (_, Some(parent_res)) = self.traction_stats_inner(parent.origin()).await? {
+                        // if the sole user is dying, this crate is too
+                        let w = res.active_users as f64;
+                        if parent_res.former_glory < res.former_glory {
+                            res.former_glory = (res.former_glory * w + parent_res.former_glory) / (w + 1.);
+                        }
+                        if parent_res.growth < res.growth {
+                            res.growth = (res.growth * w + parent_res.growth) / (w + 1.);
+                        }
+                    }
+                }
+            }
         }
-        // If a crate is used mostly indirectly, it matters less whether it's losing direct users
+
+        Ok(res)
+    }
+
+    async fn traction_stats_inner(&self, origin: &Origin) -> CResult<(u32, Option<TractionStats>)> {
+        let (direct_rev_deps, indirect_to_direct_ratio) = self.indirect_to_direct_dep_ratio(origin).await?;
+        let depender_changes = self.depender_changes(origin)?;
+
+        Ok((direct_rev_deps, Self::traction_stats_for_changes(&depender_changes, indirect_to_direct_ratio)))
+    }
+
+    async fn indirect_to_direct_dep_ratio(&self, origin: &Origin) -> Result<(u32, f64), KitchenSinkErr> {
+        let deps = match self.crates_io_dependents_stats_of(origin).await? {
+            Some(d) => d,
+            None => return Ok((0, 0.9)),
+        };
+        let direct_rev_deps = deps.direct.all();
+
+        let indirect_reverse_optional_deps = (deps.runtime.def as u32 + deps.runtime.opt as u32)
+            .max(deps.dev as u32)
+            .max(deps.build.def as u32 + deps.build.opt as u32);
+
         let indirect_to_direct_ratio = 1f64.min((direct_rev_deps * 3) as f64 / indirect_reverse_optional_deps.max(1) as f64);
         let indirect_to_direct_ratio = (0.9 + indirect_to_direct_ratio) * 0.5;
-
-        let depender_changes = self.depender_changes(origin)?;
-        Ok(Self::traction_stats_for_changes(&depender_changes, indirect_to_direct_ratio))
+        Ok((direct_rev_deps, indirect_to_direct_ratio))
     }
 
 
@@ -3413,6 +3456,9 @@ impl KitchenSink {
             let curr = curr[0].users_total + curr[1].users_total;
 
             growth = (curr + 15) as f64 / (prev + 15) as f64;
+            if current_active_users == 0 {
+                growth = growth.min(1.); // having a blip last month isn't growth
+            }
 
             // if it's clearly declining, accelerate its demise
             if prev > curr + 2 {

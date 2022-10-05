@@ -77,8 +77,12 @@ impl DependerChangesMonthly {
 
 #[derive(Debug, Copy, Clone)]
 pub struct TractionStats {
-    /// 1.0 = doing fine, 0 = abandoned
+    /// 1.0 - still at its peak
+    /// < 1 - heading into obsolescence
+    /// < 0.3 - dying
+    ///
     pub former_glory: f64,
+
     /// 1.0 = real traction, 0 = internal crate
     pub external_usage: f64,
 

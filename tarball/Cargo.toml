@@ -6,7 +6,7 @@ publish = false
 
 [dependencies]
 anyhow = "1.0.65"
-cargo_toml = "0.12.1"
+cargo_toml = "0.13.0-alpha.0"
 crate_git_checkout = { path = "../crate_git_checkout", version = "0.4.7" }
 hex = { version = "0.4.3", features = ["serde"] }
 libflate = "1.2.0"

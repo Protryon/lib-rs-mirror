@@ -12,7 +12,7 @@ crates_io_client = { path = "../crates_io_client", version = "0.8.2" }
 render_readme = { path = "../render_readme", version = "0.7" }
 udedokei = { path = "../udedokei" }
 cargo_author = "1.0.6"
-cargo_toml = "0.12.1"
+cargo_toml = "0.13.0-alpha.0"
 repo_url = { path = "../repo_url" }
 semver = "1.0.14"
 parse_cfg = "2.0.0"

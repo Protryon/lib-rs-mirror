@@ -1178,8 +1178,7 @@ impl KitchenSink {
             if let Some(repo) = crates_io_krate.repository {
                 package.set_repository(Some(repo.into()));
             } else if package.homepage().map_or(false, |h| Repo::looks_like_repo_url(h)) {
-                #[allow(deprecated)]
-                let home = package.homepage.take();
+                let home = package.homepage.take().and_then(Option::from);
                 package.set_repository(home);
             }
         }
@@ -1423,9 +1422,9 @@ impl KitchenSink {
         let package = manifest.package.as_mut().expect("pkg");
         let eq = |a: &str, b: &str| -> bool { a.eq_ignore_ascii_case(b) };
 
-        let keywords = &package.keywords;
+        let keywords = package.keywords.as_ref().unwrap();
 
-        for cat in package.categories.iter_mut() {
+        for cat in package.categories.as_mut().unwrap().iter_mut() {
             if cat.as_bytes().iter().any(|c| c.is_ascii_uppercase()) {
                 *cat = cat.to_lowercase();
             }

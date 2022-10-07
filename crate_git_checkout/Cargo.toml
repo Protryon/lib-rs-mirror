@@ -11,7 +11,7 @@ path = "src/crate_git_checkout.rs"
 
 [dependencies]
 git2 = "0.15.0"
-cargo_toml = "0.12.1"
+cargo_toml = "0.13.0-alpha.0"
 render_readme = { path = "../render_readme" }
 repo_url = { path = "../repo_url" }
 urlencoding = "2.1.2"

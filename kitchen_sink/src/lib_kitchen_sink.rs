@@ -1267,7 +1267,7 @@ impl KitchenSink {
         if let Some(ref crate_repo) = maybe_repo {
             if let Some(ghrepo) = self.github_repo(crate_repo).await? {
                 if ghrepo.archived && meta.manifest.badges.maintenance.status == MaintenanceStatus::None {
-                    meta.manifest.badges.maintenance.status = MaintenanceStatus::AsIs; // FIXME: not exactly
+                    meta.manifest.badges.maintenance.status = MaintenanceStatus::AsIs;
                 }
                 if package.homepage().is_none() {
                     if let Some(url) = ghrepo.homepage {
@@ -1291,6 +1291,18 @@ impl KitchenSink {
                     github_description = ghrepo.description;
                 }
                 github_name = Some(ghrepo.name);
+            }
+        }
+
+        if meta.manifest.badges.maintenance.status != MaintenanceStatus::Deprecated {
+            let semver: SemVer = package.version().parse()?;
+            let advisories = self.advisories_for_crate(&origin);
+            let is_unmaintained = advisories.iter()
+                .filter(|a| !a.withdrawn() && a.versions.is_vulnerable(&semver))
+                .filter_map(|a| a.metadata.informational.as_ref())
+                .any(|a| a.is_unmaintained());
+            if is_unmaintained {
+                meta.manifest.badges.maintenance.status = MaintenanceStatus::AsIs;
             }
         }
 

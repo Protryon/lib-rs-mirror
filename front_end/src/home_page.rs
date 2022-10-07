@@ -28,9 +28,10 @@ use tokio::time::timeout_at;
 use tokio::time::Instant;
 
 /// Editorialize the category list a little
-const CATEGORY_RANK_ADJUST: [(&str, f64); 28] = [
+const CATEGORY_RANK_ADJUST: [(&str, f64); 29] = [
     ("asynchronous", 1.1),
     ("command-line-utilities", 1.4), // app downloads are naturally smaller
+    ("command-line-interface", 1.1),
     ("concurrency", 1.2),
     ("cryptocurrencies", 0.1),
     ("cryptography::cryptocurrencies", 0.1),
@@ -135,6 +136,10 @@ impl<'a> HomePage<'a> {
 
             let mut c = Vec::new();
             for (_, cat) in root.iter() {
+                if matches!(cat.slug.as_str(), "std" | "uncategorized" | "cryptography::cryptocurrencies") {
+                    continue;
+                }
+
                 if stopped() { return Vec::new(); }
                 // depth first - important!
                 let (sub, own_pop) = futures::join!(
@@ -197,11 +202,6 @@ impl<'a> HomePage<'a> {
             if let Some(pmh) = ranked.get_mut("development-tools::procedural-macro-helpers") {
                 pmh.0 /= 32;
             }
-
-            // move cryptocurrencies out of cryptography for the homepage
-            ranked.get_mut("cryptography").and_then(|(_, c)| c.sub.pop());
-            // this one isn't relevant either
-            ranked.remove("uncategorized");
 
             for &(slug, adjust) in CATEGORY_RANK_ADJUST.iter() {
                 if let Some(c) = ranked.get_mut(slug) {

@@ -1,4 +1,5 @@
 use ahash::HashSetExt;
+use kitchen_sink::MaintenanceStatus;
 use crate::templates;
 use crate::Page;
 use categories::Category;
@@ -40,7 +41,8 @@ impl<'a> CatPage<'a> {
             crates: futures::stream::iter(crates
                 .top_crates_in_category(&cat.slug).await?.iter().cloned())
                 .map(|o| async move {
-                    let c = match timeout_at(deadline, crates.rich_crate_version_stale_is_ok(&o)).await {
+                    let crate_timeout = Instant::now() + Duration::from_secs(5);
+                    let c = match timeout_at(deadline.min(crate_timeout), crates.rich_crate_version_stale_is_ok(&o)).await {
                         Ok(Ok(c)) => c,
                         Err(e) => {
                             eprintln!("Skipping in cat {:?} because timed out {}", o, e);
@@ -51,7 +53,7 @@ impl<'a> CatPage<'a> {
                             return None;
                         },
                     };
-                    if c.is_yanked() {
+                    if c.is_yanked() || c.maintenance() == MaintenanceStatus::Deprecated {
                         return None;
                     }
                     let d = match crates.downloads_per_month_or_equivalent(&o).await {

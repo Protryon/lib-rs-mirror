@@ -48,7 +48,8 @@ pub struct CrateFound {
     pub origin: Origin,
     pub crate_name: String,
     pub description: String,
-    pub keywords: Vec<String>,
+    pub keywords: Vec<Box<str>>,
+    pub keywords_normalized: Vec<Box<str>>,
     pub score: f32,
     pub relevance_score: f32,
     pub crate_base_score: f32,
@@ -140,18 +141,12 @@ impl CrateSearchIndex {
             let crate_name = take_string(doc.remove("crate_name"));
             let origin = Origin::from_str(take_string(doc.remove("origin")));
 
-            let mut kw_dedupe = HashSet::with_capacity(20);
-            let keywords = take_string(doc.remove("keywords"));
-            let keywords = keywords.split(", ").filter(|&k| !k.is_empty()).take(30)
-                .filter_map(|k| {
-                    let normalized = self.synonyms.normalize(k);
-                    if kw_dedupe.insert(normalized) {
-                        Some(normalized.to_string())
-                    } else {
-                        None
-                    }
-                })
-                .collect();
+            let keywords: Vec<_> = take_string(doc.remove("keywords")).split(", ").filter(|&k| !k.is_empty()).take(30).map(Box::from).collect();
+            let mut kw_dedupe = HashSet::new();
+            let keywords_normalized = keywords.iter().filter_map(|k| {
+                let normalized = self.synonyms.normalize(k);
+                kw_dedupe.insert(normalized).then(|| normalized.into())
+            }).collect();
 
             Ok(CrateFound {
                 crate_base_score: crate_base_score as f32,
@@ -160,6 +155,7 @@ impl CrateSearchIndex {
                 crate_name,
                 description: take_string(doc.remove("description")),
                 keywords,
+                keywords_normalized,
                 version: take_string(doc.remove("crate_version")),
                 monthly_downloads: if origin.is_crates_io() { take_int(doc.get("monthly_downloads")) } else { 0 },
                 origin,
@@ -210,7 +206,7 @@ impl CrateSearchIndex {
 
         // Make sure that there's at least one crate ranked high for each of the interesting keywords
         let mut interesting_crate_indices = dividing_keywords.iter().take(6).filter_map(|dk| {
-            docs.iter().position(|k| k.keywords.iter().any(|k| k == dk))
+            docs.iter().position(|k| k.keywords_normalized.iter().any(|k| &**k == dk))
         }).collect::<Vec<_>>();
         if docs.len() > 3 {
             interesting_crate_indices.extend([0,1,2]); // but keep top 3 results as they are
@@ -243,11 +239,11 @@ impl CrateSearchIndex {
         // bonus if keyword pair exists
         let mut dupes = HashSet::new();
         let mut keyword_sets = results.iter().enumerate().filter_map(|(i, found)| {
-                if !dupes.insert(&found.keywords) { // some crate families have all the same keywords, which is spammy and biases the results
+                if !dupes.insert(&found.keywords_normalized) { // some crate families have all the same keywords, which is spammy and biases the results
                     return None;
                 }
-                let k_set: HashSet<_> = found.keywords.iter()
-                    .map(|k| k.as_str())
+                let k_set: HashSet<_> = found.keywords_normalized.iter()
+                    .map(|k| k as &str)
                     .filter(|k| !query_keywords.contains(k))
                     .collect();
                 if skip_entire_results.iter().any(|&dealbreaker| k_set.contains(dealbreaker)) {

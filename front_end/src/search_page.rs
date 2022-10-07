@@ -92,11 +92,11 @@ impl SearchPage<'_> {
             .chain(Some(query)).collect();
         let mut counts = HashMap::with_capacity(64);
         for res in self.good_results.iter().chain(self.bad_results.iter()) {
-            for keyword in res.keywords.iter() {
-                if query_keywords.iter().any(|&qk| qk == keyword) {
+            for keyword in res.keywords_normalized.iter() {
+                if query_keywords.iter().any(|&qk| qk == &**keyword) {
                     continue;
                 }
-                let cnt = counts.entry(keyword.as_str()).or_insert((0u32, 0f32));
+                let cnt = counts.entry(keyword as &str).or_insert((0u32, 0f32));
                 cnt.0 += 1;
                 cnt.1 += res.score;
             }

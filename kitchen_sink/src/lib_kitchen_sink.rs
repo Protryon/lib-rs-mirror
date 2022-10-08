@@ -830,7 +830,7 @@ impl KitchenSink {
             CrateVersion {
                 num,
                 yanked: false,
-                updated_at: date.clone(),
+                updated_at: date,
                 created_at: date,
             }
         }).collect();
@@ -851,7 +851,7 @@ impl KitchenSink {
                     CrateVersion {
                         num: num.into(),
                         yanked: false,
-                        updated_at: date.clone(),
+                        updated_at: date,
                         created_at: date,
                     }
                 }).collect();
@@ -1177,7 +1177,7 @@ impl KitchenSink {
             // it may contain data from nowhere! https://github.com/rust-lang/crates.io/issues/1624
             if let Some(repo) = crates_io_krate.repository {
                 package.set_repository(Some(repo.into()));
-            } else if package.homepage().map_or(false, |h| Repo::looks_like_repo_url(h)) {
+            } else if package.homepage().map_or(false, Repo::looks_like_repo_url) {
                 let home = package.homepage.take().and_then(Option::from);
                 package.set_repository(home);
             }
@@ -1327,12 +1327,12 @@ impl KitchenSink {
             if let Some(ref lib) = meta.lib_file {
                 words.push(lib);
             }
-            if let Some(ref s) = package.description() {words.push(s);}
+            if let Some(s) = package.description() {words.push(s);}
             if let Some(ref s) = github_description {words.push(s);}
             if let Some(ref s) = github_name {words.push(s);}
-            if let Some(ref s) = package.homepage() {words.push(s);}
-            if let Some(ref s) = package.documentation() {words.push(s);}
-            if let Some(ref s) = package.repository() {words.push(s);}
+            if let Some(s) = package.homepage() {words.push(s);}
+            if let Some(s) = package.documentation() {words.push(s);}
+            if let Some(s) = package.repository() {words.push(s);}
 
             Self::capitalized_name(&package.name, words.into_iter())
         };
@@ -2804,20 +2804,17 @@ impl KitchenSink {
     pub async fn is_sub_component(&self, k: &RichCrateVersion) -> bool {
         let name = k.short_name();
         if let Some(pos) = name.rfind(|c: char| c == '-' || c == '_') {
-            match name.get(pos+1..) {
-                Some("core" | "shared" | "runtime" | "codegen" | "private" | "internals" | "internal" |
-                    "derive" | "macros" | "utils" | "util" | "lib" | "types" | "common" | "impl" | "fork" | "unofficial" | "hack") => {
-                    if let Some(parent_name) = name.get(..pos-1) {
-                        if Origin::try_from_crates_io_name(parent_name).map_or(false, |name| self.crate_exists(&name)) {
-                            // TODO: check if owners overlap?
-                            return true;
-                        }
-                    }
-                    if self.parent_crate_same_repo_unverified(k).await.is_some() {
+            if let Some("core" | "shared" | "runtime" | "codegen" | "private" | "internals" | "internal" |
+                    "derive" | "macros" | "utils" | "util" | "lib" | "types" | "common" | "impl" | "fork" | "unofficial" | "hack") = name.get(pos+1..) {
+                if let Some(parent_name) = name.get(..pos-1) {
+                    if Origin::try_from_crates_io_name(parent_name).map_or(false, |name| self.crate_exists(&name)) {
+                        // TODO: check if owners overlap?
                         return true;
                     }
-                },
-                _ => {},
+                }
+                if self.parent_crate_same_repo_unverified(k).await.is_some() {
+                    return true;
+                }
             }
         }
         false
@@ -2827,23 +2824,20 @@ impl KitchenSink {
     pub fn is_internal_crate(&self, k: &RichCrateVersion) -> bool {
         let name = k.short_name();
         if let Some(pos) = name.rfind(|c: char| c == '-' || c == '_') {
-            match name.get(pos+1..) {
-                Some("private" | "internals" | "internal" | "impl") => {
-                    if let Some(parent_name) = name.get(..pos-1) {
-                        if Origin::try_from_crates_io_name(parent_name).map_or(false, |name| self.crate_exists(&name)) {
-                            // TODO: check if owners overlap?
-                            return true;
-                        }
+            if let Some("private" | "internals" | "internal" | "impl") = name.get(pos+1..) {
+                if let Some(parent_name) = name.get(..pos-1) {
+                    if Origin::try_from_crates_io_name(parent_name).map_or(false, |name| self.crate_exists(&name)) {
+                        // TODO: check if owners overlap?
+                        return true;
                     }
-                },
-                _ => {},
+                }
             }
         }
         false
     }
 
     async fn cachebust_string_for_repo(&self, crate_repo: &Repo) -> Result<String, KitchenSinkErr> {
-        if stopped() {return Err(KitchenSinkErr::Stopped.into());}
+        if stopped() {return Err(KitchenSinkErr::Stopped);}
 
         Ok(self.crate_db.crates_in_repo(crate_repo).map_err(Arc::from).await?
             .into_iter()
@@ -3178,7 +3172,7 @@ impl KitchenSink {
         for (idx, a) in actions.into_iter().enumerate() {
             if let Some(o) = current_owners_by_login.get_mut(&a.user.login.to_ascii_lowercase()) {
                 if o.invited_at.as_ref().map_or(true, |l| l < &a.time) {
-                    o.invited_at = Some(a.time.clone());
+                    o.invited_at = Some(a.time);
                 }
                 if o.last_seen_at.as_ref().map_or(true, |l| l < &a.time) {
                     o.last_seen_at = Some(a.time);
@@ -3191,7 +3185,7 @@ impl KitchenSink {
                     name: a.user.name,
                     github_id: None,
                     avatar: a.user.avatar,
-                    last_seen_at: Some(a.time.clone()),
+                    last_seen_at: Some(a.time),
                     invited_at: Some(a.time),
                     invited_by_github_id: None,
                     // most recent action is assumed to be done by an owner,
@@ -3329,7 +3323,7 @@ impl KitchenSink {
         // people expect sorting by downloads, even though it's meh, so compromise on half-users half-downloads
         let now = Utc::today();
         out.iter_mut().for_each(move |(origin, _, popularity)| {
-            *popularity *= self.downloads_per_month_cached(&origin, now).unwrap_or_default().unwrap_or(0) as f64;
+            *popularity *= self.downloads_per_month_cached(origin, now).unwrap_or_default().unwrap_or(0) as f64;
         });
         out.sort_unstable_by(|a,b| b.2.total_cmp(&a.2));
         out.truncate(limit);
@@ -3357,7 +3351,7 @@ impl KitchenSink {
             w.added += d.added as u32;
             w.removed += d.removed as u32;
             w.expired += d.expired as u32;
-            w.users_total = d.users_abs.into();
+            w.users_total = d.users_abs;
         }
 
         let first = &daily_changes[0];

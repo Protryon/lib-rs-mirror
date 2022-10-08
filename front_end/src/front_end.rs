@@ -359,7 +359,7 @@ pub fn render_static_trusted_html(out: &mut impl Write, title: String, html: Str
     Ok(())
 }
 
-pub fn limit_text_len<'t>(text: &'t str, mut len_min: usize, mut len_max: usize) -> Cow<'t, str> {
+pub fn limit_text_len(text: &str, mut len_min: usize, mut len_max: usize) -> Cow<'_, str> {
     assert!(len_min <= len_max);
     if text.len() <= len_max {
         return text.into();

@@ -472,7 +472,7 @@ fn index_active_rev_dependencies(crates: &CratesMap, versions: &VersionsMap, dep
             if end_date <= today {
                 let e = by_day.entry(end_date).or_insert_with(DepChangeAggregator::default);
                 for o in owners {
-                    *e.by_owner.entry(((o.owner_id, o.owner_kind))).or_default() -= per_owner_weight;
+                    *e.by_owner.entry((o.owner_id, o.owner_kind)).or_default() -= per_owner_weight;
                 }
                 if expired {
                     e.expired += 1;

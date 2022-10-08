@@ -497,7 +497,7 @@ async fn handle_home(req: HttpRequest) -> Result<HttpResponse, ServerError> {
                 front_end::render_homepage(&mut page, &crates).await?;
                 minify_html(&mut page);
                 mark_server_still_alive(&state);
-                Ok::<_, anyhow::Error>((page, Some(Utc::now().into())))
+                Ok::<_, anyhow::Error>((page, Some(Utc::now())))
             })
         })
         .await?,

@@ -131,7 +131,7 @@ impl<T: Serialize + DeserializeOwned + Clone + Send, K: Serialize + DeserializeO
                     return Ok(inner);
                 }
                 drop(inner);
-                let _ = self.lock_for_write()?;
+                let _loads_data = self.lock_for_write()?;
             }
             Err(Error::Timeout)
         })

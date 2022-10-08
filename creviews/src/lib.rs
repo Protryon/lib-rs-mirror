@@ -24,7 +24,7 @@ impl Creviews {
     pub fn reviews_for_crate(&self, crate_name: &str) -> Result<Vec<Review>, Error> {
         let db = self.crev_local.load_db()?;
 
-        let mut reviews: Vec<_> = db.get_pkg_reviews_for_name("https://crates.io", crate_name).filter_map(|r| {
+        let mut reviews: Vec<_> = db.get_pkg_reviews_for_name("https://crates.io", crate_name).map(|r| {
             let (thoroughness, understanding, rating) = r
                 .review()
                 .map(|r| (r.thoroughness, r.understanding, r.rating))
@@ -47,7 +47,7 @@ impl Creviews {
                 });
             }
 
-            Some(Review {
+            Review {
                 author_id: from.id.to_string(),
                 author_url: db.lookup_url(&from.id).verified().map(|u| u.url.to_string()),
                 unmaintained: r.flags.unmaintained,
@@ -58,7 +58,7 @@ impl Creviews {
                 comment_markdown: r.comment.clone(),
                 date: r.common.date,
                 issues,
-            })
+            }
         }).collect();
 
         reviews.sort_by(|a, b| b.author_url.is_some().cmp(&a.author_url.is_some())

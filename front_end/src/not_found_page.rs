@@ -60,7 +60,7 @@ impl NotFoundPage<'_> {
 
     /// Used to render descriptions
     pub fn render_maybe_markdown_str(&self, s: &str) -> templates::Html<String> {
-        crate::render_maybe_markdown_str(s, &self.markup, false, None)
+        crate::render_maybe_markdown_str(s, self.markup, false, None)
     }
 }
 

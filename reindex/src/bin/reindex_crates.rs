@@ -259,7 +259,7 @@ impl Reindexer {
 
         let mut is_repo_archived = false;
         if let Some(repo) = k.repository() {
-            if let Some(github_repo) = run_timeout("gh", 22, crates.github_repo(repo)).await.map_err(|e| log::error!("gh repo{}", e)).ok().and_then(|x| x) {
+            if let Some(github_repo) = crates.github_repo(repo).await? {
                 is_repo_archived = github_repo.archived;
             }
         }

@@ -195,29 +195,26 @@ impl AllVersions {
                 }
             }
 
-            match mem::take(&mut prev_required_deps) {
-                Some(mut prev) => {
-                    for (new_k, new_v) in &required_deps {
-                        match prev.remove(new_k) {
-                            Some(prev_v) => {
-                                // both versions have the same crate
-                                for (k, new) in new_v {
-                                    if prev_v.get(k).is_none() {
-                                        deps_upgraded.push((new_k.clone(), new.to_string()))
-                                    }
+            if let Some(mut prev) = mem::take(&mut prev_required_deps) {
+                for (new_k, new_v) in &required_deps {
+                    match prev.remove(new_k) {
+                        Some(prev_v) => {
+                            // both versions have the same crate
+                            for (k, new) in new_v {
+                                if prev_v.get(k).is_none() {
+                                    deps_upgraded.push((new_k.clone(), new.to_string()))
                                 }
-                            },
-                            None => {
-                                deps_added.push(new_k.clone());
                             }
+                        },
+                        None => {
+                            deps_added.push(new_k.clone());
                         }
                     }
-                    deps_removed.extend(prev.into_iter()
-                        .map(|(k,_)| k)
-                        .filter(|k| required_deps.get(k).is_none()));
-                },
-                None => {}
-            };
+                }
+                deps_removed.extend(prev.into_iter()
+                    .map(|(k,_)| k)
+                    .filter(|k| required_deps.get(k).is_none()));
+            }
             prev_required_deps = Some(required_deps);
             deps_added.sort();
             deps_upgraded.sort();

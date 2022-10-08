@@ -148,7 +148,7 @@ impl RichCrateVersion {
     pub fn repository_http_url(&self) -> Option<(&Repo, Cow<'_, str>)> {
         self.repository().map(|repo| {
             let relpath = self.derived.path_in_repo.as_deref().unwrap_or("");
-            (repo, repo.canonical_http_url(relpath, self.derived.vcs_info_git_sha1.map(|s| hex::encode(s)).as_deref()))
+            (repo, repo.canonical_http_url(relpath, self.derived.vcs_info_git_sha1.map(hex::encode).as_deref()))
         })
     }
 

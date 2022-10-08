@@ -282,7 +282,7 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn render_maybe_markdown_str(&self, s: &str) -> templates::Html<String> {
-        crate::render_maybe_markdown_str(s, &self.markup, true, Some(self.ver.short_name()))
+        crate::render_maybe_markdown_str(s, self.markup, true, Some(self.ver.short_name()))
     }
 
     pub fn render_lib_intro(&self) -> Option<templates::Html<String>> {
@@ -841,10 +841,7 @@ impl<'a> CratePage<'a> {
                 };
 
                 let commonality = self.kitchen_sink.index.version_global_popularity(&name, &semver).await.expect("depsstats").unwrap_or(0.);
-                let is_heavy_build_dep = match &*name {
-                    "bindgen" | "clang-sys" | "cmake" | "cc" if depinf.default => true, // you deserve full weight of it
-                    _ => false,
-                };
+                let is_heavy_build_dep = matches!(&*name, "bindgen" | "clang-sys" | "cmake" | "cc" if depinf.default); // you deserve full weight of it
 
                 // if optional, make it look less problematic (indirect - who knows, maybe platform-specific?)
                 let weight = if depinf.default {1.} else if depinf.direct {0.25} else {0.15} *
@@ -946,10 +943,7 @@ impl<'a> CratePage<'a> {
     }
 
     fn is_same_project(one: &RichCrateVersion, two: &RichCrateVersion) -> bool {
-        match (one.repository(), two.repository()) {
-            (Some(a), Some(b)) if a.host == b.host => true,
-            _ => false,
-        }
+        matches!((one.repository(), two.repository()), (Some(a), Some(b)) if a.host == b.host)
     }
 }
 

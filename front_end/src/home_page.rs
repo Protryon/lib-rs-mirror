@@ -236,7 +236,7 @@ impl<'a> HomePage<'a> {
         }
     }
 
-    pub fn last_modified<'b>(&self, allver: &'b RichCrate) -> DateTime<Utc> {
+    pub fn last_modified(&self, allver: &RichCrate) -> DateTime<Utc> {
         *allver.versions().iter().map(|a| &a.created_at).max().expect("no versions?")
     }
 

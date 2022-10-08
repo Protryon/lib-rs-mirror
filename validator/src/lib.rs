@@ -114,10 +114,7 @@ pub async fn warnings_for_crate(c: &KitchenSink, k: &RichCrateVersion, all: &Ric
     let displayed_msrv = c.rustc_compatibility(all).await?.values().rev().filter_map(|c| c.newest_bad()).next().unwrap_or(0);
 
     // if it's not compatible with the old compiler, there's no point using an old-compiler edition
-    if verified_msrv >= 55 && k.edition() < Edition::E2021 {
-        warnings.insert(Warning::EditionMSRV(k.edition(), displayed_msrv+1));
-    }
-    else if verified_msrv >= 30 && k.edition() < Edition::E2018 {
+    if (verified_msrv >= 55 && k.edition() < Edition::E2021) || (verified_msrv >= 30 && k.edition() < Edition::E2018) {
         warnings.insert(Warning::EditionMSRV(k.edition(), displayed_msrv+1));
     }
 
@@ -150,8 +147,7 @@ pub async fn warnings_for_crate(c: &KitchenSink, k: &RichCrateVersion, all: &Ric
 }
 
 fn find_most_recent_release<'a>(versions: &'a [(SemVer, &CrateVersion)], pre: bool) -> Option<(&'a SemVer, DateTime<Utc>)> {
-    versions.iter().filter(move |(v, _)| pre != v.pre.is_empty()).max_by(|a,b| a.1.created_at.cmp(&b.1.created_at))
-        .and_then(|(v, c)| Some((v, c.created_at)))
+    versions.iter().filter(move |(v, _)| pre != v.pre.is_empty()).max_by(|a,b| a.1.created_at.cmp(&b.1.created_at)).map(|(v, c)| (v, c.created_at))
 }
 
 async fn warn_bad_requirements(k: &RichCrateVersion, dependencies: &[RichDep], warnings: &mut HashSet<Warning>, c: &KitchenSink) {

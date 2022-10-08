@@ -57,7 +57,7 @@ impl<T: DeserializeOwned + Serialize + Clone> EventLog<T> {
         let name = name.into();
         let db = self.db()?;
         let mut q = db.prepare_cached("INSERT OR IGNORE INTO subscribers(name, last_event_id) VALUES(?1, ?2)")?;
-        let args: &[&dyn ToSql] = &[&name, &0];
+        let args: &[&dyn ToSql] = &[&name, &0i32];
         q.execute(args)?;
         Ok(Subscription {
             name,
@@ -148,7 +148,7 @@ impl<T: DeserializeOwned + Serialize + Clone> Subscription<T> {
         })
     }
 
-    pub async fn next_batch<'a>(&'a mut self) -> Result<EventBatch<'a, T>> {
+    pub async fn next_batch(&mut self) -> Result<EventBatch<'_, T>> {
         let mut wait = 2;
         loop {
             let mut batch = self.fetch_batch()?;

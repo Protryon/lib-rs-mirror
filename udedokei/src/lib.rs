@@ -37,7 +37,7 @@ pub fn from_path(path: impl AsRef<Path>) -> Option<Language> {
 
 impl LanguageExt for Language {
     fn is_code(&self) -> bool {
-        match *self {
+        !matches!(*self,
             Language::AutoHotKey |
             Language::Autoconf |
             Language::CHeader |
@@ -74,9 +74,7 @@ impl LanguageExt for Language {
             Language::VerilogArgsFile |
             Language::Xaml |
             Language::Xml |
-            Language::Yaml => false,
-            _ => true,
-        }
+            Language::Yaml)
     }
 
     fn color(&self) -> &'static str {

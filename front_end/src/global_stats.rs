@@ -244,7 +244,7 @@ fn rustc_stats(compat: &HashMap<Origin, CompatByCrateVersion>, max_rust_version:
     // (ok, maybe, not), [0] is unused
     let mut rustc_versions = vec![Compat::default(); (max_rust_version+1) as usize];
 
-    for (_, c) in compat {
+    for c in compat.values() {
         // can't compile at all
         if !c.iter().any(|(_, c)| c.has_ever_built()) {
             continue;

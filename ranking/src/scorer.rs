@@ -48,7 +48,7 @@ impl Score {
     }
 
     /// Start a new group of scores, and `max_score` is the max total score of the group
-    pub fn group<'a>(&mut self, for_what: &'static str, max_score: u32, group: impl Borrow<Score>) -> ScoreAdj<'_> {
+    pub fn group(&mut self, for_what: &'static str, max_score: u32, group: impl Borrow<Score>) -> ScoreAdj<'_> {
         self.frac(for_what, max_score, group.borrow().total())
     }
 

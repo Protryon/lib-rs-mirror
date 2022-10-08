@@ -329,7 +329,7 @@ async fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult
     }
 }
 
-async fn latest_version_matching_requirement(req: &Box<str>, deadline: Instant, kitchen_sink: &KitchenSink, origin: &Origin) -> Option<SemVer> {
+async fn latest_version_matching_requirement(req: &str, deadline: Instant, kitchen_sink: &KitchenSink, origin: &Origin) -> Option<SemVer> {
     if let Ok(req) = VersionReq::parse(req) {
         if let Ok(Ok(current)) = timeout_at(deadline.into(), kitchen_sink.rich_crate_async(origin)).await {
             let mut versions: Vec<_> = current.versions().iter().filter_map(|v| SemVer::parse(&v.num).ok()).collect();
@@ -342,7 +342,7 @@ async fn latest_version_matching_requirement(req: &Box<str>, deadline: Instant, 
     None
 }
 
-fn comma_list<'a>(items: impl Iterator<Item=impl std::fmt::Display>) -> String {
+fn comma_list(items: impl Iterator<Item=impl std::fmt::Display>) -> String {
     let mut res = items.take(5).map(|c| format!("\"{}\"", c)).collect::<Vec<_>>().join(", ");
     if res.is_empty() {
         res.push('…');

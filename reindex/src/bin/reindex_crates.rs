@@ -218,10 +218,16 @@ fn index_search(indexer: &mut Indexer, lines: &TempCache<(String, f64), [u8; 16]
 
     let mut dedup = wlita::WLITA::new(variables.iter(), &mut cb);
     if let Some(markup) = k.readme().map(|readme| &readme.markup) {
-        dedup.add_text(&renderer.visible_text(markup));
+        for (s, par) in &renderer.visible_text_by_section(markup) {
+            dedup.add_text(s);
+            dedup.add_text(par);
+        }
     }
     if let Some(markup) = k.lib_file_markdown() {
-        dedup.add_text(&renderer.visible_text(&markup));
+        for (s, par) in &renderer.visible_text_by_section(&markup) {
+            dedup.add_text(s);
+            dedup.add_text(par);
+        }
     }
 
     indexer.add(k.origin(), k.short_name(), version, k.description().unwrap_or(""), &keywords, Some(unique_text.as_str()).filter(|s| !s.trim_start().is_empty()), downloads_per_month as u64, score)?;

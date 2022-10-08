@@ -41,39 +41,76 @@ lazy_static::lazy_static! {
 }
 
 // returns an array of lowercase phrases
-fn extract_text_phrases(manifest: &Manifest, github_description: Option<&str>, readme_text: Option<&str>) -> Vec<(f64, String)> {
+fn extract_text_phrases(manifest: &Manifest, github_description: Option<&str>, readme_by_section: &[(String, String)]) -> Vec<(f32, String)> {
     let mut out = Vec::new();
-    let mut len = 0;
+
     if let Some(s) = &manifest.package().description() {
         let s = s.to_lowercase();
-        len += s.len();
-        out.push((1., s));
+        out.push((1.0f32, s));
     }
     if let Some(s) = github_description {
         let s = s.to_lowercase();
-        len += s.len();
         out.push((1., s));
     }
-    if let Some(sub) = &readme_text {
+
+    let own_name = manifest.package().name();
+    let install_boilerplate1 = format!("cargo install {own_name}");
+    let install_boilerplate2 = format!("cargo add {own_name}");
+    let install_boilerplate3 = format!("{own_name} = \"");
+    for (section, text) in readme_by_section.iter() {
+        let section_s = section.trim().to_lowercase();
+        let section = section_s.trim_end_matches('s'); // singular
+        // skip boilerplate
+        if section.starts_with("minimum supported rust") || section.starts_with("minimum rust version") {
+            continue;
+        }
+        if matches!(section, "license" | "contact" | "contribution" | "contributing" | "copyright" | "sponsor" | "financial support" | "license and link" |
+            "semantic versioning" | "compatibility policy" | "maintenance" | "building" | "msrv" | "out of scope" | "minimum rustc" |
+             "rust version compatibility" | "rust version support" | "release schedule" | "supported rust version" | "install rust") {
+            continue;
+        }
+        let relevance = if matches!(section, "info" | "tldr" | "introduction" | "main feature" | "overview" | "how it work") || section.starts_with("about") || section == own_name { 1.0 }
+        else if matches!(section, "feature flag" | "feature" | "") || section.starts_with("example") || section.starts_with("usage example") { 0.6 }
+        else if matches!(section, "usage" | "how to use") { 0.5 }
+        else if matches!(section, "getting started" | "quickstart" | "documentation") || section.starts_with("compiling") { 0.3 }
+        else if section.starts_with("install") || matches!(section, "change" | "开发示例" | "ci" | "table of content" | "setup" | "dependencie" | "limitation" | "safety" |
+            "alternative" | "other project" | "related project" | "credit" | "acknowledgement" | "changelog" | "benchmark" | "platform" | "rust version" | "getting help" |
+            "release history" | "troubleshooting" | "see also" | "requirement" | "recent change" | "contact") { 0.1 }
+        else {
+            out.push((0.1, section_s));
+            0.4
+        };
+
         // render readme to DOM, extract nodes
-        for par in sub.split('\n') {
-            if len > 300 {
-                break;
-            }
+        for par in text.split('\n') {
             let par = par.trim_start_matches(|c: char| c.is_whitespace() || c == '#' || c == '=' || c == '*' || c == '-');
-            let par = par.replace("http://", " ").replace("https://", " ").replace("the rust programming language", "rust");
+            let par = par.to_lowercase().replace("http://", " ").replace("https://", " ").replace("the rust programming language", "rust");
+            if par.contains("[dependencies]") || par.contains(&install_boilerplate1) || par.contains(&install_boilerplate2) || par.contains(&install_boilerplate3) {
+                continue;
+            }
+            if par.starts_with("licensed under either of") || par.starts_with("license:") || par.starts_with("this code is licensed under")
+            || par.starts_with("unless you explicitly state otherwise, any contribution") || par.contains("apache license 2.0") {
+                continue;
+            }
             if !par.trim_start().is_empty() {
-                let par = par.to_lowercase();
-                len += par.len();
-                out.push((0.4, par));
+                out.push((relevance, par));
             }
         }
     }
+
+    out.sort_unstable_by(|a,b| b.0.total_cmp(&a.0));
+    let mut len = 0;
+    out.retain(|(_, par)| if len > 300 {
+            false
+        } else {
+            len += par.len();
+            true
+        });
     out
 }
 
-pub fn auto_keywords(manifest: &Manifest, github_description: Option<&str>, readme_text: Option<&str>) -> Vec<(f32, String)> {
-    let d = extract_text_phrases(manifest, github_description, readme_text);
+pub fn auto_keywords(manifest: &Manifest, github_description: Option<&str>, readme_by_section: &[(String, String)]) -> Vec<(f32, String)> {
+    let d = extract_text_phrases(manifest, github_description, readme_by_section);
     let mut sw = rake::StopWords::new();
     sw.reserve(STOPWORDS.len());
     sw.extend(STOPWORDS.iter().map(|s| (*s).to_string())); // TODO: use real stopwords, THEN filter via STOPWORDS again, because multiple Rust-y words are fine
@@ -92,7 +129,7 @@ pub fn auto_keywords(manifest: &Manifest, github_description: Option<&str>, read
 
     // replace ' ' with '-'
     // keep if 3 words or less
-    rake_keywords.chain(keywords).take(25).map(|(w, s)| (w as f32, s.to_owned())).collect()
+    rake_keywords.map(|(k,v)| (k as f32, v)).take(20).chain(keywords).take(25).map(|(w, s)| (w, s.to_owned())).collect()
 }
 
 fn chop3words(s: &str) -> &str {

@@ -1318,8 +1318,11 @@ impl KitchenSink {
             let mut words = vec![package.name.as_str()];
             let readme_txt;
             if let Some(ref r) = meta.readme {
-                readme_txt = render_readme::Renderer::new(None).visible_text(&r.1);
-                words.push(&readme_txt);
+                readme_txt = render_readme::Renderer::new(None).visible_text_by_section(&r.1);
+                for (s, txt) in &readme_txt {
+                    words.push(&s);
+                    words.push(&txt);
+                }
             }
             if let Some(ref lib) = meta.lib_file {
                 words.push(lib);
@@ -2093,7 +2096,7 @@ impl KitchenSink {
         }
         let (is_build, is_dev) = self.is_build_or_dev(origin).await?;
         let package = manifest.package();
-        let readme_text = source_data.readme.as_ref().map(|r| render_readme::Renderer::new(None).visible_text(&r.markup));
+        let readme_text = source_data.readme.as_ref().map(|r| render_readme::Renderer::new(None).visible_text_by_section(&r.markup));
         let repository = package.repository().and_then(|r| Repo::new(r).ok());
         let authors = package.authors().iter().map(|a| Author::new(a)).collect::<Vec<_>>();
 
@@ -2123,7 +2126,7 @@ impl KitchenSink {
 
         category_slugs.iter().for_each(|k| debug_assert!(categories::CATEGORIES.from_slug(k).1, "'{}' must exist", k));
 
-        let extracted_auto_keywords = feat_extractor::auto_keywords(&manifest, source_data.github_description.as_deref(), readme_text.as_deref());
+        let extracted_auto_keywords = feat_extractor::auto_keywords(&manifest, source_data.github_description.as_deref(), readme_text.as_deref().unwrap_or_default());
 
         let db_index = self.crate_db.index_latest(CrateVersionData {
             cache_key,

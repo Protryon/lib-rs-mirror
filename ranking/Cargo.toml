@@ -13,5 +13,5 @@ path = "src/lib_ranking.rs"
 rich_crate = { path = "../rich_crate" }
 chrono = { version = "0.4.22", default-features = false }
 cargo_toml = "0.13.0-alpha.0"
-render_readme = { path = "../render_readme", version = "0.7" }
+render_readme = { path = "../render_readme" }
 semver = "1.0.14"

@@ -16,7 +16,7 @@ ructe = "0.13"
 [dependencies]
 kitchen_sink = { path = "../kitchen_sink", version = "0.9" }
 rich_crate = { path = "../rich_crate" }
-render_readme = { path = "../render_readme", version = "0.7.0" }
+render_readme = { path = "../render_readme" }
 categories = { path = "../categories" }
 udedokei = { path = "../udedokei" }
 search_index = { path = "../search_index" }

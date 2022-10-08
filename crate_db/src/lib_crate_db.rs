@@ -760,7 +760,8 @@ impl CrateDb {
     ///
     /// NB: must be lowercase
     pub async fn crates_with_keyword(&self, keyword: &str) -> FResult<u32> {
-        self.with_read("crates_with_keyword", |conn| {
+        let keyword = keyword.to_ascii_lowercase();
+        self.with_read_spawn("crates_with_keyword", move |conn| {
             let mut query = conn.prepare_cached("SELECT count(*) FROM crate_keywords
                 WHERE explicit AND keyword_id = (SELECT id FROM keywords WHERE keyword = ?1)")?;
             Ok(none_rows(query.query_row(&[&keyword], |row| row.get(0)))?.unwrap_or(0))
@@ -773,18 +774,19 @@ impl CrateDb {
             return Ok(res)
         }
 
-        let res = self.with_read_spawn("allkw", |conn| {
-            let mut query = conn.prepare_cached("SELECT k.keyword
-                FROM keywords k JOIN crate_keywords ck ON (ck.keyword_id = k.id)
-                WHERE k.visible
-                GROUP BY k.id ORDER BY sum(ck.weight)*count(*) DESC
-            ").map_err(|e| Error::Db(e, "akw"))?;
-            let res = query.query_map([], |row| {
-                Ok(SmolStr::from(row.get_ref(0)?.as_str()?))
-            })?;
-            Ok(res.collect::<std::result::Result<_,_>>()?)
-        }).await?;
-        Ok(self.all_explicit_keywords_cache.get_or_init(move || res))
+        Ok(self.with_read("allkw", |conn| {
+            self.all_explicit_keywords_cache.get_or_try_init(move || {
+                let mut query = conn.prepare_cached("SELECT k.keyword
+                    FROM keywords k JOIN crate_keywords ck ON (ck.keyword_id = k.id)
+                    WHERE k.visible
+                    GROUP BY k.id ORDER BY sum(ck.weight)*count(*) DESC
+                ").map_err(|e| Error::Db(e, "akw"))?;
+                let res = query.query_map([], |row| {
+                    Ok(SmolStr::from(row.get_ref(0)?.as_str()?))
+                })?;
+                Ok(res.collect::<std::result::Result<_,_>>()?)
+            })
+        }).await?)
     }
 
     /// Categories similar to the given category

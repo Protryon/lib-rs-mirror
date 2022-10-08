@@ -205,7 +205,9 @@ pub fn is_deprecated_requirement(name: &str, requirement: &VersionReq) -> bool {
         "glsl-to-spirv" => true,
         // futures 0.1
         "futures-preview" | "futures-core-preview" | "tokio-io" | "tokio-timer" | "tokio-codec" |
-        "tokio-executor" | "tokio-reactor" | "tokio-signal" | "tokio-core" | "futures-cpupool" | "tokio-threadpool" | "tokio-tcp" => true,
+        "tokio-executor" | "tokio-reactor" | "tokio-signal" | "tokio-core" | "futures-cpupool" |
+        "tokio-compat" | "tokio-async-await" | "tokio-serde-json" | "tokio-udp" |
+        "tokio-threadpool" | "tokio-tcp" | "tokio-current-thread" => true,
         // fundamentally unsound
         "str-concat" => true,
         // uses old winapi
@@ -218,7 +220,7 @@ pub fn is_deprecated_requirement(name: &str, requirement: &VersionReq) -> bool {
         "typemap" => true, // 2015
         // in stdlib
         "insideout" | "file" | "ref_slice" => true,
-
+        "rustfmt" | "clippy" => true, // rustup
         "serde_derive_internals" | "serde_codegen_internals" | "serde_macros" | "serde_codegen" => true,
         _ => false,
     }

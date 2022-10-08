@@ -148,6 +148,7 @@ Tools for programming languages: compilers, interpreters, transpilers, and virtu
 short-description = "Compilers"
 title = "Rust-lang"
 preference = 0.1
+obvious-keywords = ["language", "programming-language"]
 
 [command-line-interface]
 name = "Command-line interface"
@@ -169,7 +170,7 @@ Applications to run at the command line.\
 """
 short-description = """
 Applications to run at the command line."""
-obvious-keywords = ["cli", "command-line", "command-line-tool", "tool", "command-line-utility"]
+obvious-keywords = ["cli", "command-line", "command-line-tool", "tool", "command-line-utility", "cli-utility"]
 preference = 0.8
 
 [compression]
@@ -180,7 +181,7 @@ Algorithms for making data smaller.\
 """
 short-description = """
 Algorithms for making data smaller."""
-obvious-keywords = ["compression", "decompression"]
+obvious-keywords = ["compression", "decompression", "compress", "decompress"]
 preference = 1.1
 
 # [computer-vision]
@@ -208,7 +209,7 @@ Crates for implementing concurrent and parallel computation.\
 """
 short-description = """
 Implementing concurrent and parallel computation."""
-obvious-keywords = ["concurrency", "parallel"]
+obvious-keywords = ["concurrency", "parallel", "concurrent"]
 preference = 1.1
 
 [cryptography]
@@ -291,7 +292,7 @@ linting, performance profiling, autocompletion, formatting, and more.\
 """
 short-description = """
 Testing, debugging, linting, performance profiling, autocompletion, formatting, and more."""
-obvious-keywords = ["development-tools"]
+obvious-keywords = ["development-tools", "development", "tool"]
 preference = 0.9
 
 [development-tools.categories.build-utils]
@@ -302,7 +303,7 @@ Utilities for build scripts and other build time steps.\
 """
 short-description = """
 Utilities for build scripts and other build time steps."""
-obvious-keywords = ["build-utils", "build", "build-dependencies"]
+obvious-keywords = ["build-utils", "build", "build-dependencies", "build-script", "build-tool"]
 preference = 1.1
 
 [development-tools.categories.cargo-plugins]
@@ -313,7 +314,7 @@ Subcommands that extend the capabilities of Cargo.\
 """
 short-description = """
 Subcommands that extend the capabilities of Cargo."""
-obvious-keywords = ["cargo", "cargo-subcommand", "subcommand", "cli", "plugin", "crates"]
+obvious-keywords = ["cargo", "cargo-subcommand", "cargo-plugin", "subcommand", "cli", "plugin", "crates"]
 preference = 1.1
 
 [development-tools.categories.debugging]
@@ -359,7 +360,7 @@ Crates to help you figure out the performance of your code.\
 """
 short-description = """
 Figure out the performance of your code."""
-obvious-keywords = ["profiling", "profiler"]
+obvious-keywords = ["profiling", "profiler", "performance", "perf"]
 preference = 1.1
 
 [development-tools.categories.testing]
@@ -371,7 +372,7 @@ Crates to help you verify the correctness of your code.\
 short-description = """
 Verify the correctness of your code."""
 obvious-keywords = ["testing", "test", "tests"]
-preference = 1.1
+preference = 1.05
 
 [email]
 name = "Email"
@@ -408,7 +409,7 @@ computer. Video game systems are commonly emulated.\
 """
 short-description = """
 Run software or games not available natively on the host computer."""
-obvious-keywords = ["emulator", "emulators"]
+obvious-keywords = ["emulator", "emulators", "emulation"]
 preference = 1.1
 
 [encoding]
@@ -778,6 +779,7 @@ siblings = ["embedded"]
 description = """
 Crates related to robotics. Build firmware for robots, drones, and autonomous machines."""
 preference = 0.2
+obvious-keywords = ["robotics", "robot", "robotics-programming"]
 
 [science.categories.math]
 # crates-io has it as mathematics at the top level
@@ -812,6 +814,7 @@ simulate a networking protocol.\
 short-description = """
 Model or construct models for some activity, e.g. to simulate a networking protocol."""
 preference = 1.1
+obvious-keywords = ["simulate", "simulation", "simulator", "sim"]
 
 [template-engine]
 name = "Template engine"
@@ -822,7 +825,7 @@ documents, usually with an emphasis on processing text.\
 """
 short-description = """
 Combine templates with data to produce documents, usually with an emphasis on processing text."""
-obvious-keywords = ["template", "templating", "language"]
+obvious-keywords = ["template", "templating", "language", "template-engine", "templating-language"]
 preference = 1.1
 
 [text-editors]
@@ -846,7 +849,7 @@ in textual form.\
 short-description = """
 Deal with the complexities of human language when expressed in textual form."""
 siblings = ["value-formatting", "template-engine"]
-obvious-keywords = ["text", "processing", "string"]
+obvious-keywords = ["text", "processing", "string", "text-processing"]
 preference = 1.1
 
 [value-formatting]

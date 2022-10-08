@@ -97,6 +97,9 @@ impl<'a> AuthorPage<'a> {
                     if o.github_id == aut.github.id || o.kind != OwnerKind::User {
                         continue;
                     }
+                    if o.crates_io_login.starts_with("rust-bus") {
+                        continue;
+                    }
                     // How long co-owned together, relative to crate's age
                     let overlap = now.signed_duration_since(o.invited_at).num_days().min(own_days) as f32 / max_days;
                     let relationship = if own.invited_by_github_id == Some(o.github_id) {4.}

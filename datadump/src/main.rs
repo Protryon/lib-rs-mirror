@@ -568,7 +568,7 @@ fn process_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users:
             })
             .collect();
 
-        owners.sort_by(|a,b| a.invited_at.cmp(&b.invited_at));
+        owners.sort_unstable_by(|a,b| a.invited_at.cmp(&b.invited_at));
 
         // crates.io has some data missing in old crates
         if let Some((first_owner, rest)) = owners.split_first_mut() {

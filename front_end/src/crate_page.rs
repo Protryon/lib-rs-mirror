@@ -519,7 +519,7 @@ impl<'a> CratePage<'a> {
             };
         }
         let mut grouped: Vec<_> = grouped.into_iter().map(|(_, v)| v).collect();
-        grouped.sort_by(|a, b| b.ver.semver.cmp(&a.ver.semver));
+        grouped.sort_unstable_by(|a, b| b.ver.semver.cmp(&a.ver.semver));
         grouped
     }
 
@@ -775,7 +775,7 @@ impl<'a> CratePage<'a> {
     pub fn langs_chart(&self, stats: &Stats, width_px: u32) -> Option<LanguageStats> {
         let mut res: Vec<_> = stats.langs.iter().filter(|(lang, lines)| lines.code > 0 && lang.is_code()).map(|(a, b)| (*a, *b)).collect();
         if !res.is_empty() {
-            res.sort_by_key(|(_, lines)| lines.code);
+            res.sort_unstable_by_key(|(_, lines)| lines.code);
             let biggest = res.last().cloned().unwrap();
             let total = res.iter().map(|(_, lines)| lines.code).sum::<u32>();
             if biggest.0 != Language::Rust || biggest.1.code < total * 9 / 10 {

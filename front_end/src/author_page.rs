@@ -66,7 +66,7 @@ impl<'a> AuthorPage<'a> {
         let (mut founder, mut member): (Vec<_>, Vec<_>) = rows.into_iter().partition(|c| c.invited_by_github_id.is_none());
         let founder_total = founder.len();
         let member_total = member.len();
-        founder.sort_by(|a, b| b.latest_release.cmp(&a.latest_release));
+        founder.sort_unstable_by(|a, b| b.latest_release.cmp(&a.latest_release));
         founder.truncate(200);
 
         member.sort_unstable_by(|a, b| b.crate_ranking.partial_cmp(&a.crate_ranking).unwrap_or(Ordering::Equal));
@@ -110,11 +110,11 @@ impl<'a> AuthorPage<'a> {
         }
         let num_keywords = (1 + founder_total / 2 + member_total / 3).max(2).min(7);
         let mut keywords: Vec<_> = keywords.into_iter().collect();
-        keywords.sort_by(|a, b| b.1.total_cmp(&a.1));
+        keywords.sort_unstable_by(|a, b| b.1.total_cmp(&a.1));
         let keywords: Vec<_> = keywords.into_iter().take(num_keywords).map(|(k, _)| k.to_owned()).collect();
 
         let mut collab: Vec<_> = collab.into_iter().map(|(_, v)| v).collect();
-        collab.sort_by(|a, b| b.0.total_cmp(&a.0));
+        collab.sort_unstable_by(|a, b| b.0.total_cmp(&a.0));
         let collab: Vec<_> = join_all(collab.into_iter().take(100).map(|(_, login)| async move {
             kitchen_sink.user_by_github_login(login).await.map_err(|e| eprintln!("{}: {}", login, e)).ok().and_then(|x| x)
         })).await.into_iter().flatten().collect();

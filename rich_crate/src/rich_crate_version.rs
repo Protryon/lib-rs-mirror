@@ -438,7 +438,7 @@ impl ManifestExt for Manifest {
                     dep
                 })
                 .collect();
-            dep.sort_by(|a,b| {
+            dep.sort_unstable_by(|a,b| {
                 a.dep.optional().cmp(&b.dep.optional())
                 .then(a.only_for_targets.is_empty().cmp(&b.only_for_targets.is_empty()))
                 .then(a.package.cmp(&b.package))

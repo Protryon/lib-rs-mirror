@@ -216,7 +216,7 @@ impl<'a> CratePageRevDeps<'a> {
 
         // align selected versions and their (or older) downloads
         let mut dl_vers = self.downloads_by_ver.iter().rev().peekable();
-        ver.sort_by(|a, b| b.ver.cmp(&a.ver));
+        ver.sort_unstable_by(|a, b| b.ver.cmp(&a.ver));
         for curr in ver.iter_mut().rev() {
             let mut sum = 0;
             while let Some((next_ver, dl)) = dl_vers.peek() {

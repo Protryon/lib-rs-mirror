@@ -128,7 +128,7 @@ impl AllVersions {
 
             Some((sem, version_meta, release_date, required_deps, audit))
         }).collect();
-        combined_meta.sort_by(|(a, ..), (b, ..)| a.cmp(b));
+        combined_meta.sort_unstable_by(|(a, ..), (b, ..)| a.cmp(b));
 
         let compat = kitchen_sink.rustc_compatibility(&all).await?;
 

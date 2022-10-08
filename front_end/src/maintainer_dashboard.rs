@@ -49,7 +49,7 @@ pub struct StructuredWarning {
 
 impl<'a> MaintainerDashboard<'a> {
     pub async fn new(aut: &'a RichAuthor, mut rows: Vec<CrateOwnerRow>, kitchen_sink: &'a KitchenSink, urler: &Urler, markup: &'a Renderer, make_common_groups: bool) -> CResult<MaintainerDashboard<'a>> {
-        rows.sort_by(|a, b| b.latest_release.cmp(&a.latest_release));
+        rows.sort_unstable_by(|a, b| b.latest_release.cmp(&a.latest_release));
         rows.truncate(400);
 
         let deadline = Instant::now() + Duration::from_secs(12);
@@ -66,7 +66,7 @@ impl<'a> MaintainerDashboard<'a> {
                 okay_crates.push(res.0);
                 None
             } else {
-                res.2.sort_by(|a, b| b.severity.cmp(&a.severity).then(a.title.cmp(&b.title)));
+                res.2.sort_unstable_by(|a, b| b.severity.cmp(&a.severity).then(a.title.cmp(&b.title)));
                 Some((res.1, vec![res.0], res.2))
             }).collect();
 

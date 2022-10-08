@@ -560,7 +560,7 @@ async fn owner_stats(kitchen_sink: &KitchenSink, start: Date<Utc>) -> Result<(Ve
         if k <= 50 {
             id_examples.sort_unstable(); // promote low-id users for normal amount of crates
         } else {
-            id_examples.sort_by_key(|v| !v); // show newest users for potentially-spammy crate sets
+            id_examples.sort_unstable_by_key(|v| !v); // show newest users for potentially-spammy crate sets
         }
         // but include one counter-example just to make things more interesting
         if let Some(tmp) = id_examples.pop() {

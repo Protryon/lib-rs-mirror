@@ -272,7 +272,7 @@ impl CrateDb {
 
             if !had_explicit_categories {
                 let mut tmp = insert_keyword.keywords.iter().collect::<Vec<_>>();
-                tmp.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
+                tmp.sort_unstable_by(|a, b| b.1.partial_cmp(a.1).unwrap());
                 write!(&mut out, " #{}", tmp.into_iter().take(10).map(|(k, _)| k.as_str()).collect::<Vec<_>>().join(" #")).unwrap();
             }
 

@@ -1929,7 +1929,7 @@ impl KitchenSink {
         let cut_off = (0.2f32).min(best_ranking / 3.);
         candidates.retain(|&(_, _, ranking)| ranking >= cut_off);
 
-        candidates.sort_by(|a, b| b.1.total_cmp(&a.1)); // needs stable sort to preserve original ranking
+        candidates.sort_unstable_by(|a, b| b.1.total_cmp(&a.1)); // needs stable sort to preserve original ranking
         candidates.truncate(20);
 
         let origins: Vec<_> = repo_crates.into_iter().map(|o| (o,1.))

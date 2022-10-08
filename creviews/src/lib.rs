@@ -61,7 +61,7 @@ impl Creviews {
             }
         }).collect();
 
-        reviews.sort_by(|a, b| b.author_url.is_some().cmp(&a.author_url.is_some())
+        reviews.sort_unstable_by(|a, b| b.author_url.is_some().cmp(&a.author_url.is_some())
             .then(b.version.cmp(&a.version))
             .then_with(|| b.date.cmp(&a.date)));
 

@@ -1,3 +1,4 @@
+use ahash::HashMap;
 use ahash::HashSetExt;
 use crate::Page;
 use crate::templates;
@@ -26,16 +27,18 @@ use ahash::HashSet;
 use std::time::Duration;
 use std::time::Instant;
 use tokio::time::timeout_at;
+use log::warn;
 
 /// For `maintainer_dashboard.rs.html`
 pub struct MaintainerDashboard<'a> {
     pub(crate) aut: &'a RichAuthor,
     pub(crate) markup: &'a Renderer,
-    pub(crate) warnings: Vec<(Origin, f32, Vec<StructuredWarning>)>,
+    pub(crate) warnings: Vec<(f32, Vec<Origin>, Vec<StructuredWarning>)>,
     pub(crate) okay_crates: Vec<Origin>,
     pub(crate) printed_extended_desc: RefCell<HashSet<&'static str>>,
 }
 
+#[derive(Default)]
 pub struct StructuredWarning {
     pub(crate) title: Cow<'static, str>,
     pub(crate) desc: Cow<'static, str>,
@@ -45,13 +48,15 @@ pub struct StructuredWarning {
 }
 
 impl<'a> MaintainerDashboard<'a> {
-    pub async fn new(aut: &'a RichAuthor, mut rows: Vec<CrateOwnerRow>, kitchen_sink: &'a KitchenSink, urler: &Urler, markup: &'a Renderer) -> CResult<MaintainerDashboard<'a>> {
+    pub async fn new(aut: &'a RichAuthor, mut rows: Vec<CrateOwnerRow>, kitchen_sink: &'a KitchenSink, urler: &Urler, markup: &'a Renderer, make_common_groups: bool) -> CResult<MaintainerDashboard<'a>> {
         rows.sort_by(|a, b| b.latest_release.cmp(&a.latest_release));
         rows.truncate(400);
 
         let deadline = Instant::now() + Duration::from_secs(12);
         let tmp: Vec<_> = Self::look_up(kitchen_sink, rows, deadline)
-            .map(move |(origin, crate_ranking, res)| elaborate_warnings(origin, crate_ranking, res, urler, kitchen_sink, deadline))
+            .map(move |(origin, crate_ranking, res)| {
+                elaborate_warnings(origin, crate_ranking, res, urler, kitchen_sink, deadline.min(Instant::now() + Duration::from_secs(8)))
+            })
             .buffered(8)
             .collect().await;
 
@@ -62,23 +67,36 @@ impl<'a> MaintainerDashboard<'a> {
                 None
             } else {
                 res.2.sort_by(|a, b| b.severity.cmp(&a.severity).then(a.title.cmp(&b.title)));
-                Some(res)
+                Some((res.1, vec![res.0], res.2))
             }).collect();
-
-        /// Rows were sorted by most recent first. Keep few most recent crates at the top, which are more relevant than most horribly deprecated crates full of (t)errors.
-        fn sort_by_severity(warnings: &mut [(Origin, f32, Vec<StructuredWarning>)]) {
-            warnings.sort_unstable_by_key(|(_, crate_ranking, w)| {
-                Reverse(((w.iter().map(|w| w.severity.pow(2) as u32).sum::<u32>() * 1000 + 5000) as f32 * crate_ranking) as u32)
-            });
-        }
-        let split_point = warnings.len()/10;
-        let (top, rest) = warnings.split_at_mut(split_point);
-        sort_by_severity(top);
-        sort_by_severity(rest);
 
         if !warnings.is_empty() && warnings.iter().all(|(_, _, w)| w.iter().all(|w| w.title == "Internal error")) {
             return Err(anyhow::anyhow!("Temporary error fetching crates. Please try again."));
         }
+
+        if make_common_groups {
+            Self::make_common_groups(&mut warnings);
+        }
+
+        warnings.iter_mut().for_each(|(rank, _, w)| {
+            // this is probably just an abandoned crate
+            if w.len() >= 10 {
+                *rank /= w.len() as f32 / 5.;
+            }
+        });
+
+        /// Rows were sorted by most recent first. Keep few most recent crates at the top, which are more relevant than most horribly deprecated crates full of (t)errors.
+        fn sort_by_severity(warnings: &mut [(f32, Vec<Origin>, Vec<StructuredWarning>)]) {
+            warnings.sort_unstable_by_key(|(crate_ranking, _, w)| {
+                Reverse(((w.iter().map(|w| w.severity.pow(2) as u32).sum::<u32>() * 1000 + 5000) as f32 * crate_ranking) as u32)
+            });
+        }
+
+        warnings.sort_unstable_by(|a, b| b.0.total_cmp(&a.0));
+        let split_point = warnings.len()/8;
+        let (top, rest) = warnings.split_at_mut(split_point);
+        sort_by_severity(top);
+        sort_by_severity(rest);
 
         Ok(Self {
             aut,
@@ -141,6 +159,53 @@ impl<'a> MaintainerDashboard<'a> {
 
     pub fn render_maybe_markdown_str(&self, s: &str) -> templates::Html<String> {
         templates::Html(self.markup.markdown_str(s, true, None))
+    }
+
+    fn make_common_groups(warnings: &mut Vec<(f32, Vec<Origin>, Vec<StructuredWarning>)>) {
+        let mut common = HashMap::default();
+        for (.., warnings) in &*warnings {
+            for w in warnings {
+                common.entry((w.title.clone(), w.desc.clone())).or_insert((0, Vec::new(), None, 0f32)).0 += if warnings.len() == 1 { 2 } else { 1 };
+            }
+        }
+        common.retain(|_, (num, _, _, _)| *num >= 3);
+        if common.is_empty() || common.len() > warnings.len()/2 {
+            return;
+        }
+        warnings.sort_unstable_by(|a, b| b.0.total_cmp(&a.0));
+        warnings.retain_mut(|(rank, origins, warnings)| {
+            warnings.retain_mut(|w| {
+                let dest = match common.get_mut(&(w.title.clone(), w.desc.clone())) {
+                    Some(d) => d,
+                    None => return true,
+                };
+                dest.1.extend(origins.iter().cloned());
+                dest.3 = dest.3.max(*rank);
+                match &mut dest.2 {
+                    None => {
+                        dest.2 = Some(std::mem::take(w))
+                    },
+                    Some(old) => {
+                        if old.extended_desc.is_none() && w.extended_desc.is_some() {
+                            old.extended_desc = std::mem::take(&mut w.extended_desc);
+                        }
+                        if old.url.is_none() && w.url.is_some() {
+                            old.url = std::mem::take(&mut w.url);
+                        }
+                        old.severity = old.severity.max(w.severity);
+                    },
+                };
+                false
+            });
+            !warnings.is_empty()
+        });
+
+        warnings.reserve(common.len());
+        for (_, origins, w, rank) in common.into_values() {
+            if let Some(w) = w {
+                warnings.push((rank, origins, vec![w]));
+            }
+        }
     }
 }
 
@@ -271,7 +336,7 @@ async fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult
                     }
 
                     (if is_breaking {2} else {1}, format!("Imprecise dependency requirement {} = {}", name, req).into(),
-                        format!("Cargo does not always pick latest versions of dependencies. {}Too-low version requirements can cause breakage, especially when combined with minimal-versions flag used by users of old Rust versions. To fix this: cargo install cargo-edit; cargo upgrade", upgrade_note).into(),
+                        format!("Cargo does not always pick latest versions of dependencies. {}Too-low version requirements can cause breakage, especially when combined with minimal-versions flag used by users of old Rust versions.", upgrade_note).into(),
                         Some((format!("{} versions", name).into(), urler.all_versions(&origin).unwrap_or_else(|| urler.crate_by_origin(&origin)).into())))
                 },
                 Warning::NotAPackage => (3, "Cargo.toml parse error".into(), w.to_string().into(), None),
@@ -330,14 +395,25 @@ async fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult
 }
 
 async fn latest_version_matching_requirement(req: &str, deadline: Instant, kitchen_sink: &KitchenSink, origin: &Origin) -> Option<SemVer> {
-    if let Ok(req) = VersionReq::parse(req) {
-        if let Ok(Ok(current)) = timeout_at(deadline.into(), kitchen_sink.rich_crate_async(origin)).await {
-            let mut versions: Vec<_> = current.versions().iter().filter_map(|v| SemVer::parse(&v.num).ok()).collect();
-            if let Some(highest_matching_req) = versions.iter().filter(|v| req.matches(v)).max().cloned() {
-                versions.retain(|v| v > &highest_matching_req);
+    match VersionReq::parse(req) {
+        Ok(req) => {
+            if let Ok(Ok(current)) = timeout_at(deadline.into(), kitchen_sink.rich_crate_async(origin)).await {
+                let mut versions: Vec<_> = current.versions().iter().filter_map(|v| SemVer::parse(&v.num).ok()).collect();
+                if let Some(highest_matching_req) = versions.iter().filter(|v| req.matches(v)).max().cloned() {
+                    versions.retain(|v| v >= &highest_matching_req);
+                }
+                return versions.iter().filter(|v| v.pre.is_empty()).max()
+                    .or_else(|| versions.iter().filter(|v| !v.pre.is_empty()).max())
+                    .cloned()
+                    .map(|mut v| {
+                        if v.pre.is_empty() && v.major > 0 && v.minor > 0 && v.patch < 10 {
+                            v.patch = 0;
+                        }
+                        v
+                    });
             }
-            return versions.iter().filter(|v| v.pre.is_empty()).max().or_else(|| versions.iter().filter(|v| !v.pre.is_empty()).max()).cloned();
-        }
+        },
+        Err(e) => warn!("{req} parse error: {e}"),
     }
     None
 }

@@ -166,7 +166,7 @@ pub async fn render_maintainer_dashboard<W: Write>(out: &mut W, atom_feed: bool,
     }
 
     let urler = Urler::new(None);
-    let c = MaintainerDashboard::new(aut, rows, kitchen_sink, &urler, renderer).await.context("Can't load data for the dashboard")?;
+    let c = MaintainerDashboard::new(aut, rows, kitchen_sink, &urler, renderer, !atom_feed).await.context("Can't load data for the dashboard")?;
     if !atom_feed {
         templates::maintainer_dashboard(out, &urler, &c)
     } else {

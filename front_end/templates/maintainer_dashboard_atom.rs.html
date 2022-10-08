@@ -16,7 +16,8 @@
   <id>https://lib.rs/~@p.login()/dash</id>
   <generator uri="https://gitlab.com/crates.rs">lib.rs</generator>
 
-  @for (origin, _, warnings) in &p.warnings {
+  @for (_, origins, warnings) in &p.warnings {
+    @for origin in origins {
     @for w in warnings { @if w.severity > 0 {
       <entry>
         <title>@origin.short_crate_name(): @w.title</title>
@@ -37,6 +38,6 @@
 @ext
 }</content>
       </entry>
-    } }
+    } } }
   }
 </feed>

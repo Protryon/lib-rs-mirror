@@ -44,24 +44,27 @@
         <h3>Issues found</h3>
         <p>Based on crates you own that have been published to crates.io. The best way to monitor these issues is to <a rel="alternate nofollow" type="application/atom+xml" href="@url.crates_io_user_maintainer_dashboard_atom_by_github_login(p.login())">subscribe to the atom feed</a> in your RSS reader.</p>
         <ul class="issues-by-crate">
-        @for (origin, _, warnings) in &p.warnings {
-          <li id="crate-@origin.short_crate_name()"><details open>
-            <summary><h4><a href="@url.crate_abs_path_by_origin(origin)">@origin.short_crate_name()</a></h4></summary>
-            <ul>
-              @for w in warnings {
-                <li class="severity@w.severity"><h5>@w.title</h5><p>@w.desc</p>
-                @if let Some(ext) = w.extended_desc {
-                  @if p.should_print_extended_description(ext) {
-                    <p>@ext</p>
+        @for (_, origins, warnings) in &p.warnings {
+            <li><details open>
+              <summary><h4>
+                @for (is_last, origin) in origins.iter().identify_last() {
+                  <a id="crate-@origin.short_crate_name()" href="@url.crate_abs_path_by_origin(origin)">@origin.short_crate_name()</a>@if !is_last {,}
+                }
+              </h4></summary>
+              <ul>@for w in warnings {
+                  <li class="severity@w.severity"><h5>@w.title</h5><p>@w.desc</p>
+                  @if let Some(ext) = w.extended_desc {
+                    @if p.should_print_extended_description(ext) {
+                      <p>@ext</p>
+                    }
                   }
-                }
-                @if let Some((label, url)) = &w.url {
-                  <p><a href="@url">@label</a></p>
-                }
-                </li>
+                  @if let Some((label, url)) = &w.url {
+                    <p><a href="@url">@label</a></p>
+                  }
+                  </li>
               }
-            </ul>
-          </details></li>
+              </ul>
+            </details></li>
         }
         </ul>
         @if !p.okay_crates.is_empty() {

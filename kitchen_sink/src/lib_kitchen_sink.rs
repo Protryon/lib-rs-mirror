@@ -289,7 +289,7 @@ pub struct KitchenSink {
     crate_rustc_compat_db: OnceCell<BuildDb>,
     data_path: PathBuf,
     /// login -> reason
-    pub author_shitlist: HashMap<SmolStr, SmolStr>,
+    author_shitlist: HashMap<SmolStr, SmolStr>,
     event_log: EventLog<SharedEvent>,
 }
 
@@ -448,8 +448,8 @@ impl KitchenSink {
         Ok(out)
     }
 
-    pub fn is_crates_io_login_on_shitlist(&self, login: &str) -> bool {
-        self.author_shitlist.get(login.to_ascii_lowercase().as_str()).is_some()
+    pub fn is_crates_io_login_on_shitlist(&self, login: &str) -> Option<&str> {
+        self.author_shitlist.get(login.to_ascii_lowercase().as_str()).map(|s| s.as_str())
     }
 
     pub async fn is_crate_on_shitlist(&self, k: &RichCrate) -> bool {
@@ -464,7 +464,7 @@ impl KitchenSink {
             // some crates are co-owned by both legit and banned owners,
             // so banning by "any" would interfere with legit users' usage :(
             .all(|owner| {
-                self.is_crates_io_login_on_shitlist(&owner.crates_io_login)
+                self.is_crates_io_login_on_shitlist(&owner.crates_io_login).is_some()
             })
     }
 
@@ -2794,8 +2794,8 @@ impl KitchenSink {
     /// (common, out of how many). A is considered more important, b is matched against it.
     async fn common_real_owners(&self, a: &Origin, b: &Origin) -> CResult<(usize, usize)> {
         let (a_owners, b_owners) = futures::try_join!(self.crate_owners(a, CrateOwners::Strict), self.crate_owners(b, CrateOwners::Strict))?;
-        let a_owners: HashSet<_> = a_owners.into_iter().filter(|o| !self.is_crates_io_login_on_shitlist(&o.crates_io_login)).filter_map(|o| o.github_id).collect();
-        let b_owners: HashSet<_> = b_owners.into_iter().filter(|o| !self.is_crates_io_login_on_shitlist(&o.crates_io_login)).filter_map(|o| o.github_id).collect();
+        let a_owners: HashSet<_> = a_owners.into_iter().filter(|o| self.is_crates_io_login_on_shitlist(&o.crates_io_login).is_none()).filter_map(|o| o.github_id).collect();
+        let b_owners: HashSet<_> = b_owners.into_iter().filter(|o| self.is_crates_io_login_on_shitlist(&o.crates_io_login).is_none()).filter_map(|o| o.github_id).collect();
         let max = a_owners.len();
         let common_owners = a_owners.intersection(&b_owners).count();
         Ok((common_owners, max))

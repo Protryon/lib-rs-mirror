@@ -119,7 +119,7 @@ impl<'a> AuthorPage<'a> {
             kitchen_sink.user_by_github_login(login).await.map_err(|e| eprintln!("{}: {}", login, e)).ok().and_then(|x| x)
         })).await.into_iter().flatten().collect();
 
-        let shitlist_reason = kitchen_sink.author_shitlist.get(aut.github.login.to_ascii_lowercase().as_str()).map(|s| s.as_str());
+        let shitlist_reason = kitchen_sink.is_crates_io_login_on_shitlist(&aut.github.login);
 
         Ok(Self {
             founder_crates, member_crates,
@@ -159,7 +159,7 @@ impl<'a> AuthorPage<'a> {
 
     pub fn name(&self) -> Option<&str> {
         let gh_name = self.aut.name();
-        if !gh_name.is_empty() && gh_name != self.login() {
+        if !gh_name.eq_ignore_ascii_case(self.login()) {
             return Some(gh_name);
         }
         self.rustacean.as_ref().and_then(|r| r.name.as_deref())

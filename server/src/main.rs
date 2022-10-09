@@ -722,8 +722,24 @@ async fn handle_maintainer_dashboard_xml(req: HttpRequest) -> Result<HttpRespons
     handle_maintainer_dashboard(req, true).await
 }
 
+/// did you put crate name by accident?
+async fn author_by_crate_name(login: &str, state: &ServerState) -> Option<String> {
+    let origin = Origin::try_from_crates_io_name(login)?;
+    let login = login.to_owned();
+    let crates = state.crates.load();
+    rt_run_timeout(&state.rt, "chk", 5, async move {
+        let owners = crates.crate_owners(&origin, kitchen_sink::CrateOwners::Strict).await?;
+        if let Some(gh) = owners.iter().filter_map(|o| o.github_login()).next() {
+            if !gh.eq_ignore_ascii_case(&login) {
+                return Ok(gh.to_owned());
+            }
+        }
+        anyhow::bail!("none")
+    }).await.ok()
+}
+
 async fn handle_maintainer_dashboard(req: HttpRequest, atom_feed: bool) -> Result<HttpResponse, ServerError> {
-    let login = req.match_info().query("author");
+    let login = req.match_info().query("author").trim();
     debug!("maintainer_dashboard for {:?}", login);
     let state: &AServerState = req.app_data().expect("appdata");
 
@@ -734,6 +750,9 @@ async fn handle_maintainer_dashboard(req: HttpRequest, atom_feed: bool) -> Resul
     }).await {
         Ok(aut) => aut,
         Err(e) => {
+            if let Some(gh) = author_by_crate_name(login, &state).await {
+                return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", format!("/~{}/dash", Encoded(gh)))).body(""));
+            }
             debug!("user fetch {} failed: {}", login, e);
             return render_404_page(state, login, "user").await;
         }
@@ -743,7 +762,7 @@ async fn handle_maintainer_dashboard(req: HttpRequest, atom_feed: bool) -> Resul
     }
 
     let crates = state.crates.load();
-    if crates.author_shitlist.get(aut.github.login.to_ascii_lowercase().as_str()).is_some() {
+    if crates.is_crates_io_login_on_shitlist(login).is_some() {
         return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", format!("/~{}", Encoded(&aut.github.login)))).body(""));
     }
 
@@ -751,6 +770,9 @@ async fn handle_maintainer_dashboard(req: HttpRequest, atom_feed: bool) -> Resul
     let rows = rt_run_timeout(&state.rt, "maintainer_dashboard1", 60, async move { crates.crates_of_author(&aut2).await }).await?;
 
     if rows.is_empty() {
+        if let Some(gh) = author_by_crate_name(login, &state).await {
+            return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", format!("/~{}/dash", Encoded(gh)))).body(""));
+        }
         return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", format!("/~{}", Encoded(&aut.github.login)))).body(""));
     }
 

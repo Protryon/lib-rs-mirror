@@ -2868,15 +2868,13 @@ impl KitchenSink {
     }
 
     /// Returns (contrib, github user)
-    async fn contributors_from_repo(&self, crate_repo: &Repo, owners: &[CrateOwner], found_crate_in_repo: bool) -> CResult<(bool, HashMap<String, (f64, User)>)> {
+    async fn contributors_from_repo(&self, crate_repo: &Repo, found_crate_in_repo: bool) -> CResult<(bool, HashMap<String, (f64, User)>)> {
         let mut hit_max_contributor_count = false;
         match crate_repo.host() {
             // TODO: warn on errors?
             RepoHost::GitHub(ref repo) => {
                 // don't use repo URL if it's not verified to belong to the crate
-                if !found_crate_in_repo && !owners.iter().filter(|o| !o.contributor_only)
-                        .filter_map(|o| o.github_login())
-                        .any(|owner| owner.eq_ignore_ascii_case(&repo.owner)) {
+                if !found_crate_in_repo {
                     return Ok((false, HashMap::new()));
                 }
 
@@ -2940,85 +2938,91 @@ impl KitchenSink {
     }
 
     /// Merge authors, owners, contributors
-    pub async fn all_contributors<'a>(&self, krate: &'a RichCrateVersion) -> CResult<(Vec<CrateAuthor<'a>>, Vec<CrateAuthor<'a>>, bool, usize)> {
+    pub async fn all_contributors<'a>(&self, krate: &'a RichCrateVersion) -> CResult<(Vec<CrateAuthor<'a>>, Vec<CrateAuthor<'a>>, usize)> {
         let owners = self.crate_owners(krate.origin(), CrateOwners::All).await?;
 
+        let has_verified_repo = self.has_verified_repository_link(krate).await;
         let (hit_max_contributor_count, mut contributors_by_login) = match krate.repository() {
             // Only get contributors from github if the crate has been found in the repo,
             // otherwise someone else's repo URL can be used to get fake contributor numbers
-            Some(crate_repo) => watch("contrib", self.contributors_from_repo(crate_repo, &owners, self.has_verified_repository_link(krate).await)).await?,
-            None => (false, HashMap::new()),
+            Some(crate_repo) if has_verified_repo => watch("contrib", self.contributors_from_repo(crate_repo, has_verified_repo)).await?,
+            _ => (false, HashMap::new()),
         };
 
         let mut authors = HashMap::with_capacity(krate.authors().len());
+        let mut team_authors = Vec::new();
         for (i, author) in krate.authors().iter().enumerate() {
-                let mut ca = CrateAuthor {
-                    nth_author: Some(i),
-                    contribution: 0.,
-                    info: Some(Cow::Borrowed(author)),
-                    github: None,
-                    owner: false,
-                };
-                if let Some(ref email) = author.email {
-                    if let Ok(Some(github)) = self.user_db.user_by_email(email) {
-                        let id = github.id;
-                        ca.github = Some(github);
-                        authors.insert(AuthorId::GitHub(id), ca);
+            let mut ca = CrateAuthor {
+                nth_author: Some(i),
+                contribution: 0.,
+                info: Some(Cow::Borrowed(author)),
+                github: None,
+                owner: false,
+                is_a_team: false,
+            };
+            if let Some(ref email) = author.email {
+                if let Ok(Some(github)) = self.user_db.user_by_email(email) {
+                    let id = github.id;
+                    ca.github = Some(github);
+                    authors.insert(id, ca);
+                    continue;
+                }
+            }
+            if let Some(ref url) = author.url {
+                if let Some(rest) = url.to_ascii_lowercase().strip_prefix("https://github.com/") {
+                    let login = rest.split('/').next().expect("can't happen");
+                    if let Ok(Some(gh)) = self.user_by_github_login(login).await {
+                        let id = gh.id;
+                        ca.github = Some(gh);
+                        authors.insert(id, ca);
                         continue;
                     }
                 }
-                if let Some(ref url) = author.url {
-                    let gh_url = "https://github.com/";
-                    if url.to_ascii_lowercase().starts_with(gh_url) {
-                        let login = url[gh_url.len()..].split('/').next().expect("can't happen");
-                        if let Ok(Some(gh)) = self.user_by_github_login(login).await {
-                            let id = gh.id;
-                            ca.github = Some(gh);
-                            authors.insert(AuthorId::GitHub(id), ca);
-                            continue;
-                        }
-                    }
-                }
-                // name only, no email
-                if ca.github.is_none() && author.email.is_none() {
-                    if let Some(ref name) = author.name {
-                        if let Some((contribution, github)) = contributors_by_login.remove(&name.to_lowercase()) {
-                            let id = github.id;
-                            ca.github = Some(github);
-                            ca.info = None; // was useless; just a login; TODO: only clear name once it's Option
-                            ca.contribution = contribution;
-                            authors.insert(AuthorId::GitHub(id), ca);
-                            continue;
-                        }
-                    }
-                }
-                let key = author.email.as_ref().map(|e| AuthorId::Email(e.to_ascii_lowercase()))
-                    .or_else(|| author.name.as_ref().map(|n| AuthorId::Name(n.to_lowercase())))
-                    .unwrap_or(AuthorId::Meh(i));
-                authors.insert(key, ca);
             }
+            if let Some(ref name) = author.name.as_deref().or_else(|| author.email.as_deref().map(|e| e.split('@').next().unwrap())) {
+                let mut lc_ascii_name = deunicode::deunicode(name.trim());
+                lc_ascii_name.make_ascii_lowercase();
+                if let Some((contribution, github)) = contributors_by_login.remove(&lc_ascii_name) {
+                    let id = github.id;
+                    ca.github = Some(github);
+                    ca.info = None; // was useless; just a login; TODO: only clear name once it's Option
+                    ca.contribution = contribution;
+                    authors.insert(id, ca);
+                    continue;
+                }
+            }
+
+            if let Some(name) = author.name.as_deref() {
+                if author.email.is_none() && author.url.is_none() {
+                    let name = name.to_ascii_lowercase();
+                    if name.ends_with(" developers") || name.ends_with(" contributors") || name.ends_with(" team")  || name.ends_with(" members") {
+                        team_authors.push(author);
+                    }
+                }
+            }
+        }
 
         for owner in owners {
             if let Ok(user) = self.owners_github(&owner).await {
-                match authors.entry(AuthorId::GitHub(user.id)) {
+                match authors.entry(user.id) {
                     Occupied(mut e) => {
                         let e = e.get_mut();
                         if !owner.contributor_only {
                             e.owner = true;
                         }
-                        if e.info.is_none() {
-                            e.info = Some(Cow::Owned(Author {
-                                name: Some(owner.name().to_owned()).filter(|n| !n.is_empty()),
-                                email: None,
-                                url: owner.url.as_deref().map(|u| u.into()),
-                            }));
+                        let info = e.info.get_or_insert(Cow::Owned(Author { name: None, email: None, url: None, }));
+                        if info.name.is_none() {
+                            info.to_mut().name = Some(owner.name().to_owned()).filter(|n| !n.is_empty());
                         }
-                        if e.github.is_none() {
-                            e.github = Some(user);
-                        } else if let Some(ref mut gh) = e.github {
-                            if gh.name.is_none() && !owner.name().is_empty() {
-                                gh.name = Some(owner.name().into());
-                            }
+                        if info.url.is_none() && owner.url.is_some() {
+                            info.to_mut().url = owner.url.as_deref().map(|u| u.into());
+                        }
+                        let gh = e.github.get_or_insert(user);
+                        if gh.name.as_ref().map_or(false, |name| name == &gh.login) {
+                            gh.name = None;
+                        }
+                        if gh.name.is_none() && !owner.name().is_empty() {
+                            gh.name = Some(owner.name().into());
                         }
                     },
                     Vacant(e) => {
@@ -3032,6 +3036,7 @@ impl KitchenSink {
                             })),
                             nth_author: None,
                             owner: !owner.contributor_only,
+                            is_a_team: false,
                         });
                     },
                 }
@@ -3039,18 +3044,22 @@ impl KitchenSink {
         }
 
         for (_, (contribution, github)) in contributors_by_login {
-            authors.entry(AuthorId::GitHub(github.id))
+            authors.entry(github.id)
             .or_insert(CrateAuthor {
                 nth_author: None,
                 contribution: 0.,
                 info: None,
                 github: Some(github),
                 owner: false,
+                is_a_team: false,
             }).contribution += contribution;
         }
 
         for author in authors.values_mut() {
             if let Some(ref mut gh) = author.github {
+                if gh.name.as_ref().map_or(false, |name| name == &gh.login) {
+                    gh.name = None;
+                }
                 if gh.name.is_none() {
                     let res = self.user_by_github_login(&gh.login).await;
                     if let Ok(Some(new_gh)) = res {
@@ -3060,49 +3069,15 @@ impl KitchenSink {
             }
         }
 
-        let mut authors_by_name = HashMap::<String, CrateAuthor<'_>>::new();
-        for (_, a) in authors {
-            let mut lc_ascii_name = deunicode::deunicode(a.name());
-            lc_ascii_name.make_ascii_lowercase();
-            match authors_by_name.entry(lc_ascii_name) {
-                Occupied(mut e) => {
-                    let e = e.get_mut();
-                    if let (Some(e), Some(a)) = (e.github.as_ref(), a.github.as_ref()) {
-                        // different users? may fail on stale/renamed login name
-                        if !e.login.eq_ignore_ascii_case(&a.login) {
-                            continue;
-                        }
-                    }
-                    if e.github.is_none() {
-                        e.github = a.github;
-                    }
-                    // merge
-                    if a.owner {
-                        e.owner = true;
-                    }
-                    if e.info.is_none() {
-                        e.info = a.info;
-                    }
-                    if e.nth_author.is_none() {
-                        e.nth_author = a.nth_author;
-                    }
-                    e.contribution = e.contribution.max(a.contribution);
-                },
-                Vacant(e) => {
-                    e.insert(a);
-                },
-            }
-        }
-
-        let max_author_contribution = authors_by_name
+        let max_author_contribution = authors
             .values()
             .map(|a| if a.owner || a.nth_author.is_some() { a.contribution } else { 0. })
-            .max_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal))
+            .max_by(|a, b| a.total_cmp(b))
             .unwrap_or(0.);
         let big_contribution = if max_author_contribution < 50. { 200. } else { max_author_contribution / 2. };
 
         let mut contributors = 0;
-        let (mut authors, mut owners): (Vec<_>, Vec<_>) = authors_by_name.into_iter().map(|(_,v)|v)
+        let (mut authors_or_owners, mut passive_owners): (Vec<_>, Vec<_>) = authors.into_iter().map(|(_,v)|v)
             .filter(|a| if a.owner || a.nth_author.is_some() || a.contribution >= big_contribution {
                 true
             } else {
@@ -3114,46 +3089,35 @@ impl KitchenSink {
             });
 
 
-        authors.sort_unstable_by(|a, b| {
+        authors_or_owners.sort_unstable_by(|a, b| {
             fn score(a: &CrateAuthor<'_>) -> f64 {
                 let o = if a.owner { 200. } else { 1. };
                 o * (a.contribution + 10.) / (1 + a.nth_author.unwrap_or(99)) as f64
             }
-            score(b).partial_cmp(&score(a)).unwrap_or(Ordering::Equal)
+            score(b).total_cmp(&score(a))
         });
+        passive_owners.sort_unstable_by_key(|a| a.github.as_ref().map(|g| g.id).unwrap_or(0));
 
+        authors_or_owners.extend(team_authors.into_iter().take(3).map(|team| CrateAuthor {
+            owner: false,
+            nth_author: None,
+            contribution: 0.,
+            info: Some(Cow::Borrowed(team)),
+            github: None,
+            is_a_team: true,
+        }));
 
-        // this is probably author from contribs + author from authors field, which means it's a dupe.
-        // this needs to undo previous merge for the next check
-        if authors.len() == 2 && authors.iter().any(|a| !a.owner) && owners.is_empty() {
-            if let Some(index) = authors.iter().position(|a| a.owner) {
-                owners.push(authors.remove(index));
-            }
-        }
-        // That's a guess
-        if authors.len() == 1 && owners.len() == 1 && authors[0].github.is_none() {
-            let author_is_team = authors[0].likely_a_team();
-            let gh_is_team = owners[0].github.as_ref().map_or(false, |g| g.user_type == UserType::Org);
-            if author_is_team == gh_is_team {
-                let co = owners.remove(0);
-                authors[0].github = co.github;
-                authors[0].owner = co.owner;
-            }
-        }
+        authors_or_owners.truncate(15); // long lists look spammy
 
-        authors.truncate(20); // long lists look spammy
-
-        let owners_partial = authors.iter().any(|a| a.owner);
-        Ok((authors, owners, owners_partial, if hit_max_contributor_count { 100 } else { contributors }))
+        Ok((authors_or_owners, passive_owners, if hit_max_contributor_count { 100 } else { contributors }))
     }
 
     #[inline]
     async fn owners_github(&self, owner: &CrateOwner) -> CResult<User> {
+        let login = owner.github_login().ok_or(KitchenSinkErr::OwnerWithoutLogin)?;
+
         // This is a bit weak, since logins are not permanent
-        if let Some(user) = self.user_by_github_login(owner.github_login().ok_or(KitchenSinkErr::OwnerWithoutLogin)?).await? {
-            return Ok(user);
-        }
-        Err(KitchenSinkErr::OwnerWithoutLogin.into())
+        self.user_by_github_login(login).await?.ok_or_else(|| KitchenSinkErr::OwnerWithoutLogin.into())
     }
 
     #[inline]
@@ -3210,11 +3174,13 @@ impl KitchenSink {
                 if set == CrateOwners::Strict {
                     let mut owners = current_owners.await?;
                     // anyone can join rust-bus, so it's meaningless as a common owner between crates
-                    owners.retain(|o| !is_shared_collective_login(&o.crates_io_login) && o.github_id != Some(38887296));
+                    owners.retain(|o| !is_shared_collective_login(&o.crates_io_login));
                     owners
                 } else {
                     let (current_owners, meta) = futures::try_join!(current_owners, self.crates_io_meta(crate_name))?;
-                    Self::owners_from_audit(current_owners, meta)
+                    let mut res = Self::owners_from_audit(current_owners, meta);
+                    res.iter_mut().for_each(|o| if is_shared_collective_login(&o.crates_io_login) { o.contributor_only = true; });
+                    res
                 }
             },
             Origin::GitLab {..} => vec![],
@@ -3813,15 +3779,6 @@ pub struct Rustacean {
     pub notes: Option<String>,
 }
 
-/// This is used to uniquely identify authors based on as little information as is available
-#[derive(Debug, Hash, Eq, PartialEq)]
-enum AuthorId {
-    GitHub(u32),
-    Name(String),
-    Email(String),
-    Meh(usize),
-}
-
 #[derive(Debug, Clone)]
 pub struct CrateAuthor<'a> {
     /// Is identified as owner of the crate by crates.io API?
@@ -3834,31 +3791,27 @@ pub struct CrateAuthor<'a> {
     pub info: Option<Cow<'a, Author>>,
     /// From GitHub API and/or crates.io API
     pub github: Option<User>,
+
+    pub is_a_team: bool,
 }
 
 impl<'a> CrateAuthor<'a> {
-    pub fn likely_a_team(&self) -> bool {
-        let unattributed_name = self.github.is_none() && self.info.as_ref().map_or(true, |a| a.email.is_none() && a.url.is_none());
-        unattributed_name && (self.name().ends_with(" Developers") || self.name().ends_with(" contributors"))
-    }
-
     pub fn name(&self) -> &str {
+        if let Some(name) = self.github.as_ref().and_then(|g| g.name.as_deref()) {
+            if !name.trim_start().is_empty() {
+                return name;
+            }
+        }
         if let Some(name) = self.info.as_ref().and_then(|i| i.name.as_deref()) {
             if !name.trim_start().is_empty() {
                 return name;
             }
         }
         if let Some(ref gh) = self.github {
-            match &gh.name {
-                Some(name) if !name.trim_start().is_empty() => name,
-                _ => &gh.login,
-            }
+            &gh.login
+        } else if let Some(email) = self.info.as_ref().and_then(|i| i.email.as_deref()) {
+            email.split('@').next().unwrap()
         } else {
-            if let Some(ref info) = self.info {
-                if let Some(ref email) = &info.email {
-                    return email.split('@').next().unwrap();
-                }
-            }
             "?anon?"
         }
     }

@@ -60,7 +60,7 @@ pub struct CratePage<'a> {
     pub kitchen_sink: &'a KitchenSink,
     pub markup: &'a Renderer,
     pub top_keyword: Option<(u32, String)>,
-    pub all_contributors: (Vec<CrateAuthor<'a>>, Vec<CrateAuthor<'a>>, bool, usize),
+    pub all_contributors: (Vec<CrateAuthor<'a>>, Vec<CrateAuthor<'a>>, usize),
     /// own, deps (tarball, uncompressed source); last one is sloc
     pub sizes: Option<CrateSizes>,
     pub lang_stats: Option<(usize, Stats)>,
@@ -333,9 +333,10 @@ impl<'a> CratePage<'a> {
     }
 
     pub(crate) fn all_contributors(&self) -> Contributors<'_> {
-        let (ref authors, ref owners, co_owned, contributors) = self.all_contributors;
+        let (ref authors, ref owners, contributors) = self.all_contributors;
+        let co_owned = authors.iter().any(|a| a.owner);
         let period_after_authors = !owners.is_empty() && contributors == 0;
-        let contributors_as_a_team = authors.last().map_or(false, |last| last.likely_a_team());
+        let contributors_as_a_team = authors.last().map_or(false, |last| last.is_a_team);
         Contributors { authors: authors.clone(), owners: owners.clone(), co_owned, contributors, contributors_as_a_team, period_after_authors }
     }
 

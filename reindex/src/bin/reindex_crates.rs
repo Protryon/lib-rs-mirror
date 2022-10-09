@@ -265,7 +265,7 @@ impl Reindexer {
         }
 
         let contrib_info = run_timeout("contr", 20, crates.all_contributors(k)).await?;
-        let contributors_count = (contrib_info.0.len() + contrib_info.3) as u32;
+        let contributors_count = (contrib_info.0.len() + contrib_info.2) as u32;
 
         let owners = run_timeout("own", 20, crates.crate_owners(k.origin(), CrateOwners::All)).await?;
         let langs = k.language_stats();

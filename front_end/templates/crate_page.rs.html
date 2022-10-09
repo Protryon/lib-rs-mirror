@@ -91,11 +91,11 @@
       }
     }
     <p class=byline>
-      @if c.ver.is_yanked() {
-        was
-      }
-      by
       @if let Some(Contributors {authors, owners, co_owned, contributors, period_after_authors, contributors_as_a_team}) = Some(c.all_contributors()) {
+        @if c.ver.is_yanked() {
+          was
+        }
+        @if !authors.is_empty() { by }
         @for (last, a) in authors.iter().identify_last() {
           @if let Some(url) = url.author(a) {
             <a href="@url" @if a.owner {class="owner" title="owner"} else {class="contributor" title="contributor"}

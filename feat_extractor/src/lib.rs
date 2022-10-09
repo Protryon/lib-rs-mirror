@@ -45,12 +45,10 @@ fn extract_text_phrases(manifest: &Manifest, github_description: Option<&str>, r
     let mut out = Vec::new();
 
     if let Some(s) = &manifest.package().description() {
-        let s = s.to_lowercase();
-        out.push((1.0f32, s));
+        out.push((1.0f32, s.to_lowercase()));
     }
     if let Some(s) = github_description {
-        let s = s.to_lowercase();
-        out.push((1., s));
+        out.push((1., s.to_lowercase()));
     }
 
     let own_name = manifest.package().name();
@@ -59,37 +57,45 @@ fn extract_text_phrases(manifest: &Manifest, github_description: Option<&str>, r
     let install_boilerplate3 = format!("{own_name} = \"");
     for (section, text) in readme_by_section.iter() {
         let section_s = section.trim().to_lowercase();
-        let section = section_s.trim_end_matches('s'); // singular
+        let section = section_s
+            .trim_start_matches(|c: char| c as u32 > 0xFFFF) // strip decorative emoji
+            .trim_start_matches("the ").trim_start_matches("rust ")
+            .trim_end_matches('s') // singular
+            .trim_end_matches(" crate");
+
         // skip boilerplate
         if section.starts_with("minimum supported rust") || section.starts_with("minimum rust version") {
             continue;
         }
-        if matches!(section, "license" | "contact" | "contribution" | "contributing" | "copyright" | "sponsor" | "financial support" | "license and link" |
+        if matches!(section, "license" | "contact" | "get help" | "contribution" | "contributing" | "copyright" | "sponsor" | "financial support" | "license and link" |
             "semantic versioning" | "compatibility policy" | "maintenance" | "building" | "msrv" | "out of scope" | "minimum rustc" |
-             "rust version compatibility" | "rust version support" | "release schedule" | "supported rust version" | "install rust") {
+             "version compatibility" | "version support" | "code of conduct" | "version policy" | "release schedule" | "supported rust version" | "get it from crates.io" | "install rust") {
             continue;
         }
-        let relevance = if matches!(section, "info" | "tldr" | "introduction" | "main feature" | "overview" | "how it work") || section.starts_with("about") || section == own_name { 1.0 }
-        else if matches!(section, "feature flag" | "feature" | "") || section.starts_with("example") || section.starts_with("usage example") { 0.6 }
+        let relevance = if matches!(section, "info" | "how does it work" | "use case" | "tldr" | "summary" | "description" | "introduction" | "main feature" | "overview" | "how it work") || section.starts_with("about") || section == own_name { 1.0 }
+        else if matches!(section, "feature flag" | "feature" | "" | "basic example") || section.starts_with("example") || section.starts_with("usage example") { 0.6 }
         else if matches!(section, "usage" | "how to use") { 0.5 }
         else if matches!(section, "getting started" | "quickstart" | "documentation") || section.starts_with("compiling") { 0.3 }
-        else if section.starts_with("install") || matches!(section, "change" | "开发示例" | "ci" | "table of content" | "setup" | "dependencie" | "limitation" | "safety" |
-            "alternative" | "other project" | "related project" | "credit" | "acknowledgement" | "changelog" | "benchmark" | "platform" | "rust version" | "getting help" |
-            "release history" | "troubleshooting" | "see also" | "requirement" | "recent change" | "contact") { 0.1 }
+        else if section.starts_with("install") || section.starts_with("contributing") || section.starts_with("license") || section_s.starts_with("rust version") ||
+            matches!(section, "change" | "开发示例" | "ci" | "table of content" | "setup" | "dependencie" | "limitation" | "safety" |
+            "alternative" | "other project" | "related project" | "credit" | "participating" | "acknowledgement" | "changelog" | "benchmark" | "platform" | "rust version" | "getting help" |
+            "release history" | "troubleshooting" | "testing" | "authors and acknowledgment" | "badge" | "building from source" | "see also" |
+            "author" | "warning" | "versioning" | "disclaimer" | "requirement" | "recent change" | "contact") { 0.1 }
         else {
-            out.push((0.1, section_s));
+            out.push((if section_s.contains(own_name) {1.} else {0.1}, section_s));
             0.4
         };
 
         // render readme to DOM, extract nodes
         for par in text.split('\n') {
             let par = par.trim_start_matches(|c: char| c.is_whitespace() || c == '#' || c == '=' || c == '*' || c == '-');
-            let par = par.to_lowercase().replace("http://", " ").replace("https://", " ").replace("the rust programming language", "rust");
+            let par = par.to_lowercase();
             if par.contains("[dependencies]") || par.contains(&install_boilerplate1) || par.contains(&install_boilerplate2) || par.contains(&install_boilerplate3) {
                 continue;
             }
             if par.starts_with("licensed under either of") || par.starts_with("license:") || par.starts_with("this code is licensed under")
-            || par.starts_with("unless you explicitly state otherwise, any contribution") || par.contains("apache license 2.0") {
+            || par.starts_with("unless you explicitly state otherwise, any contribution") || par.contains("apache license 2.0")
+            || par.starts_with("add to cargo.toml") || par.starts_with("at your option") {
                 continue;
             }
             if !par.trim_start().is_empty() {
@@ -100,9 +106,10 @@ fn extract_text_phrases(manifest: &Manifest, github_description: Option<&str>, r
 
     out.sort_unstable_by(|a,b| b.0.total_cmp(&a.0));
     let mut len = 0;
-    out.retain(|(_, par)| if len > 300 {
+    out.retain_mut(|(_, par)| if len > 300 {
             false
         } else {
+            *par = par.replace("http://", " ").replace("https://", " ").replace("the rust programming language", "rust");
             len += par.len();
             true
         });

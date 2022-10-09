@@ -11,6 +11,7 @@ use event_log::EventLog;
 use anyhow::Context;
 use feat_extractor::is_deprecated_requirement;
 use futures::TryFutureExt;
+use tokio::task::block_in_place;
 use tokio::time::Instant;
 
 pub use crate::yearly::*;
@@ -1984,7 +1985,7 @@ impl KitchenSink {
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
         let user = self.gh.user_by_login(&user.login).await?.ok_or_else(|| KitchenSinkErr::AuthorNotFound(user.login.clone()))?;
         if !self.user_db.email_has_github(&commit.email)? {
-            println!("{} => {}", commit.email, user.login);
+            info!("{} => {}", commit.email, user.login);
             self.user_db.index_user(&user, Some(&commit.email), commit.name.as_deref())?;
         }
         Ok(())
@@ -1994,7 +1995,7 @@ impl KitchenSink {
     pub fn index_user(&self, user: &User, commit: &GitCommitAuthor) -> CResult<()> {
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
         if !self.user_db.email_has_github(&commit.email)? {
-            println!("{} => {}", commit.email, user.login);
+            info!("{} => {}", commit.email, user.login);
             self.user_db.index_user(user, Some(&commit.email), commit.name.as_deref())?;
         }
         Ok(())
@@ -2007,12 +2008,12 @@ impl KitchenSink {
             match self.gh.user_by_email(email).await {
                 Ok(Some(users)) => {
                     for user in users {
-                        println!("{} == {} ({:?})", user.login, email, name);
+                        info!("{login} == {email} ({name:?})", login = user.login);
                         self.user_db.index_user(&user, Some(email), name)?;
                     }
                 },
-                Ok(None) => println!("{} not found on github", email),
-                Err(e) => error!("•••• {}", e),
+                Ok(None) => warn!("{email} not found on github"),
+                Err(e) => error!("•••• {e}"),
             }
         }
         Ok(())
@@ -2387,16 +2388,16 @@ impl KitchenSink {
             if gh.created_at.is_some() { // unfortunately name is optional and can be None
                 return Ok(Some(gh));
             } else {
-                debug!("db gh user missing created_at {}", github_login);
+                debug!("db gh user missing created_at {github_login}");
             }
         } else {
-            debug!("gh user cache miss {}", github_login);
+            debug!("gh user cache miss {github_login}");
         }
-        let u = Box::pin(self.gh.user_by_login(github_login)).await.map_err(|e| {error!("gh user {}: {}", github_login, e); e})?; // errs on 404
+        let u = Box::pin(self.gh.user_by_login(github_login)).await.map_err(|e| {error!("gh user {github_login}: {e}"); e})?; // errs on 404
         if let Some(u) = &u {
             let _ = tokio::task::block_in_place(|| {
                 self.user_db.index_user(u, None, None)
-                    .map_err(|e| error!("index user {}: {} {:?}", github_login, e, u))
+                    .map_err(|e| error!("index user {github_login}: {e} {u:?}"))
             });
         }
         debug!("fetched user {:?}", u);
@@ -3114,7 +3115,9 @@ impl KitchenSink {
 
     #[inline]
     async fn owners_github(&self, owner: &CrateOwner) -> CResult<User> {
-        let login = owner.github_login().ok_or(KitchenSinkErr::OwnerWithoutLogin)?;
+        let login = owner.github_id.and_then(|id| self.login_by_github_id(id.into()).ok());
+        let login = login.as_deref().or_else(|| owner.github_login())
+            .ok_or(KitchenSinkErr::OwnerWithoutLogin)?;
 
         // This is a bit weak, since logins are not permanent
         self.user_by_github_login(login).await?.ok_or_else(|| KitchenSinkErr::OwnerWithoutLogin.into())
@@ -3455,38 +3458,40 @@ impl KitchenSink {
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
         self.crate_db.index_crate_all_owners(&all_owners).await?;
 
-        let users = all_owners.iter().flat_map(|(_, owners)| owners.iter().filter_map(|o| {
-            let login = if o.crates_io_login.starts_with("github:") {
-                o.github_login().unwrap().into()
-            } else {
-                o.crates_io_login.clone()
-            };
-            Some(User {
-                id: o.github_id?,
-                login,
-                name: o.name.clone(),
-                avatar_url: o.avatar.clone(),
-                gravatar_id: None,
-                html_url: o.url.as_deref().unwrap_or("").into(),
-                blog: None,
-                user_type: match o.kind {
-                    OwnerKind::Team => UserType::Org,
-                    OwnerKind::User => UserType::User,
-                },
-                created_at: None,
-                two_factor_authentication: None,
-            })
-        })).collect::<Vec<_>>();
+        block_in_place(|| {
+            let users = all_owners.iter().flat_map(|(_, owners)| owners.iter().filter_map(|o| {
+                let login = if o.crates_io_login.starts_with("github:") {
+                    o.github_login().unwrap().into()
+                } else {
+                    o.crates_io_login.clone()
+                };
+                Some(User {
+                    id: o.github_id?,
+                    login,
+                    name: o.name.clone(),
+                    avatar_url: o.avatar.clone(),
+                    gravatar_id: None,
+                    html_url: o.url.as_deref().unwrap_or("").into(),
+                    blog: None,
+                    user_type: match o.kind {
+                        OwnerKind::Team => UserType::Org,
+                        OwnerKind::User => UserType::User,
+                    },
+                    created_at: None,
+                    two_factor_authentication: None,
+                })
+            })).collect::<Vec<_>>();
 
-        if stopped() {return Err(KitchenSinkErr::Stopped.into());}
-        self.user_db.index_users(&users)?;
+            if stopped() {return Err(KitchenSinkErr::Stopped.into());}
+            self.user_db.index_users(&users, None)?;
 
-        for (origin, owners) in all_owners {
-            if let Origin::CratesIo(name) = origin {
-                self.crates_io_owners_cache.set(name, owners)?;
+            for (origin, owners) in all_owners {
+                if let Origin::CratesIo(name) = origin {
+                    self.crates_io_owners_cache.set(name, owners)?;
+                }
             }
-        }
-        Ok(())
+            Ok(())
+        })
     }
 
     // Sorted from the top, returns origins

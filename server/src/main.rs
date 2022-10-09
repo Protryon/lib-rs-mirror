@@ -689,7 +689,7 @@ async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
             return render_404_page(state, login, "user").await;
         }
     };
-    if aut.github.login != login {
+    if aut.github.login != login && aut.github.login.to_ascii_uppercase() != login { // FIXME: for transition lowercase urls are allowed
         return Ok(HttpResponse::PermanentRedirect().insert_header(("Location", format!("/~{}", Encoded(&aut.github.login)))).body(""));
     }
     let crates = state.crates.load();
@@ -738,7 +738,7 @@ async fn handle_maintainer_dashboard(req: HttpRequest, atom_feed: bool) -> Resul
             return render_404_page(state, login, "user").await;
         }
     };
-    if aut.github.login != login && !atom_feed {
+    if aut.github.login != login && aut.github.login.to_ascii_lowercase() != login && !atom_feed {
         return Ok(HttpResponse::PermanentRedirect().insert_header(("Location", format!("/~{}/dash", Encoded(&aut.github.login)))).body(""));
     }
 

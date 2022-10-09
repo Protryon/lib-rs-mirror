@@ -10,15 +10,17 @@ impl UserDb {
             BEGIN;
             CREATE TABLE IF NOT EXISTS github_users (
                 id            INTEGER NOT NULL,
-                login         TEXT NOT NULL,
+                login         TEXT NOT NULL, -- lowercase
+                login_case    TEXT, -- case-preserving
                 name          TEXT,
                 avatar_url    TEXT,
                 gravatar_id   TEXT,
                 html_url      TEXT,
                 type          TEXT NOT NULL DEFAULT 'user',
                 two_factor_authentication INTEGER,
+                blog       TEXT,
                 created_at TEXT,
-                blog TEXT,
+                fetched_timestamp INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY(id, login)
             );
             DROP INDEX IF EXISTS "github_users_idx";

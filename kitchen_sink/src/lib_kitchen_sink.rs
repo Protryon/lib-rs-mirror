@@ -2962,7 +2962,7 @@ impl KitchenSink {
                 is_a_team: false,
             };
             if let Some(ref email) = author.email {
-                if let Ok(Some(github)) = self.user_db.user_by_email(email) {
+                if let Ok(Some(github)) = self.user_by_email(email) {
                     let id = github.id;
                     ca.github = Some(github);
                     authors.insert(id, ca);
@@ -3019,7 +3019,7 @@ impl KitchenSink {
                             info.to_mut().url = owner.url.as_deref().map(|u| u.into());
                         }
                         let gh = e.github.get_or_insert(user);
-                        if gh.name.as_ref().map_or(false, |name| name == &gh.login) {
+                        if gh.name.as_ref().map_or(false, |name| name.eq_ignore_ascii_case(&gh.login)) {
                             gh.name = None;
                         }
                         if gh.name.is_none() && !owner.name().is_empty() {
@@ -3058,7 +3058,7 @@ impl KitchenSink {
 
         for author in authors.values_mut() {
             if let Some(ref mut gh) = author.github {
-                if gh.name.as_ref().map_or(false, |name| name == &gh.login) {
+                if gh.name.as_ref().map_or(false, |name| name.eq_ignore_ascii_case(&gh.login)) {
                     gh.name = None;
                 }
                 if gh.name.is_none() {

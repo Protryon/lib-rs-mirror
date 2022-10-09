@@ -19,7 +19,6 @@ impl UserDb {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
         let db = Self::db(path.as_ref())?;
         db.execute_batch("
-            PRAGMA synchronous = 0;
             PRAGMA journal_mode = WAL;")?;
         Ok(Self {
             conn: Mutex::new(db),
@@ -73,7 +72,8 @@ impl UserDb {
             .as_i64_or_null()?.unwrap_or(0) as u64;
         let mut login = row.get_ref_unwrap(10).as_str_or_null()?.map(Ok)
             .unwrap_or_else(|| row.get_ref_unwrap(1).as_str())?;
-        let name = row.get_ref_unwrap(2).as_str_or_null()?;
+        let name = row.get_ref_unwrap(2).as_str_or_null()?
+            .filter(|n| !n.is_empty());
         if let Some(name) = name {
             if name.eq_ignore_ascii_case(login) {
                 login = name;
@@ -83,8 +83,8 @@ impl UserDb {
             id: row.get_unwrap(0),
             login: login.into(),
             name: name.map(From::from),
-            avatar_url: row.get_unwrap(3),
-            gravatar_id: row.get_unwrap(4),
+            avatar_url: row.get_unwrap::<_, Option<Box<str>>>(3).filter(|n| !n.is_empty()),
+            gravatar_id: row.get_unwrap::<_, Option<Box<str>>>(4).filter(|n| !n.is_empty()),
             html_url: row.get_unwrap(5),
             user_type: match row.get_ref_unwrap(6).as_str().unwrap() {
                 "org" => UserType::Org,
@@ -92,8 +92,8 @@ impl UserDb {
                 _ => UserType::User,
             },
             two_factor_authentication: row.get_unwrap(7),
-            created_at: row.get_unwrap(8),
-            blog: row.get_unwrap(9),
+            created_at: row.get_unwrap::<_, Option<Box<str>>>(8).filter(|n| !n.is_empty()),
+            blog: row.get_unwrap::<_, Option<Box<str>>>(9).filter(|n| !n.is_empty()),
         }))
     }
 
@@ -107,10 +107,28 @@ impl UserDb {
     }
 
     pub fn user_by_email(&self, email: &str) -> Result<Option<User>> {
+        let std_suffix = "@users.noreply.github.com";
+        if let Some(rest) = email.strip_suffix(std_suffix) {
+            if let Some(id) = rest.split('+').next().and_then(|id| id.parse().ok()) {
+                if let Ok(login) = self.login_by_github_id(id) {
+                    return self.user_by_github_login(&login);
+                }
+            }
+        }
+        if let Some(u) = self.user_by_email_inner(email)? {
+            return Ok(Some(u));
+        }
+        if let Some(fallback) = unplussed(email) {
+            return self.user_by_email_inner(&fallback);
+        }
+        Ok(None)
+    }
+
+    fn user_by_email_inner(&self, email: &str) -> Result<Option<User>> {
         let res = self.user_by_query(r"SELECT
                 u.id,
                 u.login,
-                u.name,
+                COALESCE(u.name, e.name) as name,
                 u.avatar_url,
                 u.gravatar_id,
                 u.html_url,
@@ -167,9 +185,9 @@ impl UserDb {
             let args: &[&dyn ToSql] = &[
                 &user.id,
                 &login_lowercase,
-                &user.name.as_deref(),
-                &user.avatar_url,
-                &user.gravatar_id,
+                &user.name.as_deref().filter(|n| !n.eq_ignore_ascii_case(&login_lowercase)),
+                &user.avatar_url.as_deref().filter(|n| !n.is_empty()),
+                &user.gravatar_id.as_deref().filter(|n| !n.is_empty()),
                 &user.html_url,
                 &match user.user_type {
                     UserType::User => "user",
@@ -177,8 +195,8 @@ impl UserDb {
                     UserType::Bot => "bot",
                 },
                 &user.two_factor_authentication,
-                &user.created_at,
-                &user.blog,
+                &user.created_at.as_deref().filter(|n| !n.is_empty()),
+                &user.blog.as_deref().filter(|n| !n.is_empty()),
                 &if user.login != login_lowercase { Some(user.login.as_str()) } else { None },
                 &timestamp,
             ];
@@ -192,16 +210,30 @@ impl UserDb {
         let tx = conn.transaction()?;
         {
             Self::insert_users_inner(&tx, std::slice::from_ref(user), Some(SystemTime::now()))?;
-            let mut insert_email = tx.prepare_cached("INSERT OR REPLACE INTO github_emails (
-                github_id, email, name) VALUES (?1, ?2, ?3)")?;
             if let Some(e) = email {
-                let args: &[&dyn ToSql] = &[&user.id, &e.to_ascii_lowercase(), &name];
+                let mut insert_email = tx.prepare_cached("INSERT OR REPLACE INTO github_emails (
+                    github_id, email, name) VALUES (?1, ?2, ?3)")?;
+                let name = name.filter(|n| !n.trim_start().is_empty() && !n.eq_ignore_ascii_case(&user.login));
+                let email = e.to_ascii_lowercase();
+                let args: &[&dyn ToSql] = &[&user.id, &email, &name];
                 insert_email.execute(args)?;
+
+                if let Some(plain) = unplussed(&email) {
+                    let args: &[&dyn ToSql] = &[&user.id, &plain, &name];
+                    insert_email.execute(args)?;
+                }
             }
         }
         tx.commit()?;
         Ok(())
     }
+}
+
+fn unplussed(email: &str) -> Option<String> {
+    let mut parts = email.split('+');
+    let u = parts.next()?;
+    let rest = parts.next()?.split('@').nth(1)?;
+    Some(format!("{u}@{rest}"))
 }
 
 #[test]

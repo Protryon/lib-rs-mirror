@@ -82,8 +82,8 @@ impl GitHub {
 
     pub async fn user_by_email(&self, email: &str) -> CResult<Option<Vec<User>>> {
         let std_suffix = "@users.noreply.github.com";
-        if email.ends_with(std_suffix) {
-            let login = email[0..email.len() - std_suffix.len()].split('+').last().unwrap();
+        if let Some(rest) = email.strip_suffix(std_suffix) {
+            let login = rest.split('+').last().unwrap();
             if let Some(user) = self.user_by_login(login).await? {
                 return Ok(Some(vec![user]));
             }

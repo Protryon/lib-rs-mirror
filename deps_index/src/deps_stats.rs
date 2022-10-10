@@ -1,7 +1,6 @@
 use crate::index::*;
 use crate::DepsErr;
 use crate::Origin;
-use parking_lot::Mutex;
 use rayon::prelude::*;
 use string_interner::symbol::SymbolU32 as Sym;
 use smartstring::alias::String as SmolStr;
@@ -18,13 +17,13 @@ pub struct DepsStats {
 
 #[derive(Debug, Clone, Default)]
 pub struct RevDepCount {
-    pub def: u16,
-    pub opt: u16,
+    pub def: u32,
+    pub opt: u32,
 }
 
 impl RevDepCount {
     pub fn all(&self) -> u32 {
-        self.def as u32 + self.opt as u32
+        self.def + self.opt
     }
 }
 
@@ -69,7 +68,7 @@ pub struct DepInf {
 }
 
 pub struct DepVisitor {
-    node_visited: FxHashSet<(DepInf, *const Mutex<DepSet>)>,
+    node_visited: FxHashSet<(DepInf, *const DepSet)>,
 }
 
 impl DepVisitor {
@@ -80,12 +79,10 @@ impl DepVisitor {
     }
 
     pub(crate) fn visit(&mut self, depset: &ArcDepSet, depinf: DepInf, mut cb: impl FnMut(&mut Self, &DepName, &Dep)) {
-        let target_addr: &Mutex<FxHashMap<DepName, Dep>> = depset;
+        let target_addr: &FxHashMap<DepName, Dep> = depset;
         if self.node_visited.insert((depinf, target_addr as *const _)) {
-            if let Some(depset) = depset.try_lock() {
-                for (name, dep) in depset.iter() {
-                    cb(self, name, dep);
-                }
+            for (name, dep) in depset.iter() {
+                cb(self, name, dep);
             }
         }
     }
@@ -162,15 +159,15 @@ impl Index {
     pub(crate) fn get_deps_stats(&self) -> DepsStats {
         let crates = self.crates_io_crates();
         let crates: Vec<(SmolStr, FxHashMap<_,_>)> = crates
-        .par_iter()
-        .filter_map(|(_, c)| {
-            self.all_dependencies_flattened(c)
-            .ok()
-            .filter(|collected| !collected.is_empty())
-            .map(|dep| {
-                (c.name().to_ascii_lowercase().into(), dep)
-            })
-        }).collect();
+            .par_iter()
+            .filter_map(|(name_lowercase, c)| {
+                self.all_dependencies_flattened(c)
+                .ok()
+                .filter(|collected| !collected.is_empty())
+                .map(|deps| {
+                    (name_lowercase.clone(), deps)
+                })
+            }).collect();
 
         self.clear_cache();
 
@@ -189,9 +186,9 @@ impl Index {
                             n.direct.runtime = n.direct.runtime.checked_add(1).expect("overflow");
                         }
                         if depinf.default {
-                            n.runtime.def = n.runtime.def.checked_add(1).expect("overflow");
+                            n.runtime.def += 1;
                         } else {
-                            n.runtime.opt = n.runtime.opt.checked_add(1).expect("overflow");
+                            n.runtime.opt += 1;
                         }
                     },
                     DepTy::Build => {
@@ -200,9 +197,9 @@ impl Index {
                             n.direct.build = n.direct.build.checked_add(1).expect("overflow");
                         }
                         if depinf.default {
-                            n.build.def = n.build.def.checked_add(1).expect("overflow");
+                            n.build.def += 1;
                         } else {
-                            n.build.opt = n.build.opt.checked_add(1).expect("overflow");
+                            n.build.opt += 1;
                         }
                     },
                     DepTy::Dev => {

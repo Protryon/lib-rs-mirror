@@ -2029,14 +2029,14 @@ impl KitchenSink {
     pub fn index_crate_downloads(&self, crates_io_name: &str, by_ver: &HashMap<&str, &[(Date<Utc>, u32, bool)]>) -> CResult<()> {
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
         let mut year_data = HashMap::new();
-        for (version, date_dls) in by_ver {
-            let version = MiniVer::from(match semver::Version::parse(version) {
+        for (&version, &date_dls) in by_ver {
+            let version = match MiniVer::try_from(version) {
                 Ok(v) => v,
                 Err(e) => {
                     warn!("Bad version: {} {} {}", crates_io_name, version, e);
                     continue;
                 }
-            });
+            };
             for (day, dls, overwrite) in date_dls.iter() {
                 let curr_year = day.year() as u16;
                 let mut curr_year_data = match year_data.entry(curr_year) {

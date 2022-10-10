@@ -1,3 +1,5 @@
+use dashmap::DashMap;
+use old_semver::SemVerError;
 use rayon::prelude::*;
 pub use crates_index::DependencyKind;
 pub use crates_index::Version;
@@ -8,7 +10,6 @@ use crates_index::Crate;
 use crates_index::Dependency;
 use double_checked_cell_async::DoubleCheckedCell;
 use log::{debug, info, error};
-use parking_lot::Mutex;
 use parking_lot::RwLock;
 use rich_crate::Origin;
 use rich_crate::RichCrateVersion;
@@ -17,7 +18,6 @@ use semver::Version as SemVer;
 use semver::VersionReq;
 use serde_derive::*;
 use smartstring::alias::String as SmolStr;
-use std::iter;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use std::time::Instant;
@@ -27,7 +27,7 @@ use ahash::{HashMap, HashSet};
 use feat_extractor::is_deprecated_requirement;
 use triomphe::Arc;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Default)]
 pub struct MiniVer {
     pub major: u16,
     pub minor: u16,
@@ -38,6 +38,15 @@ pub struct MiniVer {
 
 impl MiniVer {
     pub fn to_semver(&self) -> SemVer {
+        if self.pre.is_empty() && self.build == 0 {
+            return SemVer {
+                major: self.major.into(),
+                minor: self.minor.into(),
+                patch: self.patch.into(),
+                pre: semver::Prerelease::EMPTY,
+                build: semver::BuildMetadata::EMPTY
+            };
+        }
         old_semver::Version {
             major: self.major.into(),
             minor: self.minor.into(),
@@ -134,7 +143,7 @@ pub struct Index {
     git_index: GitIndex,
 
     pub inter: RwLock<StringInterner<Sym, string_interner::backend::StringBackend<Sym>>>,
-    pub cache: RwLock<HashMap<(SmolStr, Features), ArcDepSet>>,
+    pub cache: DashMap<(SmolStr, Features), ArcDepSet, ahash::RandomState>,
     deps_stats: DoubleCheckedCell<DepsStats>,
 }
 
@@ -146,23 +155,27 @@ impl Index {
         let crates_io_index = crates_index::Index::with_path(&crates_index_path, "https://github.com/rust-lang/crates.io-index")
         .map_err(|e| DepsErr::Crates(e.to_string()))?;
         let indexed_crates: HashMap<_,_> = crates_io_index.crates_parallel()
-                .filter_map(|c| {
-                    let c = c.unwrap();
-                    let name = c.name().to_ascii_lowercase();
-                    if name == "test+package" {
-                        return None; // crates-io bug
-                    }
-                    assert!(Origin::is_valid_crate_name(&name), "{}", &name);
-                    Some((name.into(), c))
-                })
-                .collect();
+            .filter_map(|c| {
+                debug_assert!(c.is_ok());
+                let c = c.ok()?;
+                if c.name() == "test+package" {
+                    return None; // crates-io bug
+                }
+                let mut name = SmolStr::from(c.name());
+                if !name.bytes().all(|c| c.is_ascii_lowercase() || c == b'_' || c == b'-') {
+                    name = c.name().to_ascii_lowercase().into();
+                }
+                debug_assert!(Origin::is_valid_crate_name(&name), "{name}");
+                Some((name, c))
+            })
+            .collect();
         info!("Scanned crates index in {}…", start.elapsed().as_millis() as u32);
-        if indexed_crates.len() < 72000 {
+        if indexed_crates.len() < 90_000 {
             return Err(DepsErr::IndexBroken);
         }
         Ok(Self {
             git_index: GitIndex::new(data_dir)?,
-            cache: RwLock::new(HashMap::with_capacity_and_hasher(5000, Default::default())),
+            cache: DashMap::with_capacity_and_hasher(10000, Default::default()),
             inter: RwLock::new(StringInterner::new()),
             deps_stats: DoubleCheckedCell::new(),
             indexed_crates,
@@ -260,7 +273,7 @@ impl Index {
 
     fn deps_of_crate_int(&self, latest: &impl IVersion, features: Box<[SmolStr]>, DepQuery { default, all_optional, dev }: DepQuery) -> Result<Dep, DepsErr> {
         Ok(Dep {
-            semver: semver_parse(latest.version()).into(),
+            semver: latest.version().try_into().map_err(|_| DepsErr::SemverParsingError)?,
             runtime: self.deps_of_ver(latest, Features {
                 all_targets: all_optional,
                 default,
@@ -279,17 +292,21 @@ impl Index {
     }
 
     pub(crate) fn deps_of_ver(&self, ver: &impl IVersion, wants: Features) -> Result<ArcDepSet, DepsErr> {
-        let key = (format!("{}-{}", ver.name(), ver.version()).into(), wants);
-        if let Some(cached) = self.cache.read().get(&key) {
-            return Ok(cached.clone());
+        let mut key = SmolStr::new();
+        key.push_str(ver.name());
+        key.push('-');
+        key.push_str(ver.version());
+        let key = (key, wants);
+
+        if let Some(cached) = self.cache.get(&key) {
+            return Ok(Arc::clone(&cached));
         }
         let (key_id_part, wants) = key;
 
         let ver_features = ver.features(); // available features
         let mut to_enable = HashMap::with_capacity_and_hasher(wants.features.len(), Default::default());
-        let all_wanted_features = wants.features.iter()
-                        .map(|s| s.as_ref())
-                        .chain(iter::repeat("default").take(if wants.default {1} else {0}));
+        let all_wanted_features = wants.features.iter().map(|s| s.as_str())
+                        .chain(if wants.default { Some("default") } else { None });
         for feat in all_wanted_features {
             if let Some(feature_descriptors) = ver_features.get_feature_descriptors(feat) {
                 for feat_des in feature_descriptors {
@@ -297,25 +314,25 @@ impl Index {
                     let dep_descriptor = t.next().unwrap();
                     let subfeatures = t.next();
                     let dep_name = dep_descriptor.trim_start_matches("dep:").trim_end_matches('?');
-                    let enabled = to_enable.entry(dep_name.to_owned())
+                    let enabled = to_enable.entry(unicase::Ascii::new(dep_name))
                         .or_insert_with(HashSet::default);
                     if let Some(subfeatures) = subfeatures {
                         enabled.insert(subfeatures);
                     }
                 }
             } else {
-                to_enable.entry(feat.to_owned()).or_insert_with(HashSet::default);
+                to_enable.entry(unicase::Ascii::new(feat)).or_insert_with(HashSet::default);
             }
         }
 
         let deps = ver.dependencies();
-        let mut set: HashMap<DepName, (_, _, SemVer, HashSet<String>)> = HashMap::with_capacity_and_hasher(60, Default::default());
+        let mut set: HashMap<DepName, (_, _, HashSet<&str>)> = HashMap::with_capacity_and_hasher(60, Default::default());
         let mut iter1;
         let mut iter2;
         let deps: &mut dyn Iterator<Item = _> = match deps {
             Fudge::CratesIo(dep) => {
                 iter1 = dep.iter().map(|d| {
-                    (d.crate_name().to_ascii_lowercase(), d.kind(), d.target().is_some(), d.is_optional(), d.requirement(), d.has_default_features(), d.features())
+                    (d.crate_name(), d.kind(), d.target().is_some(), d.is_optional(), d.requirement(), d.has_default_features(), d.features())
                 });
                 &mut iter1
             },
@@ -324,21 +341,19 @@ impl Index {
                 .chain(dev.iter().map(|r| (r, DependencyKind::Dev)))
                 .chain(build.iter().map(|r| (r, DependencyKind::Build)))
                 .map(|(r, kind)| {
-                    (r.package.to_ascii_lowercase(), kind, !r.only_for_targets.is_empty(), r.is_optional(), r.dep.req(), true, &r.with_features[..])
+                    (&*r.package, kind, !r.only_for_targets.is_empty(), r.is_optional(), r.dep.req(), true, &r.with_features[..])
                 });
                 &mut iter2
             },
         };
         for (crate_name, kind, target_specific, is_optional, requirement, has_default_features, features) in deps {
-            debug_assert_eq!(crate_name, crate_name.to_ascii_lowercase());
-
             // people forget to include winapi conditionally
-            let is_target_specific = crate_name == "winapi" || target_specific;
+            let is_target_specific = target_specific || crate_name == "winapi";
             if !wants.all_targets && is_target_specific {
                 continue; // FIXME: allow common targets?
             }
             // hopefully nobody uses clippy at runtime, they just fail to make it dev dep
-            if !wants.dev && crate_name == "clippy" && is_optional {
+            if !wants.dev && is_optional && crate_name == "clippy" {
                 continue;
             }
 
@@ -349,12 +364,17 @@ impl Index {
                 _ => continue,
             }
 
-            let enable_dep_features = to_enable.get(&crate_name);
+
+            let enable_dep_features = to_enable.get(&unicase::Ascii::new(crate_name));
             if is_optional && enable_dep_features.is_none() {
                 continue;
             }
 
             let req = VersionReq::parse(requirement).map_err(|_| DepsErr::SemverParsingError)?;
+
+            let tmp;
+            let crate_name: &str = if crate_name.bytes().all(|c| c.is_ascii_lowercase() || c == b'-' || c == b'_') { crate_name } else { tmp = crate_name.to_ascii_lowercase(); &tmp };
+            debug_assert_eq!(crate_name, crate_name.to_ascii_lowercase());
             let krate = match self.crates_io_crate_by_lowercase_name(&crate_name) {
                 Ok(k) => k,
                 Err(e) => {
@@ -362,7 +382,7 @@ impl Index {
                     continue;
                 },
             };
-            let (matched, semver) = krate.versions().iter().rev()
+            let (matched, _) = krate.versions().iter().rev()
                 .filter(|v| !v.is_yanked())
                 .filter_map(|v| Some((v, SemVer::parse(v.version()).ok()?)))
                 .find(|(_, semver)| {
@@ -376,34 +396,32 @@ impl Index {
 
             let key = {
                 let mut inter = self.inter.write();
-                debug_assert_eq!(crate_name, crate_name.to_ascii_lowercase());
                 (inter.get_or_intern(crate_name), inter.get_or_intern(matched.version()))
             };
 
-            let (_, _, _, all_features) = set.entry(key)
-                .or_insert_with(|| (has_default_features, matched.clone(), semver, HashSet::default()));
-            all_features.extend(features.iter().cloned());
+            let (_, _, all_features) = set.entry(key)
+                .or_insert_with(|| (has_default_features, matched, HashSet::default()));
+            all_features.extend(features.iter().map(|s| s.as_str()));
             if let Some(s) = enable_dep_features {
-                all_features.extend(s.iter().copied().map(|s| s.to_string()));
+                all_features.extend(s.iter().copied());
             }
         }
 
         // break infinite recursion. Must be inserted first, since depth-first search
         // may end up requesting it.
-        let result = Arc::new(Mutex::new(HashMap::default()));
-        let key = (key_id_part, wants.clone());
-        self.cache.write().insert(key, result.clone());
+        let key = (key_id_part.clone(), wants.clone());
+        self.cache.insert(key, Default::default());
 
-        let set: Result<_,_> = set.into_iter().map(|(k, (has_default_features, matched, semver, all_features))| {
+        let set: Result<_,_> = set.into_iter().map(|(k, (has_default_features, matched, all_features))| {
             let all_features = all_features.into_iter().map(Into::into).collect::<Vec<_>>().into_boxed_slice();
-            let runtime = self.deps_of_ver(&matched, Features {
+            let runtime = self.deps_of_ver(matched, Features {
                 all_targets: wants.all_targets,
                 build: false,
                 dev: false, // dev is only for top-level
                 default: has_default_features,
                 features: all_features.clone(),
             })?;
-            let build = self.deps_of_ver(&matched, Features {
+            let build = self.deps_of_ver(matched, Features {
                 all_targets: wants.all_targets,
                 build: true,
                 dev: false, // dev is only for top-level
@@ -411,18 +429,21 @@ impl Index {
                 features: all_features,
             })?;
             Ok((k, Dep {
-                semver: semver.into(),
+                semver: matched.version().try_into().unwrap(),
                 runtime,
                 build,
             }))
         }).collect();
 
-        *result.lock() = set?;
+        let result: ArcDepSet = Arc::new(set?);
+        let key = (key_id_part, wants);
+        self.cache.insert(key, Arc::clone(&result));
+
         Ok(result)
     }
 
     pub fn clear_cache(&self) {
-        self.cache.write().clear();
+        self.cache.clear();
         *self.inter.write() = StringInterner::new();
     }
 
@@ -498,7 +519,7 @@ impl Index {
 use std::fmt;
 impl fmt::Debug for Dep {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Dep {{ {}, runtime: x{}, build: x{} }}", self.semver, self.runtime.lock().len(), self.build.lock().len())
+        write!(f, "Dep {{ {}, runtime: x{}, build: x{} }}", self.semver, self.runtime.len(), self.build.len())
     }
 }
 
@@ -508,14 +529,21 @@ fn semver_parse(ver: &str) -> SemVer {
 
 impl From<SemVer> for MiniVer {
     fn from(s: SemVer) -> Self {
-        let s: old_semver::Version = s.to_string().parse().unwrap_or_else(|_| old_semver::Version::parse("0.0.0").unwrap());
-        Self {
+        Self::try_from(s.to_string().as_str()).unwrap_or_default()
+    }
+}
+
+impl TryFrom<&str> for MiniVer {
+    type Error = SemVerError;
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        let s: old_semver::Version = s.parse()?;
+        Ok(Self {
             major: s.major as u16,
             minor: s.minor as u16,
             patch: s.patch as u16,
             pre: s.pre.into_boxed_slice(),
             build: if let Some(old_semver::Identifier::Numeric(m)) = s.build.get(0) { *m as u16 } else { 0 },
-        }
+        })
     }
 }
 
@@ -536,7 +564,7 @@ pub struct Features {
 
 pub type DepName = (Sym, Sym);
 pub type DepSet = HashMap<DepName, Dep>;
-pub type ArcDepSet = Arc<Mutex<DepSet>>;
+pub type ArcDepSet = Arc<DepSet>;
 
 pub struct Dep {
     pub semver: MiniVer,

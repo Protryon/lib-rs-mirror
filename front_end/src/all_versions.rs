@@ -145,7 +145,7 @@ impl AllVersions {
             let release_date = release_date.format("%b %e, %Y").to_string();
 
             let dl = {
-                let num = downloads.get(&version.clone().into()).copied().unwrap_or(0);
+                let num = downloads.get(&version_meta.version().try_into().unwrap()).copied().unwrap_or(0);
                 DownloadsBar {
                     num,
                     str: crate::format_downloads(num),

@@ -3729,7 +3729,7 @@ impl KitchenSink {
 
 /// Any crate can get such owner. Takes crates_io_login with host prefix
 fn is_shared_collective_login(login: &str) -> bool {
-    login.eq_ignore_ascii_case("rust-bus-owner") || login.eq_ignore_ascii_case("rust-bus") || login.starts_with("github:rust-bus:")
+    login.eq_ignore_ascii_case("rust-bus-owner") || login.eq_ignore_ascii_case("rust-bus") || login.eq_ignore_ascii_case("actions-user") || login.starts_with("github:rust-bus:")
 }
 
 /// foo & libfoo-sys && cargo-foo && rust-foo
@@ -4125,5 +4125,6 @@ fn is_valid_crates_io_category_not_on_lib_rs(slug: &str) -> bool {
     "multimedia::encoding" |
     "os::freebsd-apis" |
     "os::linux-apis" |
+    "virtualization" |
     "science::robotics")
 }

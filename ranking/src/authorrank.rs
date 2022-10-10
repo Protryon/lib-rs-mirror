@@ -178,7 +178,7 @@ struct AuthorInfo<'a> {
 // there are orgs which are collections of crates, but aren't actual contributors
 fn is_a_real_author(login: &str) -> bool {
     match login {
-        "rust-bus" | "rust-bus-owner" | "rust-lang-nursery" | "rust-lang-deprecated" => false,
+        "rust-bus" | "rust-bus-owner" | "actions-user" | "rust-lang-nursery" | "rust-lang-deprecated" => false,
         _ => true,
     }
 }

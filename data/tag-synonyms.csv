@@ -8,7 +8,9 @@
 16bit,16-bit,0
 24bit,24-bit,0
 2darray,2d-array,4
+interchain,inter-chain,5
 2ddata,2d-data,4
+asset,assets,3
 2ddrawing,2d-drawing,4
 2dengine,2d-engine,4
 2dgame,2d-game,4
@@ -311,8 +313,9 @@ angles,angle,0
 anima-engine,anima,2
 animaengine,anima-engine,4
 animals,animal,5
-animated,animation,4
+animated,animation,0
 animatedpng,animated-png,4
+animating,animation,4
 animations,animation,4
 annotation,annotations,3
 annotation-processor,annotation-processing,2
@@ -2007,6 +2010,7 @@ gae,google-app-engine,4
 gae-datastore,google-cloud-datastore,2
 game-boy,gameboy,1
 game-boy-advance,gba,2
+game-dev,gamedev,5
 game-engines,game-engine,5
 game-frameworks,game-framework,5
 game-maker-language,game-maker,0
@@ -3961,7 +3965,8 @@ slowness,performance,0
 slugs,slug,4
 smart-pointer,smart-pointers,4
 smartbear-testcomplete,testcomplete,0
-smartcontract,smart-contract,4
+smartcontract,smart-contract,5
+smartcontracts,smart-contract,5
 smarthome,smart-home,4
 smartwatch,sony-smartwatch,0
 smooth,smoothing,4

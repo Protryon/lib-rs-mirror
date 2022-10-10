@@ -54,7 +54,7 @@ fn extract_text_phrases(manifest: &Manifest, github_description: Option<&str>, r
     let own_name = manifest.package().name();
     let install_boilerplate1 = format!("cargo install {own_name}");
     let install_boilerplate2 = format!("cargo add {own_name}");
-    let install_boilerplate3 = format!("{own_name} = \"");
+    let install_boilerplate3 = format!("{own_name} = ");
     for (section, text) in readme_by_section.iter() {
         let section_s = section.trim().to_lowercase();
         let section = section_s
@@ -90,7 +90,10 @@ fn extract_text_phrases(manifest: &Manifest, github_description: Option<&str>, r
         for par in text.split('\n') {
             let par = par.trim_start_matches(|c: char| c.is_whitespace() || c == '#' || c == '=' || c == '*' || c == '-');
             let par = par.to_lowercase();
-            if par.contains("[dependencies]") || par.contains(&install_boilerplate1) || par.contains(&install_boilerplate2) || par.contains(&install_boilerplate3) {
+            if par == "cargo test" || par == "cargo build" || par.starts_with("cargo build ") {
+                continue;
+            }
+            if par.starts_with("[dependencies") || par.contains(&install_boilerplate1) || par.contains(&install_boilerplate2) || par.starts_with(&install_boilerplate3) {
                 continue;
             }
             if par.starts_with("licensed under either of") || par.starts_with("license:") || par.starts_with("this code is licensed under")
@@ -213,7 +216,7 @@ pub fn is_deprecated_requirement(name: &str, requirement: &VersionReq) -> bool {
         // futures 0.1
         "futures-preview" | "futures-core-preview" | "tokio-io" | "tokio-timer" | "tokio-codec" |
         "tokio-executor" | "tokio-reactor" | "tokio-signal" | "tokio-core" | "futures-cpupool" |
-        "tokio-compat" | "tokio-async-await" | "tokio-serde-json" | "tokio-udp" |
+        "tokio-compat" | "tokio-async-await" | "tokio-serde-json" | "tokio-udp" | "tokio-service" |
         "tokio-threadpool" | "tokio-tcp" | "tokio-current-thread" => true,
         // fundamentally unsound
         "str-concat" => true,
@@ -229,6 +232,8 @@ pub fn is_deprecated_requirement(name: &str, requirement: &VersionReq) -> bool {
         "insideout" | "file" | "ref_slice" => true,
         "rustfmt" | "clippy" => true, // rustup
         "serde_derive_internals" | "serde_codegen_internals" | "serde_macros" | "serde_codegen" => true,
+        "twoway" => true,
+        "bitcoin" => true, // planet-cooking PoW is deprecated
         _ => false,
     }
 }

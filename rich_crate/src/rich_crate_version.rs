@@ -5,7 +5,6 @@ use crate::Readme;
 use cargo_toml::{Dependency, Manifest, Package, OptionalFile};
 pub use cargo_toml::{DepsSet, Edition, Resolver, FeatureSet, MaintenanceStatus, TargetDepsSet};
 use repo_url::Repo;
-use std::borrow::Cow;
 use std::collections::BTreeMap;
 use ahash::HashSet;
 
@@ -145,7 +144,7 @@ impl RichCrateVersion {
         self.repo.as_ref()
     }
 
-    pub fn repository_http_url(&self) -> Option<(&Repo, Cow<'_, str>)> {
+    pub fn repository_http_url(&self) -> Option<(&Repo, String)> {
         self.repository().map(|repo| {
             let relpath = self.derived.path_in_repo.as_deref().unwrap_or("");
             (repo, repo.canonical_http_url(relpath, self.derived.vcs_info_git_sha1.map(hex::encode).as_deref()))

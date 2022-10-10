@@ -51,7 +51,7 @@
                     <pre class="to-copy"><code><b>cargo install</b> -f @c.ver.short_name()</code></pre>
                 }
                 @if let Some((repo, package)) = c.ver.origin().clone().into_repo() {
-                    <pre class="to-copy"><code><b>cargo install</b> -f @package --git @repo.canonical_git_url().unwrap()</code></pre>
+                    <pre class="to-copy"><code><b>cargo install</b> -f @package --git @repo.canonical_git_url()</code></pre>
                 }
                 <p>It will make @if bins.len()==1 {the } @for bin in &bins {<code>@bin</code> } command@if bins.len()>1 {s} available in your <code>PATH</code> if you've allowed the <code>PATH</code> to be modified when <a href="https://www.rust-lang.org/tools/install">installing Rust</a>. <code>cargo uninstall @c.ver.short_name()</code> uninstalls.</p>
             }
@@ -64,7 +64,7 @@
                     <pre class="to-copy"><code><b>cargo add</b> --build @name</code></pre>
                 }
                 @if let Some((repo, package)) = c.ver.origin().clone().into_repo() {
-                    <pre class="to-copy"><code><b>cargo add</b> --build @package --git @repo.canonical_git_url().unwrap()</code></pre>
+                    <pre class="to-copy"><code><b>cargo add</b> --build @package --git @repo.canonical_git_url()</code></pre>
                 }
                 <p>to add <code>@c.ver.lib_name()</code> as a build-time dependency. To add it as a run-time dependency, run:</p>
             } else {@if c.is_dev {
@@ -72,7 +72,7 @@
                     <pre class="to-copy"><code><b>cargo add</b> --dev @name</code></pre>
                 }
                 @if let Some((repo, package)) = c.ver.origin().clone().into_repo() {
-                    <pre class="to-copy"><code><b>cargo add</b> --dev @package --git @repo.canonical_git_url().unwrap()</code></pre>
+                    <pre class="to-copy"><code><b>cargo add</b> --dev @package --git @repo.canonical_git_url()</code></pre>
                 }
                 <p>to add it a dev dependency (if it's used only in tests, not in the final product). To add it as a regular run-time dependency, run:</p>
             }}
@@ -80,14 +80,14 @@
                 <pre class="to-copy"><code><b>cargo add</b> @name</code></pre>
             }
             @if let Some((repo, package)) = c.ver.origin().clone().into_repo() {
-                <pre class="to-copy"><code><b>cargo add</b> @package --git @repo.canonical_git_url().unwrap()</code></pre>
+                <pre class="to-copy"><code><b>cargo add</b> @package --git @repo.canonical_git_url()</code></pre>
             }
             <p>To add it manually, edit your project's <code>Cargo.toml</code> file and add to the @if c.is_build {<code>[build-dependencies]</code> or} <code>[dependencies]</code> section:</p>
             @if c.ver.origin().is_crates_io() {
                 <pre class="to-copy @if c.is_build {build-}dependencies-toml"><code>@c.ver.short_name() = "@c.ver.version()"</code></pre>
             }
             @if let Some((repo, package)) = c.ver.origin().clone().into_repo() {
-                <pre class="to-copy @if c.is_build {build-}dependencies-toml"><code>@package = @"{" git = "@repo.canonical_git_url().unwrap()" @"}"</code></pre>
+                <pre class="to-copy @if c.is_build {build-}dependencies-toml"><code>@package = @"{" git = "@repo.canonical_git_url()" @"}"</code></pre>
             }
             <p>The <code>@c.ver.lib_name()</code> library will be automatically available globally.
             @if let Some(url) = c.api_reference_url() {
@@ -101,14 +101,14 @@
                 <pre class="to-copy"><code><b>cargo add</b> @name</code></pre>
             }
             @if let Some((repo, package)) = c.ver.origin().clone().into_repo() {
-                <pre class="to-copy"><code><b>cargo add</b> @package --git @repo.canonical_git_url().unwrap()</code></pre>
+                <pre class="to-copy"><code><b>cargo add</b> @package --git @repo.canonical_git_url()</code></pre>
             }
             <p>To add it manually, edit your project's <code>Cargo.toml</code> file and add to the <code>[dependencies]</code> section:</p>
             @if c.ver.origin().is_crates_io() {
                 <pre class="to-copy dependencies-toml"><code>@c.ver.short_name() = "@c.ver.version()"</code></pre>
             }
             @if let Some((repo, package)) = c.ver.origin().clone().into_repo() {
-                <pre class="to-copy dependencies-toml"><code>@package = @"{" git = "@repo.canonical_git_url().unwrap()" @"}"</code></pre>
+                <pre class="to-copy dependencies-toml"><code>@package = @"{" git = "@repo.canonical_git_url()" @"}"</code></pre>
             }
             <p>You may need to import the macro(s) with <code>use @c.ver.lib_name()<tt>::*</tt></code>.</p>
             @if let Some(url) = c.api_reference_url() {

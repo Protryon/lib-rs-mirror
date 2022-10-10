@@ -6,12 +6,12 @@ mod rich_crate;
 pub use crate::rich_crate::*;
 mod rich_crate_version;
 pub use crate::rich_crate_version::*;
+use smartstring::alias::String as SmolStr;
 
 pub use cargo_toml::Manifest;
 pub use render_readme::Markup;
 pub use render_readme::Readme;
 pub use repo_url::Repo;
-pub use repo_url::RepoHost;
 pub use repo_url::SimpleRepo;
 
 /// URL-like identifier of location where crate has been published + normalized crate name
@@ -69,8 +69,8 @@ impl Origin {
     #[inline]
     pub fn from_repo(r: &Repo, package: &str) -> Option<Self> {
         match r.host() {
-            RepoHost::GitHub(r) => Some(Self::from_github(r.clone(), package)),
-            RepoHost::GitLab(r) => Some(Self::from_gitlab(r.clone(), package)),
+            Repo::GitHub(r) => Some(Self::from_github(r.clone(), package)),
+            Repo::GitLab(r) => Some(Self::from_gitlab(r.clone(), package)),
             _ => None,
         }
     }
@@ -120,20 +120,29 @@ impl Origin {
     }
 
     #[inline]
-    pub fn repo(&self) -> Option<(&SimpleRepo, &str)> {
-        match *self {
+    pub fn repo(&self) -> Option<(Repo, SmolStr)> {
+        match self {
             Origin::CratesIo(_) => None,
-            Origin::GitHub { ref package, ref repo } |
-            Origin::GitLab { ref package, ref repo } => Some((repo, package)),
+            Origin::GitHub { repo, package } => Some((Repo::GitHub(repo.clone()).try_into().ok()?, SmolStr::from(&**package))),
+            Origin::GitLab { repo, package } => Some((Repo::GitLab(repo.clone()).try_into().ok()?, SmolStr::from(&**package))),
         }
     }
 
     #[inline]
-    pub fn into_repo(self) -> Option<(RepoHost, Box<str>)> {
+    pub fn simple_repo(&self) -> Option<(&SimpleRepo, &str)> {
         match self {
             Origin::CratesIo(_) => None,
-            Origin::GitHub { package, repo } => Some((RepoHost::GitHub(repo), package)),
-            Origin::GitLab { package, repo } => Some((RepoHost::GitLab(repo), package)),
+            Origin::GitHub { repo, package } |
+            Origin::GitLab { repo, package } => Some((repo, package)),
+        }
+    }
+
+    #[inline]
+    pub fn into_repo(self) -> Option<(Repo, Box<str>)> {
+        match self {
+            Origin::CratesIo(_) => None,
+            Origin::GitHub { package, repo } => Some((Repo::GitHub(repo), package)),
+            Origin::GitLab { package, repo } => Some((Repo::GitLab(repo), package)),
         }
     }
 }

@@ -1,3 +1,4 @@
+use crate::parsed_url_domain;
 use ahash::HashMapExt;
 use ahash::HashSetExt;
 use crate::download_graph::DownloadsGraph;
@@ -23,7 +24,7 @@ use log::warn;
 use render_readme::Links;
 use render_readme::Renderer;
 use rich_crate::Readme;
-use rich_crate::RepoHost;
+use rich_crate::Repo;
 use rich_crate::RichCrate;
 use rich_crate::RichCrateVersion;
 use rich_crate::RichDep;
@@ -663,12 +664,12 @@ impl<'a> CratePage<'a> {
     }
 
     /// `(url, label)`
-    pub fn repository_links(&self, urler: &Urler) -> Vec<(Cow<'_, str>, String)> {
+    pub fn repository_links(&self, urler: &Urler) -> Vec<(String, String)> {
         let mut repo_links = Vec::new();
         if let Some((repo, url)) = self.ver.repository_http_url() {
             let label_prefix = repo.site_link_label();
             let label = match repo.host() {
-                RepoHost::GitHub(ref host) | RepoHost::GitLab(ref host) | RepoHost::BitBucket(ref host) => {
+                Repo::GitHub(ref host) | Repo::GitLab(ref host) | Repo::BitBucket(ref host) => {
                     if self.has_verified_repository_link {
                         format!("{} ({})", label_prefix, host.owner)
                     } else {
@@ -676,7 +677,7 @@ impl<'a> CratePage<'a> {
                         "Repository link".to_owned()
                     }
                 },
-                RepoHost::Other => url_domain(&url).map(|host| format!("{} ({})", label_prefix, host)).unwrap_or_else(|| label_prefix.to_string()),
+                Repo::Other(url) => parsed_url_domain(&url).map(|host| format!("{} ({})", label_prefix, host)).unwrap_or_else(|| label_prefix.to_string()),
             };
             repo_links.push((url, label))
         } else if self.ver.origin().is_crates_io() {
@@ -944,7 +945,7 @@ impl<'a> CratePage<'a> {
     }
 
     fn is_same_project(one: &RichCrateVersion, two: &RichCrateVersion) -> bool {
-        matches!((one.repository(), two.repository()), (Some(a), Some(b)) if a.host == b.host)
+        matches!((one.repository(), two.repository()), (Some(a), Some(b)) if a == b)
     }
 }
 

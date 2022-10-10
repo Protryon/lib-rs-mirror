@@ -86,7 +86,7 @@
                 <li>
                     <a href="@url.krate(c)">
                         <div class=h>
-                            <h4>@if let Some((repo, _)) = c.origin().repo() {@repo.owner/}@c.short_name()</h4>
+                            <h4>@if let Some((repo, _)) = c.origin().simple_repo() {@repo.owner/}@c.short_name()</h4>
                             @if let Some(desc) = c.description() {
                               <p class=desc>@p.render_maybe_markdown_str(&limit_text_len(desc, 180, 220))</p>
                             }

@@ -232,7 +232,7 @@ impl CrateDb {
 
             if let Some(repo) = c.repository {
                 let url = repo.canonical_git_url();
-                insert_repo.execute(&[&crate_id as &dyn ToSql, &url.as_ref()]).map_err(|e| Error::Db(e, "insert repo"))?;
+                insert_repo.execute(&[&crate_id as &dyn ToSql, &url.as_str()]).map_err(|e| Error::Db(e, "insert repo"))?;
             } else {
                 delete_repo.execute(&[&crate_id])?;
             }
@@ -474,7 +474,7 @@ impl CrateDb {
     }
 
     pub async fn crates_in_repo(&self, repo: &Repo) -> FResult<Vec<Origin>> {
-        let repo = repo.canonical_git_url().into_owned();
+        let repo = repo.canonical_git_url();
         self.with_read_spawn("crates_in_repo", move |conn| {
             let mut q = conn.prepare_cached("
                 SELECT crate_name
@@ -492,7 +492,7 @@ impl CrateDb {
 
     /// Returns crate name (not origin)
     pub async fn parent_crate(&self, repo: &Repo, child_name: &str) -> FResult<Option<Origin>> {
-        let repo_url = repo.canonical_git_url().into_owned();
+        let repo_url = repo.canonical_git_url();
         let mut paths = self.with_read_spawn("parent_crate", move |conn| {
             let mut q = conn.prepare_cached("SELECT path, crate_name FROM repo_crates WHERE repo = ?1 LIMIT 100")
                 .map_err(|e| Error::Db(e, "parent"))?;

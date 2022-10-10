@@ -1,23 +1,17 @@
 use std::borrow::Cow;
-use std::convert::TryFrom;
 use smartstring::alias::String as SmolStr;
 use url::Url;
 
 pub type GResult<T> = Result<T, GitError>;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Repo {
-    // as set by the create author
-    pub url: Url,
-    pub host: RepoHost,
-}
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
-pub enum RepoHost {
+pub enum Repo {
     GitHub(SimpleRepo),
     GitLab(SimpleRepo),
     BitBucket(SimpleRepo),
-    Other,
+    /// as set by the create author
+    Other(Url),
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
@@ -56,22 +50,17 @@ impl Repo {
     /// Parse the given URL
     pub fn new(url: &str) -> GResult<Self> {
         let url = Url::parse(url).map_err(GitError::InvalidUrl)?;
-        Ok(Repo {
-            host: match (&url.host_str(), url.path_segments()) {
-                (Some("www.github.com"), Some(path)) |
-                (Some("github.com"), Some(path)) => {
-                    RepoHost::GitHub(Self::repo_from_path(path)?)
-                },
-                (Some("www.gitlab.com"), Some(path)) |
-                (Some("gitlab.com"), Some(path)) => {
-                    RepoHost::GitLab(Self::repo_from_path(path)?)
-                },
-                (Some("bitbucket.org"), Some(path)) => {
-                    RepoHost::BitBucket(Self::repo_from_path(path)?)
-                },
-                _ => RepoHost::Other,
+        Ok(match (&url.host_str(), url.path_segments()) {
+            (Some("www.github.com" | "github.com"), Some(path)) => {
+                Self::GitHub(Self::repo_from_path(path)?)
             },
-            url,
+            (Some("www.gitlab.com" | "gitlab.com"), Some(path)) => {
+                Self::GitLab(Self::repo_from_path(path)?)
+            },
+            (Some("bitbucket.org"), Some(path)) => {
+                Self::BitBucket(Self::repo_from_path(path)?)
+            },
+            _ => Self::Other(url),
         })
     }
 
@@ -96,47 +85,43 @@ impl Repo {
         })
     }
 
-    pub fn raw_url(&self) -> &str {
-        self.url.as_str()
+    /// Enum with details of git hosting service
+    pub fn host(&self) -> &Repo {
+        self
     }
 
     /// Enum with details of git hosting service
-    pub fn host(&self) -> &RepoHost {
-        &self.host
-    }
-
-    /// Enum with details of git hosting service
-    pub fn github_host(&self) -> Option<&RepoHost> {
-        match &self.host {
-            ok @ RepoHost::GitHub(_) => Some(ok),
+    pub fn github_host(&self) -> Option<&Repo> {
+        match self {
+            ok @ Self::GitHub(_) => Some(ok),
             _ => None,
         }
     }
 
     /// URL to view who contributed to the repository
     pub fn contributors_http_url(&self) -> Cow<'_, str> {
-        match self.host {
-            RepoHost::GitHub(SimpleRepo {ref owner, ref repo}) => {
+        match self {
+            Self::GitHub(SimpleRepo {ref owner, ref repo}) => {
                 format!("https://github.com/{owner}/{repo}/graphs/contributors").into()
             },
-            RepoHost::GitLab(SimpleRepo {ref owner, ref repo}) => {
+            Self::GitLab(SimpleRepo {ref owner, ref repo}) => {
                 format!("https://gitlab.com/{owner}/{repo}/graphs/master").into()
             },
-            RepoHost::BitBucket(SimpleRepo {ref owner, ref repo}) => {
+            Self::BitBucket(SimpleRepo {ref owner, ref repo}) => {
                 // not really…
                 format!("https://bitbucket.org/{owner}/{repo}/commits/all").into()
             },
-            RepoHost::Other => self.url.as_str().into(),
+            Self::Other(url) => url.as_str().into(),
         }
     }
 
     /// Name of the hosting service
     pub fn site_link_label(&self) -> &'static str {
-        match self.host {
-            RepoHost::GitHub(..) => "GitHub",
-            RepoHost::GitLab(..) => "GitLab",
-            RepoHost::BitBucket(..) => "BitBucket",
-            RepoHost::Other => "Source Code",
+        match self {
+            Self::GitHub(..) => "GitHub",
+            Self::GitLab(..) => "GitLab",
+            Self::BitBucket(..) => "BitBucket",
+            Self::Other(_) => "Source Code",
         }
     }
 
@@ -147,17 +132,17 @@ impl Repo {
         assert!(!base_dir_in_repo.starts_with('/'));
         let treeish_revision = treeish_revision.unwrap_or("HEAD");
         let slash = if !base_dir_in_repo.is_empty() && !base_dir_in_repo.ends_with('/') { "/" } else { "" };
-        match self.host {
-            RepoHost::GitHub(SimpleRepo {ref owner, ref repo}) => {
+        match self {
+            Self::GitHub(SimpleRepo {ref owner, ref repo}) => {
                 format!("https://github.com/{owner}/{repo}/blob/{treeish_revision}/{base_dir_in_repo}{slash}")
             },
-            RepoHost::GitLab(SimpleRepo {ref owner, ref repo}) => {
+            Self::GitLab(SimpleRepo {ref owner, ref repo}) => {
                 format!("https://gitlab.com/{owner}/{repo}/blob/{treeish_revision}/{base_dir_in_repo}{slash}")
             },
-            RepoHost::BitBucket(SimpleRepo {ref owner, ref repo}) => {
+            Self::BitBucket(SimpleRepo {ref owner, ref repo}) => {
                 format!("https://bitbucket.org/{owner}/{repo}/src/{treeish_revision}/{base_dir_in_repo}{slash}")
             },
-            RepoHost::Other => self.url.to_string() // FIXME: how to add base dir?
+            Self::Other(url) => url.to_string() // FIXME: how to add base dir?
         }
     }
 
@@ -168,66 +153,43 @@ impl Repo {
         let treeish_revision = treeish_revision.unwrap_or("HEAD");
         assert!(!base_dir_in_repo.starts_with('/'));
         let slash = if !base_dir_in_repo.is_empty() && !base_dir_in_repo.ends_with('/') { "/" } else { "" };
-        match self.host {
-            RepoHost::GitHub(SimpleRepo {ref owner, ref repo}) => {
+        match self {
+            Self::GitHub(SimpleRepo {ref owner, ref repo}) => {
                 format!("https://raw.githubusercontent.com/{owner}/{repo}/{treeish_revision}/{base_dir_in_repo}{slash}")
             },
-            RepoHost::GitLab(SimpleRepo {ref owner, ref repo}) => {
+            Self::GitLab(SimpleRepo {ref owner, ref repo}) => {
                 format!("https://gitlab.com/{owner}/{repo}/raw/{treeish_revision}/{base_dir_in_repo}{slash}")
             },
-            RepoHost::BitBucket(SimpleRepo {ref owner, ref repo}) => {
+            Self::BitBucket(SimpleRepo {ref owner, ref repo}) => {
                 format!("https://bitbucket.org/{owner}/{repo}/raw/{treeish_revision}/{base_dir_in_repo}{slash}")
             },
-            RepoHost::Other => self.url.to_string() // FIXME: how to add base dir?
+            Self::Other(url) => url.to_string() // FIXME: how to add base dir?
         }
     }
 
-    /// URL for browsing the repository via web browser
-    pub fn canonical_http_url(&self, base_dir_in_repo: &str, treeish_revision: Option<&str>) -> Cow<'_, str> {
-        self.host.canonical_http_url(base_dir_in_repo, treeish_revision).map(Cow::from)
-            .unwrap_or_else(|| self.url.as_str().into())
-    }
-
-    pub fn canonical_git_url(&self) -> Cow<'_, str> {
-        match self.host.canonical_git_url() {
-            Some(s) => s.into(),
-            None => self.url.as_str().into(),
-        }
-    }
-
-    pub fn owner_name(&self) -> Option<&str> {
-        self.host.owner_name()
-    }
-
-    pub fn repo_name(&self) -> Option<&str> {
-        self.host.repo_name()
-    }
-}
-
-impl RepoHost {
     /// URL for cloning the repository via git
-    pub fn canonical_git_url(&self) -> Option<String> {
+    pub fn canonical_git_url(&self) -> String {
         match self {
-            RepoHost::GitHub(SimpleRepo {ref owner, ref repo}) => {
-                Some(format!("https://github.com/{owner}/{repo}.git"))
+            Self::GitHub(SimpleRepo {ref owner, ref repo}) => {
+                format!("https://github.com/{owner}/{repo}.git")
             },
-            RepoHost::GitLab(SimpleRepo {ref owner, ref repo}) => {
-                Some(format!("https://gitlab.com/{owner}/{repo}.git"))
+            Self::GitLab(SimpleRepo {ref owner, ref repo}) => {
+                format!("https://gitlab.com/{owner}/{repo}.git")
             },
-            RepoHost::BitBucket(SimpleRepo {ref owner, ref repo}) => {
-                Some(format!("https://bitbucket.org/{owner}/{repo}"))
+            Self::BitBucket(SimpleRepo {ref owner, ref repo}) => {
+                format!("https://bitbucket.org/{owner}/{repo}")
             },
-            RepoHost::Other => None,
+            Self::Other(url) => url.to_string()
         }
     }
 
     /// URL for browsing the repository via web browser
-    pub fn canonical_http_url(&self, base_dir_in_repo: &str, treeish_revision: Option<&str>) -> Option<String> {
+    pub fn canonical_http_url(&self, base_dir_in_repo: &str, treeish_revision: Option<&str>) -> String {
         assert!(!base_dir_in_repo.starts_with('/'));
         let treeish_revision = treeish_revision.unwrap_or("HEAD");
         let path_part = if !base_dir_in_repo.is_empty() || treeish_revision != "HEAD" {
             let dir_name = match self {
-                RepoHost::BitBucket(_) => "src",
+                Self::BitBucket(_) => "src",
                 _ => "tree",
             };
             format!("/{dir_name}/{treeish_revision}/{base_dir_in_repo}")
@@ -235,25 +197,25 @@ impl RepoHost {
             String::new()
         };
         match self {
-            RepoHost::GitHub(SimpleRepo {ref owner, ref repo}) => {
-                Some(format!("https://github.com/{owner}/{repo}{path_part}"))
+            Self::GitHub(SimpleRepo {ref owner, ref repo}) => {
+                format!("https://github.com/{owner}/{repo}{path_part}")
             },
-            RepoHost::GitLab(SimpleRepo {ref owner, ref repo}) => {
-                Some(format!("https://gitlab.com/{owner}/{repo}{path_part}"))
+            Self::GitLab(SimpleRepo {ref owner, ref repo}) => {
+                format!("https://gitlab.com/{owner}/{repo}{path_part}")
             },
-            RepoHost::BitBucket(SimpleRepo {ref owner, ref repo}) => {
-                Some(format!("https://bitbucket.org/{owner}/{repo}{path_part}"))
+            Self::BitBucket(SimpleRepo {ref owner, ref repo}) => {
+                format!("https://bitbucket.org/{owner}/{repo}{path_part}")
             },
-            RepoHost::Other => None,
+            Self::Other(url) => url.to_string(),
         }
     }
 
     pub fn owner_name(&self) -> Option<&str> {
         match self {
-            RepoHost::GitHub(SimpleRepo { ref owner, .. }) |
-            RepoHost::BitBucket(SimpleRepo { ref owner, .. }) |
-            RepoHost::GitLab(SimpleRepo { ref owner, .. }) => Some(owner),
-            RepoHost::Other => None,
+            Self::GitHub(SimpleRepo { ref owner, .. }) |
+            Self::BitBucket(SimpleRepo { ref owner, .. }) |
+            Self::GitLab(SimpleRepo { ref owner, .. }) => Some(owner),
+            Self::Other(_) => None,
         }
     }
 
@@ -263,22 +225,11 @@ impl RepoHost {
 
     pub fn repo(&self) -> Option<&SimpleRepo> {
         match self {
-            RepoHost::GitHub(repo) |
-            RepoHost::BitBucket(repo) |
-            RepoHost::GitLab(repo) => Some(repo),
-            RepoHost::Other => None,
+            Self::GitHub(repo) |
+            Self::BitBucket(repo) |
+            Self::GitLab(repo) => Some(repo),
+            Self::Other(_) => None,
         }
-    }
-}
-
-impl TryFrom<RepoHost> for Repo {
-    type Error = &'static str;
-
-    fn try_from(host: RepoHost) -> Result<Self, Self::Error> {
-        host.canonical_git_url()
-            .and_then(|url| url.parse().ok())
-            .map(|url| Repo {host, url})
-            .ok_or("not a known git host")
     }
 }
 

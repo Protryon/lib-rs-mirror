@@ -527,7 +527,7 @@ async fn handle_git_clone(req: HttpRequest) -> HttpResponse {
             };
             let r = k.repository().unwrap();
 
-            let mut url = r.canonical_git_url().into_owned();
+            let mut url = r.canonical_git_url();
             if url.ends_with('/') {
                 url.truncate(url.len() - 1);
             }
@@ -572,7 +572,7 @@ async fn handle_repo_crate(req: HttpRequest) -> Result<HttpResponse, ServerError
 
     if !state.crates.load().crate_exists(&origin) {
         let (repo, _) = origin.into_repo().expect("repohost");
-        let url = repo.canonical_http_url("", None).expect("repohost");
+        let url = repo.canonical_http_url("", None);
         return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", url)).finish());
     }
 

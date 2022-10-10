@@ -4,7 +4,6 @@ use kitchen_sink::CrateAuthor;
 use kitchen_sink::UserType;
 use rich_crate::Origin;
 use rich_crate::Repo;
-use rich_crate::RepoHost;
 use rich_crate::RichCrateVersion;
 use rich_crate::RichDep;
 use urlencoding::Encoded;
@@ -25,9 +24,9 @@ impl Urler {
         if let Some(git) = dep.dep.git() {
             if let Ok(repo) = Repo::new(git) {
                 return match repo.host() {
-                    RepoHost::GitHub(repo) => format!("/gh/{}/{}/{}", Encoded(&*repo.owner), Encoded(&*repo.repo), Encoded(&*dep.package)),
-                    RepoHost::GitLab(repo) => format!("/lab/{}/{}/{}", Encoded(&*repo.owner), Encoded(&*repo.repo), Encoded(&*dep.package)),
-                    _ => repo.canonical_http_url("", dep.dep.git_rev()).into_owned(),
+                    Repo::GitHub(repo) => format!("/gh/{}/{}/{}", Encoded(&*repo.owner), Encoded(&*repo.repo), Encoded(&*dep.package)),
+                    Repo::GitLab(repo) => format!("/lab/{}/{}/{}", Encoded(&*repo.owner), Encoded(&*repo.repo), Encoded(&*dep.package)),
+                    _ => repo.canonical_http_url("", dep.dep.git_rev()),
                 };
             }
         } else if dep.dep.detail().map_or(false, |d| d.path.is_some()) {

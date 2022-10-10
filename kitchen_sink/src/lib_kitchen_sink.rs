@@ -78,7 +78,6 @@ use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 use rayon::prelude::*;
 use repo_url::Repo;
-use repo_url::RepoHost;
 use repo_url::SimpleRepo;
 use rich_crate::Author;
 pub use rich_crate::CrateVersion;
@@ -784,14 +783,14 @@ impl KitchenSink {
     }
 
     async fn rich_crate_gh(&self, origin: &Origin, repo: &SimpleRepo, package: &str) -> CResult<RichCrate> {
-        let host = RepoHost::GitHub(repo.clone()).try_into().map_err(|_| KitchenSinkErr::CrateNotFound(origin.clone())).context("ghrepo host bad")?;
+        let host = Repo::GitHub(repo.clone()).try_into().map_err(|_| KitchenSinkErr::CrateNotFound(origin.clone())).context("ghrepo host bad")?;
         let cachebust = self.cachebust_string_for_repo(&host).await.context("ghrepo")?;
         let versions = self.get_repo_versions(origin, &host, &cachebust).await?;
         Ok(RichCrate::new(origin.clone(), format!("github/{}/{package}", repo.owner).into(), versions))
     }
 
     async fn rich_crate_gitlab(&self, origin: &Origin, repo: &SimpleRepo, package: &str) -> CResult<RichCrate> {
-        let host = RepoHost::GitLab(repo.clone()).try_into().map_err(|_| KitchenSinkErr::CrateNotFound(origin.clone())).context("ghrepo host bad")?;
+        let host = Repo::GitLab(repo.clone()).try_into().map_err(|_| KitchenSinkErr::CrateNotFound(origin.clone())).context("ghrepo host bad")?;
         let cachebust = self.cachebust_string_for_repo(&host).await.context("ghrepo")?;
         let versions = self.get_repo_versions(origin, &host, &cachebust).await?;
         Ok(RichCrate::new(origin.clone(), format!("gitlab/{}/{package}", repo.owner).into(), versions))
@@ -927,7 +926,7 @@ impl KitchenSink {
     /// Only for GitHub origins, not for crates-io crates
     pub async fn github_stargazers_and_watchers(&self, origin: &Origin) -> CResult<Option<(u32, u32)>> {
         if let Origin::GitHub { repo, .. } = origin {
-            let repo = RepoHost::GitHub(repo.clone()).try_into().expect("repohost");
+            let repo = Repo::GitHub(repo.clone()).try_into().expect("repohost");
             if let Some(gh) = self.github_repo(&repo).await? {
                 return Ok(Some((gh.stargazers_count, gh.subscribers_count)));
             }
@@ -1061,7 +1060,7 @@ impl KitchenSink {
 
     pub async fn changelog_url(&self, k: &RichCrateVersion) -> Option<String> {
         let repo = k.repository()?;
-        if let RepoHost::GitHub(ref gh) = repo.host() {
+        if let Repo::GitHub(ref gh) = repo.host() {
             trace!("get gh changelog_url");
             let releases = self.gh.releases(gh, &self.cachebust_string_for_repo(repo).await.ok()?).await.ok()??;
             if releases.iter().any(|rel| rel.body.as_ref().map_or(false, |b| b.len() > 15)) {
@@ -1072,11 +1071,7 @@ impl KitchenSink {
     }
 
     async fn crate_files_summary_from_repo(&self, origin: Origin) -> CResult<CrateFilesSummary> {
-        let (repo, package): (Repo, _) = match &origin {
-            Origin::GitHub { repo, package } => (RepoHost::GitHub(repo.clone()).try_into().expect("repohost"), package.clone()),
-            Origin::GitLab { repo, package } => (RepoHost::GitLab(repo.clone()).try_into().expect("repohost"), package.clone()),
-            _ => unreachable!(),
-        };
+        let (repo, package) = origin.clone().repo().ok_or(KitchenSinkErr::GitCheckoutFailed)?;
         let checkout = self.checkout_repo(repo.clone(), true).await?;
         spawn_blocking(move || {
             let found = crate_git_checkout::path_in_repo(&checkout, &package)?
@@ -1088,7 +1083,7 @@ impl KitchenSink {
                     for h in has {
                         info!("has: {} -> {}", h.inner_path, h.manifest.package.as_ref().map(|p| p.name.as_str()).unwrap_or("?"));
                     }
-                    KitchenSinkErr::CrateNotFoundInRepo(package.to_string(), repo.canonical_git_url().into_owned())
+                    KitchenSinkErr::CrateNotFoundInRepo(package.to_string(), repo.canonical_git_url())
                 })?;
 
 
@@ -1097,7 +1092,7 @@ impl KitchenSink {
             let package = meta.manifest.package.as_mut().ok_or(KitchenSinkErr::NotAPackage(origin))?;
 
             // Allowing any other URL would allow spoofing
-            package.set_repository(Some(repo.canonical_git_url().into_owned()));
+            package.set_repository(Some(repo.canonical_git_url()));
 
             meta.path_in_repo = Some(found.inner_path);
             Ok::<_, CError>(meta)
@@ -1226,7 +1221,7 @@ impl KitchenSink {
         // Guess keywords if none were specified
         // TODO: also ignore useless keywords that are unique db-wide
         let gh = match maybe_repo.as_ref() {
-            Some(repo) => if let RepoHost::GitHub(ref gh) = repo.host() {
+            Some(repo) => if let Repo::GitHub(ref gh) = repo.host() {
                 trace!("get gh topics");
                 self.gh.topics(gh, &self.cachebust_string_for_repo(repo).await.context("fetch topics")?).await?
             } else {None},
@@ -1405,7 +1400,7 @@ impl KitchenSink {
                     Some(p) => p,
                     None => self.crate_db.path_in_repo(&repo, &package.name).await?.unwrap_or_default(),
                 };
-                let url = repo.canonical_http_url(&path_in_repo, Some(&hex::encode(sha))).into_owned();
+                let url = repo.canonical_http_url(&path_in_repo, Some(&hex::encode(sha)));
                 self.canonical_http_of_crate_at_version_cache.set(Self::canonical_http_of_crate_at_version_cache_key(origin, crate_version), &url)?;
                 return Ok(url);
             }
@@ -1515,7 +1510,7 @@ impl KitchenSink {
 
     pub async fn github_repo(&self, crate_repo: &Repo) -> Result<Option<GitHubRepo>, KitchenSinkErr> {
         Ok(match crate_repo.host() {
-            RepoHost::GitHub(ref repo) => {
+            Repo::GitHub(ref repo) => {
                 let cachebust = self.cachebust_string_for_repo(crate_repo).await?;
                 timeout("gh2", 21, self.gh.repo(repo, &cachebust).map_err(|e| KitchenSinkErr::GitHub(format!("{crate_repo:?} {e}")))).await?
             },
@@ -2282,7 +2277,7 @@ impl KitchenSink {
         let _f = self.throttle.acquire().await;
         if stopped() {return Err(KitchenSinkErr::Stopped.into());}
         let checkout = self.checkout_repo(repo.clone(), false).await?;
-        let url = repo.canonical_git_url().into_owned();
+        let url = repo.canonical_git_url();
         let (checkout, manif) = spawn_blocking(move || {
             let (manif, warnings) = crate_git_checkout::find_manifests(&checkout)
                 .with_context(|| format!("find manifests in {}", url))?;
@@ -2298,7 +2293,7 @@ impl KitchenSink {
         }).await??;
         self.crate_db.index_repo_crates(repo, manif).await.context("index rev repo")?;
 
-        if let Repo { host: RepoHost::GitHub(ref repo), .. } = repo {
+        if let Repo::GitHub(ref repo) = repo {
             if let Some(commits) = watch("commits", self.repo_commits(repo, as_of_version)).await? {
                 for c in commits {
                     if let Some(a) = c.author {
@@ -2873,7 +2868,7 @@ impl KitchenSink {
         let mut hit_max_contributor_count = false;
         match crate_repo.host() {
             // TODO: warn on errors?
-            RepoHost::GitHub(ref repo) => {
+            Repo::GitHub(ref repo) => {
                 // don't use repo URL if it's not verified to belong to the crate
                 if !found_crate_in_repo {
                     return Ok((false, HashMap::new()));
@@ -2916,9 +2911,9 @@ impl KitchenSink {
                 }
                 Ok((hit_max_contributor_count, by_login))
             },
-            RepoHost::BitBucket(..) |
-            RepoHost::GitLab(..) |
-            RepoHost::Other => Ok((false, HashMap::new())), // TODO: could use git checkout...
+            Repo::BitBucket(..) |
+            Repo::GitLab(..) |
+            Repo::Other(_) => Ok((false, HashMap::new())), // TODO: could use git checkout...
         }
     }
 

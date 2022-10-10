@@ -31,7 +31,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
 async fn check_repo(line: &str, crates: &KitchenSink) -> Result<(), Box<dyn std::error::Error>> {
     let repo = Repo::new(line)?;
-    if let RepoHost::GitHub(gh) | RepoHost::GitLab(gh) = repo.host() {
+    if let Repo::GitHub(gh) | Repo::GitLab(gh) = repo.host() {
         print!("\nFetching {}/{}…", gh.owner, gh.repo);
         std::io::stdout().flush()?;
         let manifests = crates.inspect_repo_manifests(&repo).await?;

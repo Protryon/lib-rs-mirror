@@ -34,7 +34,7 @@ use crate::crate_page::*;
 use crate::urler::Urler;
 use categories::Category;
 use chrono::prelude::*;
-
+use smartstring::alias::String as SmolStr;
 use anyhow::Context;
 use kitchen_sink::KitchenSink;
 use kitchen_sink::Review;
@@ -438,16 +438,19 @@ pub(crate) fn format_downloads_verbose(num: u32) -> (String, &'static str) {
     }
 }
 
-pub(crate) fn url_domain(url: &str) -> Option<Cow<'static, str>> {
-    Url::parse(url).ok().and_then(|url| {
-        url.host_str().and_then(|host| {
-            if host.ends_with(".github.io") {
-                Some("github.io".into())
-            } else if host.ends_with(".githubusercontent.com") {
-                None
-            } else {
-                Some(host.trim_start_matches("www.").to_string().into())
-            }
-        })
-    })
+pub(crate) fn url_domain(url: &str) -> Option<SmolStr> {
+    let url = Url::parse(url).ok()?;
+    parsed_url_domain(&url).map(SmolStr::from)
+}
+
+
+pub(crate) fn parsed_url_domain(url: &Url) -> Option<&str> {
+    let host = url.host_str()?;
+    if host.ends_with(".github.io") {
+        Some("github.io")
+    } else if host.ends_with(".githubusercontent.com") {
+        None
+    } else {
+        Some(host.trim_start_matches("www."))
+    }
 }

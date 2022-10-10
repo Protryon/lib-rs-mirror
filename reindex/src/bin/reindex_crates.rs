@@ -185,11 +185,13 @@ fn index_search(indexer: &mut Indexer, lines: &TempCache<(String, f64), [u8; 16]
 
     let mut variables = Vec::with_capacity(15);
     variables.push(k.short_name());
+    let repo;
     if let Some(r) = k.repository() {
         if let Some(name) = r.repo_name() {
             variables.push(name);
         }
-        variables.push(r.url.as_str());
+        repo = r.canonical_http_url("", None);
+        variables.push(&repo);
     }
     for name in k.authors().iter().filter_map(|a| a.name.as_deref()) {
         variables.push(name);

@@ -348,6 +348,7 @@ impl CrateDb {
         }
         for (i, (w2, k)) in c.extracted_auto_keywords.iter().enumerate() {
             let w = *w2 as f64 * 150. / (80 + i) as f64;
+            let k = self.tag_synonyms.normalize(k);
             insert_keyword.add(k, w, false);
         }
         insert_keyword.add_synonyms(&self.tag_synonyms);

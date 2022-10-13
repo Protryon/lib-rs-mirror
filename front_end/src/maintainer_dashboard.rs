@@ -75,7 +75,17 @@ impl<'a> MaintainerDashboard<'a> {
         }
 
         if make_common_groups {
-            Self::make_common_groups(&mut warnings);
+            warnings.sort_unstable_by(|a, b| b.0.total_cmp(&a.0));
+            if warnings.len() >= 20 {
+                // don't merge junk with top crates
+                let half = warnings.len()/2;
+                let mut junk = warnings.split_off(half);
+                Self::make_common_groups(&mut warnings);
+                Self::make_common_groups(&mut junk);
+                warnings.append(&mut junk);
+            } else {
+                Self::make_common_groups(&mut warnings);
+            }
         }
 
         warnings.iter_mut().for_each(|(rank, _, w)| {
@@ -172,7 +182,6 @@ impl<'a> MaintainerDashboard<'a> {
         if common.is_empty() || common.len() > warnings.len()/2 {
             return;
         }
-        warnings.sort_unstable_by(|a, b| b.0.total_cmp(&a.0));
         warnings.retain_mut(|(rank, origins, warnings)| {
             warnings.retain_mut(|w| {
                 let dest = match common.get_mut(&(w.title.clone(), w.desc.clone())) {

@@ -18,8 +18,8 @@ pub enum DepsErr {
     #[error("crate is not a package: {0:?}")]
     NotAPackage(Origin),
 
-    #[error("Error when parsing verison")]
-    SemverParsingError,
+    #[error("Error when parsing verison of {}", _0)]
+    SemverParsingError(String),
     #[error("Stopped")]
     Stopped,
     #[error("Deps stats timeout")]

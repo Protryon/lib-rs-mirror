@@ -9,7 +9,7 @@ use crate::git_crates_index::*;
 use crates_index::Crate;
 use crates_index::Dependency;
 use double_checked_cell_async::DoubleCheckedCell;
-use log::{debug, info, error};
+use log::{debug, warn, info, error};
 use parking_lot::RwLock;
 use rich_crate::Origin;
 use rich_crate::RichCrateVersion;
@@ -273,7 +273,8 @@ impl Index {
 
     fn deps_of_crate_int(&self, latest: &impl IVersion, features: Box<[SmolStr]>, DepQuery { default, all_optional, dev }: DepQuery) -> Result<Dep, DepsErr> {
         Ok(Dep {
-            semver: latest.version().try_into().map_err(|_| DepsErr::SemverParsingError)?,
+            semver: latest.version().try_into()
+                .map_err(|_| DepsErr::SemverParsingError(format!("{}: {}", latest.name(), latest.version())))?,
             runtime: self.deps_of_ver(latest, Features {
                 all_targets: all_optional,
                 default,
@@ -370,7 +371,11 @@ impl Index {
                 continue;
             }
 
-            let req = VersionReq::parse(requirement).map_err(|_| DepsErr::SemverParsingError)?;
+            let req = VersionReq::parse(requirement)
+                .unwrap_or_else(|e| {
+                    warn!("{crate_name} = {requirement}: {e}");
+                    VersionReq::parse("*").unwrap()
+                });
 
             let tmp;
             let crate_name: &str = if crate_name.bytes().all(|c| c.is_ascii_lowercase() || c == b'-' || c == b'_') { crate_name } else { tmp = crate_name.to_ascii_lowercase(); &tmp };

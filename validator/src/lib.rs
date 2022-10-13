@@ -206,8 +206,9 @@ async fn warn_outdated_deps(dependencies: &[RichDep], warnings: &mut HashSet<War
                 warnings.insert(Warning::DeprecatedDependency(richdep.package.clone(), richdep.dep.req().into()));
                 continue;
             }
-            if let Ok(Some(pop)) = c.version_popularity(&richdep.package, &req).await {
-                if pop.lost_popularity && pop.pop < 0.2 {
+            let origin = Origin::from_crates_io_name(&richdep.package);
+            if let Ok(Some(pop)) = c.version_popularity(&origin, &req).await {
+                if pop.deprecated || (pop.lost_popularity && pop.pop < 0.2) {
                     warnings.insert(Warning::DeprecatedDependency(richdep.package.clone(), richdep.dep.req().into()));
                     continue;
                 }

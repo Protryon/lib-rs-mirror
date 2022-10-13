@@ -453,10 +453,11 @@ impl<'a> CratePage<'a> {
         }
         self.block(async {
             if let Ok(req) = richdep.dep.req().parse() {
-                if let Ok(Some(pop)) = self.kitchen_sink.version_popularity(&richdep.package, &req).await {
+                let origin = Origin::from_crates_io_name(&richdep.package);
+                if let Ok(Some(pop)) = self.kitchen_sink.version_popularity(&origin, &req).await {
                     return match pop.pop {
-                        x if x >= 0.75 && !pop.lost_popularity => "common", // hide the version completely
-                        _ if pop.matches_latest && !pop.lost_popularity => "verynew", // display version in black
+                        x if x >= 0.75 && !pop.lost_popularity && !pop.deprecated => "common", // hide the version completely
+                        _ if pop.matches_latest && !pop.lost_popularity && !pop.deprecated => "verynew", // display version in black
                         x if x >= 0.33 => "outdated", // orange
                         _ => "obsolete", // red
                     };

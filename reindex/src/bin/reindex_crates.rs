@@ -315,10 +315,11 @@ impl Reindexer {
                     return None;
                 }
                 let req = richdep.dep.req().parse().ok()?;
+                let origin = Origin::try_from_crates_io_name(&richdep.package)?;
                 Some(async move {
-                    let pop = run_timeout("depf", 15, crates.version_popularity(&richdep.package, &req)).await
+                    let pop = run_timeout("depf", 15, crates.version_popularity(&origin, &req)).await
                         .map_err(|e| log::error!("ver1pop {}", e)).unwrap_or(None);
-                    (richdep.is_optional(), pop.unwrap_or(VersionPopularity { matches_latest: true, pop: 0., lost_popularity: false}))
+                    (richdep.is_optional(), pop.unwrap_or(VersionPopularity { matches_latest: true, pop: 0., lost_popularity: false, deprecated: false}))
                 })
             })).await
             .into_iter().map(|(is_optional, pop)| {
@@ -370,6 +371,11 @@ impl Reindexer {
             temp_inp.downloads_per_month_minus_most_downloaded_user = downloads_per_month.saturating_sub(biggest as u32);
         }
 
+        let is_deprecated = is_deprecated(k) || is_repo_archived || is_unmaintained;
+        if is_deprecated {
+            crates.mark_deprecated(k.origin());
+        }
+
         let temp_score = ranking::crate_score_temporal(&temp_inp);
         let overall = OverallScoreInputs {
             former_glory: traction_stats.map_or(1., |t| t.former_glory),
@@ -378,7 +384,7 @@ impl Reindexer {
             is_sub_component: crates.is_sub_component(k).await,
             is_internal: crates.is_internal_crate(k) && !has_many_direct_rev_deps,
             is_autopublished: is_autopublished(k),
-            is_deprecated: is_deprecated(k) || is_repo_archived || is_unmaintained,
+            is_deprecated,
             is_crates_io_published: k.origin().is_crates_io(),
             is_yanked: k.is_yanked(),
             is_squatspam: is_squatspam(k) || is_on_shitlist,

@@ -290,6 +290,7 @@ pub struct KitchenSink {
     /// login -> reason
     author_shitlist: HashMap<SmolStr, SmolStr>,
     event_log: EventLog<SharedEvent>,
+    is_deprecated_crate: TempCache<()>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -362,6 +363,7 @@ impl KitchenSink {
             crates_io_owners_cache: TempCache::new(&data_path.join("cio-owners.tmp"), Duration::from_secs(3600*24*14)).context("tmp1")?,
             depender_changes: TempCache::new(&data_path.join("deps-changes3.tmp"), Duration::ZERO).context("tmp2")?,
             stats_histograms: TempCache::new(&data_path.join("stats-histograms.tmp"), Duration::from_secs(3600*24*31*3)).context("tmp3")?,
+            is_deprecated_crate: TempCache::new(&data_path.join("deprecated.tmp"), Duration::ZERO).context("tmpdp")?,
             throttle: tokio::sync::Semaphore::new(40),
             auto_indexing_throttle: tokio::sync::Semaphore::new(4),
             crate_rustc_compat_cache: RwLock::default(),
@@ -1027,6 +1029,9 @@ impl KitchenSink {
         };
 
         self.refresh_crate_data(&mut data);
+        if data.manifest.badges.maintenance.status == MaintenanceStatus::Deprecated {
+            self.mark_deprecated(origin);
+        }
 
         let krate = Arc::new(RichCrateVersion::new(origin.clone(), data.manifest, data.derived));
         if !allow_stale {
@@ -1815,21 +1820,27 @@ impl KitchenSink {
     /// 0 = not used
     /// 1 = everyone uses it
     #[inline]
-    pub async fn version_popularity(&self, crate_name: &str, requirement: &VersionReq) -> CResult<Option<VersionPopularity>> {
+    pub async fn version_popularity(&self, origin: &Origin, requirement: &VersionReq) -> CResult<Option<VersionPopularity>> {
         let mut lost_popularity = false;
-        let (matches_latest, mut pop) = match self.index.version_popularity(crate_name, requirement).await.map_err(KitchenSinkErr::Deps)? {
+        let (matches_latest, mut pop) = match self.index.version_popularity(origin.short_crate_name(), requirement).await.map_err(KitchenSinkErr::Deps)? {
             Some(res) => res,
             None => return Ok(None),
         };
 
-        if let Some(s) = self.traction_stats(&Origin::from_crates_io_name(crate_name)).await? {
+        if let Some(s) = self.traction_stats(&origin).await? {
             if s.former_glory < 0.5 {
                 lost_popularity = true;
             }
             pop *= s.former_glory as f32;
         }
+        let deprecated = if self.is_marked_deprecated(origin) {
+            pop *= 0.5;
+            true
+        } else {
+            false
+        };
         Ok(Some(VersionPopularity {
-            lost_popularity, pop, matches_latest,
+            lost_popularity, pop, matches_latest, deprecated
         }))
     }
 
@@ -2055,6 +2066,16 @@ impl KitchenSink {
             }
         }
         Ok(())
+    }
+
+    pub fn mark_deprecated(&self, origin: &Origin) {
+        if !self.is_marked_deprecated(origin) {
+            let _ = self.is_deprecated_crate.set(origin.to_str(), ());
+        }
+    }
+
+    pub fn is_marked_deprecated(&self, origin: &Origin) -> bool {
+        matches!(self.is_deprecated_crate.get(origin.to_str().as_str()), Ok(Some(())))
     }
 
     pub async fn index_crate_highest_version(&self, origin: &Origin, maintenance_only_reindexing: bool) -> CResult<()> {
@@ -3744,6 +3765,7 @@ pub struct VersionPopularity {
     pub pop: f32,
     pub matches_latest: bool,
     pub lost_popularity: bool,
+    pub deprecated: bool,
 }
 
 #[derive(Debug, Clone)]

@@ -55,7 +55,7 @@ impl Repo {
                 Self::GitHub(Self::repo_from_path(path)?)
             },
             (Some("www.gitlab.com" | "gitlab.com"), Some(path)) => {
-                Self::GitLab(Self::repo_from_path(path)?)
+                Self::GitLab(Self::gitlab_repo_from_path(path)?)
             },
             (Some("bitbucket.org"), Some(path)) => {
                 Self::BitBucket(Self::repo_from_path(path)?)
@@ -68,6 +68,32 @@ impl Repo {
         let mut owner = SmolStr::from(path.next().ok_or(GitError::IncompleteUrl)?);
         owner.make_ascii_lowercase();
         let mut repo = SmolStr::from(path.next().ok_or(GitError::IncompleteUrl)?.trim_end_matches(".git"));
+        repo.make_ascii_lowercase();
+        Ok(SimpleRepo {
+            owner,
+            repo,
+        })
+    }
+
+    fn gitlab_repo_from_path<'a>(mut path: impl Iterator<Item = &'a str>) -> GResult<SimpleRepo> {
+        let mut segments = vec![
+            path.next().ok_or(GitError::IncompleteUrl)?,
+            path.next().ok_or(GitError::IncompleteUrl)?,
+        ];
+        let mut seen_end = false;
+        segments.extend(path
+            .filter(|&item| {
+                if seen_end { return false; }
+                if item.ends_with(".git") { seen_end = true; }
+                true
+            })
+            .take_while(|&item| item != "-" && item != "tree" && item != "blob" && item != "graphs")
+            .map(|s| s.strip_suffix(".git").unwrap_or(s)));
+
+        let (&owner, repo) = segments.split_first().unwrap();
+        let mut owner = SmolStr::from(owner);
+        owner.make_ascii_lowercase();
+        let mut repo = SmolStr::from(repo.join("/"));
         repo.make_ascii_lowercase();
         Ok(SimpleRepo {
             owner,
@@ -105,7 +131,7 @@ impl Repo {
                 format!("https://github.com/{owner}/{repo}/graphs/contributors").into()
             },
             Self::GitLab(SimpleRepo {ref owner, ref repo}) => {
-                format!("https://gitlab.com/{owner}/{repo}/graphs/master").into()
+                format!("https://gitlab.com/{owner}/{repo}{}/graphs/master", if repo.contains('/') {"/-"} else {""}).into()
             },
             Self::BitBucket(SimpleRepo {ref owner, ref repo}) => {
                 // not really…
@@ -137,7 +163,7 @@ impl Repo {
                 format!("https://github.com/{owner}/{repo}/blob/{treeish_revision}/{base_dir_in_repo}{slash}")
             },
             Self::GitLab(SimpleRepo {ref owner, ref repo}) => {
-                format!("https://gitlab.com/{owner}/{repo}/blob/{treeish_revision}/{base_dir_in_repo}{slash}")
+                format!("https://gitlab.com/{owner}/{repo}{}/blob/{treeish_revision}/{base_dir_in_repo}{slash}", if repo.contains('/') {"/-"} else {""})
             },
             Self::BitBucket(SimpleRepo {ref owner, ref repo}) => {
                 format!("https://bitbucket.org/{owner}/{repo}/src/{treeish_revision}/{base_dir_in_repo}{slash}")
@@ -158,7 +184,7 @@ impl Repo {
                 format!("https://raw.githubusercontent.com/{owner}/{repo}/{treeish_revision}/{base_dir_in_repo}{slash}")
             },
             Self::GitLab(SimpleRepo {ref owner, ref repo}) => {
-                format!("https://gitlab.com/{owner}/{repo}/raw/{treeish_revision}/{base_dir_in_repo}{slash}")
+                format!("https://gitlab.com/{owner}/{repo}{}/raw/{treeish_revision}/{base_dir_in_repo}{slash}", if repo.contains('/') {"/-"} else {""})
             },
             Self::BitBucket(SimpleRepo {ref owner, ref repo}) => {
                 format!("https://bitbucket.org/{owner}/{repo}/raw/{treeish_revision}/{base_dir_in_repo}{slash}")
@@ -201,7 +227,7 @@ impl Repo {
                 format!("https://github.com/{owner}/{repo}{path_part}")
             },
             Self::GitLab(SimpleRepo {ref owner, ref repo}) => {
-                format!("https://gitlab.com/{owner}/{repo}{path_part}")
+                format!("https://gitlab.com/{owner}/{repo}{}{path_part}", if repo.contains('/') {"/-"} else {""})
             },
             Self::BitBucket(SimpleRepo {ref owner, ref repo}) => {
                 format!("https://bitbucket.org/{owner}/{repo}{path_part}")
@@ -249,6 +275,17 @@ fn repo_parse() {
     assert_eq!("https://gitlab.com/foo/bar/raw/HEAD/baz/", repo.readme_base_image_url("baz/", None));
     assert_eq!("https://gitlab.com/foo/bar/raw/main/baz/", repo.readme_base_image_url("baz/", Some("main")));
     assert_eq!("https://gitlab.com/foo/bar/tree/HEAD/sub/dir", repo.canonical_http_url("sub/dir", None));
+
+    let repo = Repo::new("HTTPS://GITlaB.COM/user/sub/project.git").unwrap();
+    assert_eq!("https://gitlab.com/user/sub/project.git", repo.canonical_git_url());
+    assert_eq!("https://gitlab.com/user/sub/project/-/blob/HEAD/", repo.readme_base_url("", None));
+    assert_eq!("https://gitlab.com/user/sub/project/-/blob/main/foo/", repo.readme_base_url("foo", Some("main")));
+    assert_eq!("https://gitlab.com/user/sub/project/-/blob/HEAD/foo/bar/", repo.readme_base_url("foo/bar", None));
+    assert_eq!("https://gitlab.com/user/sub/project/-/raw/HEAD/baz/", repo.readme_base_image_url("baz/", None));
+    assert_eq!("https://gitlab.com/user/sub/project/-/raw/main/baz/", repo.readme_base_image_url("baz/", Some("main")));
+    assert_eq!("https://gitlab.com/user/sub/project/-/tree/HEAD/sub/dir", repo.canonical_http_url("sub/dir", None));
+    assert_eq!("user", repo.owner_name().unwrap());
+    assert_eq!("sub/project", repo.repo_name().unwrap());
 
     let repo = Repo::new("http://priv@example.com/#111").unwrap();
     assert_eq!("http://priv@example.com/#111", repo.canonical_git_url());

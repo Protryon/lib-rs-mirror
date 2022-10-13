@@ -121,7 +121,7 @@ async fn main() {
                     continue;
                 }
                 if let Some(path) = file.path()?.file_name().and_then(|f| f.to_str()) {
-                    eprint!("{} ({}MB): ", path, file.header().size()? / 1000 / 1000);
+                    eprint!("{path} ({}MB): ", file.header().size()? / 1000 / 1000);
                     match path {
                         "crate_owners.csv" => {
                             eprintln!("parse_crate_owners…");
@@ -165,7 +165,7 @@ async fn main() {
                         "metadata.json" | "README.md" | // not relevant
                         "import.sql" | "export.sql" | "schema.sql" // NoSQL
                         => eprintln!("skip"),
-                        p => eprintln!("Ignored unexpected file {}", p),
+                        p => eprintln!("Ignored unexpected file {p}"),
                     };
 
                     if let (Some(crates), Some(versions), Some(crate_owners)) = (&crates, &versions, &crate_owners) {
@@ -205,10 +205,10 @@ async fn main() {
     .await.unwrap();
 
     if let Err(e) = res {
-        eprintln!("datadump failed: {}", e);
+        eprintln!("datadump failed: {e}");
         let mut src = e.source();
         while let Some(e) = src {
-            eprintln!(" {}", e);
+            eprintln!(" {e}");
             src = e.source();
         }
         std::process::exit(1);
@@ -280,10 +280,10 @@ fn index_downloads(crates: &CratesMap, versions: &VersionsMap, downloads: &Versi
                 })
                 .collect();
             if let Err(e) = ksink.index_crate_downloads(name, &data) {
-                eprintln!("Can't index downloads for {}: {}", name, e);
+                eprintln!("Can't index downloads for {name}: {e}");
             }
         } else {
-            eprintln!("Bad crate? {} {}", crate_id, name);
+            eprintln!("Bad crate? {crate_id} {name}");
         }
     }
 }
@@ -542,7 +542,7 @@ fn process_owners(crates: &CratesMap, owners: CrateOwners, teams: &Teams, users:
                         let u = match teams.get(&o.owner_id) {
                             Some(t) => t,
                             None => {
-                                eprintln!("warning: id {} is not in teams (len={}). Bad obj: {:?} {:?}", o.owner_id, teams.len(), o, origin);
+                                eprintln!("warning: id {} is not in teams (len={}). Bad obj: {o:?} {origin:?}", o.owner_id, teams.len());
                                 return None;
                             },
                         };
@@ -613,7 +613,7 @@ fn parse_crate_owners(file: impl Read) -> Result<CrateOwners, BoxErr> {
     let mut out = HashMap::with_capacity(NUM_CRATES);
     for r in csv.records() {
         let r = r?;
-        let r = r.deserialize::<CrateOwnerRow>(None).map_err(|e| format!("wat? {:#?} {}", r, e))?;
+        let r = r.deserialize::<CrateOwnerRow>(None).map_err(|e| format!("wat? {r:#?} {e}"))?;
         out.entry(r.crate_id).or_insert_with(|| Vec::with_capacity(1)).push(r);
     }
     Ok(out)
@@ -637,7 +637,7 @@ fn parse_teams(file: impl Read) -> Result<Teams, BoxErr> {
     let mut out = HashMap::with_capacity(NUM_CRATES);
     for r in csv.records() {
         let r = r?;
-        let r = r.deserialize::<TeamRow>(None).map_err(|e| format!("{}: {:?}", e, r))?;
+        let r = r.deserialize::<TeamRow>(None).map_err(|e| format!("{e}: {r:?}"))?;
         out.insert(r.id, r);
     }
     Ok(out)
@@ -661,7 +661,7 @@ fn parse_users(file: impl Read) -> Result<Users, BoxErr> {
     let mut out = HashMap::with_capacity(NUM_CRATES);
     for r in csv.records() {
         let r = r?;
-        let row = r.deserialize::<UserRow>(None).map_err(|e| format!("{}: {:?}", e, r))?;
+        let row = r.deserialize::<UserRow>(None).map_err(|e| format!("{e}: {r:?}"))?;
         out.insert(row.id, row);
     }
     Ok(out)

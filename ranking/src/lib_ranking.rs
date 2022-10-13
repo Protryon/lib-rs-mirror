@@ -344,7 +344,7 @@ pub fn crate_score_temporal(cr: &CrateTemporalInputs<'_>) -> Score {
 
     // amplify by user growth
     let active_users = if let Some(t) = cr.traction_stats {
-        t.growth.min(1.2) as f64 * t.active_users as f64
+        t.growth.min(1.2) * t.active_users as f64
     } else { 1. };
 
     // if it's new, it doesn't have to have many downloads.

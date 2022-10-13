@@ -150,7 +150,7 @@ impl CrateSearchIndex {
 
             Ok(CrateFound {
                 crate_base_score: crate_base_score as f32,
-                relevance_score: relevance_score as f32,
+                relevance_score,
                 score: 0.,
                 crate_name,
                 description: take_string(doc.remove("description")),

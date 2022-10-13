@@ -119,7 +119,7 @@ async fn main_indexing_loop(ref r: Arc<Reindexer>, crate_origins: Box<dyn Iterat
         let mut tx = tx.clone();
         async move {
         if stopped() {return;}
-        println!("{}…", i);
+        println!("{i}…");
         if !search_only {
             match run_timeout("hv", 62, r.crates.index_crate_highest_version(&origin, reindexing_all_crates)).await {
                 Ok(()) => {},
@@ -141,8 +141,8 @@ async fn main_indexing_loop(ref r: Arc<Reindexer>, crate_origins: Box<dyn Iterat
                             if s.contains(&*url) {
                                 return;
                             }
-                            println!("Indexing repo of {}: {}", v.short_name(), url);
-                            s.insert(url.to_string());
+                            println!("Indexing repo of {}: {url}", v.short_name());
+                            s.insert(url);
                         }
                         let _finished = repo_concurrency.acquire().await;
                         if stopped() {return;}
@@ -352,12 +352,12 @@ impl Reindexer {
             if direct_rev_deps > 50 {
                 has_many_direct_rev_deps = true;
             }
-            let indirect_reverse_optional_deps = (deps.runtime.def as u32 + deps.runtime.opt as u32)
+            let indirect_reverse_optional_deps = (deps.runtime.def + deps.runtime.opt)
                 .max(deps.dev as u32)
-                .max(deps.build.def as u32 + deps.build.opt as u32);
+                .max(deps.build.def + deps.build.opt);
 
             temp_inp.number_of_direct_reverse_deps = direct_rev_deps;
-            temp_inp.number_of_indirect_reverse_deps = deps.runtime.def.max(deps.build.def).into();
+            temp_inp.number_of_indirect_reverse_deps = deps.runtime.def.max(deps.build.def);
             temp_inp.number_of_indirect_reverse_optional_deps = indirect_reverse_optional_deps;
             let tmp = futures::future::join_all(
                 deps.rev_dep_names_default.iter().map(|n| (n, false)).chain(

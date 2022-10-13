@@ -150,7 +150,7 @@ impl<'a> MaintainerDashboard<'a> {
         hasher.update(warn.title.as_bytes());
         hasher.update(origin.short_crate_name().as_bytes());
         let hash = hasher.finalize().to_hex();
-        format!("https://lib.rs/crates/{}?atom-{}", origin.short_crate_name(), hash)
+        format!("https://lib.rs/crates/{}?atom-{hash}", origin.short_crate_name())
     }
 
     pub fn now(&self) -> String {
@@ -214,7 +214,7 @@ async fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult
         Ok(res) => res,
         Err(e) => return (origin, 0., vec![StructuredWarning {
             title: Cow::Borrowed("Internal error"),
-            desc: Cow::Owned(format!("We couldn't check this crate at this time, because: {}. Please try again later.", e)),
+            desc: Cow::Owned(format!("We couldn't check this crate at this time, because: {e}. Please try again later.")),
             url: None,
             extended_desc: None,
             severity: 0,
@@ -240,18 +240,18 @@ async fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult
                 Warning::NoRepositoryProperty => (3, Cow::Borrowed("No repository property"), Cow::Borrowed("Specify git repository URL in Cargo.toml to help users find more information, contribute, and for lib.rs to read more info."), None::<(Cow<'static, str>, Cow<'static, str>)>),
                 Warning::NoReadmeProperty => (if k.readme().is_some() {1} else {2}, "No readme property".into(), "Specify path to a README file for the project, so that information about is included in the crates.io tarball.".into(), None),
                 Warning::NoReadmePackaged => (if k.readme().is_some() {1} else {3}, "README missing from crate tarball".into(), "Cargo sometimes fails to package the README file. Ensure the path to the README in Cargo.toml is valid, and points to a file inside the crate's directory.".into(), None),
-                Warning::NoReadmeInRepo(url) => (if k.readme().is_some() {1} else {3}, "README missing from the repository".into(), format!("We've searched {} and could not find a README file there.", url).into(), None),
-                Warning::EscapingReadmePath(path) => (if k.readme().is_some() {1} else {3}, "Buggy README path".into(), format!("The non-local path to readme specified as '{}' exposes a bug in Cargo. Please use a path inside the crate's directory. Symlinks are okay. Please verify the change doesn't break any repo-relative URLs in the README.", path).into(), None),
+                Warning::NoReadmeInRepo(url) => (if k.readme().is_some() {1} else {3}, "README missing from the repository".into(), format!("We've searched {url} and could not find a README file there.").into(), None),
+                Warning::EscapingReadmePath(path) => (if k.readme().is_some() {1} else {3}, "Buggy README path".into(), format!("The non-local path to readme specified as '{path}' exposes a bug in Cargo. Please use a path inside the crate's directory. Symlinks are okay. Please verify the change doesn't break any repo-relative URLs in the README.").into(), None),
                 Warning::ErrorCloning(url) => {
                     extended_desc = Some("At the moment we only support git, and attempt fetching when we index a new release. Cloning is necessary for lib.rs to gather data that is missing on crates.io, e.g. to correctly resolve relative URLs in README files, which depend on repository layout and non-standard URL schemes of repository hosts.");
-                    (2, "Could not fetch repository".into(), format!("We've had trouble cloning git repo from {}", url).into(), None)
+                    (2, "Could not fetch repository".into(), format!("We've had trouble cloning git repo from {url}").into(), None)
                 },
                 Warning::BrokenLink(kind, url) => {
-                    (1, format!("Broken link to {}", kind).into(), format!("We did not get a successful HTTP response from {} (these checks are cached, so the problem may have been temporary)", url).into(), None)
+                    (1, format!("Broken link to {kind}").into(), format!("We did not get a successful HTTP response from {url} (these checks are cached, so the problem may have been temporary)").into(), None)
                 },
                 Warning::BadCategory(name) => {
                     extended_desc = Some("lib.rs has simplified and merged some of crates.io categories. Please file a bug if we got it wrong.");
-                    (if k.category_slugs().is_empty() {2} else {1}, "Incorrect category".into(), format!("Crate's categories property in Cargo.toml contains '{}', which isn't a category we recognize", name).into(), Some(("List of available categories".into(), "https://crates.io/category_slugs".into())))
+                    (if k.category_slugs().is_empty() {2} else {1}, "Incorrect category".into(), format!("Crate's categories property in Cargo.toml contains '{name}', which isn't a category we recognize").into(), Some(("List of available categories".into(), "https://crates.io/category_slugs".into())))
                 },
                 Warning::NoCategories => {
                     extended_desc = Some("Even if there are no categories that fit precisely, pick one that is least bad. You can also propose new categories in crates.io issue tracker.");
@@ -264,12 +264,12 @@ async fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult
                 Warning::NoKeywords => (if k.keywords().is_empty() {3} else {2}, "Missing keywords".into(), format!("Help users find your crates. Add keywords = [{}] (up to 5) to the Cargo.toml. Best keywords are alternative terms or their spellings that aren't in the name or description. Also add a keyword that precisely categorizes this crate and groups it with other similar crates.", comma_list(k.keywords().iter())).into(), None),
                 Warning::EditionMSRV(ed, msrv) => {
                     extended_desc = Some("Using the latest edition helps avoid old quirks of the compiler, and ensures Rust code has consistent syntax and behavior across all projects.");
-                    (1, "Using outdated edition for no reason".into(), format!("We estimate that this crate requires at least Rust 1.{}, which is newer than the last {}-edition compiler. You can upgrade without breaking any compatibility. Run cargo fix --edition and update edition=\"…\" in Cargo.toml.", msrv, ed as u16).into(),
+                    (1, "Using outdated edition for no reason".into(), format!("We estimate that this crate requires at least Rust 1.{msrv}, which is newer than the last {}-edition compiler. You can upgrade without breaking any compatibility. Run cargo fix --edition and update edition=\"…\" in Cargo.toml.", ed as u16).into(),
                         Some(("The Edition Guide".into(), "https://doc.rust-lang.org/edition-guide/".into())))
                 },
                 Warning::BadMSRV(needs, says) => {
                     let tmp;
-                    (1, "Needs to specify correct MSRV".into(), format!("We estimate that this crate requires at least Rust 1.{}{}. Add rust-version = \"1.{}\" to the Cargo.toml.", needs, if says > 0 {tmp=format!(", but specified Rust 1.{} as the minimum version", says); &tmp} else {""}, needs).into(),
+                    (1, "Needs to specify correct MSRV".into(), format!("We estimate that this crate requires at least Rust 1.{needs}{}. Add rust-version = \"1.{needs}\" to the Cargo.toml.", if says > 0 {tmp=format!(", but specified Rust 1.{says} as the minimum version"); &tmp} else {""}).into(),
                         Some((format!("{} versions", k.short_name()).into(), urler.all_versions(k.origin()).unwrap_or_else(|| urler.crate_by_origin(k.origin())).into())))
                 },
                 Warning::DocsRs => {
@@ -278,8 +278,8 @@ async fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult
                 },
                 Warning::DeprecatedDependency(name, req) => {
                     let origin = Origin::from_crates_io_name(&name);
-                    (3, format!("Dependency {} {} is deprecated", name, req).into(), "Please remove the dependency or replace it with a different crate.".into(),
-                        Some((format!("{} crate", name).into(), urler.crate_by_origin(&origin).into())))
+                    (3, format!("Dependency {name} {req} is deprecated").into(), "Please remove the dependency or replace it with a different crate.".into(),
+                        Some((format!("{name} crate").into(), urler.crate_by_origin(&origin).into())))
                 },
                 Warning::OutdatedDependency(name, req, severity) => {
                     let origin = Origin::from_crates_io_name(&name);
@@ -292,35 +292,35 @@ async fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult
                         } else {
                             "Easy way to bump dependencies: cargo install cargo-edit; cargo upgrade; Also check out Dependabot service on GitHub."
                         });
-                    (1+severity/40, format!("Dependency {} {} is {}outdated", name, req, match severity {
+                    (1+severity/40, format!("Dependency {name} {req} is {}outdated", match severity {
                         0..=10 => "slightly ",
                         11..=30 => "a bit ",
                         31..=80 => "",
                         81..=255 => "significantly ",
                     }).into(), if severity > 40 && !k.is_app() {
-                        format!("Upgrade to {} to get all the fixes, and avoid causing duplicate dependencies in projects.", upgrade_version)
+                        format!("Upgrade to {upgrade_version} to get all the fixes, and avoid causing duplicate dependencies in projects.")
                     } else {
-                        format!("Consider upgrading to {} to get all the fixes and improvements.", upgrade_version)
+                        format!("Consider upgrading to {upgrade_version} to get all the fixes and improvements.")
                     }.into(),
                     Some((
-                        format!("{} versions", name).into(),
+                        format!("{name} versions").into(),
                         if severity > 40 { urler.reverse_deps(&origin) } else { urler.all_versions(&origin) }.unwrap_or_else(|| urler.crate_by_origin(&origin)).into(),
                     )))
                 },
                 Warning::BadSemVer(ver, err) => {
-                    (2, format!("Syntax error in version {}", ver).into(),
-                    format!("This is not a valid semver: {}. Cargo enforces semver syntax now, so this version is unusable. Please yank it with cargo yank --vers {}", err, ver).into(), None)
+                    (2, format!("Syntax error in version {ver}").into(),
+                    format!("This is not a valid semver: {err}. Cargo enforces semver syntax now, so this version is unusable. Please yank it with cargo yank --vers {ver}").into(), None)
                 },
                 Warning::BadRequirement(name, req) => {
                     extended_desc = Some("Cargo used to be more forgiving about the semver syntax, so it's possible that an already-published crate doesn't satisfy the current rules.");
-                    (3, format!("Incorrect dependency requirement {} = {}", name, req).into(),
+                    (3, format!("Incorrect dependency requirement {name} = {req}").into(),
                     "We could not parse it. Please check the semver syntax.".into(),
                     Some(("Cargo dependencies manual".into(), "https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#specifying-dependencies-from-cratesio".into())))
                 },
                 Warning::ExactRequirement(name, req) => {
                     let origin = Origin::from_crates_io_name(&name);
-                    (2, format!("Locked dependency version {} {}", name, req).into(), "This can easily cause a dependency resolution conflict. If you must work around a semver-breaking dependency that can't be yanked, use a range of versions or fork it.".into(),
-                        Some((format!("{} versions", name).into(), urler.all_versions(&origin).unwrap_or_else(|| urler.crate_by_origin(&origin)).into())))
+                    (2, format!("Locked dependency version {name} {req}").into(), "This can easily cause a dependency resolution conflict. If you must work around a semver-breaking dependency that can't be yanked, use a range of versions or fork it.".into(),
+                        Some((format!("{name} versions").into(), urler.all_versions(&origin).unwrap_or_else(|| urler.crate_by_origin(&origin)).into())))
                 },
                 Warning::LaxRequirement(name, req, is_breaking) => {
                     let origin = Origin::from_crates_io_name(&name);
@@ -332,12 +332,12 @@ async fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult
 
                     let mut upgrade_note = String::new();
                     if let Some(latest) = latest_version_matching_requirement(&req, deadline, kitchen_sink, &origin).await {
-                        upgrade_note = format!("Specify the version as {} = \"{}\". ", name, latest);
+                        upgrade_note = format!("Specify the version as {name} = \"{latest}\". ");
                     }
 
-                    (if is_breaking {2} else {1}, format!("Imprecise dependency requirement {} = {}", name, req).into(),
-                        format!("Cargo does not always pick latest versions of dependencies. {}Too-low version requirements can cause breakage, especially when combined with minimal-versions flag used by users of old Rust versions.", upgrade_note).into(),
-                        Some((format!("{} versions", name).into(), urler.all_versions(&origin).unwrap_or_else(|| urler.crate_by_origin(&origin)).into())))
+                    (if is_breaking {2} else {1}, format!("Imprecise dependency requirement {name} = {req}").into(),
+                        format!("Cargo does not always pick latest versions of dependencies. {upgrade_note}Too-low version requirements can cause breakage, especially when combined with minimal-versions flag used by users of old Rust versions.").into(),
+                        Some((format!("{name} versions").into(), urler.all_versions(&origin).unwrap_or_else(|| urler.crate_by_origin(&origin)).into())))
                 },
                 Warning::NotAPackage => (3, "Cargo.toml parse error".into(), w.to_string().into(), None),
                 Warning::CryptocurrencyBS => {
@@ -371,7 +371,7 @@ async fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult
                     let unit = if days > 366*2 { "year" } else { "month" };
                     (severity,
                         format!("Latest {}release is old", if is_stable {"stable "} else {"pre"}).into(),
-                        format!("It's been over {} {}{}. {}? Make a new release, either to refresh it, or to set [badges.maintenance] status = \"deprecated\" (or \"as-is\", \"passively-maintained\").", num, unit, if num != 1 {"s"} else {""},
+                        format!("It's been over {num} {unit}{}. {}? Make a new release, either to refresh it, or to set [badges.maintenance] status = \"deprecated\" (or \"as-is\", \"passively-maintained\").", if num != 1 {"s"} else {""},
                             if k.maintenance() == MaintenanceStatus::Experimental {"How did the experiment go"} else {"Is this crate still maintained"}).into(),
                         Some(("Maintenance status field docs".into(), "https://doc.rust-lang.org/cargo/reference/manifest.html#the-badges-section".into())))
                 },
@@ -379,7 +379,7 @@ async fn elaborate_warnings(origin: Origin, mut crate_ranking: f32, res: CResult
                     let repo = k.repository_http_url();
                     let repo_url = repo.as_ref().map(|(_, url)| &**url).unwrap_or("???");
                     extended_desc = Some("If it's a newly released crate, it's possible we haven't finished indexing the repository yet.");
-                    (1, "Could not find the crate in the repository".into(), format!("Make sure the main branch of {} contains the Cargo.toml for the crate. If you have forked the crate, change the repository property in Cargo.toml to your fork's URL.", repo_url).into(), None)
+                    (1, "Could not find the crate in the repository".into(), format!("Make sure the main branch of {repo_url} contains the Cargo.toml for the crate. If you have forked the crate, change the repository property in Cargo.toml to your fork's URL.").into(), None)
                 },
                 Warning::LicenseSpdxSyntax => {
                     (1, format!("License {} is not in SPDX syntax", k.license().unwrap_or("")).into(), "Use \"OR\" instead of \"/\".".into(), Some(("SPDX license list".into(), "https://spdx.org/licenses/".into())))
@@ -419,7 +419,7 @@ async fn latest_version_matching_requirement(req: &str, deadline: Instant, kitch
 }
 
 fn comma_list(items: impl Iterator<Item=impl std::fmt::Display>) -> String {
-    let mut res = items.take(5).map(|c| format!("\"{}\"", c)).collect::<Vec<_>>().join(", ");
+    let mut res = items.take(5).map(|c| format!("\"{c}\"")).collect::<Vec<_>>().join(", ");
     if res.is_empty() {
         res.push('…');
     }

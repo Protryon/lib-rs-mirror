@@ -11,7 +11,7 @@ pub struct Writer<T: 'static, E: 'static> {
 
 impl<T, E: std::fmt::Display> Writer<T, E> {
     pub fn fail(&mut self, error: E) {
-        eprintln!("async write aborted: {}", error);
+        eprintln!("async write aborted: {error}");
         let _ = self.sender.send(Err(error));
     }
 }
@@ -25,7 +25,7 @@ where E: Send + Sync + 'static
         let _g = self.rt.enter();
         futures::executor::block_on(sent)
             .map_err(|e| {
-                eprintln!("write failed: {}", e);
+                eprintln!("write failed: {e}");
                 io::Error::new(io::ErrorKind::BrokenPipe, e)
             })?;
         Ok(len)
@@ -40,7 +40,7 @@ where E: Send + Sync + 'static
         let _g = self.rt.enter();
         futures::executor::block_on(flushed)
             .map_err(|e| {
-                eprintln!("flush failed: {}", e);
+                eprintln!("flush failed: {e}");
                 io::Error::new(io::ErrorKind::BrokenPipe, e)
             })
     }

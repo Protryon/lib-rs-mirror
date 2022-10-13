@@ -176,7 +176,7 @@ impl Compat {
             "N" => Compat::SuspectedIncompatible,
             "x" => Compat::LikelyIncompatible,
             "X" => Compat::DefinitelyIncompatible,
-            _ => panic!("bad compat str {}", s),
+            _ => panic!("bad compat str {s}"),
         }
     }
 
@@ -228,7 +228,7 @@ impl BuildDb {
         let conn = self.conn.lock();
         let mut get = conn.prepare_cached(r"SELECT rustc_version, version, compat, reason FROM build_results WHERE origin = ?1")?;
         let origin_str = origin.to_str();
-        let res = get.query_map(&[origin_str.as_str()], Self::compat_row)?;
+        let res = get.query_map([origin_str.as_str()], Self::compat_row)?;
         res.collect()
     }
 
@@ -236,7 +236,7 @@ impl BuildDb {
         let conn = self.conn.lock();
         let mut get = conn.prepare_cached(r"SELECT rustc_version, version, compat, reason FROM build_results WHERE origin = ?1")?;
         let origin_str = origin.to_str();
-        let mut rows = get.query(&[origin_str.as_str()])?;
+        let mut rows = get.query([origin_str.as_str()])?;
         let mut compat = CompatByCrateVersion::new();
         while let Some(row) = rows.next()? {
             Self::append_compat(&mut compat, Self::compat_row(row)?);
@@ -419,10 +419,10 @@ impl BuildDb {
                     continue;
                 }
                 let ver = ver.to_string();
-                let rustc_version = format!("1.{}.0", rustc_version);
+                let rustc_version = format!("1.{rustc_version}.0");
                 let origin_str = origin.to_str();
 
-                let existing = get.query_row(&[origin_str.as_str(), &ver, &rustc_version], |row| {
+                let existing = get.query_row([origin_str.as_str(), &ver, &rustc_version], |row| {
                     Ok(Compat::from_str(row.get_ref_unwrap(0).as_str()?))
                 });
                 match existing {
@@ -441,7 +441,7 @@ impl BuildDb {
             for (origin, origin_str, ver, rustc_version, new_compat, reason) in to_insert {
                 info!("https://lib.rs/compat/{}#{} R.{}={:?} ({})", origin.short_crate_name(), ver, rustc_version, new_compat, reason);
                 let result_str = new_compat.as_char().to_string();
-                insert.execute(&[origin_str.as_str(), &ver, &rustc_version, &result_str, reason])?;
+                insert.execute([origin_str.as_str(), &ver, &rustc_version, &result_str, reason])?;
             }
         }
         tx.commit()?;

@@ -28,7 +28,7 @@ impl UserDb {
     pub fn email_has_github(&self, email: &str) -> Result<bool> {
         let conn = self.conn.lock();
         let mut get_email = conn.prepare_cached("SELECT 1 FROM github_emails WHERE email = ?1 LIMIT 1")?;
-        get_email.exists(&[&email.to_ascii_lowercase()])
+        get_email.exists([&email.to_ascii_lowercase()])
     }
 
     pub fn user_by_github_login(&self, login: &str) -> Result<Option<User>> {
@@ -50,7 +50,7 @@ impl UserDb {
             ORDER BY u.fetched_timestamp DESC, u.created_at DESC
             LIMIT 1", &login.to_ascii_lowercase());
         Ok(if let Some((fetched_at, user)) = res? {
-            if fetched_at + 3600*24*31 > (SystemTime::UNIX_EPOCH.elapsed().unwrap().as_secs() as u64) {
+            if fetched_at + 3600*24*31 > SystemTime::UNIX_EPOCH.elapsed().unwrap().as_secs() {
                 Some(user)
             } else {
                 info!("ignoring stale gh user data for {}", user.login);
@@ -62,7 +62,7 @@ impl UserDb {
     fn user_by_query(&self, query: &str, arg: &dyn ToSql) -> Result<Option<(u64, User)>> {
         let conn = self.conn.lock();
         let mut get_user = conn.prepare_cached(query)?;
-        let mut res = get_user.query_map(&[arg], Self::read_user_row)?;
+        let mut res = get_user.query_map([arg], Self::read_user_row)?;
         res.next().transpose()
     }
 
@@ -103,7 +103,7 @@ impl UserDb {
         let mut get_user = conn.prepare_cached(r"SELECT login FROM github_users WHERE id = ?1
             ORDER BY fetched_timestamp DESC, created_at DESC
             LIMIT 1")?;
-        get_user.query_row(&[&id], |row| row.get(0))
+        get_user.query_row([&id], |row| row.get(0))
     }
 
     pub fn user_by_email(&self, email: &str) -> Result<Option<User>> {
@@ -179,7 +179,7 @@ impl UserDb {
                 id, login, name, avatar_url, gravatar_id, html_url, type, two_factor_authentication, created_at, blog, login_case, fetched_timestamp)
                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
             "})?;
-        let timestamp = fetched_at.and_then(|f| f.duration_since(SystemTime::UNIX_EPOCH).ok()).unwrap_or_default().as_secs() as u64;
+        let timestamp = fetched_at.and_then(|f| f.duration_since(SystemTime::UNIX_EPOCH).ok()).unwrap_or_default().as_secs();
         for user in users {
             let login_lowercase = user.login.to_ascii_lowercase();
             let args: &[&dyn ToSql] = &[

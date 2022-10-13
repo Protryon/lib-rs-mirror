@@ -54,7 +54,7 @@ impl<'a> ReviewsPage<'a> {
             return Some(id.into());
         }
         if id.starts_with("RUSTSEC-") {
-            return Some(format!("https://github.com/RustSec/advisory-db/blob/HEAD/crates/{}/{}.md", self.ver.short_name(), id).into());
+            return Some(format!("https://github.com/RustSec/advisory-db/blob/HEAD/crates/{}/{id}.md", self.ver.short_name()).into());
         }
         None
     }
@@ -142,7 +142,7 @@ impl<'a> ReviewsPage<'a> {
     pub fn render_comment(&self, markdown: &str) -> templates::Html<String> {
         let (html, warnings) = self.markup.page(&Markup::Markdown(markdown.to_string()), None, Links::Ugc, None);
         if !warnings.is_empty() {
-            eprintln!("{} creview: {:?}", self.ver.short_name(), warnings);
+            eprintln!("{} creview: {warnings:?}", self.ver.short_name());
         }
         templates::Html(html)
     }

@@ -46,7 +46,7 @@ impl AllDownloads {
         Ok(match t.entry(year) {
             Occupied(e) => e.into_mut(),
             Vacant(e) => {
-                e.insert(Arc::new(TempCache::new(self.base_path.join(format!("{}-big.rmpz", year)), Duration::ZERO)?))
+                e.insert(Arc::new(TempCache::new(self.base_path.join(format!("{year}-big.rmpz")), Duration::ZERO)?))
             },
         })
     }

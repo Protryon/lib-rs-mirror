@@ -109,14 +109,14 @@ impl CrateDb {
             match conn {
                 Ok(conn) => {
                     let now = std::time::Instant::now();
-                    let res = cb(&mut *conn.borrow_mut());
+                    let res = cb(&mut conn.borrow_mut());
                     let elapsed = now.elapsed();
                     if elapsed > std::time::Duration::from_secs(3) {
-                        eprintln!("{} write callback took {}s", context, elapsed.as_secs());
+                        eprintln!("{context} write callback took {}s", elapsed.as_secs());
                     }
                     res
                 },
-                Err(err) => Err(Error::Other(format!("{}: {}", err, context))),
+                Err(err) => Err(Error::Other(format!("{err}: {context}"))),
             }
         })
     }
@@ -134,14 +134,14 @@ impl CrateDb {
             match conn {
                 Ok(conn) => {
                     let now = std::time::Instant::now();
-                    let res = cb(&mut *conn.borrow_mut());
+                    let res = cb(&mut conn.borrow_mut());
                     let elapsed = now.elapsed();
                     if elapsed > std::time::Duration::from_secs(3) {
-                        eprintln!("{} write callback took {}s", context, elapsed.as_secs());
+                        eprintln!("{context} write callback took {}s", elapsed.as_secs());
                     }
                     res
                 },
-                Err(err) => Err(Error::Other(format!("{} (in {})", err, context))),
+                Err(err) => Err(Error::Other(format!("{err} (in {context})"))),
             }
         }).await.expect("spawn")
     }
@@ -162,7 +162,7 @@ impl CrateDb {
             tx.commit().map_err(|e| Error::Db(e, context))?;
             let elapsed = now.elapsed();
             if elapsed > std::time::Duration::from_secs(2) {
-                eprintln!("{} write callback took {}s", context, elapsed.as_secs());
+                eprintln!("{context} write callback took {}s", elapsed.as_secs());
             }
             Ok(res)
         })
@@ -184,7 +184,7 @@ impl CrateDb {
         self.with_read_spawn("crate_versions", move |conn| {
             let mut q = conn.prepare("SELECT v.version, v.created FROM crates c JOIN crate_versions v ON v.crate_id = c.id WHERE c.origin = ?1")
                 .map_err(|e| Error::Db(e, "cv prep"))?;
-            let res = q.query_map(&[&origin], |row| {
+            let res = q.query_map([&origin], |row| {
                 Ok((row.get_ref(0)?.as_str()?.into(), row.get(1)?))
             })?;
             Ok(res.collect::<Result<Vec<(SmolStr, u32)>>>()?)
@@ -212,7 +212,7 @@ impl CrateDb {
 
         let next_timestamp = (Utc::now().timestamp() + 3600 * 24 * 31) as u32;
 
-        c.category_slugs.iter().for_each(|k| debug_assert!(categories::CATEGORIES.from_slug(k).1, "'{}' must exist", k));
+        c.category_slugs.iter().for_each(|k| debug_assert!(categories::CATEGORIES.from_slug(k).1, "'{k}' must exist"));
 
         self.with_write("insert_crate", |tx| {
             let mut insert_crate = tx.prepare_cached("INSERT OR IGNORE INTO crates (origin, recent_downloads, ranking) VALUES (?1, ?2, ?3)")
@@ -225,20 +225,20 @@ impl CrateDb {
             let mut insert_category = tx.prepare_cached("INSERT OR IGNORE INTO categories (crate_id, slug, rank_weight, relevance_weight) VALUES (?1, ?2, ?3, ?4)")?;
             let mut get_crate_id = tx.prepare_cached("SELECT id, recent_downloads FROM crates WHERE origin = ?1")?;
 
-            insert_crate.execute(&[&origin as &dyn ToSql, &0i32, &0i32])?;
-            let (crate_id, downloads): (u32, u32) = get_crate_id.query_row(&[&origin], |row| Ok((row.get_unwrap(0), row.get_unwrap(1))))
+            insert_crate.execute([&origin as &dyn ToSql, &0i32, &0i32])?;
+            let (crate_id, downloads): (u32, u32) = get_crate_id.query_row([&origin], |row| Ok((row.get_unwrap(0), row.get_unwrap(1))))
                 .map_err(|e| Error::Db(e, "crate id"))?;
             let is_important_ish = downloads > 2000;
 
             if let Some(repo) = c.repository {
                 let url = repo.canonical_git_url();
-                insert_repo.execute(&[&crate_id as &dyn ToSql, &url.as_str()]).map_err(|e| Error::Db(e, "insert repo"))?;
+                insert_repo.execute([&crate_id as &dyn ToSql, &url.as_str()]).map_err(|e| Error::Db(e, "insert repo"))?;
             } else {
-                delete_repo.execute(&[&crate_id])?;
+                delete_repo.execute([&crate_id])?;
             }
 
-            let prev_c = prev_categories.query_map(&[&crate_id], |row| row.get(0))?.collect::<Result<Vec<Box<str>>,_>>()?;
-            clear_categories.execute(&[&crate_id]).map_err(|e| Error::Db(e, "clear cat"))?;
+            let prev_c = prev_categories.query_map([&crate_id], |row| row.get(0))?.collect::<Result<Vec<Box<str>>,_>>()?;
+            clear_categories.execute([&crate_id]).map_err(|e| Error::Db(e, "clear cat"))?;
             insert_keyword.pre_commit(tx, crate_id)?;
 
             // guessing categories if needed
@@ -250,7 +250,7 @@ impl CrateDb {
             let had_explicit_categories = categories.iter().any(|c| c.explicit);
             if !had_explicit_categories {
                 if categories.is_empty() {
-                    write!(&mut out, "[no categories] {:?}", prev_c)
+                    write!(&mut out, "[no categories] {prev_c:?}")
                 } else {
                     write!(&mut out, "[guessed]: ")
                 }.unwrap();
@@ -266,7 +266,7 @@ impl CrateDb {
 
             for slug in &prev_c {
                 if !categories.iter().any(|old| old.slug == *slug) {
-                    write!(&mut out, ">LOST {}", slug).unwrap();
+                    write!(&mut out, ">LOST {slug}").unwrap();
                 }
             }
 
@@ -294,8 +294,8 @@ impl CrateDb {
                 keywords = Self::keywords_tx(tx, c.origin)?;
             }
 
-            mark_updated.execute(&[&crate_id, &next_timestamp])?;
-            println!("{}", out);
+            mark_updated.execute([&crate_id, &next_timestamp])?;
+            println!("{out}");
             Ok(DbDerived {
                 categories: categories.iter().map(|cc| cc.slug.to_owned()).collect::<Vec<_>>(),
                 keywords,
@@ -365,7 +365,7 @@ impl CrateDb {
         }
         for feat in manifest.features.keys() {
             if feat != "default" && feat != "std" && feat != "nightly" {
-                insert_keyword.add_raw(format!("feature:{}", feat), 0.55, false);
+                insert_keyword.add_raw(format!("feature:{feat}"), 0.55, false);
             }
         }
         if manifest.is_sys(c.source_data.has_buildrs || package.build.is_some()) {
@@ -387,7 +387,7 @@ impl CrateDb {
             insert_keyword.add_raw("has:is_dev".into(), 0.01, false);
         }
         for &(dep, weight) in c.deps_stats {
-            insert_keyword.add_raw(format!("dep:{}", dep), weight.into(), false);
+            insert_keyword.add_raw(format!("dep:{dep}"), weight.into(), false);
         }
         for (i, k) in c.authors.iter().filter_map(|a| a.email.as_ref().or(a.name.as_ref())).enumerate() {
             let w: f64 = 50. / (100 + i) as f64;
@@ -472,7 +472,7 @@ impl CrateDb {
                 let name = name.as_ref();
                 let path = path.as_ref();
                 let revision = revision.as_ref();
-                insert_repo.execute(&[&repo.as_ref(), &path, &name, &revision])
+                insert_repo.execute([&repo.as_ref(), &path, &name, &revision])
                     .map_err(|e| Error::Db(e, "repo rev insert"))?;
             }
             Ok(())
@@ -488,7 +488,7 @@ impl CrateDb {
                 WHERE repo = ?1
                 ORDER BY path, crate_name LIMIT 10
             ").map_err(|e| Error::Db(e, "repo c"))?;
-            let q = q.query_map(&[&repo], |r| {
+            let q = q.query_map([&repo], |r| {
                 let s = r.get_ref_unwrap(0).as_str()?;
                 crates_io_name(s)
             })?.filter_map(|r| r.map_err(|e| error!("crepo: {}", e)).ok());
@@ -502,7 +502,7 @@ impl CrateDb {
         let mut paths = self.with_read_spawn("parent_crate", move |conn| {
             let mut q = conn.prepare_cached("SELECT path, crate_name FROM repo_crates WHERE repo = ?1 LIMIT 100")
                 .map_err(|e| Error::Db(e, "parent"))?;
-            let tmp = q.query_map(&[&repo_url], |r| Ok((r.get_unwrap(0), r.get_unwrap(1))))?;
+            let tmp = q.query_map([&repo_url], |r| Ok((r.get_unwrap(0), r.get_unwrap(1))))?;
             Ok(tmp.collect::<std::result::Result<HashMap<String, String>, _>>()?)
         }).await?;
 
@@ -593,7 +593,7 @@ impl CrateDb {
             let mut insert_version = tx.prepare_cached("INSERT OR IGNORE INTO crate_versions (crate_id, version, created) VALUES (?1, ?2, ?3)")?;
 
             let origin = all.origin().to_str();
-            let (crate_id, prev_ranking): (u32, f64) = get_crate_id.query_row(&[&origin], |row| Ok((row.get(0)?, row.get(1)?)))
+            let (crate_id, prev_ranking): (u32, f64) = get_crate_id.query_row([&origin], |row| Ok((row.get(0)?, row.get(1)?)))
                 .map_err(|e| Error::Db(e, "the crate hasn't been indexed yet"))?;
 
             let recent_90_days = downloads_per_month.unwrap_or(0) as u32 * 3;
@@ -650,7 +650,7 @@ impl CrateDb {
             wipe.execute([])?;
 
             for (origin, owners) in all_owners {
-                let crate_id: u32 = match get_crate_id.query_row(&[&origin.to_str()], |row| row.get(0)) {
+                let crate_id: u32 = match get_crate_id.query_row([&origin.to_str()], |row| row.get(0)) {
                     Ok(id) => id,
                     Err(rusqlite::Error::QueryReturnedNoRows) => continue,
                     Err(e) => return Err(e.into()),
@@ -680,7 +680,7 @@ impl CrateDb {
                 GROUP BY ac.crate_id
                 LIMIT 2000
             "#).map_err(|e| Error::Db(e, "coa"))?;
-            let q = query.query_map(&[&github_id], |row| {
+            let q = query.query_map([&github_id], |row| {
                 let origin = Origin::from_str(row.get_ref_unwrap(0).as_str()?);
                 let invited_by_github_id: Option<u32> = row.get_unwrap(1);
                 let invited_at = row.get_ref_unwrap(2).as_str().ok().map(|d| {
@@ -688,7 +688,7 @@ impl CrateDb {
                         .or_else(|_| Utc.datetime_from_str(d, "%Y-%m-%d %H:%M:%S"));
                     match res {
                         Ok(d) => d,
-                        Err(e) => panic!("Can't parse {}, because {}", d, e),
+                        Err(e) => panic!("Can't parse {d}, because {e}"),
                     }
                 });
                 let latest_timestamp: u32 = row.get_unwrap(3);
@@ -729,9 +729,9 @@ impl CrateDb {
         group by slug
         order by 2 desc
         limit 10"#).map_err(|e| Error::Db(e, "findcat"))?;
-        let candidates = query.query_map(&[&origin.to_str()], |row| Ok((row.get_unwrap(0), row.get_unwrap(1))))?;
+        let candidates = query.query_map([&origin.to_str()], |row| Ok((row.get_unwrap(0), row.get_unwrap(1))))?;
         let candidates = candidates.collect::<std::result::Result<HashMap<_,_>, _>>()?;
-        candidates.keys().for_each(|k| debug_assert!(categories::CATEGORIES.from_slug(k).1, "'{}' must exist", k));
+        candidates.keys().for_each(|k| debug_assert!(categories::CATEGORIES.from_slug(k).1, "'{k}' must exist"));
 
         Ok(candidates)
     }
@@ -758,7 +758,7 @@ impl CrateDb {
                 ) as tmp
             order by top + (top+30.0)/total
             "#).map_err(|e| Error::Db(e, "tkw"))?;
-            Ok(none_rows(query.query_row(&[&origin], |row| Ok((row.get_unwrap(0), row.get_unwrap(1)))))?)
+            Ok(none_rows(query.query_row([&origin], |row| Ok((row.get_unwrap(0), row.get_unwrap(1)))))?)
         }).await
     }
 
@@ -770,7 +770,7 @@ impl CrateDb {
         self.with_read_spawn("crates_with_keyword", move |conn| {
             let mut query = conn.prepare_cached("SELECT count(*) FROM crate_keywords
                 WHERE explicit AND keyword_id = (SELECT id FROM keywords WHERE keyword = ?1)")?;
-            Ok(none_rows(query.query_row(&[&keyword], |row| row.get(0)))?.unwrap_or(0))
+            Ok(none_rows(query.query_row([&keyword], |row| row.get(0)))?.unwrap_or(0))
         }).await
     }
 
@@ -780,7 +780,7 @@ impl CrateDb {
             return Ok(res)
         }
 
-        Ok(self.with_read("allkw", |conn| {
+        self.with_read("allkw", |conn| {
             self.all_explicit_keywords_cache.get_or_try_init(move || {
                 let mut query = conn.prepare_cached("SELECT k.keyword
                     FROM keywords k JOIN crate_keywords ck ON (ck.keyword_id = k.id)
@@ -792,7 +792,7 @@ impl CrateDb {
                 })?;
                 Ok(res.collect::<std::result::Result<_,_>>()?)
             })
-        }).await?)
+        }).await
     }
 
     /// Categories similar to the given category
@@ -809,7 +809,7 @@ impl CrateDb {
                 order by 1 desc
                 limit 6
             "#)?;
-            let res = query.query_map(&[&slug], |row| row.get(1))?;
+            let res = query.query_map([&slug], |row| row.get(1))?;
             Ok(res.collect::<std::result::Result<_,_>>()?)
         }).await
     }
@@ -826,7 +826,7 @@ impl CrateDb {
                 ORDER by 1 desc
                 LIMIT 4
             "#)?;
-            let res = query.query_map(&[&crate_name], |row| {
+            let res = query.query_map([&crate_name], |row| {
                 let s = row.get_ref_unwrap(1).as_str()?;
                 crates_io_name(s)
             })?;
@@ -890,7 +890,7 @@ impl CrateDb {
             order by 1 desc
             limit 10
             "#)?;
-        let res: Vec<(f64, String)> = query.query_map(&[&origin.to_str()], |row| Ok((row.get_unwrap(0), row.get_unwrap(1))))?
+        let res: Vec<(f64, String)> = query.query_map([&origin.to_str()], |row| Ok((row.get_unwrap(0), row.get_unwrap(1))))?
             .collect::<std::result::Result<_,_>>()?;
         let min_score = res.get(0).map_or(0., |(rel,_)|rel/20.);
         let crate_name = origin.short_crate_name();
@@ -916,7 +916,7 @@ impl CrateDb {
                     order by 1 desc
                     limit 12
             "#).map_err(|e| Error::Db(e, "tkic"))?;
-            let q = query.query_map(&[&slug], |row| row.get(1))?;
+            let q = query.query_map([&slug], |row| row.get(1))?;
             let q = q.filter_map(|r| r.map_err(|e| error!("kw: {}", e)).ok());
             Ok(q.collect())
         }).await
@@ -985,7 +985,7 @@ impl CrateDb {
                     order by 1 desc
                     limit 20
             "#)?;
-            let q = query.query_map(&[&slug], |row| {
+            let q = query.query_map([&slug], |row| {
                 Ok(Origin::from_str(row.get_ref_unwrap(1).as_str()?))
             })?;
             let q = q.filter_map(|r| r.map_err(|e| error!("upd: {}", e)).ok());
@@ -1009,7 +1009,7 @@ impl CrateDb {
                     order by 1 desc
                     limit ?1
             "#)?;
-            let q = query.query_map(&[&limit], |row| {
+            let q = query.query_map([&limit], |row| {
                 let origin = Origin::from_str(row.get_ref_unwrap(2).as_str()?);
                 Ok((origin, row.get(1)?))
             })?;
@@ -1026,7 +1026,7 @@ impl CrateDb {
             let mut query = conn.prepare_cached(r#"
                 select recent_downloads, origin from crates order by 1 desc limit ?1
             "#)?;
-            let q = query.query_map(&[&limit], |row| {
+            let q = query.query_map([&limit], |row| {
                 let origin = Origin::from_str(row.get_ref_unwrap(1).as_str()?);
                 Ok((origin, row.get(0)?))
             })?;
@@ -1041,7 +1041,7 @@ impl CrateDb {
         self.with_read_spawn("crate_rank", move |conn| {
             let mut query = conn.prepare_cached("SELECT ranking FROM crates WHERE origin = ?1")
                 .map_err(|e| Error::Db(e, "r"))?;
-            Ok(none_rows(query.query_row(&[&origin], |row| row.get(0)))?.unwrap_or(0.))
+            Ok(none_rows(query.query_row([&origin], |row| row.get(0)))?.unwrap_or(0.))
         }).await
     }
 
@@ -1081,7 +1081,7 @@ impl CrateDb {
         self.with_read_spawn("crates_to_reindex", |conn| {
             let mut q = conn.prepare("SELECT origin FROM crates WHERE next_update < ?1 LIMIT 1000")?;
             let timestamp = Utc::now().timestamp() as u32;
-            let q = q.query_map(&[&timestamp], |r| {
+            let q = q.query_map([&timestamp], |r| {
                 let s = r.get_ref_unwrap(0).as_str()?;
                 Ok(Origin::from_str(s))
             })?.filter_map(|r| r.map_err(|e| error!("reindx: {}", e)).ok());
@@ -1181,7 +1181,7 @@ impl KeywordInsert {
     /// Clears old keywords from the db
     pub fn pre_commit(&mut self, conn: &Connection, crate_id: u32) -> FResult<()> {
         let mut clear_keywords = conn.prepare_cached("DELETE FROM crate_keywords WHERE crate_id = ?1")?;
-        clear_keywords.execute(&[&crate_id])?;
+        clear_keywords.execute([&crate_id])?;
         self.ready = true;
         Ok(())
     }
@@ -1215,9 +1215,9 @@ impl KeywordInsert {
         for (word, (weight, visible)) in self.keywords {
             let args: &[&dyn ToSql] = &[&word, if visible { &1i32 } else { &0i32 }];
             insert_name.execute(args)?;
-            let (keyword_id, old_vis): (u32, u32) = select_id.query_row(&[&word], |r| Ok((r.get_unwrap(0), r.get_unwrap(1))))?;
+            let (keyword_id, old_vis): (u32, u32) = select_id.query_row([&word], |r| Ok((r.get_unwrap(0), r.get_unwrap(1))))?;
             if visible && old_vis == 0 {
-                make_visible.execute(&[&keyword_id])?;
+                make_visible.execute([&keyword_id])?;
             }
             let weight = weight * overall_weight;
             let args: &[&dyn ToSql] = &[&keyword_id, &crate_id, &weight, if visible { &1i32 } else { &0i32 }];
@@ -1229,7 +1229,7 @@ impl KeywordInsert {
 
 fn crates_io_name(name: &str) -> std::result::Result<Origin, rusqlite::Error> {
     Origin::try_from_crates_io_name(name)
-                    .ok_or_else(|| rusqlite::Error::ToSqlConversionFailure(format!("bad name {}", name).into()))
+                    .ok_or_else(|| rusqlite::Error::ToSqlConversionFailure(format!("bad name {name}").into()))
 }
 
 fn hex_hash(s: &str) -> String {

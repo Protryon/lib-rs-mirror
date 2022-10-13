@@ -58,7 +58,7 @@ impl<'a> InstallPage<'a> {
         };
         let (html, warnings) = self.markup.page(&readme.markup, urls, Links::Ugc, Some(self.ver.short_name()));
         if !warnings.is_empty() {
-            eprintln!("{} readme: {:?}", self.ver.short_name(), warnings);
+            eprintln!("{} readme: {warnings:?}", self.ver.short_name());
         }
         templates::Html(html)
     }

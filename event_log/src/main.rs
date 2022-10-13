@@ -9,7 +9,7 @@ async fn main() -> Result<()> {
     loop {
         let batch = s.next_batch().await?;
         for e in batch {
-            println!("{:?}", e);
+            println!("{e:?}");
         }
     }
 }

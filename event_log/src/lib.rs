@@ -83,7 +83,7 @@ impl<T: DeserializeOwned + Serialize + Clone> EventLog<T> {
         let event_bytes = rmp_serde::to_vec_named(event)?;
         let db = self.db()?;
         let mut q = db.prepare_cached("INSERT INTO events(data) VALUES(?1)")?;
-        q.execute(&[&event_bytes])?;
+        q.execute([&event_bytes])?;
         Ok(())
     }
 }
@@ -138,7 +138,7 @@ impl<T: DeserializeOwned + Serialize + Clone> Subscription<T> {
         // TODO: some kind of lock against concurrent access, so that last_event_id isn't messed up
         let db = self.log.db()?;
         let mut q = db.prepare_cached("SELECT e.id, e.data FROM events e WHERE e.id > (SELECT last_event_id FROM subscribers WHERE name = ?1) ORDER BY e.id LIMIT 10")?;
-        let mut events = q.query_map(&[&self.name], |row| Ok((row.get(0)?, row.get(1)?)))?.collect::<Result<Vec<_>, _>>()?;
+        let mut events = q.query_map([&self.name], |row| Ok((row.get(0)?, row.get(1)?)))?.collect::<Result<Vec<_>, _>>()?;
         events.reverse(); // batch iterator pops them!
         Ok(EventBatch {
             events,

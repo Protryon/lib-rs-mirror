@@ -15,7 +15,7 @@ async fn main() {
         let crates = Arc::new(match KitchenSink::new_default().await {
             Ok(a) => a,
             Err(e) => {
-                eprintln!("Reindex users error: {}", e);
+                eprintln!("Reindex users error: {e}");
                 std::process::exit(1);
             },
         });
@@ -49,16 +49,16 @@ async fn main() {
                         }
 
                         if let Err(err) = crates.index_email(email, a.name.as_deref()).await {
-                            eprintln!("•• {}: {}", email, err);
+                            eprintln!("•• {email}: {err}");
                         }
                     }
                 }
                 Ok::<_, anyhow::Error>(())
             }.then(|res| async move {
                 if let Err(e) = res {
-                    eprintln!("••• error: {}", e);
+                    eprintln!("••• error: {e}");
                     for c in e.chain() {
-                        eprintln!("•   error: -- {}", c);
+                        eprintln!("•   error: -- {c}");
                     }
                 }
             })).map(drop));

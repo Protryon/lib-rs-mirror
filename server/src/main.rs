@@ -328,7 +328,7 @@ fn handle_static_page(state: &ServerState, path: &str) -> Result<Option<HttpResp
         return Ok(None);
     }
 
-    let md_path = state.data_dir.as_path().join(format!("page/{}.md", path));
+    let md_path = state.data_dir.as_path().join(format!("page/{path}.md"));
     if !md_path.exists() {
         return Ok(None);
     }
@@ -357,7 +357,7 @@ fn handle_static_page(state: &ServerState, path: &str) -> Result<Option<HttpResp
 async fn handle_maintainer_form(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let query = req.query_string().trim_start_matches('?');
     if let Some(u) = query.strip_prefix("username=") {
-        return Ok(HttpResponse::PermanentRedirect().insert_header(("Location", format!("/~{}/dash", u))).body(""));
+        return Ok(HttpResponse::PermanentRedirect().insert_header(("Location", format!("/~{u}/dash"))).body(""));
     }
 
     let mut page = Vec::with_capacity(5000);
@@ -484,7 +484,7 @@ async fn handle_category(req: HttpRequest, cat: &'static Category) -> Result<Htt
 async fn handle_home(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let query = req.query_string().trim_start_matches('?');
     if !query.is_empty() && query.find('=').is_none() {
-        return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", format!("/search?q={}", query))).finish());
+        return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", format!("/search?q={query}"))).finish());
     }
 
     let state: &AServerState = req.app_data().expect("appdata");
@@ -507,7 +507,7 @@ async fn handle_home(req: HttpRequest) -> Result<HttpResponse, ServerError> {
 async fn handle_redirect(req: HttpRequest) -> HttpResponse {
     let inf = req.match_info();
     let rest = inf.query("rest");
-    HttpResponse::PermanentRedirect().insert_header(("Location", format!("/{}", rest))).body("")
+    HttpResponse::PermanentRedirect().insert_header(("Location", format!("/{rest}"))).body("")
 }
 
 async fn handle_git_clone(req: HttpRequest) -> HttpResponse {
@@ -550,13 +550,13 @@ async fn handle_git_clone(req: HttpRequest) -> HttpResponse {
 async fn handle_crate_reverse_dependencies_redir(req: HttpRequest) -> HttpResponse {
     let inf = req.match_info();
     let rest = inf.query("crate");
-    HttpResponse::PermanentRedirect().insert_header(("Location", format!("/crates/{}/rev", rest))).body("")
+    HttpResponse::PermanentRedirect().insert_header(("Location", format!("/crates/{rest}/rev"))).body("")
 }
 
 async fn handle_author_redirect(req: HttpRequest) -> HttpResponse {
     let inf = req.match_info();
     let rest = inf.query("author");
-    HttpResponse::PermanentRedirect().insert_header(("Location", format!("/~{}", rest))).body("")
+    HttpResponse::PermanentRedirect().insert_header(("Location", format!("/~{rest}"))).body("")
 }
 
 async fn handle_game_redirect(_: HttpRequest) -> HttpResponse {
@@ -699,7 +699,7 @@ async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
         return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", format!("https://github.com/{}", Encoded(&aut.github.login)))).body(""));
     }
     Ok(serve_page(
-        with_file_cache(state, &format!("@{}.html", login), 3600, {
+        with_file_cache(state, &format!("@{login}.html"), 3600, {
             let state = state.clone();
             run_timeout("authorpage", 60, async move {
                 let crates = state.crates.load();
@@ -750,7 +750,7 @@ async fn handle_maintainer_dashboard(req: HttpRequest, atom_feed: bool) -> Resul
     }).await {
         Ok(aut) => aut,
         Err(e) => {
-            if let Some(gh) = author_by_crate_name(login, &state).await {
+            if let Some(gh) = author_by_crate_name(login, state).await {
                 return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", format!("/~{}/dash", Encoded(gh)))).body(""));
             }
             debug!("user fetch {} failed: {}", login, e);
@@ -770,13 +770,13 @@ async fn handle_maintainer_dashboard(req: HttpRequest, atom_feed: bool) -> Resul
     let rows = rt_run_timeout(&state.rt, "maintainer_dashboard1", 60, async move { crates.crates_of_author(&aut2).await }).await?;
 
     if rows.is_empty() {
-        if let Some(gh) = author_by_crate_name(login, &state).await {
+        if let Some(gh) = author_by_crate_name(login, state).await {
             return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", format!("/~{}/dash", Encoded(gh)))).body(""));
         }
         return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", format!("/~{}", Encoded(&aut.github.login)))).body(""));
     }
 
-    let cache_file_name = format!("@{}.dash{}.html", login, if atom_feed { "xml" } else { "" });
+    let cache_file_name = format!("@{login}.dash{}.html", if atom_feed { "xml" } else { "" });
     let rendered = with_file_cache(state, &cache_file_name, if atom_feed { 3 * 3600 } else { 600 }, {
         let state = state.clone();
         run_timeout("maintainer_dashboard2", 60, async move {
@@ -800,12 +800,12 @@ fn cache_file_name_for_origin(origin: &Origin) -> String {
     match origin {
         Origin::CratesIo(crate_name) => {
             assert!(!crate_name.as_bytes().iter().any(|&b| b == b'/' || b == b'.'));
-            format!("{}.html", crate_name)
+            format!("{crate_name}.html")
         },
         Origin::GitHub { repo, package } | Origin::GitLab { repo, package } => {
             assert!(!package.as_bytes().iter().any(|&b| b == b'/' || b == b'.'));
             let slug = if let Origin::GitHub {..} = origin { "gh" } else { "lab" };
-            format!("{},{},{},{}.html", slug, repo.owner, repo.repo, package)
+            format!("{slug},{},{},{package}.html", repo.owner, repo.repo)
         }
     }
 }
@@ -1141,7 +1141,7 @@ async fn handle_keyword(req: HttpRequest) -> Result<HttpResponse, ServerError> {
         if !is_alnum(&query) {
             return Ok::<_, anyhow::Error>((query, None));
         }
-        let keyword_query = format!("keywords:\"{}\"", query);
+        let keyword_query = format!("keywords:\"{query}\"");
         let mut results = state2.index.search(&keyword_query, 250, false)?;
 
         let crates = state2.crates.load();
@@ -1195,7 +1195,7 @@ fn serve_page(Rendered {page, cache_time, refresh, last_modified}: Rendered) -> 
     h.content_type("text/html;charset=UTF-8");
     h.insert_header(("etag", etag));
     if !refresh {
-        h.insert_header(("Cache-Control", format!("public, max-age={}, stale-while-revalidate={}, stale-if-error={}", cache_time, cache_time * 3, err_max)));
+        h.insert_header(("Cache-Control", format!("public, max-age={cache_time}, stale-while-revalidate={}, stale-if-error={err_max}", cache_time * 3)));
     }
     if refresh {
         h.insert_header(("Refresh", "5"));
@@ -1221,7 +1221,7 @@ fn serve_feed(Rendered {page, cache_time, refresh, last_modified}: Rendered) -> 
     h.content_type("application/atom+xml;charset=UTF-8");
     h.insert_header(("etag", etag));
     if !refresh {
-        h.insert_header(("Cache-Control", format!("public, max-age={}", cache_time)));
+        h.insert_header(("Cache-Control", format!("public, max-age={cache_time}")));
         if let Some(l) = last_modified {
             h.insert_header(("Last-Modified", l.to_rfc2822()));
         }

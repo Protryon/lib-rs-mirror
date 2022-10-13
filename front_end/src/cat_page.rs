@@ -45,11 +45,11 @@ impl<'a> CatPage<'a> {
                     let c = match timeout_at(deadline.min(crate_timeout), crates.rich_crate_version_stale_is_ok(&o)).await {
                         Ok(Ok(c)) => c,
                         Err(e) => {
-                            eprintln!("Skipping in cat {:?} because timed out {}", o, e);
+                            eprintln!("Skipping in cat {o:?} because timed out {e}");
                             return None;
                         },
                         Ok(Err(e)) => {
-                            eprintln!("Skipping in cat {:?} because {}", o, e);
+                            eprintln!("Skipping in cat {o:?} because {e}");
                             return None;
                         },
                     };
@@ -59,7 +59,7 @@ impl<'a> CatPage<'a> {
                     let d = match crates.downloads_per_month_or_equivalent(&o).await {
                         Ok(d) => d.unwrap_or(0) as u32,
                         Err(e) => {
-                            eprintln!("Skipping {:?} because dl {}", o, e);
+                            eprintln!("Skipping {o:?} because dl {e}");
                             return None;
                         },
                     };

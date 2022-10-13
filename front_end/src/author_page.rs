@@ -55,7 +55,7 @@ impl<'a> AuthorPage<'a> {
         let orgs = kitchen_sink.user_github_orgs(&aut.github.login).await?;
         let orgs = futures::stream::iter(orgs.unwrap_or_default()).map(|org| async move {
             kitchen_sink.github_org(&org.login).await
-                .map_err(|e| eprintln!("org: {} {}", &org.login, e))
+                .map_err(|e| eprintln!("org: {} {e}", &org.login))
                 .ok().and_then(|x| x)
         })
         .buffered(8)
@@ -113,10 +113,10 @@ impl<'a> AuthorPage<'a> {
         keywords.sort_unstable_by(|a, b| b.1.total_cmp(&a.1));
         let keywords: Vec<_> = keywords.into_iter().take(num_keywords).map(|(k, _)| k.to_owned()).collect();
 
-        let mut collab: Vec<_> = collab.into_iter().map(|(_, v)| v).collect();
+        let mut collab: Vec<_> = collab.into_values().collect();
         collab.sort_unstable_by(|a, b| b.0.total_cmp(&a.0));
         let collab: Vec<_> = join_all(collab.into_iter().take(100).map(|(_, login)| async move {
-            kitchen_sink.user_by_github_login(login).await.map_err(|e| eprintln!("{}: {}", login, e)).ok().and_then(|x| x)
+            kitchen_sink.user_by_github_login(login).await.map_err(|e| eprintln!("{login}: {e}")).ok().and_then(|x| x)
         })).await.into_iter().flatten().collect();
 
         let shitlist_reason = kitchen_sink.is_crates_io_login_on_shitlist(&aut.github.login);
@@ -139,9 +139,9 @@ impl<'a> AuthorPage<'a> {
     async fn look_up(kitchen_sink: &KitchenSink, rows: Vec<CrateOwnerRow>) -> Vec<(ArcRichCrateVersion, u32, CrateOwnerRow, Vec<OtherOwner>)> {
         futures::stream::iter(rows.into_iter())
             .map(|row| async move {
-                let c = kitchen_sink.rich_crate_version_async(&row.origin).await.map_err(|e| eprintln!("{}", e)).ok()?;
-                let dl = kitchen_sink.downloads_per_month(&row.origin).await.map_err(|e| eprintln!("{}", e)).ok()?.unwrap_or(0) as u32;
-                let owners = kitchen_sink.crate_owners(&row.origin, CrateOwners::All).await.map_err(|e| eprintln!("o: {}", e)).ok()?.into_iter().filter_map(|o| {
+                let c = kitchen_sink.rich_crate_version_async(&row.origin).await.map_err(|e| eprintln!("{e}")).ok()?;
+                let dl = kitchen_sink.downloads_per_month(&row.origin).await.map_err(|e| eprintln!("{e}")).ok()?.unwrap_or(0) as u32;
+                let owners = kitchen_sink.crate_owners(&row.origin, CrateOwners::All).await.map_err(|e| eprintln!("o: {e}")).ok()?.into_iter().filter_map(|o| {
                     Some(OtherOwner {
                         invited_at: o.invited_at()?,
                         github_id: o.github_id?,
@@ -172,7 +172,7 @@ impl<'a> AuthorPage<'a> {
             .and_then(|r| r.twitter.as_deref())
             .map(|t| t.trim_start_matches('@'))
             .filter(|t| !t.is_empty())
-            .map(|t| (format!("https://twitter.com/{}", t), t))
+            .map(|t| (format!("https://twitter.com/{t}"), t))
     }
 
     pub fn forum_link(&self) -> Option<(String, &str)> {
@@ -181,7 +181,7 @@ impl<'a> AuthorPage<'a> {
             .and_then(|r| r.discourse.as_deref())
             .map(|t| t.trim_start_matches('@'))
             .filter(|t| !t.is_empty())
-            .map(|t| (format!("https://users.rust-lang.org/u/{}", t), t))
+            .map(|t| (format!("https://users.rust-lang.org/u/{t}"), t))
     }
 
     /// `(url, label)`
@@ -193,7 +193,7 @@ impl<'a> AuthorPage<'a> {
             if url.starts_with("https://") || url.starts_with("http://") {
                 let label = url_domain(url)
                     .map(|host| {
-                        format!("Home ({})", host).into()
+                        format!("Home ({host})").into()
                     })
                     .unwrap_or_else(|| "Homepage".into());
                 return Some((url, label));

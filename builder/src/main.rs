@@ -197,7 +197,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             if let Err(e) = run_and_analyze_versions(&db, &docker_root, versions) {
-                eprintln!("•• {}", e);
+                eprintln!("•• {e}");
             }
         }
         eprintln!("builder end");
@@ -241,7 +241,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 s.send(vers).unwrap();
             },
             Err(e) => {
-                eprintln!("•• {}: {}", all.name(), e);
+                eprintln!("•• {}: {e}", all.name());
                 continue;
             }
         }
@@ -350,16 +350,16 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
     }})).await?;
 
     for c in &candidates {
-        println!("{} {}\t^{}\tinferred={}~{} checked={}~{}", crate_name, c.version, c.score,
+        println!("{crate_name} {}\t^{}\tinferred={}~{} checked={}~{}", c.version, c.score,
             c.rustc_compat.oldest_ok().unwrap_or(0), c.rustc_compat.newest_bad().unwrap_or(0),
             c.rustc_compat.oldest_ok_certain().unwrap_or(0), c.rustc_compat.newest_bad_likely().unwrap_or(0));
         for (k,(v,r)) in c.rustc_compat.required_deps() {
-            println!(" + {}@{} for r{}", k, v, r);
+            println!(" + {k}@{v} for r{r}");
         }
     }
 
     if candidates.is_empty() {
-        println!("{} ???\tno candidates", crate_name);
+        println!("{crate_name} ???\tno candidates");
     }
 
     Ok(candidates)
@@ -419,7 +419,7 @@ fn run_and_analyze_versions(db: &BuildDb, docker_root: &Path, versions: Vec<Crat
 }
 
 fn prepare_docker(docker_root: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let _ = std::fs::create_dir_all(&docker_root);
+    let _ = std::fs::create_dir_all(docker_root);
 
     for &p in &["git","registry","target","job_inputs"] {
         let p = Path::new(TEMP_JUNK_DIR).join(p);
@@ -457,8 +457,8 @@ fn prepare_docker(docker_root: &Path) -> Result<(), Box<dyn std::error::Error>> 
         .current_dir(docker_root)
         .arg("run")
         .arg("--rm")
-        .arg("-v").arg(format!("{}/git:/home/rustyuser/.cargo/git", TEMP_JUNK_DIR))
-        .arg("-v").arg(format!("{}/registry:/home/rustyuser/.cargo/registry", TEMP_JUNK_DIR))
+        .arg("-v").arg(format!("{TEMP_JUNK_DIR}/git:/home/rustyuser/.cargo/git"))
+        .arg("-v").arg(format!("{TEMP_JUNK_DIR}/registry:/home/rustyuser/.cargo/registry"))
         .arg(DOCKER_NAME)
         .arg("bash").arg("-c").arg("cargo install libc --vers 99.9.9 --color=always -vv") // force index update
         .status()?;
@@ -481,7 +481,7 @@ fn do_builds(docker_root: &Path, versions: &[CrateToRun]) -> Result<(String, Str
         let mut cargo_toml = format!("[package]\nname=\"_____\"\nversion=\"0.0.0\"\n[profile.dev]\ndebug=false\n[dependencies]\n{} = \"{}\"\n", c.crate_name, c.version);
         for (c, v) in &c.required_deps {
             use std::fmt::Write;
-            let _ = writeln!(&mut cargo_toml, "{} = \"<= {}, {}{}\"", c, v, if v.major == 0 {"0."} else {""}, if v.major == 0 { v.minor } else { v.major });
+            let _ = writeln!(&mut cargo_toml, "{c} = \"<= {v}, {}{}\"", if v.major == 0 {"0."} else {""}, if v.major == 0 { v.minor } else { v.major });
         }
         debug!("{}", cargo_toml);
         std::fs::write(dir.join("Cargo.toml"), cargo_toml)?;
@@ -553,9 +553,9 @@ fn do_builds(docker_root: &Path, versions: &[CrateToRun]) -> Result<(String, Str
         .arg("docker")
         .arg("run")
         .arg("--rm")
-        .arg("-v").arg(format!("{}/git:/home/rustyuser/.cargo/git", TEMP_JUNK_DIR))
-        .arg("-v").arg(format!("{}/registry:/home/rustyuser/.cargo/registry", TEMP_JUNK_DIR))
-        .arg("-v").arg(format!("{}/target:/home/rustyuser/cargo_target", TEMP_JUNK_DIR))
+        .arg("-v").arg(format!("{TEMP_JUNK_DIR}/git:/home/rustyuser/.cargo/git"))
+        .arg("-v").arg(format!("{TEMP_JUNK_DIR}/registry:/home/rustyuser/.cargo/registry"))
+        .arg("-v").arg(format!("{TEMP_JUNK_DIR}/target:/home/rustyuser/cargo_target"))
         .arg("-v").arg(format!("{}:/home/rustyuser/job_inputs:ro", job_inputs_root.display()))
         .arg("-e").arg("CARGO_INCREMENTAL=0")
         // .arg("-e").arg("CARGO_UNSTABLE_AVOID_DEV_DEPS=true") // breaks --locked
@@ -579,7 +579,7 @@ fn do_builds(docker_root: &Path, versions: &[CrateToRun]) -> Result<(String, Str
     let mut stderr = std::mem::take(&mut *stderr.lock());
 
     if !status.success() {
-        stderr += &format!("\nexit failure {:?}\n", status);
+        stderr += &format!("\nexit failure {status:?}\n");
     }
 
     Ok((stdout, stderr))
@@ -589,7 +589,7 @@ fn rustc_minor_ver_to_version(rustc_minor_ver: u16) -> String {
     if rustc_minor_ver == 56 {
         "1.56.1".into()
     } else {
-        format!("1.{}.0", rustc_minor_ver)
+        format!("1.{rustc_minor_ver}.0")
     }
 }
 
@@ -606,7 +606,7 @@ fn streamfetch(prefix: &'static str, inp: impl std::io::Read + Send + 'static) -
             if line.len() > 230 && line.is_char_boundary(230) {
                 line.truncate(230);
             }
-            println!("{}: {}", prefix, line);
+            println!("{prefix}: {line}");
         }
     });
     out2

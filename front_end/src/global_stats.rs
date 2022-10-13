@@ -152,7 +152,7 @@ pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSin
     let dl_grid_line_every = (max_downloads_per_week / 6_000_000) * 1_000_000;
     let mut hs_deps1 = Histogram::new(kitchen_sink.get_stats_histogram("deps")?.expect("hs_deps"), true,
         &[0,1,2,3,4,5,6,7,8,9,10,11,12,14,16,18,20,25,30,40,60,80,100,120,150],
-        |n| if n > 11 {format!("≥{}", n)} else {n.to_string()});
+        |n| if n > 11 {format!("≥{n}")} else {n.to_string()});
     let hs_deps2 = Histogram {
         max: hs_deps1.max,
         buckets: hs_deps1.buckets.split_off(10),
@@ -162,13 +162,13 @@ pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSin
     let rev_deps = kitchen_sink.crates_io_all_rev_deps_counts().await?;
     let mut hs_rev_deps = Histogram::new(rev_deps, true,
         &[0,1,2,5,15,50,100,250,500,750,1000,2500,5000,10000,15000,20000,50000],
-        |n| if n > 2 {format!("≥{}", n)} else {n.to_string()});
+        |n| if n > 2 {format!("≥{n}")} else {n.to_string()});
 
     hs_rev_deps.buckets.iter_mut().take(5).for_each(|b| b.examples.truncate(5));
 
     let age_label = |n| match n {
         0..=1 => "≤1 week".to_string(),
-        2..=4 => format!("≤{} weeks", n),
+        2..=4 => format!("≤{n} weeks"),
         5 => "≤1 month".to_string(),
         6..=51 => format!("≤{} months", (n as f64 / (365./12./7.)).round()),
         52 => "≤1 year".to_string(),
@@ -188,7 +188,7 @@ pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSin
         max_downloads_per_week,
         dl_grid_line_every,
 
-        hs_releases: Histogram::new(kitchen_sink.get_stats_histogram("releases")?.expect("hs_releases"), true, &[1,2,4,8,16,32,50,100,500], |n| if n > 2 {format!("≥{}", n)} else {n.to_string()}),
+        hs_releases: Histogram::new(kitchen_sink.get_stats_histogram("releases")?.expect("hs_releases"), true, &[1,2,4,8,16,32,50,100,500], |n| if n > 2 {format!("≥{n}")} else {n.to_string()}),
         hs_sizes: Histogram::new(kitchen_sink.get_stats_histogram("sizes")?.expect("hs_sizes"), true, &[1,10,50,100,500,1_000,5_000,10_000,20_000], |n| {
             let mut t = format_bytes(n*1024);
             t.insert(0, '≤'); t
@@ -197,7 +197,7 @@ pub async fn render_global_stats(out: &mut impl Write, kitchen_sink: &KitchenSin
         hs_maintenance: Histogram::new(kitchen_sink.get_stats_histogram("maintenance")?.expect("hs_maintenance"), false, &[0, 1, 5, 26, 52, 52*2, 52*3, 52*5, 52*6, 52*8], |n| match n {
             0 => "one-off".to_string(),
             1 => "≤1 week".to_string(),
-            2..=4 => format!("≤{} weeks", n),
+            2..=4 => format!("≤{n} weeks"),
             5 => "≤1 month".to_string(),
             6..=51 => format!("≤{} months", (n as f64 / (365./12./7.)).round()),
             52 => "≤1 year".to_string(),
@@ -353,12 +353,12 @@ async fn category_stats(kitchen_sink: &KitchenSink) -> Result<Vec<TreeBox>, anyh
     let mut roots = cat_slugs(&CATEGORIES.root);
     #[track_caller]
     fn take_cat(slug: &str, items: &mut Vec<TreeBox>) -> TreeBox {
-        let pos = items.iter().position(|i| i.cat.slug == slug).unwrap_or_else(|| panic!("{} in {:?}", slug, items));
+        let pos = items.iter().position(|i| i.cat.slug == slug).unwrap_or_else(|| panic!("{slug} in {items:?}"));
         items.swap_remove(pos)
     }
     #[track_caller]
     fn get_cat<'a>(slug: &str, items: &'a mut Vec<TreeBox>) -> &'a mut TreeBox {
-        let pos = items.iter().position(|i| i.cat.slug == slug).unwrap_or_else(|| panic!("{} in {:?}", slug, items));
+        let pos = items.iter().position(|i| i.cat.slug == slug).unwrap_or_else(|| panic!("{slug} in {items:?}"));
         &mut items[pos]
     }
     fn new_cat(sub: Vec<TreeBox>) -> TreeBox {
@@ -544,7 +544,7 @@ async fn owner_stats(kitchen_sink: &KitchenSink, start: Date<Utc>) -> Result<(Ve
         }
         let mon_num = (y as usize - 2015) * 12 + m as usize - 5;
         if mon_num < total_owners_at_month.len() {
-            total_owners_at_month[mon_num as usize] += 1;
+            total_owners_at_month[mon_num] += 1;
         }
         // update histogram
         let t = owner_crates_with_ids.entry(o.num_crates).or_insert((0, Vec::<u64>::new()));
@@ -587,7 +587,7 @@ async fn owner_stats(kitchen_sink: &KitchenSink, start: Date<Utc>) -> Result<(Ve
         sum += *n;
         *n = sum;
     });
-    let hs_owner_crates = Histogram::new(owner_crates, true, &[1,2,3,6,25,50,75,100,150,200,500,750,2000], |n| if n > 3 {format!("≥{}", n)} else {n.to_string()});
+    let hs_owner_crates = Histogram::new(owner_crates, true, &[1,2,3,6,25,50,75,100,150,200,500,750,2000], |n| if n > 3 {format!("≥{n}")} else {n.to_string()});
     Ok((total_owners_at_month, hs_owner_crates))
 }
 
@@ -698,5 +698,5 @@ pub fn format_bytes(bytes: u32) -> String {
         0..=9_999_999 => return format!("{}MB", ((bytes + 250_000) / 500_000) as f64 * 0.5),
         _ => ((bytes + 500_000) / 1_000_000, "MB"),
     };
-    format!("{}{}", Numeric::english().format_int(num), unit)
+    format!("{}{unit}", Numeric::english().format_int(num))
 }

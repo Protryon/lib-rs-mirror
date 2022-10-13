@@ -92,7 +92,7 @@ impl GitHub {
                        .path("search/users")
                        .query("q=in:email%20").arg(email)
                        .send(), |res: SearchResults<User>| {
-                        println!("Found {} = {:#?}", email, res.items);
+                        println!("Found {email} = {:#?}", res.items);
                         res.items
                     }).await
     }
@@ -184,18 +184,18 @@ impl GitHub {
             if ver == key.1 {
                 return Ok(payload);
             }
-            eprintln!("Cache near miss {}@{} vs {}", key.0, ver, key.1);
+            eprintln!("Cache near miss {}@{ver} vs {}", key.0, key.1);
         }
 
         let (status, res) = match Box::pin(cb(&self.client)).await {
             Ok(res) => {
                 let status = res.status();
                 let headers = res.headers();
-                eprintln!("Recvd {}@{} {:?} {:?}", key.0, key.1, status, headers);
+                eprintln!("Recvd {}@{} {status:?} {headers:?}", key.0, key.1);
                 (status, Some(res))
             },
             Err(github_v3::GHError::Response { status, message }) => {
-                eprintln!("GH Error {} {}", status, message.as_deref().unwrap_or("??"));
+                eprintln!("GH Error {status} {}", message.as_deref().unwrap_or("??"));
                 (status, None)
             },
             Err(e) => return Err(e.into()),
@@ -221,9 +221,9 @@ impl GitHub {
             _ => None,
         };
         match body.ok_or_else(|| Error::NoBody(format!("{},{}", key.0, key.1))).and_then(|stats| {
-            let dbg = format!("stats={:?}", stats);
+            let dbg = format!("stats={stats:?}");
             Ok(postproc(serde_json::from_value(stats).map_err(|e| {
-                eprintln!("Error matching JSON: {}\n {} data: {}", e, key.0, dbg); e
+                eprintln!("Error matching JSON: {e}\n {} data: {dbg}", key.0); e
             })?))
         }) {
             Ok(val) => {
@@ -337,7 +337,7 @@ async fn github_releases() {
         repo:"gifski".into(),
     };
     let releases = gh.releases(&repo, "").await.unwrap().unwrap();
-    assert!(releases.len() > 4, "{:?}", releases);
+    assert!(releases.len() > 4, "{releases:?}");
 }
 
 #[cfg(test)]

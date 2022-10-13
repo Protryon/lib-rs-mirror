@@ -82,7 +82,7 @@ impl Page {
         {
             if let Some(url) = self.critical_css_dev_url {
                 // it's super ugly hack, but just for dev
-                return templates::Html(Box::leak(format!("</style><link rel=stylesheet href='{}'><style>", url).into_boxed_str()));
+                return templates::Html(Box::leak(format!("</style><link rel=stylesheet href='{url}'><style>").into_boxed_str()));
             }
         }
         let data = self.critical_css_data.unwrap_or(include_str!("../../style/public/critical.css"));
@@ -330,7 +330,7 @@ pub fn render_static_page(out: &mut impl Write, title: String, page: &Markup, re
 
     let (html, warnings) = renderer.page(page, Some(("https://lib.rs", "https://lib.rs")), Links::Trusted, None);
     if !warnings.is_empty() {
-        eprintln!("static: {:?}", warnings);
+        eprintln!("static: {warnings:?}");
     }
 
     templates::static_page(out, &Page {
@@ -375,7 +375,7 @@ pub fn limit_text_len(text: &str, mut len_min: usize, mut len_max: usize) -> Cow
     if let Some(pos) = optional.find(&['.', ',', '!', '\n', '?', ')', ']'][..]).or_else(|| optional.find(' ')) {
         cut = cut[..=len_min + pos].trim_end_matches(&['.', ',', '!', '\n', '?', ' '][..]);
     };
-    format!("{}…", cut).into()
+    format!("{cut}…").into()
 }
 
 #[test]
@@ -421,7 +421,7 @@ pub(crate) fn render_maybe_markdown_str(s: &str, markup: &Renderer, allow_links:
 /// To show that these numbers are just approximate.
 pub(crate) fn format_downloads(num: u32) -> (String, &'static str) {
     match num {
-        a @ 0..=99 => (format!("{}", a), ""),
+        a @ 0..=99 => (format!("{a}"), ""),
         a @ 0..=500 => (format!("{}", a / 10 * 10), ""),
         a @ 0..=999 => (format!("{}", a / 50 * 50), ""),
         a @ 0..=9999 => (format!("{}.{}", a / 1000, a % 1000 / 100), "K"),
@@ -432,7 +432,7 @@ pub(crate) fn format_downloads(num: u32) -> (String, &'static str) {
 
 pub(crate) fn format_downloads_verbose(num: u32) -> (String, &'static str) {
     match num {
-        a @ 0..=99 => (format!("{}", a), ""),
+        a @ 0..=99 => (format!("{a}"), ""),
         a @ 0..=999_999 => (format!("{}", a / 1000), "thousand"),
         a => (format!("{}.{}", a / 1_000_000, a % 1_000_000 / 100_000), "million"),
     }

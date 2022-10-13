@@ -130,7 +130,7 @@ impl SimpleCache {
         loop {
             match cb() {
                 Err(Error::Db(_, ref e)) if retries > 0 && matches!(**e, SqliteFailure(ref e, _) if e.code == DatabaseLocked) => {
-                    eprintln!("Retrying: {}", e);
+                    eprintln!("Retrying: {e}");
                     retries -= 1;
                     thread::sleep(Duration::from_secs(1));
                 },
@@ -143,7 +143,7 @@ impl SimpleCache {
         self.with_connection(|conn| {
             let mut q = conn.prepare_cached("SELECT data FROM cache2 WHERE key = ?1 AND ver = ?2")
                 .map_err(|e| Error::Db(self.url.clone(), Arc::new(e)))?;
-            let row: Result<Vec<u8>, _> = q.query_row(&[&key.0, &key.1], |r| r.get(0));
+            let row: Result<Vec<u8>, _> = q.query_row([&key.0, &key.1], |r| r.get(0));
             match row {
                 Ok(row) => Ok(Some(row)),
                 Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
@@ -156,7 +156,7 @@ impl SimpleCache {
         self.with_connection(|conn| {
             let mut q = conn.prepare_cached("DELETE FROM cache2 WHERE key = ?1")
                 .map_err(|e| Error::Db(self.url.clone(), Arc::new(e)))?;
-            q.execute(&[&key.0])
+            q.execute([&key.0])
                 .map_err(|e| Error::Db(self.url.clone(), Arc::new(e)))?;
             Ok(())
         })

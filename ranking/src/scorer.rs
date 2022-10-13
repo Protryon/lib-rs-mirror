@@ -55,7 +55,7 @@ impl Score {
     /// Get total score
     pub fn total(&self) -> f64 {
         let sum = self.scores.iter().map(|&(v, limit, _)| v.max(0.).min(limit)).sum::<f64>();
-        sum / self.total as f64
+        sum / self.total
     }
 }
 

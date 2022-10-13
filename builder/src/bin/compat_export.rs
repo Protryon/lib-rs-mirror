@@ -52,7 +52,7 @@ async fn main() {
             }
         }
         if let Err(e) = crate_compat(crates, name).await {
-            eprintln!("•• {}: {}", name, e);
+            eprintln!("•• {name}: {e}");
         }
     }).await;
 }
@@ -113,7 +113,7 @@ async fn crate_compat(crates: &KitchenSink, name: &str) -> kitchen_sink::CResult
             let mut out = String::with_capacity(100);
             out.push_str(name);
             for (rustc_minor_ver, crate_ver) in by_rustc {
-                write!(&mut out, " 1.{}<={}.{}.{}", rustc_minor_ver,
+                write!(&mut out, " 1.{rustc_minor_ver}<={}.{}.{}",
                     crate_ver.major, // don't print prerelease and +garbage
                     crate_ver.minor,
                     crate_ver.patch,

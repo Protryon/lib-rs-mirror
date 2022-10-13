@@ -61,7 +61,7 @@ pub fn read_repo(repo: &crate_git_checkout::Repository, path_in_tree: crate_git_
 }
 
 pub fn read_archive(archive: &[u8], name: &str, ver: &str) -> Result<CrateFilesSummary, UnarchiverError> {
-    let prefix = PathBuf::from(format!("{}-{}", name, ver));
+    let prefix = PathBuf::from(format!("{name}-{ver}"));
     let mut collect = Collector::new(archive.len());
     read_archive_files(archive, |mut file| {
         let header = file.header();

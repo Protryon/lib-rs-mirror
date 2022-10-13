@@ -49,7 +49,7 @@ impl NotFoundPage<'_> {
     /// To show that these numbers are just approximate.
     pub fn downloads(&self, num: u64) -> (String, &str) {
         match num {
-            a @ 0..=99 => (format!("{}", a), ""),
+            a @ 0..=99 => (format!("{a}"), ""),
             a @ 0..=500 => (format!("{}", a / 10 * 10), ""),
             a @ 0..=999 => (format!("{}", a / 50 * 50), ""),
             a @ 0..=9999 => (format!("{}.{}", a / 1000, a % 1000 / 100), "K"),

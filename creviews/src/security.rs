@@ -22,7 +22,7 @@ impl RustSec {
     }
 
     fn db_at_path(path: &Path) -> Result<Database, Error> {
-        let r = Repository::fetch(DEFAULT_URL, &path, true)?;
+        let r = Repository::fetch(DEFAULT_URL, path, true)?;
         Database::load_from_repo(&r)
     }
 

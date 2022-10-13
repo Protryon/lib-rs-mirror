@@ -166,7 +166,7 @@ impl<'a> HomePage<'a> {
             // mark seen from least popular (assuming they're more specific)
             for (cat, top) in c.iter_mut().rev() {
                 let top: Vec<_> = top.as_ref().map(|v| v.as_slice())
-                    .map_err(|e| eprintln!("top fail: {}", e)).unwrap_or_default()
+                    .map_err(|e| eprintln!("top fail: {e}")).unwrap_or_default()
                     .iter()
                     .take(35)
                     .filter(|c| seen.get(c).is_none())
@@ -190,7 +190,7 @@ impl<'a> HomePage<'a> {
                 for c in top_resolved {
                     match c {
                         Ok(c) => cat.top.push(c),
-                        Err(e) => eprintln!("catstream: {} (in {})", e, cat.cat.slug),
+                        Err(e) => eprintln!("catstream: {e} (in {})", cat.cat.slug),
                     }
                 }
                 cat.dl = dl.max(cat.dl);
@@ -221,7 +221,7 @@ impl<'a> HomePage<'a> {
             Self::avg_pair(&mut ranked, "database-implementations", "database");
             Self::avg_pair(&mut ranked, "command-line-interface", "command-line-utilities");
 
-            let mut c = ranked.into_iter().map(|(_, v)| v).collect::<Vec<_>>();
+            let mut c = ranked.into_values().collect::<Vec<_>>();
             c.sort_unstable_by(|a, b| b.0.cmp(&a.0));
 
             c.into_iter().map(|(_, c)| c).collect()

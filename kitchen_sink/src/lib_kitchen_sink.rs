@@ -443,7 +443,7 @@ impl KitchenSink {
             if categories.is_empty() {
                 continue;
             }
-            categories.iter().for_each(|k| debug_assert!(categories::CATEGORIES.from_slug(k).1, "'{}' is invalid for override '{}'", k, crate_name));
+            categories.iter().for_each(|k| debug_assert!(categories::CATEGORIES.from_slug(k).1, "'{k}' is invalid for override '{crate_name}'"));
             out.insert(crate_name.into(), categories);
         }
         Ok(out)
@@ -664,7 +664,7 @@ impl KitchenSink {
         }
 
         // normalize data sample to be proportional to montly downloads
-        let actual_downloads_per_month = self.downloads_per_month(origin).await?.unwrap_or(total as usize * 30 / days as usize);
+        let actual_downloads_per_month = self.downloads_per_month(origin).await?.unwrap_or(total as usize * 30 / days);
         Ok(out.into_iter().map(|(k,v)|
             (k.clone(), (v as usize * actual_downloads_per_month / total.max(1) as usize) as u32)
         ).collect())
@@ -948,7 +948,7 @@ impl KitchenSink {
         let mut meta = meta.ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?;
         if !meta.versions.iter().any(|v| v.num == latest_in_index) {
             warn!("Crate data missing latest version {}@{}", name, latest_in_index);
-            meta = watch("meta-retry", self.crates_io.crate_meta(name, &format!("{}-try-again", latest_in_index)))
+            meta = watch("meta-retry", self.crates_io.crate_meta(name, &format!("{latest_in_index}-try-again")))
                 .await?
                 .ok_or_else(|| KitchenSinkErr::CrateNotFound(Origin::from_crates_io_name(name)))?;
             if !meta.versions.iter().any(|v| v.num == latest_in_index) {
@@ -1023,7 +1023,7 @@ impl KitchenSink {
                 debug!("Getting/indexing {:?}", origin);
                 let _th = timeout("autoindex", 29, self.auto_indexing_throttle.acquire().map(|e| e.map_err(CError::from))).await?;
                 let reindex = timeout("reindex", 59, self.index_crate_highest_version(origin, false)).map_err(|e| {error!("{:?} reindex: {}", origin, e); e});
-                watch("reindex", reindex).await.with_context(|| format!("reindexing {:?}", origin))?; // Pin to lower stack usage
+                watch("reindex", reindex).await.with_context(|| format!("reindexing {origin:?}"))?; // Pin to lower stack usage
                 timeout("reindexed data", 9, self.rich_crate_version_data_derived(origin)).await?.ok_or(KitchenSinkErr::DerivedDataTimedOut)?
             },
         };
@@ -1124,7 +1124,7 @@ impl KitchenSink {
 
     pub async fn crate_files_summary_from_crates_io_tarball(&self, name: &str, ver: &str) -> Result<CrateFilesSummary, KitchenSinkErr> {
         let tarball = timeout("tarball fetch", 16, self.crates_io.crate_data(name, ver)
-            .map_err(|e| KitchenSinkErr::DataNotFound(format!("{}-{}: {}", name, ver, e)))).await?;
+            .map_err(|e| KitchenSinkErr::DataNotFound(format!("{name}-{ver}: {e}")))).await?;
 
         let meta = timeout("untar1", 40, spawn_blocking({
                 let name = name.to_owned();
@@ -1132,7 +1132,7 @@ impl KitchenSink {
                 move || tarball::read_archive(&tarball[..], &name, &ver)
             })
             .map_err(|e| KitchenSinkErr::Internal(std::sync::Arc::new(e)))).await?
-            .map_err(|e| KitchenSinkErr::UnarchiverError(format!("{}-{}", name, ver), Arc::new(e)))?;
+            .map_err(|e| KitchenSinkErr::UnarchiverError(format!("{name}-{ver}"), Arc::new(e)))?;
         Ok(meta)
     }
 
@@ -1321,8 +1321,8 @@ impl KitchenSink {
             if let Some(ref r) = meta.readme {
                 readme_txt = render_readme::Renderer::new(None).visible_text_by_section(&r.1);
                 for (s, txt) in &readme_txt {
-                    words.push(&s);
-                    words.push(&txt);
+                    words.push(s);
+                    words.push(txt);
                 }
             }
             if let Some(ref lib) = meta.lib_file {
@@ -1539,8 +1539,8 @@ impl KitchenSink {
             // direct deps are more relevant, but sparse data gives wrong results
             let direct_weight = 1 + d.direct.all()/4;
 
-            let build = d.direct.build as u32 * direct_weight + d.build.def as u32 * 2 + d.build.opt as u32;
-            let runtime = d.direct.runtime as u32 * direct_weight + d.runtime.def as u32 * 2 + d.runtime.opt as u32;
+            let build = d.direct.build as u32 * direct_weight + d.build.def * 2 + d.build.opt;
+            let runtime = d.direct.runtime as u32 * direct_weight + d.runtime.def * 2 + d.runtime.opt;
             let dev = d.direct.dev as u32 * direct_weight + d.dev as u32 * 2;
             let is_build = build > 3 * (runtime + 15); // fudge factor, don't show anything if data is uncertain
             let is_dev = !is_build && dev > (3 * runtime + 3 * build + 15);
@@ -1587,7 +1587,7 @@ impl KitchenSink {
     }
 
     async fn add_readme_from_crates_io(&self, meta: &mut CrateFilesSummary, name: &str, ver: &str) {
-        let key = format!("{}/{}", name, ver);
+        let key = format!("{name}/{ver}");
         if let Ok(Some(_)) = self.readme_check_cache.get(key.as_str()) {
             return;
         }
@@ -1827,7 +1827,7 @@ impl KitchenSink {
             None => return Ok(None),
         };
 
-        if let Some(s) = self.traction_stats(&origin).await? {
+        if let Some(s) = self.traction_stats(origin).await? {
             if s.former_glory < 0.5 {
                 lost_popularity = true;
             }
@@ -2141,7 +2141,7 @@ impl KitchenSink {
             category_slugs = categories::Categories::fixed_category_slugs(&tmp, &mut bad_categories);
         }
 
-        category_slugs.iter().for_each(|k| debug_assert!(categories::CATEGORIES.from_slug(k).1, "'{}' must exist", k));
+        category_slugs.iter().for_each(|k| debug_assert!(categories::CATEGORIES.from_slug(k).1, "'{k}' must exist"));
 
         let extracted_auto_keywords = feat_extractor::auto_keywords(&manifest, source_data.github_description.as_deref(), readme_text.as_deref().unwrap_or_default());
 
@@ -2301,7 +2301,7 @@ impl KitchenSink {
         let url = repo.canonical_git_url();
         let (checkout, manif) = spawn_blocking(move || {
             let (manif, warnings) = crate_git_checkout::find_manifests(&checkout)
-                .with_context(|| format!("find manifests in {}", url))?;
+                .with_context(|| format!("find manifests in {url}"))?;
             for warn in warnings {
                 warn!("warning: {}", warn.0);
             }
@@ -2654,7 +2654,7 @@ impl KitchenSink {
                         if c.newest_bad().unwrap_or(0) < dep_newest_bad {
                             if dep_newest_bad >= 25 {
                                 debug!("{} {} MSRV went from {} to {} because of https://lib.rs/compat/{} {} = {}", all.name(), crate_ver, c.newest_bad().unwrap_or(0), dep_newest_bad, dep_origin.short_crate_name(), req, dep_found_ver);
-                                let reason = format!("{} {}={} has MSRV {}", dep_origin.short_crate_name(), req, dep_found_ver, dep_newest_bad);
+                                let reason = format!("{} {req}={dep_found_ver} has MSRV {dep_newest_bad}", dep_origin.short_crate_name());
                                 c.add_compat(dep_newest_bad, Compat::BrokenDeps, Some(reason.clone()));
 
                                 // setting this will make builder skip this version.
@@ -2868,7 +2868,7 @@ impl KitchenSink {
             .next()
             .unwrap_or_else(|| {
                 let weeks = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).expect("clock").as_secs() / (3600 * 24 * 7);
-                format!("w{}", weeks)
+                format!("w{weeks}")
             }))
     }
 
@@ -2996,7 +2996,7 @@ impl KitchenSink {
                     }
                 }
             }
-            if let Some(ref name) = author.name.as_deref().or_else(|| author.email.as_deref().map(|e| e.split('@').next().unwrap())) {
+            if let Some(name) = author.name.as_deref().or_else(|| author.email.as_deref().map(|e| e.split('@').next().unwrap())) {
                 let mut lc_ascii_name = deunicode::deunicode(name.trim());
                 lc_ascii_name.make_ascii_lowercase();
                 if let Some((contribution, github)) = contributors_by_login.remove(&lc_ascii_name) {
@@ -3094,7 +3094,7 @@ impl KitchenSink {
         let big_contribution = if max_author_contribution < 50. { 200. } else { max_author_contribution / 2. };
 
         let mut contributors = 0;
-        let (mut authors_or_owners, mut passive_owners): (Vec<_>, Vec<_>) = authors.into_iter().map(|(_,v)|v)
+        let (mut authors_or_owners, mut passive_owners): (Vec<_>, Vec<_>) = authors.into_values()
             .filter(|a| if a.owner || a.nth_author.is_some() || a.contribution >= big_contribution {
                 true
             } else {
@@ -3177,7 +3177,7 @@ impl KitchenSink {
                 });
             }
         }
-        current_owners_by_login.into_iter().map(|(_, v)| v).collect()
+        current_owners_by_login.into_values().collect()
     }
 
     /// true if it's verified current owner, false if may be a past owner (contributor now)
@@ -3411,9 +3411,9 @@ impl KitchenSink {
         };
         let direct_rev_deps = deps.direct.all();
 
-        let indirect_reverse_optional_deps = (deps.runtime.def as u32 + deps.runtime.opt as u32)
+        let indirect_reverse_optional_deps = (deps.runtime.def + deps.runtime.opt)
             .max(deps.dev as u32)
-            .max(deps.build.def as u32 + deps.build.opt as u32);
+            .max(deps.build.def + deps.build.opt);
 
         let indirect_to_direct_ratio = 1f64.min((direct_rev_deps * 3) as f64 / indirect_reverse_optional_deps.max(1) as f64);
         let indirect_to_direct_ratio = (0.9 + indirect_to_direct_ratio) * 0.5;
@@ -3668,7 +3668,7 @@ impl KitchenSink {
             return None;
         }
 
-        let path = self.data_path.join(format!("rustaceans/data/{}.json", login));
+        let path = self.data_path.join(format!("rustaceans/data/{login}.json"));
         let json = std::fs::read(path).ok()?;
         serde_json::from_slice(&json).ok()
     }
@@ -3934,7 +3934,7 @@ fn fetch_uppercase_name_and_tarball() {
 
         let testk = k.index.crates_io_crate_by_lowercase_name("dssim-core").unwrap();
         let meta = k.crate_files_summary_from_crates_io_tarball("dssim-core", testk.versions()[8].version()).await.unwrap();
-        assert_eq!(meta.path_in_repo.as_deref(), Some("dssim-core"), "{:#?}", meta);
+        assert_eq!(meta.path_in_repo.as_deref(), Some("dssim-core"), "{meta:#?}");
         assert_eq!(meta.vcs_info_git_sha1.as_ref().unwrap(), b"\xba\x0a\x40\xd1\x3b\x1d\x11\xb0\x19\xf6\xb6\x6a\x77\x2e\xbd\xa7\xd0\xf9\x45\x0c");
     })).unwrap();
 }
@@ -3945,7 +3945,7 @@ async fn index_test() {
     let stats = idx.deps_stats().await.unwrap();
     assert!(stats.total > 13800);
     let lode = stats.counts.get("lodepng").unwrap();
-    assert!(lode.runtime.def >= 14 && lode.runtime.def < 50, "{:?}", lode);
+    assert!(lode.runtime.def >= 14 && lode.runtime.def < 50, "{lode:?}");
 }
 
 fn is_alnum(q: &str) -> bool {

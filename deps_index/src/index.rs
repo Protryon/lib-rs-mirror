@@ -375,7 +375,7 @@ impl Index {
             let tmp;
             let crate_name: &str = if crate_name.bytes().all(|c| c.is_ascii_lowercase() || c == b'-' || c == b'_') { crate_name } else { tmp = crate_name.to_ascii_lowercase(); &tmp };
             debug_assert_eq!(crate_name, crate_name.to_ascii_lowercase());
-            let krate = match self.crates_io_crate_by_lowercase_name(&crate_name) {
+            let krate = match self.crates_io_crate_by_lowercase_name(crate_name) {
                 Ok(k) => k,
                 Err(e) => {
                     info!("{}@{} depends on missing crate {} (@{}): {}", ver.name(), ver.version(), crate_name, req, e);

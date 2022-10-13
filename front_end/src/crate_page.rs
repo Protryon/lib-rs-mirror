@@ -206,7 +206,7 @@ impl<'a> CratePage<'a> {
             title: self.page_title(),
             keywords: if !keywords.is_empty() { Some(keywords) } else { None },
             created: self.date_created_string(),
-            description: self.ver.description().map(|d| format!("{} | Rust/Cargo package", d)),
+            description: self.ver.description().map(|d| format!("{d} | Rust/Cargo package")),
             item_name: Some(self.ver.short_name().to_string()),
             item_description: self.ver.description().map(|d| d.to_string()),
             alternate: url.crates_io_crate(self.ver.origin()),
@@ -245,9 +245,9 @@ impl<'a> CratePage<'a> {
         let name_capital = self.ver.capitalized_name();
 
         if self.ver.is_yanked() || self.former_glory < 0.3 {
-            format!("{} {} [deprecated]", name_capital, self.ver.version())
+            format!("{name_capital} {} [deprecated]", self.ver.version())
         } else {
-            format!("{} — {}", name_capital, kind)
+            format!("{name_capital} — {kind}")
         }
     }
 
@@ -258,8 +258,8 @@ impl<'a> CratePage<'a> {
     pub fn dependents_stats(&self) -> Option<DepsStatsResult> {
         let d = self.dependents_stats?;
         let d = DepsStatsResult {
-            deps: d.runtime.def as u32 + d.runtime.opt as u32 + d.build.def as u32 + d.build.opt as u32 + d.dev as u32,
-            direct: d.direct.all() as u32,
+            deps: d.runtime.def + d.runtime.opt + d.build.def + d.build.opt + d.dev as u32,
+            direct: d.direct.all(),
             name: d.rev_dep_names_default.iter().chain(d.rev_dep_names_optional.iter()).chain(d.rev_dep_names_dev.iter()).next(),
             former_glory: self.former_glory,
         };
@@ -363,13 +363,13 @@ impl<'a> CratePage<'a> {
             0..=9_999_999 => return format!("{}MB", ((bytes + 250_000) / 500_000) as f64 * 0.5),
             _ => ((bytes + 500_000) / 1_000_000, "MB"),
         };
-        format!("{}{}", Numeric::english().format_int(num), unit)
+        format!("{}{unit}", Numeric::english().format_int(num))
     }
 
     fn format_number_frac(num: f64) -> String {
         if num > 0.05 && num < 10. && num.fract() > 0.09 && num.fract() < 0.9 {
             if num < 3. {
-                format!("{:.1}", num)
+                format!("{num:.1}")
             } else {
                 format!("{}", (num * 2.).round() / 2.)
             }
@@ -402,13 +402,13 @@ impl<'a> CratePage<'a> {
         if low_val > 1. && high_val > 10. {
             low_val = low_val.round(); // spread is so high that precision of low end isn't relevant
         }
-        format!("{}–{}{}", Self::format_number_frac(low_val), Self::format_number_frac(high_val), unit)
+        format!("{}–{}{unit}", Self::format_number_frac(low_val), Self::format_number_frac(high_val))
     }
 
     /// Display number 0..1 as percent
     pub fn format_fraction(&self, num: f64) -> String {
         if num < 1.9 {
-            format!("{:0.1}%", num)
+            format!("{num:0.1}%")
         } else {
             format!("{}%", Numeric::english().format_int(num.round() as usize))
         }
@@ -520,7 +520,7 @@ impl<'a> CratePage<'a> {
                 },
             };
         }
-        let mut grouped: Vec<_> = grouped.into_iter().map(|(_, v)| v).collect();
+        let mut grouped: Vec<_> = grouped.into_values().collect();
         grouped.sort_unstable_by(|a, b| b.ver.semver.cmp(&a.ver.semver));
         grouped
     }
@@ -646,7 +646,7 @@ impl<'a> CratePage<'a> {
                     if docs_on_same_host {
                         Cow::Borrowed("Home") // there will be verbose label on docs link, so repeating it would be noisy
                     } else {
-                        format!("Home ({})", host).into()
+                        format!("Home ({host})").into()
                     }
                 })
                 .unwrap_or_else(|| "Homepage".into());
@@ -658,7 +658,7 @@ impl<'a> CratePage<'a> {
     pub fn documentation_link(&self) -> Option<(&str, Cow<'_, str>)> {
         self.ver.documentation().map(|url| {
             let label = url_domain(url)
-                .map(|host| if host == "docs.rs" { "API Reference".into() } else { Cow::Owned(format!("Documentation ({})", host)) })
+                .map(|host| if host == "docs.rs" { "API Reference".into() } else { Cow::Owned(format!("Documentation ({host})")) })
                 .unwrap_or_else(|| "Documentation".into());
             (url, label)
         })
@@ -672,18 +672,18 @@ impl<'a> CratePage<'a> {
             let label = match repo.host() {
                 Repo::GitHub(ref host) | Repo::GitLab(ref host) | Repo::BitBucket(ref host) => {
                     if self.has_verified_repository_link {
-                        format!("{} ({})", label_prefix, host.owner)
+                        format!("{label_prefix} ({})", host.owner)
                     } else {
-                        repo_links.push((urler.docs_rs_source(self.ver.short_name(), self.ver.version()).into(), "Source".into()));
+                        repo_links.push((urler.docs_rs_source(self.ver.short_name(), self.ver.version()), "Source".into()));
                         "Repository link".to_owned()
                     }
                 },
-                Repo::Other(url) => parsed_url_domain(&url).map(|host| format!("{} ({})", label_prefix, host)).unwrap_or_else(|| label_prefix.to_string()),
+                Repo::Other(url) => parsed_url_domain(url).map(|host| format!("{label_prefix} ({host})")).unwrap_or_else(|| label_prefix.to_string()),
             };
             repo_links.push((url, label))
         } else if self.ver.origin().is_crates_io() {
             // crates without a repo get docs.rs' HTTP crate file viewer link
-            repo_links.push((format!("https://docs.rs/crate/{}/{}/source/", self.ver.short_name(), self.ver.version()).into(), "Source".into()));
+            repo_links.push((format!("https://docs.rs/crate/{}/{}/source/", self.ver.short_name(), self.ver.version()), "Source".into()));
         }
         repo_links
     }
@@ -993,14 +993,14 @@ impl ReleaseCounts {
         };
         if n == self.total || (n > 7 && n * 10 >= self.total * 8) {
             if majorinfo {
-                (format!("{} {} release{}", n, label, plural(n)), Some(format!("({} {})", n2, label2)))
+                (format!("{n} {label} release{}", plural(n)), Some(format!("({n2} {label2})")))
             } else {
-                (format!("{} {} release{}", n, label, plural(n)), None)
+                (format!("{n} {label} release{}", plural(n)), None)
             }
         } else if n * 3 >= self.total * 2 {
-            (format!("{} release{}", self.total, plural(self.total)), Some(format!("({})", label)))
+            (format!("{} release{}", self.total, plural(self.total)), Some(format!("({label})")))
         } else {
-            (format!("{} release{}", self.total, plural(self.total)), if !label.is_empty() { Some(format!("({} {})", n, label)) } else { None })
+            (format!("{} release{}", self.total, plural(self.total)), if !label.is_empty() { Some(format!("({n} {label})")) } else { None })
         }
     }
 }

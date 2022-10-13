@@ -40,7 +40,7 @@ pub struct Findings {
 }
 
 pub fn parse_analyses(stdout: &str, stderr: &str) -> Vec<Findings> {
-    let divider = format!("{}\n", DIVIDER);
+    let divider = format!("{DIVIDER}\n");
 
     stdout.split(&divider).zip(stderr.split(&divider))
         .filter_map(|(out, err)| parse_analysis(out, err).map_err(|e| warn!("{}", e)).ok()).collect()
@@ -594,7 +594,7 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Result<Findings, String> {
     let first_line = lines.next().ok_or("no first line!?")?;
     let mut fl = first_line.split(' ');
     if fl.next().unwrap() != "CHECKING" {
-        return Err(format!("----------\nBad first line {}", first_line));
+        return Err(format!("----------\nBad first line {first_line}"));
     }
     let rustc_version_semver = SemVer::parse(fl.next().ok_or("first line 1")?).map_err(|e| e.to_string())?;
     assert_eq!(rustc_version_semver.major, 1);
@@ -635,7 +635,7 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Result<Findings, String> {
                         desc.contains("No such file or directory") ||
                         desc.starts_with("error: could not parse/generate dep") ||
                         desc.starts_with("couldn't create a temp dir:") {
-                        return Err(format!("• err: broken build, ignoring: {}", desc)); // oops, our bad
+                        return Err(format!("• err: broken build, ignoring: {desc}")); // oops, our bad
                     }
 
                     if desc.starts_with("`#![feature]` may not be used on the stable release channel") {
@@ -855,7 +855,7 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Result<Findings, String> {
                             (Some(build), Some(other)) if other < build => return None,
                             _ => {},
                         };
-                        Some(format!("{}@{}: {}", name, ver, reason))
+                        Some(format!("{name}@{ver}: {reason}"))
                     }).collect::<Vec<_>>().join("\n"))
                 };
                 findings.crates.insert((None, top_level_crate_name.to_owned(), top_level_crate_ver.to_owned(), compat, reason));
@@ -953,7 +953,7 @@ fn parse_analysis(stdout: &str, stderr: &str) -> Result<Findings, String> {
                 (Some(build), Some(other)) if other < build => return None,
                 _ => {},
             };
-            Some(format!("{}@{}: {}", name, ver, reason))
+            Some(format!("{name}@{ver}: {reason}"))
         }).collect::<Vec<_>>().join("\n");
         findings.crates.insert((None, top_level_crate_name.to_owned(), top_level_crate_ver, Compat::BrokenDeps, reason));
     }
@@ -1078,11 +1078,11 @@ exit failure
 "##;
 
     let res = parse_analyses(out, err);
-    assert!(res[0].crates.get(&(None, "vector2d".into(), "2.2.0".parse().unwrap(), Compat::VerifiedWorks, "ok".into())).is_some(), "{:#?}", res);
+    assert!(res[0].crates.get(&(None, "vector2d".into(), "2.2.0".parse().unwrap(), Compat::VerifiedWorks, "ok".into())).is_some(), "{res:#?}");
     assert!((res[0].check_time.unwrap() - 0.880) < 0.001);
-    assert!(res[0].crates.get(&(Some(30), "proc_vector2d".into(), "1.0.2".parse().unwrap(), Compat::DefinitelyIncompatible, "edition 2018".into())).is_some(), "{:#?}", res);
-    assert!(res[1].crates.get(&(None, "vector2d".into(), "2.2.0".parse().unwrap(), Compat::VerifiedWorks, "ok".into())).is_some(), "{:#?}", res);
-    assert!(res[1].crates.get(&(Some(30), "proc_vector2d".into(), "1.0.2".parse().unwrap(), Compat::DefinitelyIncompatible, "edition 2018".into())).is_some(), "{:#?}", res);
-    assert!(res[2].crates.get(&(None, "proc_vector2d".into(), "1.0.2".parse().unwrap(), Compat::SuspectedIncompatible, "function-like proc macros are currently unstable (see issue #38356)".into())).is_some(), "{:#?}", res);
-    assert!(res[2].crates.get(&(None, "toplevelcrate".into(), "1.0.1-testcrate".parse().unwrap(), Compat::BrokenDeps, "proc_vector2d@1.0.2: function-like proc macros are currently unstable (see issue #38356)".into())).is_some(), "{:#?}", res);
+    assert!(res[0].crates.get(&(Some(30), "proc_vector2d".into(), "1.0.2".parse().unwrap(), Compat::DefinitelyIncompatible, "edition 2018".into())).is_some(), "{res:#?}");
+    assert!(res[1].crates.get(&(None, "vector2d".into(), "2.2.0".parse().unwrap(), Compat::VerifiedWorks, "ok".into())).is_some(), "{res:#?}");
+    assert!(res[1].crates.get(&(Some(30), "proc_vector2d".into(), "1.0.2".parse().unwrap(), Compat::DefinitelyIncompatible, "edition 2018".into())).is_some(), "{res:#?}");
+    assert!(res[2].crates.get(&(None, "proc_vector2d".into(), "1.0.2".parse().unwrap(), Compat::SuspectedIncompatible, "function-like proc macros are currently unstable (see issue #38356)".into())).is_some(), "{res:#?}");
+    assert!(res[2].crates.get(&(None, "toplevelcrate".into(), "1.0.1-testcrate".parse().unwrap(), Compat::BrokenDeps, "proc_vector2d@1.0.2: function-like proc macros are currently unstable (see issue #38356)".into())).is_some(), "{res:#?}");
 }

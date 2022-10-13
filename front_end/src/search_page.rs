@@ -120,7 +120,7 @@ impl SearchPage<'_> {
         let mut desc = String::with_capacity(300);
         match self.query {
             SearchKind::Query(_) => desc.push_str("Found Rust crates: "),
-            SearchKind::Keyword(q) => desc.push_str(&format!("#{} = ", q)),
+            SearchKind::Keyword(q) => desc.push_str(&format!("#{q} = ")),
         };
         for r in &self.good_results[0..self.good_results.len().min(10)] {
             desc.push_str(&r.crate_name);
@@ -129,8 +129,8 @@ impl SearchPage<'_> {
         desc.push_str("etc.");
         Page {
             title: match self.query {
-                SearchKind::Query(q) => format!("‘{}’ search", q),
-                SearchKind::Keyword(q) => format!("#{}", q),
+                SearchKind::Query(q) => format!("‘{q}’ search"),
+                SearchKind::Keyword(q) => format!("#{q}"),
             },
             description: Some(desc),
             noindex: true,
@@ -166,7 +166,7 @@ impl SearchPage<'_> {
     /// To show that these numbers are just approximate.
     pub fn downloads(&self, num: u64) -> (String, &str) {
         match num {
-            a @ 0..=99 => (format!("{}", a), ""),
+            a @ 0..=99 => (format!("{a}"), ""),
             a @ 0..=500 => (format!("{}", a / 10 * 10), ""),
             a @ 0..=999 => (format!("{}", a / 50 * 50), ""),
             a @ 0..=9999 => (format!("{}.{}", a / 1000, a % 1000 / 100), "K"),

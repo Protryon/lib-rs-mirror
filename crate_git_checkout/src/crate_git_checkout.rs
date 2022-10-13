@@ -101,7 +101,7 @@ fn iter_blobs_recurse<E, F>(repo: &Repository, tree: &Tree<'_>, path: &mut Strin
 
 fn get_repo(repo: &Repo, base_path: &Path, shallow: bool) -> Result<Repository, git2::Error> {
     // ensure one clone per dir at a time
-    let lock = GLOBAL_LOCK.lock().unwrap().entry(repo.canonical_git_url().to_string()).or_insert_with(|| Arc::new(Mutex::new(()))).clone();
+    let lock = GLOBAL_LOCK.lock().unwrap().entry(repo.canonical_git_url()).or_insert_with(|| Arc::new(Mutex::new(()))).clone();
     let _lock = lock.lock().unwrap();
 
     let url = &*repo.canonical_git_url();
@@ -112,7 +112,7 @@ fn get_repo(repo: &Repo, base_path: &Path, shallow: bool) -> Result<Repository, 
         Ok(repo) => Ok(repo),
         Err(err) => {
             if !url.starts_with("http://") && !url.starts_with("https://") && !url.starts_with("git@github.com:") {
-                eprintln!("Rejecting non-HTTP git URL: {}", url);
+                eprintln!("Rejecting non-HTTP git URL: {url}");
                 return Err(err);
             }
             if err.code() == git2::ErrorCode::Exists {
@@ -214,7 +214,7 @@ fn find_manifests_in_tree(repo: &Repository, start_tree: &Tree<'_>, commit_id: O
                     }
                 },
                 Err(err) => {
-                    warnings.push(ParseError(format!("Can't parse {}/{}/{}: {}", repo.path().display(), inner_path, name, err)));
+                    warnings.push(ParseError(format!("Can't parse {}/{inner_path}/{name}: {err}", repo.path().display())));
                 },
             }
         }
@@ -246,8 +246,8 @@ pub fn find_versions(repo: &Repository) -> Result<PackageVersionTimestamps, Erro
     let mut package_versions: PackageVersionTimestamps = HashMap::with_capacity(4);
     for commit in repo.tag_names(None)?.iter()
         .flatten()
-        .filter_map(|tag| repo.find_reference(&format!("refs/tags/{}", tag)).map_err(|e| eprintln!("bad tag {}: {}", tag, e)).ok())
-        .filter_map(|r| r.peel_to_commit().map_err(|e| eprintln!("bad ref/tag: {}", e)).ok())
+        .filter_map(|tag| repo.find_reference(&format!("refs/tags/{tag}")).map_err(|e| eprintln!("bad tag {tag}: {e}")).ok())
+        .filter_map(|r| r.peel_to_commit().map_err(|e| eprintln!("bad ref/tag: {e}")).ok())
     {
         for f in find_manifests_in_tree(repo, &commit.tree()?, commit.id())?.0 {
             if let Some(pkg) = f.manifest.package {
@@ -304,9 +304,9 @@ pub fn find_dependency_changes(repo: &Repository, mut cb: impl FnMut(HashSet<Str
                 add_package(&mut package_versions, pkg, &commit);
             }
 
-            older_deps.extend(f.manifest.dependencies.into_iter().map(|(k, _)| k));
-            older_deps.extend(f.manifest.dev_dependencies.into_iter().map(|(k, _)| k));
-            older_deps.extend(f.manifest.build_dependencies.into_iter().map(|(k, _)| k));
+            older_deps.extend(f.manifest.dependencies.into_keys());
+            older_deps.extend(f.manifest.dev_dependencies.into_keys());
+            older_deps.extend(f.manifest.build_dependencies.into_keys());
         }
 
         let mut added = HashSet::with_capacity(10);

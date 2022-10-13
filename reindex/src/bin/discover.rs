@@ -18,10 +18,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             line = format!("https://github.com/{}", line.trim_start_matches('/'));
         }
         if let Err(e) = check_repo(&line, &crates).await {
-            eprintln!("{}: {}", line, e);
+            eprintln!("{line}: {e}");
             let mut src = e.source();
             while let Some(e) = src {
-                eprintln!(" {}", e);
+                eprintln!(" {e}");
                 src = e.source();
             }
         }
@@ -41,7 +41,7 @@ async fn check_repo(line: &str, crates: &KitchenSink) -> Result<(), Box<dyn std:
             let path = f.inner_path;
             if let Some(pkg) = &manif.package {
                 if path.contains("example") {
-                    println!("// skip {} {}", path, pkg.name());
+                    println!("// skip {path} {}", pkg.name());
                     continue;
                 }
                 if crates.crate_exists(&Origin::from_github(gh.clone(), pkg.name())) {
@@ -54,11 +54,11 @@ async fn check_repo(line: &str, crates: &KitchenSink) -> Result<(), Box<dyn std:
                 } else if let Some(d) = pkg.description() {
                     println!("// {}", d.trim());
                 }
-                println!("github:{}/{}/{}\n,{}", gh.owner, gh.repo, pkg.name, if !path.is_empty() && path != pkg.name() {format!(" // in {}", path)} else {String::new()});
+                println!("github:{}/{}/{}\n,{}", gh.owner, gh.repo, pkg.name, if !path.is_empty() && path != pkg.name() {format!(" // in {path}")} else {String::new()});
             }
         }
     } else {
-        eprintln!("Not supported host: {:?}", repo);
+        eprintln!("Not supported host: {repo:?}");
     }
     Ok(())
 }

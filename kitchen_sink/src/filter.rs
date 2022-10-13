@@ -26,9 +26,9 @@ pub struct ImageOptimAPIFilter {
 impl ImageOptimAPIFilter {
     pub async fn new(api_id: &str, cache_path: impl AsRef<Path>) -> Result<Self, Error> {
         Ok(Self {
-            img_prefix: format!("https://img.gs/{}/full/", api_id),
-            img2x_prefix: format!("https://img.gs/{}/full,2x/", api_id),
-            meta_prefix: format!("https://img.gs/{}/meta,timeout=3/", api_id),
+            img_prefix: format!("https://img.gs/{api_id}/full/"),
+            img2x_prefix: format!("https://img.gs/{api_id}/full,2x/"),
+            meta_prefix: format!("https://img.gs/{api_id}/meta,timeout=3/"),
             cache: TempCacheJson::new(cache_path, Arc::new(Fetcher::new(8)), Duration::from_secs(3600*24*15))?,
             handle: tokio::runtime::Handle::current(),
         })
@@ -44,23 +44,23 @@ impl ImageFilter for ImageOptimAPIFilter {
             return (url.into(), None);
         }
         (
-            format!("{}{}", self.img_prefix, url).into(),
-            Some(format!("{}{} 2x", self.img2x_prefix, url).into())
+            format!("{}{url}", self.img_prefix).into(),
+            Some(format!("{}{url} 2x", self.img2x_prefix).into())
         )
     }
 
     fn image_size(&self, image_url: &str) -> Option<(u32, u32)> {
         let image_url = image_url.trim_start_matches(&self.img_prefix).trim_start_matches(&self.img2x_prefix);
-        let api_url = format!("{}{}", self.meta_prefix, image_url);
+        let api_url = format!("{}{image_url}", self.meta_prefix);
         let rt = self.handle.enter();
         let cache_future = timeout(Duration::from_secs(5), self.cache.get_json(image_url, api_url, |f| f));
         let ImageOptimImageMeta { mut width, mut height } = futures::executor::block_on(cache_future)
             .map_err(|_| {
-                eprintln!("warning: image req to meta of {} timed out", image_url);
+                eprintln!("warning: image req to meta of {image_url} timed out");
             })
             .ok()?
             .map_err(|e| {
-                eprintln!("warning: image req to meta of {} failed: {}", image_url, e);
+                eprintln!("warning: image req to meta of {image_url} failed: {e}");
             })
             .ok()??;
         drop(rt);

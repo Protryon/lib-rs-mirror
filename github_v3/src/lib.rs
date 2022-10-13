@@ -141,7 +141,7 @@ impl Client {
         let mut default_headers = HeaderMap::with_capacity(2);
         default_headers.insert("Accept", HeaderValue::from_static("application/vnd.github.v3+json"));
         if let Some(token) = token {
-            default_headers.insert("Authorization", HeaderValue::from_str(&format!("token {}", token)).unwrap());
+            default_headers.insert("Authorization", HeaderValue::from_str(&format!("token {token}")).unwrap());
         }
 
         Self {

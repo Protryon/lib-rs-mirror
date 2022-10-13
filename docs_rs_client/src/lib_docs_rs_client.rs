@@ -30,12 +30,12 @@ impl DocsRsClient {
     }
 
     pub async fn build_status(&self, crate_name: &str, version: &str) -> Result<Option<Vec<BuildStatus>>, Error> {
-        let key = format!("{}-{}", crate_name, version);
+        let key = format!("{crate_name}-{version}");
         // Don't cache 404s, since builds can appear later
         if let Some(Some(cached)) = self.cache.get(key.as_str())? {
             return Ok(Some(cached));
         }
-        let url = format!("https://docs.rs/crate/{}/{}/builds.json", crate_name, version);
+        let url = format!("https://docs.rs/crate/{crate_name}/{version}/builds.json");
         Ok(self.cache.get_json(&key, url, |t| t).await?.and_then(|f| f))
     }
 }

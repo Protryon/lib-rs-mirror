@@ -211,8 +211,7 @@ impl AllVersions {
                         }
                     }
                 }
-                deps_removed.extend(prev.into_iter()
-                    .map(|(k,_)| k)
+                deps_removed.extend(prev.into_keys()
                     .filter(|k| required_deps.get(k).is_none()));
             }
             prev_required_deps = Some(required_deps);

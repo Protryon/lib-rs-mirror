@@ -82,7 +82,7 @@ impl CratesIoClient {
         let url = self.crate_data_url(crate_name, version);
         let data = self.fetcher.fetch(&url).await?;
         if data.len() < 10 || data[0] != 31 || data[1] != 139 {
-            return Err(Error::Other(format!("Not tarball: {}", url)));
+            return Err(Error::Other(format!("Not tarball: {url}")));
         }
         let _ = std::fs::create_dir_all(tarball_path.parent().unwrap());
         std::fs::write(&tarball_path, &data)?;
@@ -90,7 +90,7 @@ impl CratesIoClient {
     }
 
     pub async fn readme(&self, crate_name: &str, version: &str) -> Result<Option<Vec<u8>>, Error> {
-        let key = format!("{}.html", crate_name);
+        let key = format!("{crate_name}.html");
         let url = format!("https://crates.io/api/v1/crates/{}/{}/readme", Encoded(crate_name), Encoded(version));
         self.readmes.get_cached((&key, version), &url).await
     }
@@ -99,7 +99,7 @@ impl CratesIoClient {
         let encoded_name = encode(crate_name);
         let cache_key = (&*encoded_name, as_of_version);
 
-        let url = format!("https://crates.io/api/v1/crates/{}", encoded_name);
+        let url = format!("https://crates.io/api/v1/crates/{encoded_name}");
         self.metacache.fetch_cached_deserialized(cache_key, url).await
     }
 
@@ -141,7 +141,7 @@ fn fs_safe(name: &str) -> Cow<str> {
     if name.as_bytes().iter().all(|&c| c >= b' ' && c != b'/' && c != b'\\' && c < 0x7f) {
         name.into()
     } else {
-        name.as_bytes().iter().map(|b| format!("{:02x}", b)).collect::<String>().into()
+        name.as_bytes().iter().map(|b| format!("{b:02x}")).collect::<String>().into()
     }
 }
 

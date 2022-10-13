@@ -240,7 +240,7 @@ impl<'a> CratePageRevDeps<'a> {
             i.num_width = 4. + 7. * i.num_str.len() as f32; // approx visual width of the number
 
             i.dl.perc = i.dl.num as f32 / dl_max * 100.0;
-            i.dl.str = self.downloads(i.dl.num as u32);
+            i.dl.str = self.downloads(i.dl.num);
             i.dl.num_width = 4. + 7. * (i.dl.str.0.len() + i.dl.str.1.len()) as f32; // approx visual width of the number
         }
         ver

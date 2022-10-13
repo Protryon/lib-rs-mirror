@@ -23,7 +23,7 @@ impl<F: Future> Future for NonBlock<F> {
         let res = projected.poll(ctx);
         let elapsed = start.elapsed().as_secs();
         if elapsed >= 1 {
-            eprintln!("blocking poll: {} took {}s", label, elapsed);
+            eprintln!("blocking poll: {label} took {elapsed}s");
         }
         res
     }

@@ -56,7 +56,7 @@ impl Urler {
             }
             Origin::GitHub { repo, package } | Origin::GitLab { repo, package } => {
                 let host = if let Origin::GitHub { .. } = origin { "gh" } else { "lab" };
-                format!("/install/{}/{}/{}/{}", host, Encoded(&*repo.owner), Encoded(&*repo.repo), Encoded::str(package))
+                format!("/install/{host}/{}/{}/{}", Encoded(&*repo.owner), Encoded(&*repo.repo), Encoded::str(package))
             }
         }
     }
@@ -173,12 +173,12 @@ impl Urler {
             })
         } else if let Some(ref info) = author.info {
             if let Some(ref em) = info.email {
-                Some(format!("mailto:{}", em)) // add name? encode?
+                Some(format!("mailto:{em}")) // add name? encode?
             } else if let Some(ref url) = info.url {
                 if url.starts_with("http://") || url.starts_with("https://") || url.starts_with("mailto:") {
                     Some(url.to_owned())
                 } else {
-                    println!("bad info url: {:?}", author);
+                    println!("bad info url: {author:?}");
                     None
                 }
             } else {

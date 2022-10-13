@@ -21,7 +21,7 @@ async fn main() -> Result<(), GHError> {
     let mut users = gh.get().path("users").send().await?.array::<User>();
 
     while let Some(Ok(user)) = users.next().await {
-        println!("User! {:#?}", user);
+        println!("User! {user:#?}");
     }
     Ok(())
 }

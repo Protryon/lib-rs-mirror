@@ -57,7 +57,7 @@ fn parse_package_id(id: Option<&str>) -> Option<(String, SemVer)> {
     Some((name, ver))
 }
 
-const RUSTC_FEATURES_STABLE_SINCE: [(u16, &str); 516] = [
+const RUSTC_FEATURES_STABLE_SINCE: &[(u16, &str)] = &[
 // rg  --no-filename -o '\[stable\(feature.*\]' library/ | fgrep 1. | sort -u | sed -E 's/.*feature ?= ?"(.+)", since ?= ?"1\.(..+)\..".*/(\2, "\1"),/' | sort -V | pbcopy
 
 (17, "addr_from_into_ip"),

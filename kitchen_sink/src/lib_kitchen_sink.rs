@@ -2659,7 +2659,7 @@ impl KitchenSink {
                                     let _ = db.set_compat(all.origin(), &crate_ver, dep_newest_bad, Compat::BrokenDepsLikely, &reason);
                                 }
                             }
-                        } else if dependency_affects_msrv {
+                        } else if dependency_affects_msrv && best_compat >= 45 {
                             // keep track of this only if it's not reflected in `BrokenDeps` (i.e. happens sometimes, not always)
                             c.requires_dependency_version(dep_origin.short_crate_name(), dep_found_ver.clone(), best_compat);
                         }

@@ -36,7 +36,7 @@ RUN rustup set profile minimal
 
 const TEMP_JUNK_DIR: &str = "/var/tmp/crates_env";
 
-const RUST_VERSIONS: [RustcMinorVersion; 14] = [
+const RUST_VERSIONS: [RustcMinorVersion; 15] = [
     61,
     60,
     59,
@@ -51,6 +51,7 @@ const RUST_VERSIONS: [RustcMinorVersion; 14] = [
     38,
     32,
     63,
+    30,
 ];
 
 use crate_db::builddb::*;
@@ -560,9 +561,9 @@ fn do_builds(docker_root: &Path, versions: &[CrateToRun]) -> Result<(String, Str
         .arg("-e").arg("CARGO_INCREMENTAL=0")
         // .arg("-e").arg("CARGO_UNSTABLE_AVOID_DEV_DEPS=true") // breaks --locked
         .arg("-e").arg("CARGO_UNSTABLE_BINDEPS=true")
-        .arg("-e").arg("CARGO_BUILD_JOBS=3")
-        .arg("-m3000m")
-        .arg("--cpus=3")
+        .arg("-e").arg("CARGO_BUILD_JOBS=2")
+        .arg("-m2500m")
+        .arg("--cpus=2")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

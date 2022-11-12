@@ -3797,8 +3797,25 @@ pub struct Rustacean {
     pub reddit: Option<String>,
     /// username on Twitter, including the @.
     pub twitter: Option<String>,
+    /// username on Mastodon, including the @.
+    pub mastodon: Option<String>,
     /// any notes you lik
     pub notes: Option<String>,
+}
+
+impl Rustacean {
+    /// URL, label
+    pub fn mastodon(&self) -> Option<(String, &str)> {
+        let handle = self.mastodon.as_ref()?.trim();
+        let mut parts = handle.trim_start_matches('@').splitn(2, '@');
+        let username = parts.next()?;
+        let host = parts.next()?;
+        Some((format!("https://{host}/@{username}"), handle))
+    }
+
+    pub fn twitter(&self) -> Option<&str> {
+        Some(self.twitter.as_deref().filter(|t| !t.is_empty())?.trim_start_matches('@'))
+    }
 }
 
 #[derive(Debug, Clone)]

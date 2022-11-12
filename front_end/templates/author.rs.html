@@ -55,10 +55,13 @@
         <li><a href="@url" rel="ugc nofollow" >@label</a></li>
       }
       @if let Some((url, label)) = p.twitter_link() {
-        <li><a href="@url" rel="ugc nofollow" >Twitter (@label)</a></li>
+        <li><a href="@url" rel="ugc nofollow">Muskverse (@label)</a></li>
+      }
+      @if let Some((url, label)) = p.mastodon_link() {
+        <li><a href="@url" rel="ugc nofollow">@label</a></li>
       }
       @if let Some((url, label)) = p.forum_link() {
-        <li><a href="@url" rel="ugc nofollow" >Forum (@label)</a></li>
+        <li><a href="@url" rel="ugc nofollow">Forum (@label)</a></li>
       }
       @if p.founder_total != 0 || p.member_total != 0 {
         <li><a rel="nofollow" href="@url.crates_io_user_maintainer_dashboard_by_github_login(&p.aut.github.login)">Maintainer dashboard</a></li>

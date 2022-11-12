@@ -32,6 +32,10 @@ impl UserDb {
     }
 
     pub fn user_by_github_login(&self, login: &str) -> Result<Option<User>> {
+        self.user_by_github_login_opt(login, false)
+    }
+
+    pub fn user_by_github_login_opt(&self, login: &str, allow_stale: bool) -> Result<Option<User>> {
         let res = self.user_by_query(r"SELECT
                 u.id,
                 u.login,
@@ -50,7 +54,7 @@ impl UserDb {
             ORDER BY u.fetched_timestamp DESC, u.created_at DESC
             LIMIT 1", &login.to_ascii_lowercase());
         Ok(if let Some((fetched_at, user)) = res? {
-            if fetched_at + 3600*24*31 > SystemTime::UNIX_EPOCH.elapsed().unwrap().as_secs() {
+            if allow_stale || fetched_at + 3600*24*31 > SystemTime::UNIX_EPOCH.elapsed().unwrap().as_secs() {
                 Some(user)
             } else {
                 info!("ignoring stale gh user data for {}", user.login);
@@ -111,7 +115,8 @@ impl UserDb {
         if let Some(rest) = email.strip_suffix(std_suffix) {
             if let Some(id) = rest.split('+').next().and_then(|id| id.parse().ok()) {
                 if let Ok(login) = self.login_by_github_id(id) {
-                    return self.user_by_github_login(&login);
+                    // don't lose reliable association only because other metadata is stale
+                    return self.user_by_github_login_opt(&login, true);
                 }
             }
         }

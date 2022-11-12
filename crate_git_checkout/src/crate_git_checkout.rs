@@ -384,7 +384,7 @@ pub fn find_readme(repo: &Repository, package: &Package) -> Result<Option<(Strin
 /// Check if given filename is a README. If `package` is missing, guess.
 fn is_readme_filename(path: &Path, package: Option<&Package>) -> bool {
     path.to_str().map_or(false, |s| {
-        if let Some(OptionalFile::Path(r)) = package.map(|p| p.readme()) {
+        if let Some(r) = package.map(|p| p.readme()).and_then(|p| p.as_path()).and_then(|p| p.to_str()) {
             let r = r.trim_start_matches('.').trim_start_matches('/'); // hacky hack for ../readme
             r.eq_ignore_ascii_case(s) // crates published on Mac have this
         } else {

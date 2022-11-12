@@ -265,7 +265,7 @@
                   }
                 } else {
                   @if let Some(filename) = c.ver.license_file() {
-                    <b title="@filename">Custom license</b>
+                    <b title="@filename.display()">Custom license</b>
                   }
                 }
                 @if let Some(ref vir) = c.viral_license {

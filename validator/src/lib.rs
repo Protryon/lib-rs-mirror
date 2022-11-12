@@ -104,7 +104,7 @@ pub async fn warnings_for_crate(c: &KitchenSink, k: &RichCrateVersion, all: &Ric
         warnings.insert(Warning::SysNoLinks);
     }
 
-    if let Some(readme_raw_path) = k.readme_raw_path() {
+    if let Some(readme_raw_path) = k.readme_raw_path().and_then(|p| p.to_str()) {
         if readme_raw_path.starts_with("..") || readme_raw_path.starts_with('/') {
             warnings.insert(Warning::EscapingReadmePath(readme_raw_path.into()));
         }

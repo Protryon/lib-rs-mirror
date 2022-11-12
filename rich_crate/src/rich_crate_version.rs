@@ -1,3 +1,4 @@
+use std::path::Path;
 use crate::Author;
 use crate::Markup;
 use crate::Origin;
@@ -99,7 +100,7 @@ impl RichCrateVersion {
         })
     }
 
-    pub fn license_file(&self) -> Option<&str> {
+    pub fn license_file(&self) -> Option<&Path> {
         self.package().license_file()
     }
 
@@ -160,8 +161,8 @@ impl RichCrateVersion {
         self.derived.readme.as_ref()
     }
 
-    pub fn readme_raw_path(&self) -> Option<&str> {
-        self.package().readme().as_ref()
+    pub fn readme_raw_path(&self) -> Option<&Path> {
+        self.package().readme().as_path()
     }
 
     /// Contents of the `src/lib.rs` from the crate, if available

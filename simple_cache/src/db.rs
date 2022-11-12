@@ -100,10 +100,8 @@ impl SimpleCache {
 
     fn connect(&self) -> Result<Connection, rusqlite::Error> {
         let conn = Connection::open(&self.url)?;
-        conn.execute_batch(
-            "
+        conn.execute_batch("
             CREATE TABLE IF NOT EXISTS cache2 (key TEXT NOT NULL PRIMARY KEY, ver TEXT NOT NULL, data BLOB NOT NULL);
-            PRAGMA synchronous = 0;
             PRAGMA JOURNAL_MODE = WAL;
             PRAGMA read_uncommitted;",
         )?;

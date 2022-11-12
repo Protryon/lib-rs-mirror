@@ -74,8 +74,7 @@ impl CrateDb {
             COMMIT;"#)?;
         conn.execute_batch("
             PRAGMA cache_size = 500000;
-            PRAGMA threads = 4;
-            PRAGMA synchronous = 0;")?;
+            PRAGMA threads = 4;")?;
         Ok(conn)
     }
 }

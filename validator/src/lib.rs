@@ -110,8 +110,11 @@ pub async fn warnings_for_crate(c: &KitchenSink, k: &RichCrateVersion, all: &Ric
         }
     }
 
-    let verified_msrv = c.rustc_compatibility(all).await?.values().rev().filter_map(|c| c.newest_bad_certain()).next().unwrap_or(0);
-    let displayed_msrv = c.rustc_compatibility(all).await?.values().rev().filter_map(|c| c.newest_bad()).next().unwrap_or(0);
+    let compat = c.rustc_compatibility(all).await?;
+    let newest_bad = compat.values().rev().filter_map(|c| c.newest_bad_certain()).next().unwrap_or(0); // serde is an odd one with too-old-to-fail msrv
+    let oldest_ok = compat.values().rev().filter_map(|c| c.oldest_ok_certain()).next().unwrap_or(999);
+    let verified_msrv = newest_bad.min(oldest_ok);
+    let displayed_msrv = compat.values().rev().filter_map(|c| c.newest_bad()).next().unwrap_or(0);
 
     // if it's not compatible with the old compiler, there's no point using an old-compiler edition
     if (verified_msrv >= 55 && k.edition() < Edition::E2021) || (verified_msrv >= 30 && k.edition() < Edition::E2018) {

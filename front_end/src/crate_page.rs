@@ -113,8 +113,8 @@ struct ReleaseCounts {
 }
 
 pub(crate) struct Contributors<'a> {
-    pub authors: Vec<CrateAuthor<'a>>,
-    pub owners: Vec<CrateAuthor<'a>>,
+    pub authors: &'a [CrateAuthor<'a>],
+    pub owners: &'a [CrateAuthor<'a>],
     pub co_owned: bool,
     pub contributors: usize,
     pub period_after_authors: bool,
@@ -338,7 +338,7 @@ impl<'a> CratePage<'a> {
         let co_owned = authors.iter().any(|a| a.owner);
         let period_after_authors = !owners.is_empty() && contributors == 0;
         let contributors_as_a_team = authors.last().map_or(false, |last| last.is_a_team);
-        Contributors { authors: authors.clone(), owners: owners.clone(), co_owned, contributors, contributors_as_a_team, period_after_authors }
+        Contributors { authors, owners, co_owned, contributors, contributors_as_a_team, period_after_authors }
     }
 
     pub fn format_number(&self, num: impl Display) -> String {

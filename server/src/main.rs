@@ -675,7 +675,6 @@ async fn handle_install(req: HttpRequest) -> Result<HttpResponse, ServerError> {
 
 async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let login = req.match_info().query("author");
-    debug!("author page for {:?}", login);
     let state: &AServerState = req.app_data().expect("appdata");
 
     let aut = match rt_run_timeout(&state.rt, "aut1", 5, {
@@ -689,6 +688,7 @@ async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
             return render_404_page(state, login, "user").await;
         }
     };
+    debug!("author page for {login:?}", );
     if aut.github.login != login && aut.github.login.to_ascii_uppercase() != login { // FIXME: for transition lowercase urls are allowed
         return Ok(HttpResponse::PermanentRedirect().insert_header(("Location", format!("/~{}", Encoded(&aut.github.login)))).body(""));
     }
@@ -696,6 +696,7 @@ async fn handle_author(req: HttpRequest) -> Result<HttpResponse, ServerError> {
     let aut2 = aut.clone();
     let rows = rt_run_timeout(&state.rt, "authorpage1", 60, async move { crates.crates_of_author(&aut2).await }).await?;
     if rows.is_empty() {
+        debug!("author {login:?} has 0 crates");
         return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", format!("https://github.com/{}", Encoded(&aut.github.login)))).body(""));
     }
     Ok(serve_page(

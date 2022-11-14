@@ -3835,6 +3835,25 @@ pub struct CrateAuthor<'a> {
 }
 
 impl<'a> CrateAuthor<'a> {
+    pub fn trusted_name(&self) -> &str {
+        if let Some(gh) = &self.github {
+            if let Some(created_at) = gh.created_at.as_deref() {
+                if let Ok(created) = DateTime::parse_from_rfc3339(created_at) {
+                    let created = created.date().with_timezone(&Utc);
+                    let today = Utc::today();
+                    if today.signed_duration_since(created).num_days() > 365*2 {
+                        return self.name();
+                    }
+                }
+            }
+            debug!("{} account is too new to display name {}", gh.login, self.name());
+            &gh.login
+        } else {
+            // in practice we don't show non-GH authors any more
+            self.name()
+        }
+    }
+
     pub fn name(&self) -> &str {
         if let Some(name) = self.github.as_ref().and_then(|g| g.name.as_deref()) {
             if !name.trim_start().is_empty() {

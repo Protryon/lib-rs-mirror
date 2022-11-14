@@ -99,7 +99,7 @@
         @for (last, a) in authors.iter().identify_last() {
           @if let Some(url) = url.author(a) {
             <a href="@url" @if a.owner {class="owner" title="owner"} else {class="contributor" title="contributor"}
-              property="author" typeof="Person"><span property="name">@a.name()</span></a>@if !last {,} else {@if period_after_authors {.}}
+              property="author" typeof="Person"><span property="name">@a.trusted_name()</span></a>@if !last {,} else {@if period_after_authors {.}}
           } else {
             @a.name()@if !last {,} else {@if period_after_authors {.}}
           }

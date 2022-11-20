@@ -1,5 +1,4 @@
 use cargo_toml::Manifest;
-use cargo_toml::OptionalFile;
 use cargo_toml::Package;
 use libflate::gzip::Decoder;
 use render_readme::Markup;

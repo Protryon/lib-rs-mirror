@@ -1,5 +1,4 @@
 use crate::iter::HistoryIter;
-use cargo_toml::OptionalFile;
 use cargo_toml::{Manifest, Package};
 
 use git2::build::RepoBuilder;

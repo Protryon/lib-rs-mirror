@@ -4,6 +4,7 @@
 @use crate::templates::author_list;
 @use crate::templates::base;
 @use crate::Urler;
+@use kitchen_sink::ABlockReason;
 
 @(url: &Urler, p: &AuthorPage)
 
@@ -27,7 +28,6 @@
           <a href="@url.keyword(key)" class=keyword><span>#</span>@key</a>
         }
       </span>
-
     </div>
 
     <h2>
@@ -71,12 +71,22 @@
   </header>
   <main>
     <div class="inner-col">
-      @if let Some(reason) = p.shitlist_reason {
+      @if let Some(reason) = p.blocklist_reason {
         <section>
-          <h3>⛔️ Banned user ⛔️</h3>
-          <p>This user has been banned from lib.rs. Reason: <i>@reason</i>.</p>
-          <hr>
-          <p>If you're the banned user, you can appeal by opening an issue in <a href="https://gitlab.com/crates.rs/crates.rs">the project repo</a>.</p>
+        @if let ABlockReason::Banned(reason) = reason {
+            <h3>⛔️ Banned user ⛔️</h3>
+            <p>This user has been banned from lib.rs. Reason: <i>@reason</i>.</p>
+            <hr>
+            <p>If you're the banned user, you can appeal by opening an issue in <a href="https://gitlab.com/crates.rs/crates.rs">the project repo</a>.</p>
+        }
+        @if let ABlockReason::Hidden(reason, url) = reason {
+          <aside>
+            <h3>This page has been removed</h3>
+            <blockquote>@reason@if let Some(url) = url {<a href="@url">*</a>}</blockquote>
+            <hr>
+            <p><a href="https://crates.io/users/@p.aut.github.login">See the profile on crates.io</a></p>
+          <aside>
+        }
         </section>
       } else {
         @if !p.orgs.is_empty() {

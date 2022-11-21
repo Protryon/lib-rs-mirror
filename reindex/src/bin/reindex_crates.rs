@@ -1,4 +1,5 @@
 use ahash::HashSetExt;
+use kitchen_sink::ABlockReason;
 use kitchen_sink::CrateOwners;
 use kitchen_sink::SemVer;
 use anyhow::anyhow;
@@ -240,14 +241,15 @@ impl Reindexer {
     async fn crate_overall_score(&self, all: &RichCrate, k: &RichCrateVersion, renderer: &Renderer) -> Result<(usize, f64), anyhow::Error> {
         let crates = &self.crates;
 
-        let (traction_stats, downloads_per_month, has_docs_rs, has_verified_repository_link, is_on_shitlist, deps_stats) = futures::join!(
+        let (traction_stats, downloads_per_month, has_docs_rs, has_verified_repository_link, blocklist_reasons, deps_stats) = futures::join!(
             run_timeout("ts", 10, crates.traction_stats(all.origin())),
             run_timeout("dl", 10, crates.downloads_per_month_or_equivalent(all.origin())),
             crates.has_docs_rs(k.origin(), k.short_name(), k.version()),
             crates.has_verified_repository_link(k),
-            crates.is_crate_on_shitlist(all),
+            crates.crate_blocklist_reasons(all),
             run_timeout("depstats", 20, crates.crates_io_dependents_stats_of(k.origin())),
         );
+        let is_banned = blocklist_reasons.1.iter().any(|b| matches!(b, ABlockReason::Banned {..}));
         let traction_stats = traction_stats?;
         let deps_stats = deps_stats?;
         let downloads_per_month = downloads_per_month?.unwrap_or(0) as u32;
@@ -387,7 +389,7 @@ impl Reindexer {
             is_deprecated,
             is_crates_io_published: k.origin().is_crates_io(),
             is_yanked: k.is_yanked(),
-            is_squatspam: is_squatspam(k) || is_on_shitlist,
+            is_squatspam: is_squatspam(k) || is_banned,
             is_unwanted_category: k.category_slugs().iter().any(|c| &**c == "cryptography::cryptocurrencies"),
         };
 

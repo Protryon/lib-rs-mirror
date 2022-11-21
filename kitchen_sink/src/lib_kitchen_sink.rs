@@ -4,6 +4,7 @@ extern crate serde_derive;
 #[macro_use]
 extern crate log;
 
+mod ablocklist;
 mod yearly;
 use crate_db::builddb::RustcMinorVersion;
 use crate_git_checkout::FoundManifest;
@@ -14,6 +15,7 @@ use futures::TryFutureExt;
 use tokio::task::block_in_place;
 use tokio::time::Instant;
 
+pub use crate::ablocklist::*;
 pub use crate::yearly::*;
 pub use deps_index::*;
 use futures::future::BoxFuture;
@@ -288,7 +290,7 @@ pub struct KitchenSink {
     crate_rustc_compat_db: OnceCell<BuildDb>,
     data_path: PathBuf,
     /// login -> reason
-    author_shitlist: HashMap<SmolStr, SmolStr>,
+    ablocklist: ABlockList,
     event_log: EventLog<SharedEvent>,
     is_deprecated_crate: TempCache<()>,
 }
@@ -359,7 +361,7 @@ impl KitchenSink {
             top_crates_cached: Mutex::new(FxHashMap::default()),
             yearly: AllDownloads::new(data_path),
             category_overrides: Self::load_category_overrides(&data_path.join("category_overrides.txt")).context("cat")?,
-            author_shitlist: Self::load_author_shitlist(&data_path.join("author_shitlist.txt"))?,
+            ablocklist: ABlockList::new(&data_path.join("ablocklist.csv"))?,
             crates_io_owners_cache: TempCache::new(&data_path.join("cio-owners.tmp"), Duration::from_secs(3600*24*14)).context("tmp1")?,
             depender_changes: TempCache::new(&data_path.join("deps-changes3.tmp"), Duration::ZERO).context("tmp2")?,
             stats_histograms: TempCache::new(&data_path.join("stats-histograms.tmp"), Duration::from_secs(3600*24*31*3)).context("tmp3")?,
@@ -409,26 +411,6 @@ impl KitchenSink {
         &self.data_path
     }
 
-    fn load_author_shitlist(path: &Path) -> CResult<HashMap<SmolStr, SmolStr>> {
-        let p = std::fs::read_to_string(path)?;
-        let mut out = HashMap::with_capacity(10);
-        for line in p.lines() {
-            if line.starts_with('#') {
-                continue;
-            }
-            let mut parts = line.splitn(2, ':');
-            let login = parts.next().unwrap().trim();
-            if login.is_empty() {
-                continue;
-            }
-            let reason = parts.next().expect("shitlist broken").trim();
-            let mut login = SmolStr::from(login);
-            login.make_ascii_lowercase();
-            out.insert(login, reason.into());
-        }
-        Ok(out)
-    }
-
     fn load_category_overrides(path: &Path) -> CResult<HashMap<SmolStr, Vec<SmolStr>>> {
         let p = std::fs::read_to_string(path)?;
         let mut out = HashMap::new();
@@ -449,24 +431,30 @@ impl KitchenSink {
         Ok(out)
     }
 
-    pub fn is_crates_io_login_on_shitlist(&self, login: &str) -> Option<&str> {
-        self.author_shitlist.get(login.to_ascii_lowercase().as_str()).map(|s| s.as_str())
+    pub fn crates_io_login_on_blocklist(&self, login: &str) -> Option<&ABlockReason> {
+        self.ablocklist.get(login)
     }
 
-    pub async fn is_crate_on_shitlist(&self, k: &RichCrate) -> bool {
+    pub async fn crate_blocklist_reasons(&self, k: &RichCrate) -> (bool, Vec<&ABlockReason>) {
         let owners = match self.crate_owners(k.origin(), CrateOwners::All).await {
             Ok(o) => o,
             Err(e) => {
                 warn!("can't check owners of {:?}: {e}", k.origin());
-                return false
+                vec![]
             },
         };
-        owners.iter()
+        let mut all = true;
+        let out = owners.into_iter()
             // some crates are co-owned by both legit and banned owners,
-            // so banning by "any" would interfere with legit users' usage :(
-            .all(|owner| {
-                self.is_crates_io_login_on_shitlist(&owner.crates_io_login).is_some()
-            })
+            // so banning by "any" would interfere with legit users' usage,
+            .filter_map(|owner| {
+                let r = self.crates_io_login_on_blocklist(&owner.crates_io_login);
+                if r.is_none() {
+                    all = false;
+                }
+                r
+            }).collect();
+        (all, out)
     }
 
     /// Don't make requests to crates.io
@@ -2810,8 +2798,8 @@ impl KitchenSink {
     /// (common, out of how many). A is considered more important, b is matched against it.
     async fn common_real_owners(&self, a: &Origin, b: &Origin) -> CResult<(usize, usize)> {
         let (a_owners, b_owners) = futures::try_join!(self.crate_owners(a, CrateOwners::Strict), self.crate_owners(b, CrateOwners::Strict))?;
-        let a_owners: HashSet<_> = a_owners.into_iter().filter(|o| self.is_crates_io_login_on_shitlist(&o.crates_io_login).is_none()).filter_map(|o| o.github_id).collect();
-        let b_owners: HashSet<_> = b_owners.into_iter().filter(|o| self.is_crates_io_login_on_shitlist(&o.crates_io_login).is_none()).filter_map(|o| o.github_id).collect();
+        let a_owners: HashSet<_> = a_owners.into_iter().filter(|o| self.crates_io_login_on_blocklist(&o.crates_io_login).is_none()).filter_map(|o| o.github_id).collect();
+        let b_owners: HashSet<_> = b_owners.into_iter().filter(|o| self.crates_io_login_on_blocklist(&o.crates_io_login).is_none()).filter_map(|o| o.github_id).collect();
         let max = a_owners.len();
         let common_owners = a_owners.intersection(&b_owners).count();
         Ok((common_owners, max))

@@ -12,6 +12,7 @@ use chrono::prelude::*;
 use chrono::Duration;
 use futures::future::Future;
 use futures::stream::StreamExt;
+use kitchen_sink::ABlockReason;
 use kitchen_sink::ArcRichCrateVersion;
 use kitchen_sink::CResult;
 use kitchen_sink::CrateAuthor;
@@ -78,8 +79,9 @@ pub struct CratePage<'a> {
     parent_crate: Option<ArcRichCrateVersion>,
     downloads_per_month_or_equivalent: Option<usize>,
     pub(crate) top_versions: Vec<VersionGroup<'a>>,
-    pub has_reviews: bool,
-    pub is_on_shitlist: bool,
+    pub(crate) has_reviews: bool,
+    pub(crate) banned: Vec<&'a ABlockReason>,
+    pub(crate) hidden: Vec<&'a ABlockReason>,
     pub security_advisory_url: Option<String>,
     has_verified_repository_link: bool,
 }
@@ -156,7 +158,10 @@ impl<'a> CratePage<'a> {
 
         let deps = kitchen_sink.all_dependencies_flattened(ver);
         let has_docs_rs = kitchen_sink.has_docs_rs(ver.origin(), ver.short_name(), ver.version()).await;
-        let is_on_shitlist = kitchen_sink.is_crate_on_shitlist(all).await;
+        let (all_owners, reasons) = kitchen_sink.crate_blocklist_reasons(all).await;
+        // with multiple owners it's unclear who is the main owner in charge of the crate
+        let (banned, hidden) = all_owners.then(|| reasons.into_iter().partition(|r| matches!(r, ABlockReason::Banned(_)))).unwrap_or_default();
+
         let api_reference_url = if has_docs_rs {
             Some(format!("https://docs.rs/{}", ver.short_name()))
         } else {
@@ -186,7 +191,7 @@ impl<'a> CratePage<'a> {
             parent_crate,
             downloads_per_month_or_equivalent,
             has_reviews,
-            is_on_shitlist,
+            banned, hidden,
             top_versions: Vec::new(),
             has_verified_repository_link,
         };
@@ -211,7 +216,7 @@ impl<'a> CratePage<'a> {
             item_description: self.ver.description().map(|d| d.to_string()),
             alternate: url.crates_io_crate(self.ver.origin()),
             canonical: Some(format!("https://lib.rs{}", url.crate_abs_path_by_origin(self.ver.origin()))),
-            noindex: self.ver.is_yanked() || self.is_on_shitlist,
+            noindex: self.ver.is_yanked() || !self.banned.is_empty() || !self.hidden.is_empty(),
             search_meta: false,
             ..Default::default()
         }

@@ -1,4 +1,5 @@
 use ahash::HashMapExt;
+use kitchen_sink::ABlockReason;
 use crate::templates;
 use crate::url_domain;
 use crate::Page;
@@ -44,7 +45,7 @@ pub struct AuthorPage<'a> {
     pub(crate) collab: Vec<User>,
     pub(crate) rustacean: Option<Rustacean>,
     // If Some, it's banned
-    pub(crate) shitlist_reason: Option<&'a str>,
+    pub(crate) blocklist_reason: Option<&'a ABlockReason>,
     pub(crate) two_factor_authentication: Option<bool>,
 }
 
@@ -119,7 +120,7 @@ impl<'a> AuthorPage<'a> {
             kitchen_sink.user_by_github_login(login).await.map_err(|e| eprintln!("{login}: {e}")).ok().and_then(|x| x)
         })).await.into_iter().flatten().collect();
 
-        let shitlist_reason = kitchen_sink.is_crates_io_login_on_shitlist(&aut.github.login);
+        let blocklist_reason = kitchen_sink.crates_io_login_on_blocklist(&aut.github.login);
 
         Ok(Self {
             founder_crates, member_crates,
@@ -131,7 +132,7 @@ impl<'a> AuthorPage<'a> {
             keywords,
             collab,
             rustacean,
-            shitlist_reason,
+            blocklist_reason,
             two_factor_authentication: aut.github.two_factor_authentication,
         })
     }
@@ -239,7 +240,7 @@ impl<'a> AuthorPage<'a> {
             title: format!("@{}'s Rust crates", self.login()),
             critical_css_data: Some(include_str!("../../style/public/author.css")),
             critical_css_dev_url: Some("/author.css"),
-            noindex: self.joined.is_none() || self.shitlist_reason.is_some(),
+            noindex: self.joined.is_none() || self.blocklist_reason.is_some(),
             ..Default::default()
         }
     }

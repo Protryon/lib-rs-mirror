@@ -12,12 +12,13 @@
 @use rich_crate::MaintenanceStatus;
 @use std::ops::Div;
 @use udedokei::LanguageExt;
+@use kitchen_sink::ABlockReason;
 
 @(url: &Urler, c: &CratePage)
 
 @:base(&c.page(url), {
   <div typeof="SoftwareApplication">
-  <header id="package" @if c.ver.is_yanked() || c.is_on_shitlist {class="yanked"} else {@if c.ver.is_nightly() {class="nightly"}}>
+  <header id="package" @if c.ver.is_yanked() || !c.banned.is_empty() {class="yanked"} else {@if c.ver.is_nightly() {class="nightly"}}>
     <div class="inner-col">
     <div class="breadcrumbs" typeof="BreadcrumbList">
     <h1>
@@ -83,13 +84,14 @@
       </span>
 
     </h2>
-    @if !c.is_on_shitlist {
+    @if c.banned.is_empty() && c.hidden.is_empty() {
       @if let Some(desc) = c.ver.description() {
         @if !c.has_no_readme_or_lib() {
           <p class=desc>@c.render_maybe_markdown_str(desc)</p>
         }
       }
     }
+    @if c.hidden.is_empty() {
     <p class=byline>
       @if let Some(Contributors {authors, owners, co_owned, contributors, period_after_authors, contributors_as_a_team}) = Some(c.all_contributors()) {
         @if c.ver.is_yanked() {
@@ -127,19 +129,20 @@
         }
       }
     </p>
+    }
     <nav><ul>
       @if !c.ver.is_yanked() {
         @if c.has_reviews {
           <li><a class="button" href="@url.reviews(c.ver.origin())">Audit</a></li>
         }
-        @if !c.is_on_shitlist {
+        @if c.banned.is_empty() {
           <li><a class="button" href="@url.install(c.ver.origin())">@if c.has_reviews {Installation} else {Install}</a></li>
           @if let Some(doc) = c.api_reference_url() {
             <li><a href="@doc">API reference</a></li>
           }
         }
       }
-      @if !c.is_on_shitlist {
+      @if c.banned.is_empty() {
         @for (url, label) in c.repository_links(url) {
           <li><a href="@url" @if c.homepage_link().is_none() {property="url"}>@label</a></li>
         }
@@ -155,7 +158,7 @@
   </header>
   <main>
     <div class="inner-col">
-      @if !c.is_on_shitlist {
+      @if c.banned.is_empty() && c.hidden.is_empty() {
       <section id="readme-deps">
         <div>
           <section class="about-crate">
@@ -196,7 +199,7 @@
 
             <section id="downloads">
               @if let Some(url) = &c.security_advisory_url {
-                <p><a href="@url">⚠️ Vulnerability reported</a></p>
+                <p><a href="@url">⚠️ Issues reported</a></p>
               }
 
               @if let Some((top, cat)) = c.top_category() {
@@ -429,7 +432,22 @@
         </section>
       </section>
       } else {
-        <p>⛔️ Owner of this crate is banned from lib.rs ⛔️</p>
+        <aside>
+        @for r in c.banned.iter().chain(&c.hidden) {
+          @if let ABlockReason::Banned(reason) = r {
+            <h3>⛔️ This crate has been removed ⛔️</h3>
+            <p>Owner of this crate is banned from lib.rs: <i>@reason</i></p>
+          }
+          @if let ABlockReason::Hidden(reason, rurl) = r {
+            <h3>This page has been removed</h3>
+            <blockquote>@reason@if let Some(rurl) = rurl {<a rel="noindex nofollow" href="@rurl">*</a>}</blockquote>
+            @if let Some(url) = url.crates_io_crate(c.ver.origin()) {
+              <hr>
+              <p><a href="@url">See this crate on crates.io</a></p>
+            }
+          }
+        }
+        </aside>
       }
     </div>
   </main>

@@ -763,7 +763,7 @@ async fn handle_maintainer_dashboard(req: HttpRequest, atom_feed: bool) -> Resul
     }
 
     let crates = state.crates.load();
-    if crates.is_crates_io_login_on_shitlist(login).is_some() {
+    if crates.crates_io_login_on_blocklist(login).is_some() {
         return Ok(HttpResponse::TemporaryRedirect().insert_header(("Location", format!("/~{}", Encoded(&aut.github.login)))).body(""));
     }
 

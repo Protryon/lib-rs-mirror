@@ -390,7 +390,8 @@ impl Reindexer {
             is_crates_io_published: k.origin().is_crates_io(),
             is_yanked: k.is_yanked(),
             is_squatspam: is_squatspam(k) || is_banned,
-            is_unwanted_category: k.category_slugs().iter().any(|c| &**c == "cryptography::cryptocurrencies"),
+            // Check out https://web3isgoinggreat.com
+            is_vaporware_or_ponzi_scheme: k.category_slugs().iter().any(|c| &**c == "cryptography::cryptocurrencies"),
         };
 
         debug!("score {base_score:?} {temp_score:?} {overall:?}");

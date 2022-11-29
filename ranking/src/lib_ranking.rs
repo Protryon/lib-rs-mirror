@@ -405,7 +405,7 @@ pub struct OverallScoreInputs {
     pub is_crates_io_published: bool,
     pub is_yanked: bool,
     pub is_squatspam: bool,
-    pub is_unwanted_category: bool,
+    pub is_vaporware_or_ponzi_scheme: bool,
 }
 
 pub fn combined_score(base_score: Score, temp_score: Score, f: &OverallScoreInputs) -> f64 {
@@ -437,7 +437,10 @@ pub fn combined_score(base_score: Score, temp_score: Score, f: &OverallScoreInpu
         score *= 0.2;
     }
 
-    if f.is_unwanted_category {
+    // Cryptocurrencies use technology to obscure that they are modern versions of pump and dump scams,
+    // ponzi schemes, investment fraud, unregulated gambling, and large-scale money laundering.
+    // The promises are empty. The real effects are proliferation of ransomware and other criminal activity
+    if f.is_vaporware_or_ponzi_scheme {
         score *= 0.4;
     }
 

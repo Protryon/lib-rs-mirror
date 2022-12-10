@@ -576,6 +576,18 @@ const RUSTC_FEATURES_STABLE_SINCE: &[(u16, &str)] = &[
 (64, "ready_macro"),
 (64, "tcp_listener_incoming_fused_iterator"),
 (64, "windows_file_type_ext"),
+(65, "backtrace"),
+(65, "bound_as_ref_shared"),
+(65, "io_read_to_string"),
+(65, "io_safety_wasi"),
+(65, "ptr_const_cast"),
+(66, "bench_black_box"),
+(66, "boxed_array_try_from_vec"),
+(66, "duration_checked_float"),
+(66, "map_first_last"),
+(66, "mixed_integer_ops"),
+(66, "proc_macro_source_text"),
+(66, "unzip_option"),
 ];
 
 fn parse_analysis(stdout: &str, stderr: &str) -> Result<Findings, String> {

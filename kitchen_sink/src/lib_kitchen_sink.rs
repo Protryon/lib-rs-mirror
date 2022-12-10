@@ -3800,10 +3800,6 @@ impl Rustacean {
         let host = parts.next()?;
         Some((format!("https://{host}/@{username}"), handle))
     }
-
-    pub fn twitter(&self) -> Option<&str> {
-        Some(self.twitter.as_deref().filter(|t| !t.is_empty())?.trim_start_matches('@'))
-    }
 }
 
 #[derive(Debug, Clone)]

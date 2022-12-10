@@ -166,11 +166,6 @@ impl<'a> AuthorPage<'a> {
         self.rustacean.as_ref().and_then(|r| r.name.as_deref())
     }
 
-    pub fn twitter_link(&self) -> Option<(String, &str)> {
-        let t = self.rustacean.as_ref()?.twitter()?;
-        Some((format!("https://twitter.com/{t}"), t))
-    }
-
     pub fn mastodon_link(&self) -> Option<(String, &str)> {
         self.rustacean.as_ref()?.mastodon()
     }

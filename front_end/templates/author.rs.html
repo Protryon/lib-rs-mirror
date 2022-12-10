@@ -54,9 +54,6 @@
       @if let Some((url, label)) = p.homepage_link() {
         <li><a href="@url" rel="ugc nofollow" >@label</a></li>
       }
-      @if let Some((url, label)) = p.twitter_link() {
-        <li><a href="@url" rel="ugc nofollow">Muskverse (@label)</a></li>
-      }
       @if let Some((url, label)) = p.mastodon_link() {
         <li><a href="@url" rel="ugc nofollow">@label</a></li>
       }

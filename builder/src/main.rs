@@ -257,6 +257,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) -> Result<Vec<ToCheck>, Box<dyn std::error::Error>> {
     let crate_name: Arc<str> = all.name().into();
     let origin = &Origin::from_crates_io_name(&crate_name);
+    let mut rng = rand::thread_rng();
+
+    let popularity_factor = crates.crate_ranking_for_builder(origin).await.unwrap_or(0.3);
+    if popularity_factor < rng.gen_range(0.15..0.33) {
+        return Ok(vec![]);
+    }
+
     let krate = crates.rich_crate_async(origin).await?;
 
     let min_relevant_rustc = RUST_VERSIONS.iter().copied().min().unwrap_or_default()
@@ -266,7 +273,6 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
 
     let has_anything_built_ok_yet = compat_info.values().any(|c| c.has_ever_built());
 
-    let mut rng = rand::thread_rng();
     let mut candidates: Vec<_> = all.versions().iter().rev() // rev() starts from most recent
         .filter(|v| !v.is_yanked())
         .take(MAX_OLD_VERSIONS)
@@ -320,8 +326,7 @@ async fn find_versions_to_build(all: &CratesIndexCrate, crates: &KitchenSink) ->
         .collect();
 
 
-    let popularity_factor = if candidates.is_empty() { 0. } else { crates.crate_ranking_for_builder(origin).await.unwrap_or(0.3) };
-    if popularity_factor < 0.2 {
+    if candidates.is_empty()  {
         return Ok(vec![]);
     }
 

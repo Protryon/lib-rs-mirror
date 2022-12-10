@@ -29,7 +29,7 @@ assets = [
 
 [dependencies]
 actix-web = "4.2.1"
-env_logger = "0.9.1"
+env_logger = "0.10.0"
 log = "0.4.17"
 render_readme = { path = "../render_readme" }
 search_index = { path = "../search_index" }

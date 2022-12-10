@@ -18,8 +18,6 @@ pub struct UserDb {
 impl UserDb {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self> {
         let db = Self::db(path.as_ref())?;
-        db.execute_batch("
-            PRAGMA journal_mode = WAL;")?;
         Ok(Self {
             conn: Mutex::new(db),
         })

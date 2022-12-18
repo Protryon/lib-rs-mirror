@@ -84,6 +84,10 @@ pub struct CratePage<'a> {
     pub(crate) hidden: Vec<&'a ABlockReason>,
     pub security_advisory_url: Option<String>,
     has_verified_repository_link: bool,
+    downloads_per_month_cached: Option<usize>,
+    github_stargazers_and_watchers: Option<(u32, u32)>,
+    direct_dependencies: (Vec<RichDep>, Vec<RichDep>, Vec<RichDep>),
+    up_to_date_class_cache: HashMap<String, &'static str>,
 }
 
 /// Helper used to find most "interesting" versions
@@ -125,18 +129,19 @@ pub(crate) struct Contributors<'a> {
 
 impl<'a> CratePage<'a> {
     pub async fn new(all: &'a RichCrate, ver: &'a RichCrateVersion, kitchen_sink: &'a KitchenSink, markup: &'a Renderer) -> CResult<CratePage<'a>> {
+        let origin = all.origin();
         let (top_category, parent_crate, keywords_populated, (related_crates, ns_crates, downloads_per_month_or_equivalent), has_verified_repository_link) = futures::join!(
             kitchen_sink.top_category(ver),
             kitchen_sink.parent_crate(ver),
             kitchen_sink.keywords_populated(ver),
             async {
-                let downloads_per_month_or_equivalent = kitchen_sink.downloads_per_month_or_equivalent(ver.origin()).await.ok().and_then(|x| x);
+                let downloads_per_month_or_equivalent = kitchen_sink.downloads_per_month_or_equivalent(origin).await.ok().and_then(|x| x);
                 let (related_crates, ns_crates) = Self::make_related_crates(kitchen_sink, ver, downloads_per_month_or_equivalent).await;
                 (related_crates, ns_crates, downloads_per_month_or_equivalent)
             },
             kitchen_sink.has_verified_repository_link(ver),
         );
-        let advisories = kitchen_sink.advisories_for_crate(ver.origin());
+        let advisories = kitchen_sink.advisories_for_crate(origin);
         let semver: SemVer = ver.version().parse()?;
         let advisory = advisories.iter()
             .filter(|a| a.versions.is_vulnerable(&semver) && !a.withdrawn() && a.severity().is_some())
@@ -146,18 +151,22 @@ impl<'a> CratePage<'a> {
         let top_category = top_category
             .and_then(|(top, slug)| CATEGORIES.from_slug(slug).0.last().map(|&c| (top, c)));
 
-        let (is_build_or_dev, dependents_stats, traction_stats, top_keyword, all_contributors) = futures::try_join!(
-            async { Ok(kitchen_sink.is_build_or_dev(ver.origin()).await?) },
+        let (is_build_or_dev, dependents_stats, traction_stats, top_keyword, all_contributors, downloads_per_month_cached, github_stargazers_and_watchers) = futures::try_join!(
+            async { Ok(kitchen_sink.is_build_or_dev(origin).await?) },
             async {
-                Ok(kitchen_sink.crates_io_dependents_stats_of(all.origin()).await?)
+                Ok(kitchen_sink.crates_io_dependents_stats_of(origin).await?)
             },
-            kitchen_sink.traction_stats(all.origin()),
+            kitchen_sink.traction_stats(origin),
             kitchen_sink.top_keyword(all),
             kitchen_sink.all_contributors(ver),
+            async {
+                Ok(kitchen_sink.downloads_per_month(origin).await?)
+            },
+            kitchen_sink.github_stargazers_and_watchers(origin),
         )?;
 
         let deps = kitchen_sink.all_dependencies_flattened(ver);
-        let has_docs_rs = kitchen_sink.has_docs_rs(ver.origin(), ver.short_name(), ver.version()).await;
+        let has_docs_rs = kitchen_sink.has_docs_rs(origin, ver.short_name(), ver.version()).await;
         let (all_owners, reasons) = kitchen_sink.crate_blocklist_reasons(all).await;
         // with multiple owners it's unclear who is the main owner in charge of the crate
         let (banned, hidden) = all_owners.then(|| reasons.into_iter().partition(|r| matches!(r, ABlockReason::Banned(_)))).unwrap_or_default();
@@ -167,8 +176,12 @@ impl<'a> CratePage<'a> {
         } else {
             None
         };
-        let has_reviews = !kitchen_sink.reviews_for_crate(ver.origin()).is_empty();
+        let has_reviews = !kitchen_sink.reviews_for_crate(origin).is_empty();
         let mut page = Self {
+            up_to_date_class_cache: HashMap::new(),
+            direct_dependencies: ver.direct_dependencies(),
+            downloads_per_month_cached,
+            github_stargazers_and_watchers,
             security_advisory_url,
             top_keyword,
             all_contributors,
@@ -202,6 +215,7 @@ impl<'a> CratePage<'a> {
 
         let total = lang_stats.langs.iter().filter(|(lang, _)| lang.is_code()).map(|(_, lines)| lines.code).sum::<u32>();
         page.lang_stats = Some((total as usize, lang_stats));
+        page.up_to_date_class_prefetch().await;
         Ok(page)
     }
 
@@ -333,11 +347,6 @@ impl<'a> CratePage<'a> {
         }
     }
 
-    fn block<O>(&self, f: impl Future<Output = O>) -> O {
-        let _g = self.handle.enter();
-        futures::executor::block_on(f)
-    }
-
     pub(crate) fn all_contributors(&self) -> Contributors<'_> {
         let (ref authors, ref owners, contributors) = self.all_contributors;
         let co_owned = authors.iter().any(|a| a.owner);
@@ -448,28 +457,41 @@ impl<'a> CratePage<'a> {
         }
     }
 
-    pub fn direct_dependencies(&self) -> Option<(Vec<RichDep>, Vec<RichDep>, Vec<RichDep>)> {
-        Some(self.ver.direct_dependencies())
+    pub fn direct_dependencies(&self) -> Option<(&[RichDep], &[RichDep], &[RichDep])> {
+        Some((
+            &self.direct_dependencies.0,
+            &self.direct_dependencies.1,
+            &self.direct_dependencies.2,
+        ))
     }
 
     pub fn up_to_date_class(&self, richdep: &RichDep) -> &str {
         if richdep.dep.req() == "*" || !richdep.dep.is_crates_io() {
             return "common";
         }
-        self.block(async {
+        let key = format!("{}={}", richdep.package, richdep.dep.req());
+        self.up_to_date_class_cache.get(&key).copied().unwrap_or("obsolete")
+    }
+
+    async fn up_to_date_class_prefetch(&mut self) {
+        for richdep in self.direct_dependencies.0.iter().chain(&self.direct_dependencies.1).chain(&self.direct_dependencies.2) {
+            if richdep.dep.req() == "*" || !richdep.dep.is_crates_io() {
+                continue;
+            }
+            let key = format!("{}={}", richdep.package, richdep.dep.req());
             if let Ok(req) = richdep.dep.req().parse() {
                 let origin = Origin::from_crates_io_name(&richdep.package);
                 if let Ok(Some(pop)) = self.kitchen_sink.version_popularity(&origin, &req).await {
-                    return match pop.pop {
+                    let res = match pop.pop {
                         x if x >= 0.75 && !pop.lost_popularity && !pop.deprecated => "common", // hide the version completely
                         _ if pop.matches_latest && !pop.lost_popularity && !pop.deprecated => "verynew", // display version in black
                         x if x >= 0.33 => "outdated", // orange
                         _ => "obsolete", // red
                     };
+                    self.up_to_date_class_cache.insert(key, res);
                 }
             }
-            "obsolete"
-        })
+        }
     }
 
     /// The rule is - last displayed digit may change (except 0.x)
@@ -753,11 +775,11 @@ impl<'a> CratePage<'a> {
     }
 
     pub fn downloads_per_month(&self) -> Option<usize> {
-        self.block(self.kitchen_sink.downloads_per_month(self.all.origin())).ok().and_then(|x| x)
+        self.downloads_per_month_cached
     }
 
     pub fn github_stargazers_and_watchers(&self) -> Option<(u32, u32)> {
-        self.block(self.kitchen_sink.github_stargazers_and_watchers(self.all.origin())).ok().and_then(|x| x)
+        self.github_stargazers_and_watchers
     }
 
     pub fn related_crates(&self) -> Option<&[Origin]> {
